@@ -1,0 +1,236 @@
+{
+  "accepted_at_sha": null,
+  "accepted_on": null,
+  "author": "Alfio Caprino",
+  "conflicts": [],
+  "created_from_task": "simplify-muro-factory-router",
+  "entities": [
+    {
+      "entity_type": "PERSON",
+      "evidence": [
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 163,
+          "excerpt": "author: Alfio Caprino",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 142
+        }
+      ],
+      "id": "ENT-001",
+      "name": "Alfio Caprino",
+      "status": "extracted"
+    },
+    {
+      "entity_type": "PERSON",
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 12403,
+          "excerpt": "marketplaces/mattpocock@4ae2317d",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 12371
+        }
+      ],
+      "id": "ENT-002",
+      "name": "Matt Pocock",
+      "status": "extracted"
+    }
+  ],
+  "frd_id": "FRD-0001",
+  "last_verified_sha": null,
+  "proposed_at_sha": "fcfefea846fca0286cb278a5ca003f14a6a053e5",
+  "proposed_on": "2026-11-08",
+  "relationships": [
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 12403,
+          "excerpt": "marketplaces/mattpocock@4ae2317d",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 12371
+        }
+      ],
+      "id": "REL-001",
+      "source": "ENT-001",
+      "status": "extracted",
+      "target": "ENT-002",
+      "type": "CURATES_UPSTREAM_SOURCE_FROM"
+    }
+  ],
+  "requirements": [
+    {
+      "evidence": [
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 1436,
+          "excerpt": "The user must never have to remember a skill name, install a plugin by hand,\n  or know which skill pairs with which.",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 1320
+        },
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 5661,
+          "excerpt": "- **INV-003**: The product exposes at most one user-facing command.",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 5594
+        }
+      ],
+      "id": "REQ-001",
+      "status": "extracted",
+      "text": "The user never has to remember a skill name, install a plugin by hand, or know which skill pairs with which; the product exposes at most one configurable user-facing command (/<command>)."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 1543,
+          "excerpt": "The result must run identically on Claude Code, Codex, Pi, OpenCode and\n  Hermes from the first release.",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 1439
+        },
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 5467,
+          "excerpt": "- **INV-001**: The core (components, maps, protocols) contains nothing that\n  depends on one host's hooks or mechanisms; host specifics live only in\n  adapters.",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 5307
+        }
+      ],
+      "id": "REQ-002",
+      "status": "extracted",
+      "text": "The generated coordinator plugin runs across Claude Code, Codex, Pi, OpenCode, and Hermes from a host-neutral core, isolating host specifics inside thin adapters."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 4786,
+          "excerpt": "**Configurable collector identity:** `sources.json` defines `plugin.slug` (default `\"muro\"`), `plugin.name` (default `\"Muro\"`), `plugin.command` (default `\"muro\"`), and `plugin.version` (default `\"0.1.0\"`). `muro_build.py` parameterizes the output directory (`dist/<slug>/`), host manifests (`.claude-plugin/plugin.json`, root `SKILL.md`), the single slash command (`/<command>`), and the consumer project's work-map path (`.<slug>/map.md`).",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 4345
+        }
+      ],
+      "id": "REQ-003",
+      "status": "extracted",
+      "text": "sources.json defines the target collector plugin identity (plugin.slug, plugin.name, plugin.command, plugin.version) and parameterizes dist/<slug>/, /<command>, and .<slug>/map.md."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 11372,
+          "excerpt": "- **INV-005**: `muro_build.py` fails closed if `plugin.slug` or `plugin.command` is empty, non-kebab-case, or matches a reserved host command (`help`, `clear`, `compact`, `init`, `review`, `plan`, `model`, `config`, `status`, `mcp`, `agent`, `login`, `logout`, `doctor`, `bug`), if any two capabilities share an `id`, or if `after` contains a cycle.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 11023
+        }
+      ],
+      "id": "REQ-004",
+      "status": "extracted",
+      "text": "muro_build.py prevents naming collisions across three levels: stripping upstream public commands, enforcing unique capability IDs and per-source script namespaces (scripts/<source-id>/), and rejecting reserved native host commands or colliding installed plugins."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 6101,
+          "excerpt": "- **INV-006**: Every source on the list is under an explicit `MIT` or\n  `Apache-2.0` license verified against its pinned Git repository before intake",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 5952
+        },
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 11631,
+          "excerpt": "- **INV-006**: `muro_build.py --check-sources` fails closed if any source in `sources.json` lacks a 40-character Git commit SHA, lacks a root `LICENSE` matching `MIT` or `Apache-2.0`, or includes any path matching `excluded_paths` or binary media extensions.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 11373
+        }
+      ],
+      "id": "REQ-005",
+      "status": "extracted",
+      "text": "muro_build.py --check-sources verifies before intake that every source in sources.json has an immutable 40-character Git commit SHA and a root LICENSE matching MIT or Apache-2.0, excluding binary media and external asset downloaders and refusing unpinned local directories without LICENSE."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 3668,
+          "excerpt": "`prompts/intake.md`: transforms each approved source's `selected_paths` into 1–3 Markdown files under `capabilities/<id>.md`. Each file carries a 6-field YAML front matter (`id`, `role`, `when`, `after`, `outputs`, `checks`), actionable instructions, an optional `## Specifics` section, a `## Checks` section, and a `## Sources` provenance footer.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 3321
+        }
+      ],
+      "id": "REQ-006",
+      "status": "extracted",
+      "text": "prompts/intake.md converts each approved source into 1-3 Markdown capability files (capabilities/<id>.md) with a 6-field YAML front matter (id, role, when, after, outputs, checks) and a Sources provenance section."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 6100,
+          "excerpt": "1. **`merge` (Same `role`, compatible or conflicting rules -> Build-time Merge):** The Harmonizer merges overlapping rules for the same role into one canonical `capabilities/<id>.md`. `sources.json` list order resolves direct contradictions; non-conflicting specialized rules from lower-priority sources are preserved under `## Specifics` with explicit applicability conditions.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 5722
+        }
+      ],
+      "id": "REQ-007",
+      "status": "extracted",
+      "text": "When multiple sources share the same role with overlapping or conflicting rules (merge relation), the Harmonizer merges them at build-time into one canonical capability file, resolving direct conflicts by sources.json order and preserving non-conflicting rules under ## Specifics."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 10871,
+          "excerpt": "- **INV-002**: No single execution step ever loads two `capabilities/<id>.md` files sharing the same `role`.\n- **INV-003**: A `variant` capability whose `when` stack constraint conflicts with the target project is never selected by priority fallback.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 10621
+        }
+      ],
+      "id": "REQ-008",
+      "status": "extracted",
+      "text": "When multiple capabilities share the same role for mutually exclusive stacks (variant relation), ROUTER.md filters by when against the target project stack and constraints first, selecting at most one compatible survivor and never falling back to a forbidden or incompatible dependency."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 11022,
+          "excerpt": "- **INV-004**: Every prerequisite in `after` is executed first unless all of its declared `outputs` keys already exist in `.<slug>/map.md ## Outputs`.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 10872
+        }
+      ],
+      "id": "REQ-009",
+      "status": "extracted",
+      "text": "When capabilities represent complementary stages in the same area (after relation), the coordinator executes them sequentially, loading one capability file per step, passing decisions and artifact paths in .<slug>/map.md ## Outputs, and skipping any prerequisite whose outputs keys are already present."
+    },
+    {
+      "evidence": [
+        {
+          "document_sha256": "8b9727d301ff8a6740ea3bae743a5eb6c7a7da429a5d261b0e095f2504aeb4a3",
+          "end": 3965,
+          "excerpt": "- **EX-002** (boundary case): Input: a task small enough for one step\n  (\"rinomina questa funzione\") -> Expected: the map degenerates to one step and\n  the coordinator does it without ceremony.",
+          "path": "docs/adr/ADR-0001-factory-and-coordinator.md",
+          "start": 3772
+        },
+        {
+          "document_sha256": "a62ef93154ac2819948448f52177d2a954857e31159462a5f53d426f1f2c8d18",
+          "end": 7483,
+          "excerpt": "4. **No Runtime MoE (Static `## Checks` for Evaluation):** Parallel multi-agent synthesis is never used at runtime. Each capability defines a static `## Checks` list, and the final evaluation step verifies the checklists of the capabilities executed in the plan.",
+          "path": "docs/adr/ADR-0002-simplified-router-branding-and-license-gate.md",
+          "start": 7221
+        }
+      ],
+      "id": "REQ-010",
+      "status": "extracted",
+      "text": "One-step tasks execute directly without map ceremony, while multi-step tasks verify the static ## Checks lists of the executed capabilities and report results to the user at each step without spawning runtime MoE agents."
+    }
+  ],
+  "schema_version": 1,
+  "status": "Proposed",
+  "superseded_by": null,
+  "title": "Muro Simplified Factory, Branded Collector Manifest, and 4-Rule Contextual Router",
+  "version": 1
+}

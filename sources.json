@@ -1,0 +1,113 @@
+{
+  "plugin": {
+    "slug": "muro",
+    "name": "Muro",
+    "command": "muro",
+    "version": "0.1.0"
+  },
+  "sources": [
+    {
+      "id": "taste-skill",
+      "repo_url": "https://github.com/Leonxlnx/taste-skill.git",
+      "commit": "f6b76575f949707b4e3c37cd86cb44b0b98643e8",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Leonxlnx",
+      "selected_paths": [
+        "skills/taste-skill/SKILL.md",
+        "skills/taste-skill/references/system.md",
+        "skills/taste-skill/references/sections.md",
+        "skills/taste-skill/references/layout-v4.md",
+        "skills/taste-skill/references/motion.md",
+        "skills/taste-skill/references/copy.md",
+        "skills/taste-skill/library/type.json",
+        "skills/taste-skill/library/palettes.json",
+        "skills/taste-skill/assets/effects/fx.js",
+        "skills/taste-skill/scripts/start.mjs",
+        "skills/taste-skill/scripts/shoot.mjs"
+      ],
+      "excluded_paths": [
+        "skills/taste-skill/scripts/assets.mjs",
+        "skills/taste-skill/scripts/photos.mjs",
+        "skills/taste-skill/library/**/*.png",
+        "skills/taste-skill/assets/**/*.png",
+        "skills/taste-skill/examples/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Extract art direction, layout, typography, palette and anti-slop checks; do not download photos, fonts or other external assets."
+      }
+    },
+    {
+      "id": "motion-design",
+      "repo_url": "https://github.com/LottieFiles/motion-design-skill",
+      "commit": "f9a8a041b85185ee4881b3471d3415e939aac772",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 LottieFiles",
+      "selected_paths": [
+        "skills/motion-design/SKILL.md",
+        "skills/motion-design/director/**",
+        "skills/motion-design/patterns/**",
+        "skills/motion-design/reference/**"
+      ],
+      "excluded_paths": [
+        "assets/**",
+        "examples/**",
+        "scripts/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Extract motion principles, timing, easing, choreography and accessibility constraints; do not include unrelated GSAP library implementation."
+      }
+    },
+    {
+      "id": "gsap-scrolltrigger",
+      "repo_url": "https://github.com/greensock/gsap-skills",
+      "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 GreenSock",
+      "selected_paths": [
+        "skills/gsap-scrolltrigger/SKILL.md"
+      ],
+      "excluded_paths": [
+        "skills/gsap-scrolltrigger/scripts/**",
+        "skills/gsap-scrolltrigger/assets/**",
+        "skills/gsap-scrolltrigger/examples/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "gsap",
+          "version": "3",
+          "license": "GSAP Standard License (target project dependency, not bundled by Muro)",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Extract ScrollTrigger implementation and cleanup patterns, respecting reduced motion; do not instruct Muro to install GSAP or misstate its runtime license."
+      }
+    },
+    {
+      "id": "wayfinder",
+      "repo_url": "https://github.com/mattpocock/skills.git",
+      "commit": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Matt Pocock",
+      "selected_paths": [
+        "skills/engineering/wayfinder/SKILL.md",
+        "docs/engineering/wayfinder.md",
+        "skills/engineering/to-tickets/SKILL.md",
+        "skills/engineering/to-spec/SKILL.md"
+      ],
+      "excluded_paths": [
+        "skills/**/scripts/**",
+        "skills/**/agents/**",
+        "package-lock.json",
+        "package.json",
+        "examples/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Extract the local work-map protocol, decision handoffs and evaluation gates; extend it through build and review without remote trackers."
+      }
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 adr_id: ADR-0001
 version: 1
 title: Muro is a factory that compiles curated skills into one multi-host coordinator plugin
-status: Proposed
+status: Accepted
 author: Alfio Caprino
 scope:
   paths:
@@ -19,8 +19,8 @@ depends_on:
 created_from_task: brainstorm-muro
 proposed_on: 2026-11-03
 proposed_at_sha: null
-accepted_on: null
-accepted_at_sha: null
+accepted_on: 2026-11-09
+accepted_at_sha: fcfefea846fca0286cb278a5ca003f14a6a053e5
 last_verified_sha: null
 retired_on: null
 retired_reason: null
@@ -32,7 +32,7 @@ changes:
 # ADR-0001: Muro is a factory that compiles curated skills into one multi-host coordinator plugin
 
 <!-- adr-header:start -->
-Version 1 · Proposed 2026-11-03 by Alfio Caprino
+Version 1 · Accepted 2026-11-09 at fcfefea · proposed 2026-11-03 by Alfio Caprino
 <!-- adr-header:end -->
 
 ## Context and Problem Statement
@@ -131,10 +131,11 @@ The source list is curated by the user and grows one source at a time.
   documentation, adapters and a new release through the factory, never by hand.
 - **INV-005**: No long autonomous run without a report to the user: each map
   step states what was done, what is proposed and what is asked.
-- **INV-006**: Every source on the list is under a permissive open-source
-  license (MIT, Apache-2.0, BSD or equivalent); the intake records license
-  and copyright holder, the release carries the attributions, and a source
-  failing the gate is refused at intake.
+- **INV-006**: Every source on the list is under an explicit `MIT` or
+  `Apache-2.0` license verified against its pinned Git repository before intake
+  (never inferred by an LLM or from unpinned local folders without a `LICENSE`
+  file); the build script copies the license text, records copyright holders and
+  modification notices in `NOTICE.md`, and refuses any source failing the check.
 
 ## Consequences
 

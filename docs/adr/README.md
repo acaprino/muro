@@ -15,13 +15,14 @@ run `index`; do not edit this block by hand.
 
 | ADR | Title | Governs | Symbols | Accepted at |
 |---|---|---|---:|---|
-| none | | | | |
+| [ADR-0001](<ADR-0001-factory-and-coordinator.md>) | Muro is a factory that compiles curated skills into one multi-host coordinator plugin | `factory`, `intake`, `harmonization`, `coordinator`, `release`, `multi-host` | 0 | `fcfefea846fca0286cb278a5ca003f14a6a053e5` |
+| [ADR-0002](<ADR-0002-simplified-router-branding-and-license-gate.md>) | Simplified 2-prompt factory, branded collector manifest, and 4-rule contextual router | `sources.json`, `muro_build.py`, `prompts/**`, `capabilities/**`, `ROUTER.md`, `adapters/**`, `dist/**`, `factory`, `intake`, `harmonization`, `coordinator`, `release`, `multi-host`, `licensing` | 0 | `fcfefea846fca0286cb278a5ca003f14a6a053e5` |
 
 ## Proposed
 
 | ADR | Title | Governs | From task |
 |---|---|---|---|
-| [ADR-0001](<ADR-0001-factory-and-coordinator.md>) | Muro is a factory that compiles curated skills into one multi-host coordinator plugin | `factory`, `intake`, `harmonization`, `coordinator`, `release`, `multi-host` | `brainstorm-muro` |
+| none | | | |
 
 ## Superseded
 
