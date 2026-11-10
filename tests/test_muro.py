@@ -15,6 +15,7 @@ from muro import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def test_validate_plugin_identity_rejects_reserved_and_non_kebab():
@@ -55,13 +56,13 @@ def test_legacy_role_resolver_requires_host_ai_even_with_compatible_candidates(c
 
 def test_repository_capabilities_and_router_are_valid():
     from muro import parse_capability, validate_capabilities_and_router
-    cap_dir = ROOT / "capabilities"
-    router_path = ROOT / "ROUTER.md"
+    cap_dir = PACKAGE / "capabilities"
+    router_path = PACKAGE / "ROUTER.md"
     capabilities = []
     for f in sorted(cap_dir.glob("*.md")):
         capabilities.append(parse_capability(f))
     # Parse ROUTER.md
-    text = (ROOT / "ROUTER.md").read_text(encoding="utf-8")
+    text = (PACKAGE / "ROUTER.md").read_text(encoding="utf-8")
     router_rows = []
     for ln in text.splitlines():
         ln = ln.strip()

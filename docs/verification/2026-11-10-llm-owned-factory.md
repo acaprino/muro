@@ -99,3 +99,30 @@ LLM authorship. Portable launchers are exercised outside the source checkout;
 this is not a live native session in Claude Code, Codex, Pi, OpenCode or Hermes.
 No actual Office or Figma task, runtime dependency installation or hook activation
 is claimed. The host LLM must still perform intake and synthesis when used.
+
+## Superseded the same day
+
+Re-verification later on 2026-11-10, against the working tree as it then stood:
+
+- The GenOffice pin `8dc3bd16` above was replaced by the release pin `v0.12.852`
+  (`4b55db9ed1994575a695160ffc6cfd0bfc866211`). See
+  [the pin-mode record](2026-11-10-pin-modes-and-release-pins.md). Both releases
+  under `.muro/release-llm-factory-20261110*` still package `8dc3bd16` and no
+  longer match `sources.json`. No fresh build was made by this re-verification.
+- The suite grew after this record was written:
+  `python -m pytest -q --basetemp .muro/pytest-verify-20261110` returned
+  **197 passed in 106.90s**, with TEMP/TMP pointed to `.muro/tmp-verify-20261110`.
+  A first run with the temporary directory on a longer path outside the checkout
+  gave 21 failures and 54 errors, the inspected one being `git init` exit status
+  128 in the fixture setup; `git init` succeeded there when run on a shorter
+  path, and nothing failed with the project-local directory. The cause was not
+  isolated further.
+- `python muro_build.py --validate` and `python muro_build.py --check-sources`
+  passed; `git diff --check` passed with line-ending notices only.
+- The packaged launcher of `.muro/release-llm-factory-20261110-final/muro` was run
+  once from a directory outside the checkout, PYTHONPATH removed, with the
+  claude-code fixture only: `classification-required` without a decision, a
+  direct `office-files` step with it, no map state written. The other four host
+  fixtures were not re-run.
+- Not repeatable and not re-checked: the pre-change `DID NOT RAISE` failures, the
+  bounded LLM review and the recorded timings.

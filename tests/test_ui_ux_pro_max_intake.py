@@ -5,10 +5,11 @@ from pathlib import Path
 from muro import check_sources, parse_capabilities, parse_router
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def test_ui_ux_pro_max_manifest_is_mit_and_scoped():
-    manifest = json.loads((ROOT / "sources.json").read_text(encoding="utf-8"))
+    manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
     src = next(s for s in manifest["sources"] if s["id"] == "ui-ux-pro-max")
     assert src["commit"] == "a38d04c3d5c298c851dbe5e6ee1965ee3de42cb5"
     assert src["license"] == "MIT"
@@ -20,19 +21,21 @@ def test_ui_ux_pro_max_manifest_is_mit_and_scoped():
     assert src["intake"]["goal"]
 
 
-def test_visual_direction_contains_bounded_local_search():
-    caps = {cap.id: cap for cap in parse_capabilities(ROOT / "capabilities")}
-    visual = caps["visual-direction"]
-    assert "design_candidates" in visual.outputs
-    assert "stack_guidance" in visual.outputs
-    assert "scripts/ui-ux-pro-max/scripts/search.py" in visual.body
-    assert "--design-system" in visual.body
-    assert "never use `--force`" in visual.body
-    assert "ui-ux-pro-max" in visual.body
-    assert any(row.id == "visual-direction" for row in parse_router(ROOT / "ROUTER.md"))
+def test_design_guidance_contains_bounded_local_search():
+    caps = {cap.id: cap for cap in parse_capabilities(PACKAGE / "capabilities")}
+    guidance = caps["design-guidance"]
+    assert guidance.outputs == ["design_candidates", "stack_guidance"]
+    assert "<package_root>/scripts/ui-ux-pro-max/scripts/search.py" in guidance.body
+    assert "--design-system" in guidance.body
+    assert "`--force` needs the user's explicit authorization" in guidance.body
+    assert "ui-ux-pro-max" in guidance.body
+    assert any(row.id == "design-guidance" for row in parse_router(PACKAGE / "ROUTER.md"))
+    # Split from visual-direction on 2026-11-10: a website build no longer runs the search.
+    assert "search.py" not in caps["visual-direction"].body
+    assert "design_candidates" not in caps["visual-direction"].outputs
 
 
 def test_live_ui_ux_pro_max_source_passes_license_gate():
-    manifest = json.loads((ROOT / "sources.json").read_text(encoding="utf-8"))
+    manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
     src = next(s for s in manifest["sources"] if s["id"] == "ui-ux-pro-max")
-    assert check_sources({"sources": [src]}, ROOT) == []
+    assert check_sources({"sources": [src]}, PACKAGE) == []

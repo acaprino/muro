@@ -23,7 +23,9 @@ def catalog_entries(rows: list[RouterRow], capabilities: dict[str, Capability]) 
              "intents": copy.deepcopy(capabilities[row.id].intents),
              "tools": copy.deepcopy(capabilities[row.id].tools),
              "hooks": copy.deepcopy(capabilities[row.id].hooks),
-             "conflicts": list(capabilities[row.id].conflicts)} for row in rows]
+             "conflicts": list(capabilities[row.id].conflicts),
+             "reads": list(capabilities[row.id].reads),
+             "needs": copy.deepcopy(capabilities[row.id].needs)} for row in rows]
 
 
 def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str) -> str:
@@ -52,11 +54,14 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
     if not isinstance(selections, list) or bool(selections) != (value["status"] == "selected"):
         raise ValueError("Only selected classifications require nonempty selections")
     seen = set()
+    order = [s.get("capability") for s in selections if isinstance(s, dict)]
     for selection in selections:
-        if (not isinstance(selection, dict) or set(selection) != {"capability", "intent", "reason"}
-                or any(not isinstance(v, str) or not v.strip() for v in selection.values())):
+        if (not isinstance(selection, dict) or set(selection) - {"needs"} != {"capability", "intent", "reason"}
+                or any(not isinstance(selection[k], str) or not selection[k].strip() for k in ("capability", "intent", "reason"))):
             raise ValueError("Each selection requires capability, intent and reason strings")
         identifier = selection["capability"]
+        if identifier in capabilities:
+            _validate_needs(selection, capabilities[identifier], order)
         if identifier not in capabilities:
             raise ValueError(f"Unknown capability in AI classification: {identifier}")
         if identifier in seen:
@@ -65,6 +70,30 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
         if selection["intent"] not in {i["id"] for i in capabilities[identifier].intents}:
             raise ValueError(f"Unknown intent for capability {identifier}: {selection['intent']}")
     return copy.deepcopy(value)
+
+
+def _validate_needs(selection: dict, capability: Capability, order: list) -> None:
+    """The AI judged every declared conditional prerequisite; Python only holds it to that judgment."""
+    identifier = capability.id
+    declared = [need["capability"] for need in capability.needs]
+    judged = selection.get("needs", [])
+    if not declared and "needs" in selection:
+        raise ValueError(f"Capability {identifier} declares no conditional prerequisite; remove needs")
+    if (not isinstance(judged, list) or any(
+            not isinstance(item, dict) or set(item) != {"requires", "applies", "reason"}
+            or not isinstance(item["requires"], str) or not isinstance(item["applies"], bool)
+            or not isinstance(item["reason"], str) or not item["reason"].strip() for item in judged)):
+        raise ValueError(f"Each needs judgment for {identifier} requires requires, boolean applies and a reason")
+    if sorted(item["requires"] for item in judged) != sorted(declared):
+        raise ValueError(f"Selection {identifier} must judge exactly its declared conditional prerequisites: {declared}")
+    for item in judged:
+        if not item["applies"]:
+            continue
+        required = item["requires"]
+        if required not in order:
+            raise ValueError(f"{identifier} needs {required} for this task (applies: true), but it is not selected")
+        if order.index(required) > order.index(identifier):
+            raise ValueError(f"{identifier} needs {required} first: select {required} before it")
 
 
 def resolve_selection(rows: list[RouterRow], selected: list[str], stack: set[str], outputs: set[str],

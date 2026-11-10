@@ -48,7 +48,7 @@ Preserve classifications through extraction; the Harmonizer will normalize overl
 
 Produce one Markdown capability per distinct functional responsibility. Let the
 source's meaning determine the number; do not impose a quota or merge distinct
-outcomes merely to shorten the catalog. Use these ten frontmatter fields:
+outcomes merely to shorten the catalog. Use these ten frontmatter fields (plus the optional `reads`, below):
 
 ```yaml
 ---
@@ -64,6 +64,17 @@ hooks: []
 conflicts: []
 ---
 ```
+
+`reads` is an optional eleventh field: the output keys of other capabilities this
+one uses when they are already recorded, e.g. `reads: ["palette", "typography"]`.
+It documents data flow only. It never adds a step, never blocks a capability
+whose inputs are absent, and is not a substitute for `after`.
+
+`needs` is an optional twelfth field for a prerequisite that holds only in some
+cases: `needs: [{"capability":"<id>","label":"<at most 5 words>","when":"<condition in plain language>","reason":"<why>"}]`.
+`label` summarizes the condition for the graph arrow in at most 5 words.
+Write `when` for another AI to judge against a real task and project; never as
+keywords. Use `after` only for a stage required every time.
 
 `intents` must be a nonempty JSON array of records with exactly `id`, `description`
 and `excludes`. Descriptions must explain meaning rather than list trigger words;
@@ -101,7 +112,9 @@ List what the capability needs at runtime and does not ship: packages,
 command-line tools, applications. For each one, record in the body how to check
 that it is present and the official way to install it (a package manager command
 or the official release source), taken from the source material. When the source
-gives no install method, say so instead of inventing a command.
+gives no install method, say so instead of inventing a command. The list is
+guidance, not a closed manifest: at runtime the host AI judges, case by case,
+what the task in front of it needs and installs what is missing.
 
 A capability installs a missing dependency when the task needs it; it does not
 stop the work to ask whether to install. Before installing it says in one line

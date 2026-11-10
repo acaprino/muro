@@ -44,8 +44,12 @@ outputs explicit. Python's output/conflict checks cannot detect undeclared effec
 `stack:css-only` expresses an explicit implementation constraint, not an empty
 package.json. If needed, inspect the project and rerun `plan` with factual
 `--stack` tokens before authoring the classification. Never invent a stack token
-merely to make a preferred capability pass validation. Tool availability (for
-example Figma MCP) must be checked before executing the capability.
+merely to make a preferred capability pass validation. `stack:gsap` names GSAP as
+the scroll engine: already in the project, or adopted because the request names
+no other library and nothing rules a JavaScript library out; its step then
+installs GSAP when it is missing. Never pass it against a CSS-only constraint.
+Tool availability (for example Figma MCP) must be checked before executing the
+capability. What a task needs installed is judged at runtime, case by case.
 
 ## Return JSON
 
@@ -67,7 +71,18 @@ and `catalog_digest`. Add exactly `status`, `selections`, `reason`, `questions`:
 ```
 
 - `selected`: nonempty selections, one entry per capability, no questions.
-  Select complementary capabilities explicitly when both are requested.
+  Select complementary capabilities explicitly when both are requested, in
+  execution order: a capability that consumes another's outputs comes after it.
+  The catalog's `reads` lists the outputs each capability uses when recorded.
+  The coordinator keeps this order and adds only declared `after` prerequisites.
+  A catalog entry may declare `needs`: prerequisites that hold only when their
+  `when` condition is true. For every selected capability with `needs`, judge
+  each condition against this task and project and add to that selection
+  `"needs": [{"requires": "<capability id>", "applies": true|false, "reason": "<why, for this task>"}]`,
+  one entry per declared prerequisite. When `applies` is true, also select the
+  required capability, with its own intent and reason, before the dependent one.
+  Decide from meaning and context; an already recorded output can make a
+  condition false. Omit `needs` for capabilities that declare none.
 - `no_match`: empty selections/questions and a reason explaining the unsupported
   outcome. Do not select work-map just because nothing else fits.
 - `needs_clarification`: empty selections, nonempty targeted questions and a reason

@@ -1,0 +1,3 @@
+# Preserve official vendored bytes used by the release guide's SHA-256 pins.
+muro/vendor/cytoscape/cytoscape.min.js -text
+muro/vendor/cytoscape/LICENSE -text

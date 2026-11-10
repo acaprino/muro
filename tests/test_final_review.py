@@ -18,13 +18,14 @@ from test_regressions import git
 from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def runtime_package(tmp_path):
     root = tmp_path / "package"
     root.mkdir()
-    shutil.copytree(ROOT / "capabilities", root / "capabilities")
-    shutil.copy2(ROOT / "ROUTER.md", root / "ROUTER.md")
+    shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
+    shutil.copy2(PACKAGE / "ROUTER.md", root / "ROUTER.md")
     copy_prompts(root)
     return root
 
@@ -34,12 +35,12 @@ def test_new_task_does_not_reuse_old_outputs_and_archives_previous_map(tmp_path)
     project = tmp_path / "consumer"
     coordinator = Coordinator(package, project)
     old = "Build a landing page with scroll animation"
-    old_route = decision(coordinator, old, ["gsap-scrolltrigger"], {"stack:gsap"})
+    old_route = decision(coordinator, old, ["visual-direction", "motion-principles", "gsap-scrolltrigger"], {"stack:gsap"})
     coordinator._write_state({"schema_version": 2, "map_id": "previous-map", "classification": old_route, "task": old, "plan": ["visual-direction", "motion-principles", "gsap-scrolltrigger"],
                               "stack_tokens": ["stack:gsap"], "outputs": {"palette": "old", "motion-spec": "old"},
                               "results": []})
     new_task = "Create another landing page with scroll animation"
-    result = proposed(coordinator, new_task, ["gsap-scrolltrigger"], {"stack:gsap"})
+    result = proposed(coordinator, new_task, ["visual-direction", "motion-principles", "gsap-scrolltrigger"], {"stack:gsap"})
     assert result["plan"] == ["visual-direction", "motion-principles", "gsap-scrolltrigger"]
     coordinator.confirm(new_task, result["plan"], {"stack:gsap"})
     assert coordinator._state()["task"] == new_task

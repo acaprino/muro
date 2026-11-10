@@ -14,6 +14,7 @@ from muro.runtime import Coordinator
 from routing_helpers import decision
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 EXPLAIN = {
     "interactive-explainer": ("explainer-authoring", ["explainer.source-walkthrough", "explainer.topic-research",
                                                      "explainer.codebase-walkthrough"]),
@@ -27,8 +28,8 @@ def coordinator(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     for directory in ("capabilities", "prompts"):
-        shutil.copytree(ROOT / directory, package / directory)
-    shutil.copy2(ROOT / "ROUTER.md", package / "ROUTER.md")
+        shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
+    shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
     return Coordinator(package, tmp_path / "consumer")
 
 
@@ -42,7 +43,7 @@ def route(coordinator, task, pairs, stack=None):
 
 
 def test_manifest_pins_the_three_skills_and_leaves_host_files_out():
-    manifest = json.loads((ROOT / "sources.json").read_text(encoding="utf-8"))
+    manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
     src = next(s for s in manifest["sources"] if s["id"] == "explain-this")
     assert src["repo_url"] == "https://github.com/analyticalmonk/explain-this"
     assert src["commit"] == "f64dab456ca23a351fe4d932c4e73bc91d3f2c52"
@@ -56,8 +57,8 @@ def test_manifest_pins_the_three_skills_and_leaves_host_files_out():
 
 
 def test_explainer_capabilities_match_the_router_and_stay_passive():
-    caps = {cap.id: cap for cap in parse_capabilities(ROOT / "capabilities")}
-    router = {row.id: row for row in parse_router(ROOT / "ROUTER.md")}
+    caps = {cap.id: cap for cap in parse_capabilities(PACKAGE / "capabilities")}
+    router = {row.id: row for row in parse_router(PACKAGE / "ROUTER.md")}
     for name, (role, intents) in EXPLAIN.items():
         cap = caps[name]
         assert cap.role == role and router[name].role == role
@@ -72,7 +73,7 @@ def test_explainer_capabilities_match_the_router_and_stay_passive():
 
 
 def test_bodies_hand_outputs_over_and_point_helpers_at_the_package():
-    caps = {cap.id: cap for cap in parse_capabilities(ROOT / "capabilities")}
+    caps = {cap.id: cap for cap in parse_capabilities(PACKAGE / "capabilities")}
     for name in EXPLAIN:
         instructions, _, provenance = caps[name].body.partition("## Sources")
         assert "## Output handoff" in instructions and "Do not edit" in instructions, name
@@ -88,7 +89,7 @@ def test_bodies_hand_outputs_over_and_point_helpers_at_the_package():
 
 
 def test_explainer_outputs_have_one_owner_across_the_catalog():
-    caps = parse_capabilities(ROOT / "capabilities")
+    caps = parse_capabilities(PACKAGE / "capabilities")
     own = [key for cap in caps if cap.id in EXPLAIN for key in cap.outputs]
     assert len(set(own)) == len(own)
     assert not set(own) & {key for cap in caps if cap.id not in EXPLAIN for key in cap.outputs}

@@ -1,0 +1,9 @@
+{
+  "name": "Cytoscape.js",
+  "version": "3.34.4",
+  "license": "MIT",
+  "release": "https://github.com/cytoscape/cytoscape.js/releases/tag/v3.34.4",
+  "source": "https://raw.githubusercontent.com/cytoscape/cytoscape.js/v3.34.4/dist/cytoscape.min.js",
+  "sha256": "081591ab735b2b6a3b31a3c60f8f3a3e2fee8c92939e0c7820ad1208571b6cd8",
+  "license_sha256": "eb319c6e6f233607f71e8e2f450391751883cfc0eeb3ca7ef574c13d1d9c2203"
+}

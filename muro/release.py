@@ -7,7 +7,8 @@ import shutil
 
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
-from .factory import copy_source_helpers
+from .factory import copy_source_helpers, prompts_dir, runtime_source
+from .guide import write_release_guide
 from .sources import copyright_notices, inspect_source, parse_capabilities
 
 
@@ -29,7 +30,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     if errors:
         raise ValueError("Invalid router: " + "; ".join(errors))
     for prompt in ("intake.md", "harmonizer.md", "classify.md"):
-        path = project_root / "prompts" / prompt
+        path = prompts_dir(project_root) / prompt
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
             raise ValueError(f"Required AI prompt missing or empty: {path}")
     for src in sources:
@@ -50,9 +51,9 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     try:
         shutil.copy2(project_root / "ROUTER.md", dist / "ROUTER.md")
         shutil.copytree(project_root / "capabilities", dist / "capabilities")
-        if (project_root / "prompts").is_dir():
-            shutil.copytree(project_root / "prompts", dist / "prompts")
+        shutil.copytree(prompts_dir(project_root), dist / "prompts")
         (dist / "sources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        shutil.copy2(project_root / "guide-examples.json", dist / "guide-examples.json")
         for src in sources:
             copy_source_helpers(src, project_root, dist)
 
@@ -82,7 +83,8 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
         if runtime_deps:
             lines += ["Runtime Dependencies (Not Bundled):", *runtime_deps, ""]
         (dist / "NOTICE.md").write_text("\n".join(lines), encoding="utf-8")
-        write_adapters(dist, plugin, project_root / "muro")
+        write_release_guide(dist, plugin, sources)
+        write_adapters(dist, plugin, runtime_source(project_root))
         dist.replace(target)
         completed = True
         return target

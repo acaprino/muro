@@ -15,6 +15,7 @@ from muro import check_sources
 from test_regressions import MIT
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 @pytest.fixture
@@ -119,7 +120,7 @@ def test_every_source_must_declare_its_pin_mode(repo, fields):
 
 
 def test_manifest_declares_a_mode_for_every_source():
-    sources = json.loads((ROOT / "sources.json").read_text(encoding="utf-8"))["sources"]
+    sources = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))["sources"]
     modes = {src["id"]: (src.get("pin"), src.get("release")) for src in sources}
     assert modes == {
         "taste-skill": ("release", "v2.5.1"),

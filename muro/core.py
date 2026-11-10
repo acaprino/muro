@@ -45,6 +45,11 @@ class Capability:
     tools: list[dict[str, Any]] = field(default_factory=list)
     hooks: list[dict[str, Any]] = field(default_factory=list)
     conflicts: list[str] = field(default_factory=list)
+    # Output keys of other capabilities this one uses when they are recorded (optional data flow).
+    reads: list[str] = field(default_factory=list)
+    # Conditional prerequisites: {capability, label, when, reason}. The host AI judges `when` per task;
+    # `label` is its AI-written summary for graph arrows, at most 5 words.
+    needs: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def after_str(self) -> str:
@@ -236,7 +241,15 @@ def parse_capability(path: Path) -> Capability:
     for key in ("id", "role", "when"):
         if not isinstance(front[key], str) or not front[key].strip():
             raise ValueError(f"{path}: {key} must be a nonempty string")
-    for key in ("after", "outputs", "checks", "conflicts"):
+    front.setdefault("reads", [])  # optional eleventh field
+    front.setdefault("needs", [])  # optional twelfth field: AI-judged conditional prerequisites
+    for need in front["needs"] if isinstance(front["needs"], list) else [None]:
+        if (not isinstance(need, dict) or set(need) != {"capability", "label", "when", "reason"}
+                or any(not isinstance(v, str) or not v.strip() for v in need.values())):
+            raise ValueError(f"{path}: each needs entry requires nonempty capability, label, when and reason strings")
+        if len(need["label"].split()) > 5:
+            raise ValueError(f"{path}: needs label must be at most 5 words: {need['label']}")
+    for key in ("after", "outputs", "checks", "conflicts", "reads"):
         if not isinstance(front[key], list) or any(not isinstance(x, str) or not x for x in front[key]):
             raise ValueError(f"{path}: {key} must be a list of nonempty strings")
 
@@ -285,6 +298,8 @@ def parse_capability(path: Path) -> Capability:
         tools=front["tools"],
         hooks=front["hooks"],
         conflicts=front["conflicts"],
+        reads=[key.strip() for key in front["reads"]],
+        needs=front["needs"],
     )
 
 
@@ -385,7 +400,7 @@ def validate_capabilities_and_router(
         seen.add(r.id)
 
     # Cycle detection in `after`
-    graph: dict[str, list[str]] = {c.id: c.after for c in capabilities}
+    graph: dict[str, list[str]] = {c.id: c.after + [n["capability"] for n in c.needs] for c in capabilities}
     by_id = {c.id: c for c in capabilities}
     for c in capabilities:
         for conflict in c.conflicts:
@@ -394,6 +409,24 @@ def validate_capabilities_and_router(
         for dep in c.after:
             if dep not in graph:
                 errors.append(f"Capability {c.id}: missing prerequisite {dep}")
+        required = [need["capability"] for need in c.needs]
+        if len(set(required)) != len(required):
+            errors.append(f"Capability {c.id}: duplicate needs entry")
+        for target in required:
+            other = by_id.get(target)
+            if other is None or target == c.id:
+                errors.append(f"Capability {c.id}: needs unknown capability {target}")
+            elif target in c.after:
+                errors.append(f"Capability {c.id}: {target} is already an unconditional prerequisite (after)")
+            elif other.role == c.role or target in c.conflicts or c.id in other.conflicts:
+                errors.append(f"Capability {c.id}: needs {target}, which is an alternative or a conflict")
+        if len(set(c.reads)) != len(c.reads):
+            errors.append(f"Capability {c.id}: duplicate reads entry")
+        for key in c.reads:
+            if key in c.outputs:
+                errors.append(f"Capability {c.id}: reads its own output {key}")
+            elif not any(key in other.outputs for other in capabilities if other.id != c.id):
+                errors.append(f"Capability {c.id}: reads {key}, which no other capability produces")
     for r in router_rows:
         cap = by_id.get(r.id)
         if cap and (r.role != cap.role or r.when != cap.when or r.after_list() != cap.after or r.outputs_list() != cap.outputs
@@ -422,7 +455,7 @@ def validate_capabilities_and_router(
         if n not in visited:
             cycle = has_cycle(n, visited, set(), [])
             if cycle:
-                errors.append(f"Cycle detected in 'after' dependencies: {' -> '.join(cycle)}")
+                errors.append(f"Cycle detected in 'after'/'needs' dependencies: {' -> '.join(cycle)}")
                 break
 
     return errors

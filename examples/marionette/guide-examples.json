@@ -1,0 +1,88 @@
+{
+  "examples": [
+    {
+      "title": "Landing con animazioni allo scroll",
+      "task": "Progetta una nuova landing page e definisci le animazioni allo scroll, poi implementale nel progetto che usa GSAP.",
+      "stack_tokens": [
+        "stack:gsap"
+      ],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "visual-direction",
+          "intent": "ui.landing-strategy",
+          "reason": "La nuova landing richiede offerta, struttura dei contenuti e direzione visiva coerenti."
+        },
+        {
+          "capability": "motion-principles",
+          "intent": "ui.motion-design",
+          "reason": "La richiesta lascia aperti comportamento e tempi: serve definire la specifica di movimento."
+        },
+        {
+          "capability": "gsap-scrolltrigger",
+          "intent": "ui.scroll-animation",
+          "reason": "Il progetto usa GSAP e viene richiesta l'implementazione delle animazioni allo scroll."
+        }
+      ],
+      "reason": "Prima la direzione della pagina, poi la specifica di movimento, infine il codice. È un percorso esemplare scelto dall'IA per questa richiesta, non un obbligo per ogni animazione.",
+      "questions": []
+    },
+    {
+      "title": "Landing nuova in Figma",
+      "task": "Disegna in Figma la landing page del nostro nuovo prodotto; non abbiamo ancora una struttura dei contenuti.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "visual-direction",
+          "intent": "ui.landing-strategy",
+          "reason": "Manca offerta e struttura della pagina: servono prima di disegnare le sezioni."
+        },
+        {
+          "capability": "figma-design",
+          "intent": "ui.figma-design",
+          "reason": "Il risultato richiesto è un design dentro il file Figma.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": true,
+              "reason": "È una landing nuova e non esiste un outline registrato né fornito dall'utente."
+            }
+          ]
+        }
+      ],
+      "reason": "Il prerequisito condizionato di Figma Design vale in questo caso: prima la strategia della landing, poi il design. Per un componente o una schermata app l'IA avrebbe risposto che non si applica.",
+      "questions": []
+    },
+    {
+      "title": "Convertire un documento in PDF",
+      "task": "Converti il documento Word esistente in PDF senza cambiarne il contenuto.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-files",
+          "intent": "office.format-conversion",
+          "reason": "Serve un'operazione sul file esistente; non la scrittura di un nuovo documento né una direzione visiva."
+        }
+      ],
+      "reason": "Un solo passo di conversione. La capability verifica lo strumento necessario e il file risultante.",
+      "questions": []
+    },
+    {
+      "title": "Spiegare un repository",
+      "task": "Crea una spiegazione HTML interattiva di un meccanismo di questo repository, con figure navigabili e riferimenti al codice reale.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interactive-explainer",
+          "intent": "explainer.codebase-walkthrough",
+          "reason": "Il risultato richiesto è una spiegazione interattiva basata sul codice, non una revisione o un refactoring."
+        }
+      ],
+      "reason": "Un'unica capability gestisce lettura, spiegazione, figure e verifica delle affermazioni nel proprio flusso. Non aggiunge una landing o uno strumento di animazione esterno.",
+      "questions": []
+    }
+  ]
+}

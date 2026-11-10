@@ -7,6 +7,20 @@ router. **AI classifies every absorbed skill/plugin and every runtime request.**
 Python validates the resulting data and coordinates execution; it never guesses
 intent from keywords. At runtime the coordinator loads **one capability at a time**.
 
+Muro is the factory only. A package (the list of sources and the unified catalog
+built from them) is a separate directory with `sources.json`, `capabilities/`,
+`ROUTER.md` and `guide-examples.json`. `examples/marionette/` is the example
+plugin: design, motion, Office and explainer skills unified as **Marionette**.
+Prompts and the shipped runtime come from the factory (ADR-0011).
+
+Capabilities relate in three declared ways. `after` is a prerequisite that holds
+every time. `needs` is a conditional prerequisite: the harmonizing AI writes the
+condition in plain language, the classifying AI judges it for each task, and
+Python only requires that judgment and holds the plan to it. `reads` names the
+outputs a capability uses when another one recorded them; it adds no step. The
+guide graph is draggable, always shows `after` and `needs`, and shows `reads`
+only for a chosen example path or intent (ADR-0012).
+
 ## AI ownership and decision graph
 
 The two factory prompts and the runtime prompt have distinct responsibilities:
@@ -16,7 +30,8 @@ The two factory prompts and the runtime prompt have distinct responsibilities:
    may contain several skills and support several intents.
 2. **Harmonizer AI** normalizes equivalent outcomes, merges overlapping roles,
    preserves specialized intents and writes `ROUTER.md`. Alternative implementations
-   share a role/outcome; complementary stages use `after` dependencies.
+   share a role/outcome; `after` declares only a stage that is required every time.
+   Stages that are useful but optional are selected by the host AI, in order.
 3. **Host AI at runtime** reasons about the user's request, project and constraints
    against that catalog and selects an appropriate path through the graph.
 4. **Python** checks the decision, orders prerequisites, handles confirmation and
@@ -32,14 +47,17 @@ role-based `resolve_plan` API now refuses selection and directs callers to the
 host-AI classification flow.
 
 Intent vocabulary is open: adding a new domain requires AI-authored catalog data,
-not Python keyword edits. The current catalog has visual direction, landing
-strategy, local design guidance, Figma design, motion design, scroll implementation
-and engineering coordination, plus Office work through GenOffice: new
+not Python keyword edits. The current catalog has website direction and build with
+landing strategy, local design guidance for any interface, Figma design, motion
+design, scroll implementation and engineering coordination, plus Office work through GenOffice: new
 presentations, new documents and workbooks, and reading, converting or editing
 existing files; and interactive HTML explainers from documents, topic research
 or a codebase, with a claim-by-claim fact-check. GSAP/CSS are alternative implementations of the same
 scroll outcome. A static hero does not imply motion; hover timing does not imply
-scroll implementation. Full descriptions and exclusions live in the capabilities.
+scroll implementation or a new page design. Since the 2026-11-10 re-harmonization
+no shipped capability has a mandatory prerequisite: each can start from existing
+work or a stated behavior and reads earlier outputs when they are recorded.
+Full descriptions and exclusions live in the capabilities.
 
 ### Catalog contract
 
@@ -78,13 +96,16 @@ sequential handoffs rather than layering competing skills on the same artifact.
 Requires Python 3.10+ and Git. Tests additionally require pytest.
 
 ```bash
-python muro_build.py --validate
-python muro_build.py --check-sources
-python muro_build.py --prepare-intake taste-skill
-python muro_build.py --harmonize
-python muro_build.py --build
+python muro_build.py --manifest examples/marionette/sources.json --validate
+python muro_build.py --manifest examples/marionette/sources.json --check-sources
+python muro_build.py --manifest examples/marionette/sources.json --prepare-intake taste-skill
+python muro_build.py --manifest examples/marionette/sources.json --harmonize
+python muro_build.py --manifest examples/marionette/sources.json --build
 python -m pytest -q
 ```
+
+`--manifest` names the package; its outputs (`dist/`, `.muro/factory/`) are
+written beside that manifest.
 
 `--prepare-intake` exports the selected source files and a source-specific
 `PROMPT.md` under `.muro/factory/intake/<source-id>/`, including the existing router
@@ -130,11 +151,50 @@ A newer release is adopted by a reviewed re-pin, never automatically.
 moved into `dist/<slug>/` only after all steps succeed. Existing `dist/` content
 may predate the current implementation and is not evidence of a verified build.
 
+## Illustrated release guide
+
+Every successful release includes **`GUIDE.html`** at its root and in each of the
+five standalone host skill folders. Open it in a browser: the file is self-contained,
+works offline and needs no server, installation or external fonts/scripts.
+
+The initial view contains only a responsive, navigable capability graph and a
+few controls to highlight example paths or intents. Clicking a node opens its
+brief intent descriptions and details; no panel opens automatically. Commands and the full
+catalog open on demand, including prerequisites, alternatives, conflicts,
+exclusions, constraints, outputs, tools, passive hooks, checks and instructions.
+
+Cytoscape.js draws and lays out the graph, with pan, zoom and touch gestures.
+The pinned MIT browser bundle is vendored in `muro/vendor/cytoscape/` and embedded
+with its license in the HTML. Opening or building a guide downloads nothing.
+Keyboard users can navigate nodes with Tab/Enter, pan with arrow keys, zoom with
+plus/minus and restore the viewport with Home or `Ripristina`.
+
+`guide-examples.json` supplies the documented scenarios and is required by every
+build. People or the host LLM author and review these examples with the catalog;
+the generator validates their explicit decisions and expands only declared
+prerequisites. Clicking an example illustrates its recorded path, without
+classifying a new request or executing work. The examples ship beside the guide
+at the package root and in each standalone skill folder.
+
+The build regenerates the guide from the validated catalog being packaged, with
+the plugin identity/version, generation time and catalog digest. The LLM-authored
+capabilities supply meaning and functional explanations; Python renders that
+evidence and declared relationships. Graph layout and intent highlighting never infer
+intent, create collaborations or choose a capability. A stack condition is a
+constraint, not an automatic trigger, and source order establishes no precedence.
+
+Do not edit a generated guide or reuse an older release's copy. Update the
+AI-authored catalog and rebuild to a fresh location. See
+[ADR-0010](docs/adr/ADR-0010-release-html-guide.md) and
+[the guide verification record](docs/verification/2026-11-10-release-html-guide.md)
+for the contract and recorded checks.
+
 ## Runtime and installation
 
 Every adapter contains a complete `skills/<slug>/` directory: `SKILL.md`,
 `muro.py`, the Python package, capabilities, router, prompts, source helpers and license
-notices. Install the complete skill folder, not just `SKILL.md`.
+notices, plus `GUIDE.html` and `guide-examples.json`. Install the complete skill
+folder, not just `SKILL.md`.
 
 - **Claude Code:** plugin layout with `.claude-plugin/plugin.json` and
   `skills/muro/SKILL.md`. The installed plugin skill is namespaced by the host;

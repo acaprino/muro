@@ -10,6 +10,7 @@ from muro.runtime import Coordinator
 from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 @pytest.fixture
@@ -17,8 +18,8 @@ def coordinator(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     for directory in ("capabilities", "prompts"):
-        shutil.copytree(ROOT / directory, package / directory)
-    shutil.copy2(ROOT / "ROUTER.md", package / "ROUTER.md")
+        shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
+    shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
     return Coordinator(package, tmp_path / "consumer")
 
 
@@ -43,7 +44,19 @@ def test_motion_spec_does_not_imply_scroll_implementation(coordinator):
     task = "Describe hover timing, no implementation"
     route = decision(coordinator, task, ["motion-principles"], {"stack:gsap"})
     result = coordinator.propose(task, {"stack:gsap"}, classification=route)
-    assert result["plan"] == ["visual-direction", "motion-principles"]
+    # Neither scroll code nor a website direction is added to a motion-only request.
+    assert result["mode"] == "direct"
+    assert result["capability"] == "motion-principles"
+
+
+def test_shipped_catalog_declares_no_forced_prerequisites(coordinator):
+    # Re-harmonization 2026-11-10: each consumer can start from existing work;
+    # the AI orders producer and consumer explicitly when both are needed.
+    assert all(not cap.after for cap in coordinator.capabilities.values())
+    task = "Design the landing page, then specify its scroll motion and build it"
+    ids = ["visual-direction", "motion-principles", "gsap-scrolltrigger"]
+    result = proposed(coordinator, task, ids, {"stack:gsap"})
+    assert result["plan"] == ids
 
 
 @pytest.mark.parametrize("status", ["no_match", "needs_clarification"])
@@ -90,8 +103,8 @@ def test_catalog_change_requires_reclassification(coordinator):
 
 
 def test_resume_retains_ai_selection_and_rejects_legacy_state(coordinator):
-    task = "Specify hover behavior"
-    route = decision(coordinator, task, ["motion-principles"])
+    task = "Design the page, then specify its hover behavior"
+    route = decision(coordinator, task, ["visual-direction", "motion-principles"])
     proposal = coordinator.propose(task, classification=route)
     coordinator.confirm(task, proposal["plan"])
     state = json.loads(coordinator.state_path.read_text(encoding="utf-8"))
@@ -137,11 +150,11 @@ def test_duplicate_role_selection_is_rejected_even_if_both_are_compatible(coordi
 
 def test_stack_constraints_on_implicit_prerequisites_are_enforced(coordinator):
     path = coordinator.package_root / "capabilities" / "figma-design.md"
-    path.write_text(path.read_text(encoding="utf-8").replace('after: ["visual-direction"]',
+    path.write_text(path.read_text(encoding="utf-8").replace('after: []',
                     'after: ["gsap-scrolltrigger"]'), encoding="utf-8")
     router = coordinator.package_root / "ROUTER.md"
     router.write_text(router.read_text(encoding="utf-8").replace(
-        "| figma-design | figma-design | — | visual-direction |",
+        "| figma-design | figma-design | — | — |",
         "| figma-design | figma-design | — | gsap-scrolltrigger |"), encoding="utf-8")
     current = Coordinator(coordinator.package_root, coordinator.project_root)
     with pytest.raises(ValueError, match="[Ii]ncompatible"):
@@ -164,7 +177,7 @@ def test_legacy_map_can_be_archived_without_interpreting_or_overwriting_it(coord
 
 def test_changed_classification_cannot_reuse_old_outputs(coordinator):
     task = "Improve the interface"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     coordinator.confirm(task, proposal["plan"])
     before = coordinator.state_path.read_bytes()
     with pytest.raises(ValueError, match="--new"):
@@ -280,8 +293,8 @@ def test_undeclared_native_hook_policy_is_rejected(tmp_path):
 
 
 def test_another_writer_cannot_overwrite_active_map_evidence(coordinator):
-    task = "Specify motion"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    task = "Design the page and specify its motion"
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     step = coordinator.confirm(task, proposal["plan"])
     before = coordinator.state_path.read_bytes()
     (coordinator.state_dir / ".write-lock").write_text("another process", encoding="utf-8")
@@ -302,11 +315,11 @@ def test_declared_conflict_cannot_be_hidden_by_completed_outputs(coordinator):
 @pytest.mark.parametrize("same_task", [False, True])
 def test_late_outputs_and_checks_cannot_contaminate_replacement_map(coordinator, same_task):
     task_a = "Original motion task"
-    proposal = proposed(coordinator, task_a, ["motion-principles"])
+    proposal = proposed(coordinator, task_a, ["visual-direction", "motion-principles"])
     old_step = coordinator.confirm(task_a, proposal["plan"])
     other = Coordinator(coordinator.package_root, coordinator.project_root)
     task_b = task_a if same_task else "Unrelated Figma task"
-    proposal = proposed(other, task_b, ["figma-design"], new=True)
+    proposal = proposed(other, task_b, ["visual-direction", "figma-design"], new=True)
     new_step = other.confirm(task_b, proposal["plan"])
     assert old_step["map_id"] != new_step["map_id"]
     before = other.state_path.read_bytes()
@@ -320,8 +333,8 @@ def test_late_outputs_and_checks_cannot_contaminate_replacement_map(coordinator,
 
 
 def test_evidence_requires_exact_active_step_binding(coordinator):
-    task = "Specify motion"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    task = "Design the page and specify its motion"
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     step = coordinator.confirm(task, proposal["plan"])
     outputs = {key: "fixture evidence" for key in step["required_outputs"]}
     with pytest.raises(ValueError, match="capability|step"):
@@ -354,8 +367,8 @@ def test_helper_commands_resolve_against_installed_package_not_consumer(coordina
 
 
 def test_check_must_belong_to_its_bound_capability(coordinator):
-    task = "Specify motion"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    task = "Design the page and specify its motion"
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     step = coordinator.confirm(task, proposal["plan"])
     before = coordinator.state_path.read_bytes()
     check = {"name": "palette_applied", "status": "pass", "evidence": "Fixture check"}
@@ -369,8 +382,8 @@ def test_check_must_belong_to_its_bound_capability(coordinator):
 
 
 def test_map_without_identity_is_not_silently_resumed(coordinator):
-    task = "Specify motion"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    task = "Design the page and specify its motion"
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     coordinator.confirm(task, proposal["plan"])
     state = json.loads(coordinator.state_path.read_text(encoding="utf-8"))
     del state["map_id"]
@@ -381,8 +394,8 @@ def test_map_without_identity_is_not_silently_resumed(coordinator):
 
 def test_cli_rejects_unbound_evidence_and_accepts_exact_binding(coordinator, tmp_path, capsys):
     from muro.runtime import runtime_main
-    task = "Specify motion"
-    proposal = proposed(coordinator, task, ["motion-principles"])
+    task = "Design the page and specify its motion"
+    proposal = proposed(coordinator, task, ["visual-direction", "motion-principles"])
     step = coordinator.confirm(task, proposal["plan"])
     outputs = tmp_path / "outputs.json"
     outputs.write_text(json.dumps({key: "fixture evidence" for key in step["required_outputs"]}), encoding="utf-8")

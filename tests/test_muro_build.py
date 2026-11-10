@@ -13,6 +13,7 @@ from muro_build import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def test_validate_plugin_identity_rejects_reserved_and_non_kebab():
@@ -53,7 +54,7 @@ def test_legacy_build_export_rejects_role_and_intent_token_routing():
 
 
 def test_repository_capabilities_and_router_are_valid():
-    errors = validate_capabilities_and_router(ROOT / "capabilities", ROOT / "ROUTER.md")
+    errors = validate_capabilities_and_router(PACKAGE / "capabilities", PACKAGE / "ROUTER.md")
     assert errors == []
 
 

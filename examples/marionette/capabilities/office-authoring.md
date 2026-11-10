@@ -22,7 +22,7 @@ Creates a new Word document, Excel workbook or PDF as a real file with the local
 3. **Create.**
    - Document: `genoffice create --type docx --from <text.md|fragment.html> --out <path> --json`. Local images referenced by relative path are embedded.
    - Workbook: `genoffice create --type xlsx --from <data.csv|table.json> [--header] [--decimal ,] --out <path> --json`. `--header` freezes row 1 and filters the range.
-   - PDF: `genoffice create --type pdf --from <md|html|docx|xlsx|pptx> --out <path> --json`.
+   - PDF: `genoffice create --type pdf --from <md|html, or the docx|xlsx made in this step> --out <path> --json`. A PDF of a file the user already has is a format conversion (`office-files`).
 4. **Refine with ops when needed.** Read `genoffice guide docs` or `genoffice guide sheets` (`guide <domain> <op> --json` for one schema) before writing ops; then `genoffice docs apply` or `genoffice sheet apply <file> --ops <file>` for styles, headers and footers, formats, charts, tables and validation. Use `--dry-run` for a large batch; a rejected batch wrote nothing, so fix the op and resend all of it.
 5. **Check.** `genoffice docs check <docx> --json` or `genoffice sheet check <xlsx> --json`. Findings are in `detail.issues[]` even when the exit code is 0; apply the `suggest` ops they carry.
 6. **Look.** `genoffice render <file> --out <dir> --json` and look at the images: page 1 and the last page of a document, each sheet of a workbook.
@@ -56,3 +56,4 @@ Return `office_file` (every path written) and `office_review` (check findings, w
 - Runtime dependency: the GenOffice app and its `genoffice` command line (Apache-2.0), not bundled by Muro; the capability installs it from the official releases when it is missing.
 - Hooks: the selected SKILL.md defines none. The rest of the repository was not inspected for hooks.
 - Harmonized by: prompts/harmonizer.md — document and workbook creation share one role because they share the create → check → render flow; deck creation is a separate role with its own pipeline.
+- Re-harmonization 2026-11-10: `create --type pdf` accepts any md/html/docx/xlsx/pptx file (`SKILL.md` Commands), but the source's command choice sends "Change the file format" to `convert` (`SKILL.md` "Which command"). A PDF of an existing file is therefore left to `office-files` (office.format-conversion), so the two capabilities never both claim it; this step prints only content it wrote.

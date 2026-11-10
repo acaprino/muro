@@ -30,6 +30,9 @@ description: {name} AI-routed coordinator for the capabilities in its catalog. C
 
 # {name} coordinator
 
+The offline `GUIDE.html` beside this file explains this release's decision graph,
+commands, intents and handoffs. It is documentation, not an activation mechanism.
+
 1. Read the user's task and relevant project context. Run:
    `python {launcher} plan --task "<user task>" --project "<current project>"`.
 2. The result is `classification-required`: follow its `instructions` from
@@ -99,12 +102,15 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path) -> None:
         shutil.copytree(dist / "LICENSES", skill_dir / "LICENSES")
         shutil.copy2(dist / "NOTICE.md", skill_dir / "NOTICE.md")
         shutil.copy2(dist / "sources.json", skill_dir / "sources.json")
+        shutil.copy2(dist / "GUIDE.html", skill_dir / "GUIDE.html")
+        shutil.copy2(dist / "guide-examples.json", skill_dir / "guide-examples.json")
         if (dist / "scripts").is_dir():
             shutil.copytree(dist / "scripts", skill_dir / "scripts")
         (root / "INSTALL.md").write_text(
             f"# {plugin['name']} on {host}\n\n"
             f"Install the complete folder `skills/{plugin['command']}` as one skill; do not copy only SKILL.md. "
-            "It includes its runtime, capabilities and license notices. "
+            "It includes its runtime, capabilities, license notices and offline `GUIDE.html`. "
+            f"Open `skills/{plugin['command']}/GUIDE.html` for this release's illustrated decision graph and commands. "
             "The universal fallback is `python muro.py` inside that folder. "
             "See README.md in the source project for current verification limits.\n",
             encoding="utf-8")

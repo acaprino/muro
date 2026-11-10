@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mappa navigabile degli intenti e delle capability della release.">
+  <link rel="icon" href="data:,">
+  <title>Mappa della release</title>
+  <style>
+    :root{color-scheme:light;--paper:#f5f7fb;--white:#fff;--ink:#172d45;--muted:#607186;--blue:#2b53bd;--pale:#edf2ff;--line:#d6dfeb;--green:#237564;--red:#a43c4c;--font:"Segoe UI",system-ui,-apple-system,sans-serif}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.55 var(--font)}button,input,select{font:inherit}button{cursor:pointer}a{color:var(--blue);text-underline-offset:3px}button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--blue);outline-offset:4px}h1,h2,h3,h4,p{margin:0}h1,h2,h3,h4{line-height:1.25}code,pre{font-family:Consolas,"Cascadia Code",monospace}code{font-size:.85em;overflow-wrap:anywhere}pre{font-size:11px;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere;padding:13px;background:#edf2f8;border-radius:6px;overflow:auto;max-height:440px}ul,ol{padding-left:20px}li+li{margin-top:7px}[hidden]{display:none!important}.skip{position:absolute;left:15px;top:-80px;z-index:30;background:white;padding:10px}.skip:focus{top:10px}.toolbar{height:66px;padding:0 25px;display:flex;align-items:center;justify-content:space-between;gap:20px;background:white;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px;min-width:0}.brand h1{font:650 24px Bahnschrift,var(--font);letter-spacing:-.025em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.version{font-size:11px;color:var(--muted);white-space:nowrap}.controls{display:flex;gap:7px;align-items:center}.control{border:1px solid var(--line);border-radius:7px;background:white;color:var(--ink);padding:8px 13px;min-height:36px;font-size:13px}.control:hover,.control[aria-expanded="true"]{background:var(--pale);border-color:var(--blue);color:var(--blue)}.control.reset{border-color:transparent;color:var(--muted)}.menu-wrap{position:relative}.menu{position:absolute;right:0;top:calc(100% + 8px);z-index:12;width:310px;max-width:calc(100vw - 30px);padding:7px;background:white;border:1px solid var(--line);border-radius:9px;box-shadow:0 9px 30px #172d4514}.example-button{display:block;width:100%;border:0;background:white;text-align:left;color:var(--ink);padding:11px 12px;border-radius:5px;font-size:13px;line-height:1.4}.example-button:hover,.example-button[aria-pressed="true"]{background:var(--pale);color:var(--blue)}.menu-label{display:block;padding:7px 8px;font-size:11px;color:var(--muted)}.menu select{width:100%;padding:10px;border:1px solid var(--line);border-radius:5px;background:white;color:var(--ink);font-size:12px}.menu-empty{padding:11px 12px;font-size:12px;color:var(--muted)}.graph-scroll{height:calc(100vh - 99px);height:calc(100dvh - 99px);overflow:auto;overscroll-behavior:contain;position:relative;outline-offset:-5px!important}.graph-canvas{position:relative;width:100%;height:100%;touch-action:none}.node-access{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}.node-access:focus{clip-path:none;width:auto;height:auto;max-width:85%;margin:0;padding:10px 14px;left:14px;bottom:14px;background:white;border:1px solid var(--blue);border-radius:6px;color:var(--ink);z-index:5;white-space:normal}.graph-scroll{overflow:hidden}.graph-status{min-height:33px;display:flex;align-items:center;justify-content:center;padding:4px 20px;font-size:11px;color:var(--muted);border-top:1px solid var(--line);background:white;text-align:center}.drawer{position:fixed;z-index:20;right:18px;top:80px;bottom:47px;width:360px;max-width:calc(100vw - 36px);background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 50px #172d451c;display:flex;flex-direction:column;overflow:hidden}.drawer-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;padding:20px 18px 15px;border-bottom:1px solid var(--line)}.drawer-head h2{font-size:20px;overflow-wrap:anywhere}.close{border:0;background:var(--paper);color:var(--muted);border-radius:6px;width:30px;height:30px;flex:0 0 30px;font-size:22px;line-height:1}.close:hover{background:var(--pale);color:var(--blue)}.drawer-body{padding:17px 19px;overflow:auto;min-height:0}.drawer-body>p{font-size:13px;margin-bottom:14px}.drawer-body .intent-id{font-size:10px;color:var(--muted);margin-top:5px;margin-bottom:15px;overflow-wrap:anywhere}.drawer-body h3{font-size:14px;margin:19px 0 9px}.drawer-body h4{font-size:12px;margin:16px 0 7px}.drawer-body details{margin:13px 0;border:1px solid var(--line);border-radius:7px;padding:11px 12px}.drawer-body details>summary{cursor:pointer;font-size:12px;font-weight:600}.drawer-body details>p{font-size:12px;margin-top:11px}.drawer-body ul,.drawer-body ol{font-size:12px;margin-top:10px;margin-bottom:13px}.drawer-body .hint{font-size:11px;color:var(--muted)}.relation-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:13px}.relation-list button{padding:5px 8px;background:var(--paper);border:1px solid var(--line);border-radius:5px;color:var(--blue);font-size:11px;text-align:left;overflow-wrap:anywhere}.cap-body{overflow-wrap:anywhere}.cap-body h3{font-size:15px;margin:22px 0 9px}.cap-body h4{font-size:12px;margin:15px 0 7px}.cap-body p,.cap-body li{font-size:12px}.cap-body p+p{margin-top:8px}.cap-body pre{font-size:10px}.source-list{display:grid;gap:9px}.source-entry{padding:12px;border:1px solid var(--line);border-radius:6px;overflow-wrap:anywhere}.source-entry h3{font-size:13px;margin:0 0 7px}.source-entry p{font-size:11px;margin-top:6px;color:var(--muted)}.source-entry code{font-size:9px}.reference-data{padding:25px;max-width:1000px;margin:auto}.reference-data>h2{margin:20px 0 12px;font-size:22px}.reference-data .capability{margin:10px 0;padding:13px;border:1px solid var(--line);border-radius:7px;background:white}.reference-data .capability>summary{cursor:pointer;display:flex;gap:15px;align-items:center}.reference-data .cap-title{font-weight:650;flex:1}.reference-data .capability>summary>code{font-size:10px;color:var(--muted)}.reference-data .cap-body{padding-top:18px}.reference-data .catalog-notes{padding:13px;background:white;border:1px solid var(--line);border-radius:7px}.workflow-copy p{font-size:12px;margin:9px 0}.workflow-copy pre{font-size:10px}.no-script{padding:20px 25px;font-size:14px}.only-js{display:none}.has-js .controls{display:flex}.has-js .graph{display:block}.has-js .reference-data{display:none}
+    @media(max-width:640px){.toolbar{height:62px;padding:0 13px;gap:12px}.brand{gap:7px;flex-wrap:wrap;align-content:center}.brand h1{font-size:20px}.version{font-size:9px}.controls{gap:3px}.control{font-size:11px;padding:8px 9px;min-height:35px}.control.reset{padding-right:3px;padding-left:6px}.menu{position:fixed;top:69px;right:12px;width:calc(100vw - 24px);max-width:360px}.graph-scroll{height:calc(100vh - 95px);height:calc(100dvh - 95px)}.graph-node{min-height:58px;padding:8px 10px;border-radius:8px}.node-title{font-size:12px}.root-node{min-height:68px;border-radius:12px}.root-name{font-size:19px}.graph-status{font-size:10px;height:33px;padding:0 11px}.drawer{top:auto;right:0;bottom:0;left:0;width:100%;max-width:none;max-height:72vh;max-height:72dvh;border-radius:16px 16px 0 0;box-shadow:0 -10px 40px #172d4522}.drawer-head{padding:17px 18px 13px}.drawer-head h2{font-size:18px}.drawer-body{padding:15px 18px 22px;max-height:calc(72vh - 75px)}.reference-data{padding:15px}.reference-data .capability>summary{flex-wrap:wrap}.reference-data .capability>summary>code{width:100%}.step-badge{width:22px;height:22px;font-size:10px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+    @media print{body{background:white}.toolbar{height:auto;padding:15px 0;border:0}.only-js,.graph,.controls,.drawer,.skip{display:none!important}.has-js .reference-data,.reference-data{display:block;padding:0;max-width:none}.reference-data .capability{break-inside:avoid}.cap-body{display:block!important}pre{max-height:none;overflow:visible}.reference-data>h2{font-size:18pt}.source-list{grid-template-columns:1fr 1fr}.source-entry{break-inside:avoid}a{color:inherit}}
+  </style>
+</head>
+<body>
+  <a class="skip" href="#graph-region">Vai al grafo</a>
+  <header class="toolbar"><div class="brand"><h1>__MURO_TITLE__</h1><span class="version">__MURO_VERSION__</span></div><nav class="controls only-js" aria-label="Controlli del grafo"><div class="menu-wrap"><button class="control" id="paths-toggle" type="button" aria-expanded="false" aria-controls="paths-menu">Percorsi</button><div class="menu" id="paths-menu" hidden><div id="example-buttons"></div></div></div><div class="menu-wrap"><button class="control" id="intents-toggle" type="button" aria-expanded="false" aria-controls="intents-menu">Intenti</button><div class="menu" id="intents-menu" hidden><label class="menu-label" for="intent-select">Intento dichiarato nel catalogo</label><select id="intent-select"><option value="">Scegli un intento</option></select></div></div><button class="control reset" id="reset" type="button">Ripristina</button></nav></header>
+  <main>
+    <section class="graph only-js" id="graph-region" aria-label="Grafo navigabile delle capability"><div class="graph-scroll" id="graph-scroll" tabindex="0" aria-label="Grafo delle capability, scorrevole"><div class="graph-canvas" id="capability-map" tabindex="0" role="group" aria-label="Grafo interattivo. Trascina per spostare, scorri per zoomare. Con la tastiera usa le frecce, più e meno; Tab raggiunge i nodi."></div><div id="graph-access" aria-label="Nodi del grafo"></div></div><p class="graph-status" id="graph-status" role="status">Clicca un nodo per i dettagli.</p></section>
+    <noscript><p class="no-script">Il grafo navigabile richiede JavaScript. Il catalogo completo è disponibile qui sotto.</p></noscript>
+    <div class="reference-data" id="reference-data">
+      <h2>Come funziona il coordinatore</h2>
+      <div class="workflow-copy" id="workflow-data"><p>L’IA interpreta la richiesta e il contesto, confronta intenti ed esclusioni e seleziona le capability. Non usa parole chiave per scegliere una skill.</p><p>Le linee grigie collegano l’IA alle capability senza prerequisiti dichiarati: sono scelte disponibili, non passi da eseguire tutti. Le frecce blu indicano solo i prerequisiti <code>after</code>, validi sempre. Le frecce arancioni tratteggiate sono prerequisiti condizionati (<code>needs</code>): l’etichetta la riassume in poche parole; la condizione completa si legge cliccando la freccia o il nodo di arrivo, e la valuta l’IA per ogni richiesta; se vale, la capability di partenza entra nel piano prima dell’altra. Il flusso dei dati (<code>reads</code>) non è mostrato nella vista base, perché dipende dal lavoro scelto. Scegliendo un percorso compaiono frecce verdi piene dove chi produce viene prima di chi legge: lì i dati passano davvero. Scegliendo un intento compaiono frecce verdi tratteggiate: output che le capability di quell’intento possono usare o fornire, se l’altra capability è nel piano. Non obbligano a eseguire chi li produce. I tratti blu discontinui e i numeri mostrano un percorso illustrativo, senza introdurre nuovi prerequisiti.</p><p>Una capability lavora alla volta. Un solo responsabile per output; conflitti e varianti incompatibili vengono rifiutati. Un prerequisito si salta solo se tutti i suoi output sono già registrati.</p><details><summary>Esiti della decisione IA</summary><p><code>selected</code>: esegue il percorso validato. Un passo è diretto; più passi richiedono conferma se non già autorizzati.</p><p><code>needs_clarification</code>: pone la domanda necessaria e si ferma. <code>no_match</code>: segnala che il catalogo non copre il risultato e si ferma.</p><p><code>classification-required</code>: l’host deve produrre una decisione IA. Nessuna capability viene eseguita.</p></details><details><summary>Comandi</summary><pre><code>/__MURO_COMMAND__ &lt;risultato desiderato&gt;</code></pre><p>Quando l’host supporta i comandi delle skill; su Claude Code il nome può essere qualificato dal plugin. L’host prepara la classificazione, senza chiederti di conoscere le capability.</p><p>Percorso universale, dalla cartella della skill:</p><pre><code>python muro.py plan --task "&lt;richiesta&gt;" --project "&lt;progetto&gt;"
+python muro.py plan --task "&lt;richiesta&gt;" --project "&lt;progetto&gt;" --classification "classification.json"
+python muro.py plan --task "&lt;richiesta&gt;" --project "&lt;progetto&gt;" --classification "classification.json" --confirm
+python muro.py resume --project "&lt;progetto&gt;"</code></pre><p>Per i passi con mappa, usa gli identificatori restituiti con il passo. Mantieni le stesse opzioni di stack tra le chiamate.</p><pre><code>python muro.py record --project "&lt;progetto&gt;" --map-id &lt;map_id&gt; --capability &lt;capability&gt; --outputs "outputs.json"
+python muro.py check --project "&lt;progetto&gt;" --map-id &lt;map_id&gt; --capability &lt;capability&gt; --result "result.json"</code></pre><p>Ogni controllo registra <code>name</code>, <code>status</code> (<code>pass</code>, <code>fail</code> o <code>not-tested</code>) ed <code>evidence</code>. Per sostituire consapevolmente una mappa: nuova classificazione e <code>plan --new</code>; la conferma archivia le evidenze precedenti. Il browser non esegue comandi.</p></details><details><summary>Strumenti, attivatori e precedenze</summary><p>I vincoli <code>stack:*</code> indicano compatibilità tecnica, non attivatori testuali. L’host verifica strumenti e autorizzazioni. Gli hook sono descrizioni passive, non vengono installati o attivati automaticamente.</p><p>Il passo che richiede una dipendenza mancante gestisce l’installazione prevista. Ordine delle fonti e posizione nel grafo non conferiscono autorità. Solo il coordinatore scrive la mappa e lo stato.</p></details></div>
+      <h2>Catalogo completo</h2><div id="capability-catalog">__MURO_CONTENT__</div>
+      <h2>Fonti della release</h2><div id="release-sources">__MURO_SOURCES__</div>
+    </div>
+  </main>
+  <aside class="drawer" id="drawer" aria-labelledby="drawer-title" hidden><div class="drawer-head"><h2 id="drawer-title" tabindex="-1"></h2><button class="close" id="close-drawer" type="button" aria-label="Chiudi dettagli">×</button></div><div class="drawer-body" id="drawer-body"></div></aside>
+  <script id="graph-library">__MURO_GRAPH_LIBRARY__</script>
+  <script id="guide-data" type="application/json">__MURO_DATA__</script>
+  <script>
+  (() => {
+    'use strict';
+    const data = JSON.parse(document.getElementById('guide-data').textContent);
+    const caps = Array.isArray(data.capabilities) ? data.capabilities : [];
+    const examples = Array.isArray(data.examples) ? data.examples : [];
+    const byId = new Map(caps.map(cap => [cap.id,cap]));
+    const ids = value => Array.isArray(value) ? value : [];
+    const make = (tag,text,className) => { const el=document.createElement(tag); if(text!==undefined) el.textContent=text; if(className) el.className=className; return el; };
+    const canvas=document.getElementById('capability-map'), scroll=document.getElementById('graph-scroll');
+    const status=document.getElementById('graph-status'), drawer=document.getElementById('drawer'), drawerBody=document.getElementById('drawer-body');
+    const nodes=new Map(), exampleButtons=[];
+    let selectedId=null, exampleIndex=null, activeIntent=null, drawerTrigger=null;
+    const currentExample=()=>exampleIndex===null?null:examples[exampleIndex];
+    const currentPath=()=>ids(currentExample()?.path).filter(id=>byId.has(id));
+    const sameRole=id=>caps.filter(cap=>cap.id!==id && cap.role===byId.get(id)?.role).map(cap=>cap.id);
+    const conflicts=id=>caps.filter(cap=>cap.id!==id && (ids(byId.get(id)?.conflicts).includes(cap.id)||ids(cap.conflicts).includes(id))).map(cap=>cap.id);
+    const dependents=id=>caps.filter(cap=>ids(cap.after).includes(id)).map(cap=>cap.id);
+    document.title=(data.plugin?.name||'Plugin')+' · Mappa della release '+(data.plugin?.version||'');
+    const graphAccess=document.getElementById('graph-access');
+    const elements=[{data:{id:'$root',tw:158,label:'Scelta IA\n'+(data.plugin?.name||'Plugin')},classes:'root-node'}];
+    caps.forEach(cap=>{
+      elements.push({data:{id:cap.id,tw:158,label:cap.title||cap.id,title:cap.title||cap.id}});
+      if(!ids(cap.after).length)elements.push({data:{id:'entry:'+cap.id,source:'$root',target:cap.id},classes:'available-edge'+(ids(cap.needs).some(need=>byId.has(need.capability))?' entry-sub':'')});
+      ids(cap.after).forEach((parent,index)=>{if(byId.has(parent))elements.push({data:{id:'after:'+cap.id+':'+index,source:parent,target:cap.id},classes:'prerequisite-edge'});});
+    });
+    const producer=new Map();caps.forEach(cap=>ids(cap.outputs).forEach(key=>producer.set(key,cap.id)));
+    const reads=id=>{const from=new Map();ids(byId.get(id)?.reads).forEach(key=>{const owner=producer.get(key);if(owner&&owner!==id){if(!from.has(owner))from.set(owner,[]);from.get(owner).push(key);}});return from;};
+    caps.forEach(cap=>ids(cap.needs).forEach((need,index)=>{if(byId.has(need.capability))elements.push({data:{id:'needs:'+cap.id+':'+index,source:need.capability,target:cap.id,label:need.label||'solo in certi casi',when:need.when,requires:need.capability,dependent:cap.id},classes:'needs-edge'});}));
+    caps.forEach(cap=>reads(cap.id).forEach((keys,owner)=>elements.push({data:{id:'reads:'+owner+':'+cap.id,source:owner,target:cap.id,label:keys.slice(0,3).join(', ')+(keys.length>3?' +'+(keys.length-3):''),keys:keys.join(', ')},classes:'reads-edge'})));
+    const cy=cytoscape({container:canvas,elements,layout:{name:'preset'},minZoom:.15,maxZoom:3,wheelSensitivity:.2,boxSelectionEnabled:false,autoungrabify:false,autounselectify:true,style:[
+      {selector:'node',style:{shape:'roundrectangle',width:180,height:72,'background-color':'#ffffff','border-color':'#c8d5e5','border-width':1,label:'data(label)',color:'#172d45','font-family':'Segoe UI, system-ui, sans-serif','font-size':15,'font-weight':500,'text-wrap':'wrap','text-max-width':'data(tw)','text-valign':'center','text-halign':'center'}},
+      {selector:'.root-node',style:{width:166,height:80,'background-color':'#172d45','border-color':'#172d45',color:'#ffffff','font-size':18,'font-weight':600}},
+      {selector:'edge',style:{width:1.4,'line-color':'#d6dfeb','curve-style':'bezier','target-arrow-shape':'none'}},
+      {selector:'.prerequisite-edge',style:{width:1.8,'line-color':'#2b53bd','target-arrow-color':'#2b53bd','target-arrow-shape':'triangle'}},
+      {selector:'.needs-edge',style:{width:2,'line-style':'dashed','line-color':'#b8621b','target-arrow-color':'#b8621b','target-arrow-shape':'triangle','curve-style':'bezier','control-point-step-size':70,label:'data(label)','font-size':10,color:'#8a4710','text-wrap':'wrap','text-max-width':110,'text-background-color':'#f4f6fa','text-background-opacity':1,'text-background-padding':3}},
+      {selector:'.reads-edge',style:{display:'none',width:1.4,'line-style':'dashed','line-color':'#237564','target-arrow-color':'#237564','target-arrow-shape':'triangle','curve-style':'bezier',label:'data(label)','font-size':10,color:'#237564','text-wrap':'wrap','text-max-width':150,'text-rotation':'autorotate','text-background-color':'#f4f6fa','text-background-opacity':1,'text-background-padding':3}},
+      {selector:'.is-possible',style:{display:'element'}},
+      {selector:'.is-flowing',style:{display:'element',width:3,'line-style':'solid','font-size':11,'font-weight':600}},
+      {selector:'.example-edge',style:{width:2.6,'line-color':'#2b53bd','line-style':'dashed','target-arrow-shape':'triangle','target-arrow-color':'#2b53bd','curve-style':'bezier','control-point-step-size':45}},
+      {selector:'.is-dim',style:{opacity:.22}},
+      {selector:'.is-active',style:{'background-color':'#2b53bd','border-color':'#2b53bd',color:'#ffffff'}},
+      {selector:'.is-selected, .keyboard-focus',style:{'border-color':'#2b53bd','border-width':4}},
+      {selector:'.is-alternative',style:{'border-color':'#237564','border-style':'dashed','border-width':2}},
+      {selector:'.is-conflict',style:{'border-color':'#a43c4c','border-width':2}},
+      {selector:'.is-emphasized',style:{'line-color':'#2b53bd',width:2}}
+    ]});
+    document.documentElement.classList.add('has-js');
+    cy.on('mouseover','node',()=>canvas.style.cursor='pointer');
+    cy.on('grab','node',()=>canvas.style.cursor='grabbing');
+    cy.on('free','node',()=>canvas.style.cursor='pointer');
+    cy.on('mouseout','node',()=>canvas.style.cursor='grab');
+    canvas.style.cursor='grab';
+    function addAccessibleNode(id,label,action){
+      const button=make('button',label,'node-access');button.type='button';button.dataset.capability=id;button.setAttribute('aria-pressed','false');
+      button.addEventListener('click',action);
+      button.addEventListener('focus',()=>{const node=cy.getElementById(id);node.addClass('keyboard-focus');cy.center(node);});
+      button.addEventListener('blur',()=>cy.getElementById(id).removeClass('keyboard-focus'));
+      graphAccess.append(button);nodes.set(id,button);
+    }
+    addAccessibleNode('$root','Scelta IA: funzionamento, comandi e fonti',showRoot);
+    caps.forEach(cap=>addAccessibleNode(cap.id,(cap.title||cap.id)+': mostra dettagli',()=>showCapability(cap.id)));
+    cy.on('tap','.needs-edge',event=>{const d=event.target.data();status.textContent=(byId.get(d.dependent)?.title||d.dependent)+' richiede prima '+(byId.get(d.requires)?.title||d.requires)+' solo se: '+d.when;});
+    cy.on('tap','.reads-edge',event=>{const d=event.target.data();status.textContent='Dati che possono passare: '+d.keys;});
+    cy.on('tap','node',event=>{const id=event.target.id();drawerTrigger=nodes.get(id);if(id==='$root')showRoot();else showCapability(id);});
+    function fitView(collection=cy.elements()){
+      const bb=collection.boundingBox();if(!collection.length)return;
+      if(window.matchMedia('(max-width:640px)').matches){
+        const zoom=Math.min(1,(canvas.clientWidth-28)/Math.max(1,bb.w));cy.zoom(zoom);cy.pan({x:canvas.clientWidth/2-(bb.x1+bb.w/2)*zoom,y:24-bb.y1*zoom});
+      }else{cy.fit(collection,36);if(cy.zoom()>1)cy.zoom({level:1,renderedPosition:{x:canvas.clientWidth/2,y:canvas.clientHeight/2}});}
+    }
+    function layout(){
+      cy.resize();const mobile=window.matchMedia('(max-width:640px)').matches;
+      cy.edges('.available-edge').style(mobile?{'curve-style':'taxi','taxi-direction':'downward','taxi-turn':'100%'}:{'curve-style':'bezier'});
+      if(!mobile)cy.edges('.entry-sub').style({'curve-style':'unbundled-bezier','control-point-distances':[130],'control-point-weights':[.55],'line-style':'dotted'});
+      if(mobile){
+        cy.nodes().filter(node=>node.id()!=='$root').layout({name:'grid',fit:false,cols:2,condense:true,avoidOverlap:true,avoidOverlapPadding:18,boundingBox:{x1:0,y1:140,w:396,h:Math.max(100,Math.ceil(caps.length/2)*100)}}).run();
+        const bb=cy.nodes().filter(node=>node.id()!=='$root').boundingBox();cy.getElementById('$root').position({x:bb.x1+bb.w/2,y:40});
+      }else{
+        // Subordinate capabilities (after, or conditional needs) hang outside their prerequisite instead of sitting on the ring.
+        const parentOf=new Map();caps.forEach(cap=>{const parent=[...ids(cap.after),...ids(cap.needs).map(need=>need.capability)].find(id=>byId.has(id)&&id!==cap.id);if(parent)parentOf.set(cap.id,parent);});
+        // Ring nodes go on an ellipse sized to the window, so a wide screen is used at full zoom and labels stay readable.
+        const ring=[],onRing=new Set(),seat=cap=>{if(onRing.has(cap.id)||parentOf.has(cap.id))return;onRing.add(cap.id);ring.push(cap);caps.filter(other=>reads(other.id).has(cap.id)).forEach(seat);};caps.forEach(seat);
+        const outer=parentOf.size>0;
+        const rx=Math.max(430,Math.min(620,canvas.clientWidth/2-120-(outer?150:0))),ry=Math.max(260,Math.min(340,canvas.clientHeight/2-60-(outer?150:0)));
+        cy.getElementById('$root').position({x:0,y:0});
+        ring.forEach((cap,index)=>{const turn=-Math.PI/2+index*2*Math.PI/Math.max(1,ring.length);cy.getElementById(cap.id).position({x:Math.cos(turn)*rx,y:Math.sin(turn)*ry});});
+        const root=cy.getElementById('$root').position(),placed=new Set(cy.nodes().filter(node=>!parentOf.has(node.id())).map(node=>node.id()));
+        for(let pass=0;pass<caps.length&&placed.size<cy.nodes().length;pass++){
+          const groups=new Map();parentOf.forEach((parent,child)=>{if(!placed.has(child)&&placed.has(parent)){if(!groups.has(parent))groups.set(parent,[]);groups.get(parent).push(child);}});
+          groups.forEach((children,parent)=>{const from=cy.getElementById(parent).position(),angle=Math.atan2(from.y-root.y,from.x-root.x);children.forEach((child,index)=>{const turn=angle+(index-(children.length-1)/2)*.6;cy.getElementById(child).position({x:from.x+Math.cos(turn)*250,y:from.y+Math.sin(turn)*200});placed.add(child);});});
+        }
+        const steps=currentPath();
+        if(steps.length>1){const gap=340,low=cy.nodes().boundingBox().y2+150;steps.forEach((id,index)=>cy.getElementById(id).position({x:(index-(steps.length-1)/2)*gap,y:low}));fitView(cy.nodes().filter(node=>steps.includes(node.id())));return;}
+      }
+      fitView();
+    }
+    canvas.addEventListener('keydown',event=>{
+      const pan=cy.pan(),moves={ArrowLeft:[40,0],ArrowRight:[-40,0],ArrowUp:[0,40],ArrowDown:[0,-40]};
+      if(moves[event.key]){event.preventDefault();const [x,y]=moves[event.key];cy.pan({x:pan.x+x,y:pan.y+y});}
+      else if(['+','=','-'].includes(event.key)){event.preventDefault();cy.zoom({level:Math.max(cy.minZoom(),Math.min(cy.maxZoom(),cy.zoom()*(event.key==='-'?.85:1.15))),renderedPosition:{x:canvas.clientWidth/2,y:canvas.clientHeight/2}});}
+      else if(event.key==='Home'){event.preventDefault();fitView();}
+    });
+    function closeMenus(){document.getElementById('paths-menu').hidden=true;document.getElementById('intents-menu').hidden=true;document.getElementById('paths-toggle').setAttribute('aria-expanded','false');document.getElementById('intents-toggle').setAttribute('aria-expanded','false');}
+    function toggleMenu(which){const menu=document.getElementById(which+'-menu'),open=menu.hidden;closeMenus();if(open){menu.hidden=false;document.getElementById(which+'-toggle').setAttribute('aria-expanded','true');}}
+    document.getElementById('paths-toggle').addEventListener('click',()=>toggleMenu('paths'));
+    document.getElementById('intents-toggle').addEventListener('click',()=>toggleMenu('intents'));
+    document.addEventListener('click',event=>{if(!event.target.closest('.menu-wrap'))closeMenus();});
+    function openDrawer(title){if(!nodes.has(selectedId)||document.activeElement!==document.body)drawerTrigger=document.activeElement;document.getElementById('drawer-title').textContent=title;drawerBody.replaceChildren();drawer.hidden=false;closeMenus();document.getElementById('drawer-title').focus({preventScroll:true});}
+    function closeDrawer(restore=true){drawer.hidden=true;selectedId=null;paint();if(restore&&drawerTrigger?.isConnected)drawerTrigger.focus({preventScroll:true});}
+    document.getElementById('close-drawer').addEventListener('click',()=>closeDrawer());
+    document.addEventListener('keydown',event=>{if(event.key==='Escape'){closeMenus();if(!drawer.hidden)closeDrawer();}});
+    function safeClone(source){const clone=source.cloneNode(true);if(clone.nodeType===1){clone.removeAttribute('id');clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));}return clone;}
+    function cloneChildren(source,target){if(source)[...source.childNodes].forEach(child=>target.append(safeClone(child)));}
+    function relationLinks(label,members){if(!members.length)return;drawerBody.append(make('h3',label));const list=make('div',undefined,'relation-list');members.forEach(id=>{const button=make('button',byId.get(id)?.title||id);button.type='button';button.addEventListener('click',()=>showCapability(id));list.append(button);});drawerBody.append(list);}
+    function showCapability(id){const cap=byId.get(id);if(!cap)return;selectedId=id;openDrawer(cap.title||id);const selectedIntent=activeIntent||ids(currentExample()?.selections).find(item=>item.capability===id)?.intent;const intent=ids(cap.intents).find(item=>item.id===selectedIntent)||ids(cap.intents)[0];if(intent){drawerBody.append(make('p',intent.description),make('p',intent.id,'intent-id'));}if(ids(cap.intents).length>1){const more=make('details');more.append(make('summary','Altri intenti'));const list=make('ul');cap.intents.filter(item=>item!==intent).forEach(item=>list.append(make('li',item.description)));more.append(list);drawerBody.append(more);}if(cap.when!=='—')drawerBody.append(make('p','Vincolo: '+cap.when,'hint'));relationLinks('Prerequisiti',ids(cap.after));relationLinks('Dipendenti diretti',dependents(id));ids(cap.needs).forEach(need=>{drawerBody.append(make('p','Prerequisito condizionato: '+need.capability+' — solo se: '+need.when,'hint'));});relationLinks('Può usare gli output di (se registrati)',[...reads(id).keys()]);relationLinks('I suoi output possono servire a',caps.filter(other=>reads(other.id).has(id)).map(other=>other.id));relationLinks('Stesso ruolo: scelta esclusiva',sameRole(id));relationLinks('Conflitti dichiarati',conflicts(id));const full=make('details');full.append(make('summary','Scheda completa'));const source=document.getElementById('cap-'+id)?.querySelector('.cap-body');if(source)full.append(safeClone(source));else full.append(make('p',cap.body||'Nessun dettaglio aggiuntivo disponibile.'));drawerBody.append(full);paint();}
+    function showRoot(){selectedId='$root';openDrawer('Scelta IA');cloneChildren(document.getElementById('workflow-data'),drawerBody);if(currentExample()){const example=currentExample(),details=make('details');details.append(make('summary','Esempio selezionato'),make('p',example.task),make('p',example.reason));if(ids(example.questions).length){const list=make('ul');example.questions.forEach(question=>list.append(make('li',question)));details.append(list);}drawerBody.append(details);}const sources=make('details');sources.append(make('summary','Fonti della release'));cloneChildren(document.getElementById('release-sources'),sources);drawerBody.append(sources);const notes=document.querySelector('#capability-catalog .catalog-notes');if(notes)drawerBody.append(safeClone(notes));const library=make('details');library.append(make('summary','Libreria del grafo'),make('p',data.graph_library.name+' '+data.graph_library.version+' · '+data.graph_library.license),make('p',data.graph_library.release));drawerBody.append(library);const metadata=make('details');metadata.append(make('summary','Dati della release'),make('p','Generata: '+(data.generated_at||'non dichiarata')),make('p','Impronta del catalogo: '+(data.catalog_digest||'non disponibile'),'intent-id'));drawerBody.append(metadata);paint();}
+    drawerBody.addEventListener('click',event=>{const link=event.target.closest('a[href^="#cap-"]');if(!link)return;event.preventDefault();try{showCapability(decodeURIComponent(link.getAttribute('href').slice(5)));}catch{}});
+    function rebuildExampleEdges(){
+      cy.edges('.example-edge').remove();const path=currentPath();
+      for(let index=1;index<path.length;index++){if(reads(path[index]).has(path[index-1]))continue;cy.add({data:{id:'example:'+index,source:path[index-1],target:path[index]},classes:'example-edge'});}
+    }
+    function paint(){
+      const path=currentPath();let active=null;
+      if(exampleIndex!==null)active=new Set(path);else if(activeIntent)active=new Set(caps.filter(cap=>ids(cap.intents).some(intent=>intent.id===activeIntent)).map(cap=>cap.id));
+      const alternatives=selectedId&&byId.has(selectedId)?sameRole(selectedId):[],incompatible=selectedId&&byId.has(selectedId)?conflicts(selectedId):[];
+      const relabelled=[];
+      cy.batch(()=>{
+        cy.nodes().forEach(node=>{
+          const id=node.id();node.toggleClass('is-selected',selectedId===id);node.toggleClass('is-active',!!active?.has(id));node.toggleClass('is-dim',id!=='$root'&&!!active&&!active.has(id));node.toggleClass('is-alternative',alternatives.includes(id));node.toggleClass('is-conflict',incompatible.includes(id));
+          if(byId.has(id)){const text=(path.includes(id)?(path.indexOf(id)+1)+'. ':'')+(byId.get(id).title||id);if(node.data('label')!==text){node.data('label',text);relabelled.push(node);}}
+          nodes.get(id)?.setAttribute('aria-pressed',String(selectedId===id));
+        });
+        cy.edges().not('.example-edge').forEach(edge=>{const connected=active&&(edge.source().id()==='$root'?active.has(edge.target().id()):active.has(edge.source().id())&&active.has(edge.target().id()));edge.toggleClass('is-dim',!!active&&!connected);edge.toggleClass('is-emphasized',!!connected&&edge.hasClass('prerequisite-edge'));if(edge.hasClass('reads-edge')){const from=path.indexOf(edge.source().id()),to=path.indexOf(edge.target().id()),flowing=exampleIndex!==null&&from>=0&&to>from,possible=exampleIndex===null&&!!activeIntent&&(active.has(edge.source().id())||active.has(edge.target().id()));edge.toggleClass('is-flowing',flowing);edge.toggleClass('is-possible',possible);edge.removeClass('is-dim');}});
+      });
+      // Cytoscape 3.34.4 draws a changed label inside the box of the previous text (a numbered
+      // single-line label is clipped on both sides) until a label style value changes in a later frame.
+      if(relabelled.length)requestAnimationFrame(()=>requestAnimationFrame(()=>cy.batch(()=>relabelled.forEach(node=>node.data('tw',node.data('tw')===158?159:158)))));
+      exampleButtons.forEach((button,index)=>button.setAttribute('aria-pressed',String(index===exampleIndex)));
+      if(exampleIndex!==null){const example=currentExample();status.textContent=example.status==='selected'?'Esempio: '+example.title+' · '+path.length+' passi':example.status==='needs_clarification'?'Esempio: '+example.title+' · serve un chiarimento':'Esempio: '+example.title+' · nessuna capability attiva';}
+      else if(activeIntent)status.textContent='Intento: '+activeIntent+' · '+active.size+' capability';
+      else status.textContent='Trascina un nodo per spostarlo, lo sfondo per muovere la mappa; scorri per zoomare. Clicca un nodo per i dettagli.';
+    }
+    function selectExample(index){if(!examples[index])return;closeDrawer(false);exampleIndex=index;activeIntent=null;document.getElementById('intent-select').value='';closeMenus();rebuildExampleEdges();paint();layout();if(currentPath().length===1)fitView(cy.nodes().filter(node=>currentPath().includes(node.id())));}
+    examples.forEach((example,index)=>{const button=make('button',example.title,'example-button');button.type='button';button.setAttribute('aria-pressed','false');button.addEventListener('click',()=>selectExample(index));exampleButtons.push(button);document.getElementById('example-buttons').append(button);});if(!examples.length)document.getElementById('example-buttons').append(make('p','Nessun percorso illustrativo in questa release.','menu-empty'));
+    const intentSelect=document.getElementById('intent-select'),uniqueIntents=new Map();caps.forEach(cap=>ids(cap.intents).forEach(intent=>{if(!uniqueIntents.has(intent.id))uniqueIntents.set(intent.id,intent);}));uniqueIntents.forEach(intent=>{const option=make('option',intent.id+' — '+intent.description);option.value=intent.id;intentSelect.append(option);});
+    intentSelect.addEventListener('change',()=>{closeDrawer(false);activeIntent=intentSelect.value||null;exampleIndex=null;closeMenus();rebuildExampleEdges();paint();layout();if(currentPath().length===1)fitView(cy.nodes().filter(node=>currentPath().includes(node.id())));});
+    document.getElementById('reset').addEventListener('click',()=>{closeDrawer(false);closeMenus();exampleIndex=null;activeIntent=null;selectedId=null;intentSelect.value='';rebuildExampleEdges();paint();layout();});
+    const printState=new Map();window.addEventListener('beforeprint',()=>document.querySelectorAll('.reference-data details').forEach(detail=>{printState.set(detail,detail.open);detail.open=true;}));window.addEventListener('afterprint',()=>{printState.forEach((open,detail)=>{detail.open=open;});printState.clear();});
+    window.addEventListener('resize',()=>requestAnimationFrame(layout));if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>requestAnimationFrame(layout)).observe(scroll);
+    layout();paint();
+  })();
+  </script>
+</body>
+</html>

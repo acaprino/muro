@@ -12,7 +12,15 @@ Source order and matching role/name labels do not decide precedence or merges.
 Preparation only supplies evidence; it is not completed AI intake/harmonization.
 Record concise source-grounded reasons and unresolved gaps (ADR-0008).
 
-Read README.md, ROUTER.md, the relevant capability files and
+Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
+a package of their own, never part of Muro: the example is `examples/marionette/`
+(`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin
+identity `marionette`). Paths below that name those files are relative to a
+package directory. Keep package-specific knowledge (named dependencies, domain
+rules) out of `muro/` and `prompts/`. Prompts and the shipped runtime come from
+the factory unless the package directory has its own (ADR-0011).
+
+Read README.md, the package's ROUTER.md, the relevant capability files and
 docs/adr/ADR-0003-ai-owned-intent-classification.md before changing routing.
 ADR-0001/0002 document the original architecture; ADR-0003 records the requested
 correction and its implemented contract (its text is not yet separately approved).
@@ -36,7 +44,13 @@ installation, publication or replacement of existing dist output without request
   and defines alternatives/dependencies. Preparation commands do not call an LLM.
 - `capabilities/*.md`: ten frontmatter fields: id, role, when, after, outputs,
   checks, intents, tools, hooks, conflicts. `intents` is nonempty `{id, description, excludes}`
-  data. `when` is only `—` or comma-separated stack constraints. Router rows must
+  data. Optional eleventh field `reads`: output keys of other capabilities used
+  when recorded; AI-authored data flow for the guide, validated against producers,
+  never a prerequisite. Optional twelfth field `needs`: conditional prerequisites
+  `{capability, label, when, reason}`; `when` is plain language judged per task by
+  the classifying AI, never by Python, which only requires a reasoned judgment
+  for each and holds the plan to it. AI-written graph labels are 5 words at most
+  (ADR-0012). `when` is only `—` or comma-separated stack constraints. Router rows must
   match the capability exactly, including ordered intent IDs in column six.
 - `prompts/classify.md`: the host AI interprets the runtime task and actual project
   context. `muro/routing.py` validates its structured decision and expands only
@@ -44,6 +58,24 @@ installation, publication or replacement of existing dist output without request
 - `muro/adapters.py` and `muro/release.py`: every host's standalone skill folder
   includes runtime, router, capabilities, prompts and license notices. Test the
   packaged launcher outside the source checkout, not only Python imports.
+- `muro/guide.py` and `muro/guide.html`: every release generates an offline,
+  self-contained `GUIDE.html` at its root and in every standalone host skill.
+  Initially show only the responsive navigable graph and a few controls for
+  paths, intents and reset. Open brief intent descriptions and details on node
+  click; keep full catalog and commands available on demand.
+  Render actual packaged metadata and source pins without losing exclusions,
+  constraints, dependencies, alternatives, conflicts, outputs, tools or checks.
+  Meaning and collaboration rationale remain AI-authored; rendering/filtering
+  never classifies tasks or invents graph edges. Do not hand-edit or reuse a
+  previous release's HTML (ADR-0010).
+  Use the pinned Cytoscape.js bundle in `muro/vendor/cytoscape/` for graph layout
+  and navigation; verify its recorded hashes and preserve its MIT license. Embed
+  it in the HTML rather than fetching a browser CDN. Keep semantic decisions in
+  the AI-authored catalog and examples.
+- `guide-examples.json`: required nonempty documented examples authored/reviewed
+  by a person or host LLM, maintained with the catalog and packaged beside the
+  guide. Validate explicit decisions with runtime rules and expand declared
+  prerequisites only; never derive example meanings or selections by script.
 
 ## Tools, hooks and execution
 
@@ -66,6 +98,12 @@ dependency as a reason to stop. Intake records how each dependency is checked
 and installed; when the source gives no method, it says so. Intake and build
 still install nothing, the skill or plugin itself is never installed by a
 capability, and hooks stay passive (ADR-0007).
+
+Owner correction of 2026-11-10 ("sono da valutare runtime caso per caso"): there
+is no closed dependency manifest and no build gate on dependencies. The host AI
+judges at runtime what the task needs (GSAP, a browser, a runtime) and installs
+what is missing under the rule above. `runtime_deps` and capability notes are
+guidance from intake, not an exhaustive list.
 
 Analyze contradictions and shared resource writes during harmonization and runtime
 selection. Use `conflicts` for incompatible capability IDs, not just role labels.
@@ -97,8 +135,9 @@ examples supplied as AI fixtures, variant constraints, dependencies, state
 preservation, missing tools and passive hook metadata. A fixture does not prove
 AI reasoning quality. Report real and simulated integrations separately.
 
-Run `python -m pytest -q` and `python muro_build.py --validate`. For source/build
-changes also run `python muro_build.py --check-sources` and verify a fresh staged
+Run `python -m pytest -q` and `python muro_build.py --manifest
+examples/marionette/sources.json --validate`. For source/build changes also run
+the same command with `--check-sources` and verify a fresh staged
 release. Source checks contact pinned Git remotes. Run targeted tests first for
 new behavior and preserve failure/success evidence in docs/verification/.
 

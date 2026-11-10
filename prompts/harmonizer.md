@@ -28,6 +28,39 @@ unresolved choice changes the outcome, report the exact gap or decision needed;
 do not silently pick a source or present that part as harmonized. Missing source
 analysis must return to Intake AI with the approved pinned evidence.
 
+## Explain the released plugin
+
+Every release renders a compact offline `GUIDE.html`. Initially show only the
+responsive navigable graph and a few controls for paths, intents and reset.
+Brief intent descriptions and details open on node click; commands and full
+catalog details remain available on demand. Make intent descriptions and
+exclusions explain activation by meaning; keep stack constraints distinct from
+triggers. In capability bodies and `## Output handoff`,
+state what each stage contributes, which earlier outputs it consumes, why a
+prerequisite is required and what later work must preserve. Explain alternatives
+and conflict decisions with their source-grounded rationale. This is part of
+harmonization, not a second semantic classifier in the guide generator.
+
+Keep these explanations aligned with `after`, `outputs`, `conflicts`, tools and
+passive hook policy. Do not imply collaboration merely because names, intent IDs
+or outputs match. The release renderer displays declared relationships and the
+existing runtime command contract; it cannot repair missing meaning. Do not
+write or edit generated HTML yourself, or claim the guide proves execution.
+
+Maintain `guide-examples.json` as part of harmonization. Its top-level `examples`
+array must be nonempty; each example has exactly `title`, `task`, `stack_tokens`,
+`status`, `selections`, `reason` and `questions`. The decision fields follow the
+host classification contract: explicit capability/intent pairs with reasons,
+or `no_match`/`needs_clarification`. Do not supply `catalog_digest`; the release
+renderer binds the current catalog and validates references, variants, conflicts
+and prerequisites with the runtime rules. It derives only the displayed ordered
+path from the explicit selection, never the selection itself.
+
+Author concise representative scenarios and review their meaning whenever the
+catalog changes. Preserve deliberate execution order and explain any collaboration;
+do not turn an illustrative path into a mandatory dependency. These are documented
+human/LLM decisions, not executable browser classifications or semantic test proof.
+
 ## Preserve source coverage
 
 Check that every selected skill/plugin entry point has an AI-derived classification
@@ -68,14 +101,30 @@ still require your analysis and the host's checks.
    be acyclic and reference existing capabilities. Python expands those dependencies
    and skips a prerequisite only when all declared outputs are already recorded.
    Do not model optional follow-on work as a mandatory dependency.
-4. **Sequential execution:** one active capability body per step, no runtime MoE.
+4. **Reads:** for every capability, declare in `reads` the output keys of other
+   capabilities that its body uses when they are recorded. Decide this from what
+   the body actually does with each output, not from matching names. Each key
+   must be an output of another capability. `reads` is optional data flow shown
+   in the guide; a consumer still starts without it, and only `after` forces a
+   stage.
+5. **Needs:** when a capability requires another one only in some cases, do not
+   leave that rule in prose and do not force it with `after`. Declare
+   `needs: [{"capability","label","when","reason"}]` on the dependent capability.
+   `label` is your summary of the condition for the graph arrow: 5 words at
+   most, never more. Every label you write for the guide follows that limit. `when`
+   is a plain-language condition the runtime AI judges per task (what kind of
+   work, what is already recorded); it is never matched by Python. Search every
+   body for hidden conditional prerequisites ("for X without Y, do not…").
+   Not for alternatives of the same role or conflicting capabilities.
+6. **Sequential execution:** one active capability body per step, no runtime MoE.
    The compact catalog is available to the classifying host AI. Static checks are
    instructions for collecting evidence, not proof of successful execution.
 
 ## Output
 
-Return changed capability files and one `ROUTER.md` of at most 80 lines. Each
-capability must have exactly one row with these six columns in this order:
+Return changed capability files, reviewed `guide-examples.json` and one
+`ROUTER.md` of at most 80 lines. Each capability must have exactly one row with
+these six columns in this order:
 
 ```markdown
 | id | role | when | after | outputs | intents |

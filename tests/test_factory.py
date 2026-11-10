@@ -43,6 +43,7 @@ def test_harmonizer_prompt_contains_all_capability_bodies(repo, tmp_path):
     assert '"selected_paths"' in text
     assert "testing.verify" in text
     assert router in text
+    assert (project / "guide-examples.json").read_text(encoding="utf-8") in text
     assert (project / "ROUTER.md").read_text(encoding="utf-8") == router
 
 
@@ -142,6 +143,7 @@ def test_missing_intake_prompt_leaves_no_partial_export(repo, tmp_path):
     src = {"id": "demo", "repo_path": str(root), "commit": commit, "pin": "head", "license": "MIT",
            "selected_paths": ["SKILL.md"], "excluded_paths": [], "intake": {"goal": "Classify the skill"}}
     output = tmp_path / "intake"
+    (tmp_path / "prompts").mkdir()  # a package with its own, incomplete prompts: no factory fallback
     with pytest.raises((OSError, ValueError)):
         prepare_intake(src, tmp_path, output)
     assert not output.exists()
@@ -149,6 +151,7 @@ def test_missing_intake_prompt_leaves_no_partial_export(repo, tmp_path):
 
 def test_missing_harmonizer_prompt_leaves_no_partial_export(tmp_path):
     output = tmp_path / "harmonize"
+    (tmp_path / "prompts").mkdir()  # own, incomplete prompts: no factory fallback
     with pytest.raises((OSError, ValueError)):
         harmonize_prompt(tmp_path, output)
     assert not output.exists()
@@ -203,3 +206,15 @@ def test_packaged_launchers_bind_evidence_to_map_and_step(portable_project, tmp_
         check.write_text(json.dumps({"name": "checked", "status": "pass", "evidence": "Fixture check"}), encoding="utf-8")
         checked = run("check", "--result", str(check), "--map-id", step["map_id"], "--capability", "ui")
         assert checked["results"] == [{"name": "checked", "status": "pass", "evidence": "Fixture check", "capability": "ui"}]
+
+
+def test_package_outside_the_factory_uses_the_factory_prompts_and_runtime(tmp_path):
+    """The factory owns prompts and runtime; a package directory holds only its catalog."""
+    from muro.factory import FACTORY_ROOT, prompts_dir, runtime_source
+    assert prompts_dir(tmp_path) == FACTORY_ROOT / "prompts"
+    assert runtime_source(tmp_path) == FACTORY_ROOT / "muro"
+    (tmp_path / "prompts").mkdir()
+    assert prompts_dir(tmp_path) == tmp_path / "prompts"
+    for name in ("capabilities", "ROUTER.md", "sources.json", "guide-examples.json"):
+        assert not (FACTORY_ROOT / name).exists(), name
+        assert (FACTORY_ROOT / "examples" / "marionette" / name).exists(), name

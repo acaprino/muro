@@ -1,8 +1,8 @@
 {
   "plugin": {
-    "slug": "muro",
-    "name": "Muro",
-    "command": "muro",
+    "slug": "marionette",
+    "name": "Marionette",
+    "command": "marionette",
     "version": "0.1.0"
   },
   "sources": [
@@ -86,7 +86,7 @@
         }
       ],
       "intake": {
-        "goal": "Extract ScrollTrigger implementation and cleanup patterns, respecting reduced motion; do not instruct Muro to install GSAP or misstate its runtime license."
+        "goal": "Extract ScrollTrigger implementation and cleanup patterns, respecting reduced motion; do not misstate GSAP's runtime license."
       }
     },
     {

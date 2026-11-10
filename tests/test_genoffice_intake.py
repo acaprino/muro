@@ -15,6 +15,7 @@ from muro.runtime import Coordinator
 from routing_helpers import decision
 
 ROOT = Path(__file__).resolve().parent.parent
+PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 OFFICE = {
     "office-deck": ("deck-authoring", ["office.presentation-creation"]),
     "office-authoring": ("document-authoring", ["office.document-creation", "office.spreadsheet-creation"]),
@@ -28,8 +29,8 @@ def coordinator(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     for directory in ("capabilities", "prompts"):
-        shutil.copytree(ROOT / directory, package / directory)
-    shutil.copy2(ROOT / "ROUTER.md", package / "ROUTER.md")
+        shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
+    shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
     return Coordinator(package, tmp_path / "consumer")
 
 
@@ -43,7 +44,7 @@ def route(coordinator, task, pairs, stack=None):
 
 
 def test_genoffice_manifest_is_apache_and_scoped_to_the_cli_skill():
-    manifest = json.loads((ROOT / "sources.json").read_text(encoding="utf-8"))
+    manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
     src = next(s for s in manifest["sources"] if s["id"] == "genoffice")
     assert src["repo_url"] == "https://github.com/genspark-ai/genoffice"
     assert src["commit"] == "4b55db9ed1994575a695160ffc6cfd0bfc866211"
@@ -58,8 +59,8 @@ def test_genoffice_manifest_is_apache_and_scoped_to_the_cli_skill():
 
 
 def test_office_capabilities_carry_ai_authored_intents_and_passive_operations():
-    caps = {cap.id: cap for cap in parse_capabilities(ROOT / "capabilities")}
-    router = {row.id: row for row in parse_router(ROOT / "ROUTER.md")}
+    caps = {cap.id: cap for cap in parse_capabilities(PACKAGE / "capabilities")}
+    router = {row.id: row for row in parse_router(PACKAGE / "ROUTER.md")}
     for name, (role, intents) in OFFICE.items():
         cap = caps[name]
         assert cap.role == role and router[name].role == role
@@ -75,7 +76,7 @@ def test_office_capabilities_carry_ai_authored_intents_and_passive_operations():
 
 
 def test_office_bodies_hand_outputs_over_install_the_engine_and_never_simulate():
-    caps = {cap.id: cap for cap in parse_capabilities(ROOT / "capabilities")}
+    caps = {cap.id: cap for cap in parse_capabilities(PACKAGE / "capabilities")}
     for name in OFFICE:
         instructions, _, provenance = caps[name].body.partition("## Sources")
         assert "## Output handoff" in instructions and "Do not edit" in instructions, name
@@ -92,7 +93,7 @@ def test_office_bodies_hand_outputs_over_install_the_engine_and_never_simulate()
 
 
 def test_office_outputs_have_one_owner_across_the_catalog():
-    caps = parse_capabilities(ROOT / "capabilities")
+    caps = parse_capabilities(PACKAGE / "capabilities")
     office_outputs = {key for cap in caps if cap.id in OFFICE for key in cap.outputs}
     assert len(office_outputs) == sum(len(cap.outputs) for cap in caps if cap.id in OFFICE)
     assert not office_outputs & {key for cap in caps if cap.id not in OFFICE for key in cap.outputs}
