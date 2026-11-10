@@ -10,6 +10,8 @@
       "id": "taste-skill",
       "repo_url": "https://github.com/Leonxlnx/taste-skill.git",
       "commit": "f6b76575f949707b4e3c37cd86cb44b0b98643e8",
+      "pin": "release",
+      "release": "v2.5.1",
       "license": "MIT",
       "copyright": "Copyright (c) 2026 Leonxlnx",
       "selected_paths": [
@@ -41,6 +43,7 @@
       "id": "motion-design",
       "repo_url": "https://github.com/LottieFiles/motion-design-skill",
       "commit": "f9a8a041b85185ee4881b3471d3415e939aac772",
+      "pin": "head",
       "license": "MIT",
       "copyright": "Copyright (c) 2025 LottieFiles",
       "selected_paths": [
@@ -63,6 +66,7 @@
       "id": "gsap-scrolltrigger",
       "repo_url": "https://github.com/greensock/gsap-skills",
       "commit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "pin": "head",
       "license": "MIT",
       "copyright": "Copyright (c) 2026 GreenSock",
       "selected_paths": [
@@ -88,7 +92,9 @@
     {
       "id": "wayfinder",
       "repo_url": "https://github.com/mattpocock/skills.git",
-      "commit": "4ae2317ddb22b046e26455e4f9c9b3aaaf62212d",
+      "commit": "d1478fcb140db0b93c0c8df17bcfd311844749d0",
+      "pin": "release",
+      "release": "v1.3.2",
       "license": "MIT",
       "copyright": "Copyright (c) 2026 Matt Pocock",
       "selected_paths": [
@@ -107,6 +113,138 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Extract the local work-map protocol, decision handoffs and evaluation gates; extend it through build and review without remote trackers."
+      }
+    },
+    {
+      "id": "ai-design-skills",
+      "repo_url": "https://github.com/elayadesign/ai-design-skills",
+      "commit": "456d9e0d3e2d84c748bb143c6ca3d90c45e16213",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Elaya",
+      "selected_paths": [
+        "skills/landing-page-design/SKILL.md",
+        "skills/figma-designer/SKILL.md"
+      ],
+      "excluded_paths": [
+        "assets/**",
+        "scripts/**",
+        "tests/**",
+        ".github/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Figma MCP and figma-use",
+          "license": "External host integration, not bundled by Muro",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Understand conversion strategy, content states and Figma token, component and responsive methods from the selected skills. Compare their functional responsibilities with the existing catalog and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Do not simulate Figma MCP or include unrelated installation workflows."
+      }
+    },
+    {
+      "id": "ui-ux-pro-max",
+      "repo_url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "a38d04c3d5c298c851dbe5e6ee1965ee3de42cb5",
+      "pin": "release",
+      "release": "v2.15.0",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2024 Next Level Builder",
+      "selected_paths": [
+        ".claude/skills/ui-ux-pro-max/SKILL.md",
+        ".claude/skills/ui-ux-pro-max/references/pro-rules.md",
+        ".claude/skills/ui-ux-pro-max/references/quick-reference.md",
+        "src/ui-ux-pro-max/scripts/core.py",
+        "src/ui-ux-pro-max/scripts/design_system.py",
+        "src/ui-ux-pro-max/scripts/reasoning_contract.py",
+        "src/ui-ux-pro-max/scripts/search.py",
+        "src/ui-ux-pro-max/data/**"
+      ],
+      "excluded_paths": [
+        "assets/**",
+        "screenshots/**",
+        "cli/**",
+        "docs/**",
+        "src/ui-ux-pro-max/scripts/tests/**",
+        "src/ui-ux-pro-max/templates/**",
+        ".github/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Python 3.10+ (standard library)",
+          "license": "PSF runtime prerequisite, not bundled by Muro",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Understand local design-system search, stack-specific UX and accessibility guidance, and assess their functional relationship with the existing catalog before proposing placement. Preserve the offline search script and data without premium assets, install flows or unverified recommendations; search results are candidates for AI judgment, not automatic catalog decisions."
+      }
+    },
+    {
+      "id": "genoffice",
+      "repo_url": "https://github.com/genspark-ai/genoffice",
+      "commit": "4b55db9ed1994575a695160ffc6cfd0bfc866211",
+      "pin": "release",
+      "release": "v0.12.852",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2026 Mainfunc, Inc.",
+      "selected_paths": [
+        "skills/genoffice/SKILL.md"
+      ],
+      "excluded_paths": [
+        "skills/recommended/**",
+        "ee/**",
+        "apps/**",
+        "packages/**",
+        "packaging/**",
+        "tools/**",
+        "scripts/**",
+        "e2e/**",
+        "fixtures/**",
+        "docs/**",
+        ".github/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "GenOffice desktop app with its genoffice command line",
+          "version": ">=0.9.0",
+          "license": "Apache-2.0 (external application, not bundled by Muro; installed at runtime from the official releases when missing)",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Classify every outcome of the genoffice command-line skill (new decks, workbooks, Word and PDF documents, edits to existing files, conversion, extraction, editor handoff) into Office capabilities with their own checks. Keep the CLI an external user-installed dependency, mark the provider-backed search, image and media commands as data leaving the machine, and drop the skill, MCP and CLI installation or registration flows. The enterprise-licensed ee/ tree and the separate recommended scenario skills are out of scope."
+      }
+    },
+    {
+      "id": "explain-this",
+      "repo_url": "https://github.com/analyticalmonk/explain-this",
+      "commit": "f64dab456ca23a351fe4d932c4e73bc91d3f2c52",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 analyticalmonk",
+      "selected_paths": [
+        "skills/creating-explainers/SKILL.md",
+        "skills/creating-explainers/assets/article-template.html",
+        "skills/creating-explainers/references/**",
+        "skills/explaining-codebases/SKILL.md",
+        "skills/explaining-codebases/references/**",
+        "skills/fact-checking-explainers/SKILL.md",
+        "skills/fact-checking-explainers/references/**"
+      ],
+      "excluded_paths": [
+        "skills/**/agents/**",
+        ".claude-plugin/**",
+        ".codex-plugin/**",
+        "docs/**",
+        "evals/**",
+        "AGENTS.md",
+        "CLAUDE.md"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Classify every outcome of the three skills: an interactive single-file HTML explainer built from documents, from topic research or from a codebase, and the claim-by-claim fact-check of an explainer. Keep the article template and the references as packaged helpers, keep the zero-dependency rule and the blocking fact-check gate, and drop the plugin manifests, host agent files, evals and upstream planning documents."
       }
     }
   ]

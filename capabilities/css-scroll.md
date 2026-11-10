@@ -1,7 +1,11 @@
 ---
 id: css-scroll
 role: scroll-code
+tools: [{"name":"file-access","purpose":"Inspect and patch the target CSS/components.","required":true},{"name":"browser","purpose":"Verify browser support, timelines, sticky behavior and reduced motion.","required":true}]
+hooks: []
+conflicts: ["gsap-scrolltrigger"]
 when: stack:css-only
+intents: [{"id":"ui.scroll-animation","description":"Implement scroll-linked animation, scrub or pin behavior from a motion specification.","excludes":["Motion-only specifications and ordinary hover transitions do not require scroll code.","An empty package manifest is not a CSS-only requirement."]}]
 after: ["motion-principles"]
 outputs: ["code-patch", "scroll-verified"]
 checks: ["scroll_timeline_accurate", "pin_stable_css", "reduced_motion_disables_animation", "no_js_required"]
@@ -26,9 +30,13 @@ Generates pure-CSS scroll-driven animations using `animation-timeline: scroll()`
    }
    ```
 4. **Write Patch** — Output a unified diff or file replacement for the target CSS/component file (e.g., `src/Hero.css`).
-5. **Record** — Write to `.muro/map.md ## Outputs`:
+5. **Record** — Prepare these output keys for the handoff below:
    - `code-patch`: path to modified CSS file and diff summary
    - `scroll-verified`: checklist (timeline matches scroll, sticky holds, reduced-motion disables, no JS required)
+
+## Output handoff
+
+Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from `.muro/map.md` only. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
 
 ## CSS Scroll-Driven Animation Specifics
 
@@ -40,8 +48,8 @@ Generates pure-CSS scroll-driven animations using `animation-timeline: scroll()`
 
 ## Specifics
 
-- If the target project has `gsap` in `package.json`, the `gsap-scrolltrigger` variant takes priority (ROUTER.md table order).
-- This variant is selected only when `stack:css-only` is present in stack tokens (no GSAP, no Framer Motion).
+- The host AI selects this variant only when CSS-only implementation fits the request and project constraints; Python never substitutes another variant.
+- This variant requires explicit `stack:css-only` context, even when a project happens to have GSAP installed.
 - Generated code is pure CSS — no runtime dependencies, no bundle size impact.
 
 ## Checks

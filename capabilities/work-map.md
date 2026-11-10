@@ -1,6 +1,10 @@
 ---
 id: work-map
 role: coordinator
+tools: [{"name":"file-access","purpose":"Inspect the engineering task and preserve decisions and evidence.","required":true},{"name":"shell","purpose":"Run project-specific checks when the authorized work requires them.","required":false}]
+hooks: []
+conflicts: []
+intents: [{"id":"engineering.work-coordination","description":"Coordinate a software change through requirements, decisions, implementation and evidence-backed review; handle a small engineering task directly when no specialist is needed.","excludes":["Not a fallback for unknown, ambiguous or non-engineering requests.","Do not add planning ceremony to a task that fits one direct step."]}]
 when: "—"
 after: []
 outputs: ["task_map", "step_sequence"]
@@ -9,18 +13,16 @@ checks: ["map_structure_valid", "steps_have_capabilities", "no_orphan_steps"]
 
 # Work Map Coordinator
 
-Generates and manages the local `.muro/map.md` work map for multi-step tasks.
+Coordinates engineering work; the Python runtime owns the managed work map and state.
 
 ## Behavior
 
-1. **Analyze** the user's request and infer required roles (from ROUTER.md).
-2. **Build** an ordered step sequence using `resolve_plan` (variant filter + after expansion + output-satisfaction skip).
-3. **Write** `.muro/map.md` with:
-   - `## Plan` — numbered steps with capability IDs and status checkboxes
-   - `## Outputs` — per-step bullet decisions and artifact paths
-4. **Ask** for one-line confirmation before executing the first step.
-5. **Execute** steps one at a time, loading only the current capability's Markdown file.
-6. **Update** `.muro/map.md ## Outputs` after each step completes.
+1. **Read** the host AI's validated classification and the user's engineering objective. This capability is explicitly selected, never a fallback for unclassified requests.
+2. **Coordinate** the authorized engineering work. Domain routing is owned by `prompts/classify.md`; Python's `resolve_selection` expands only selected capabilities and prerequisites. Do not recursively invoke a second routing policy.
+3. **Describe** the authorized work in `task_map` and `step_sequence`; these are output artifacts, not permission to edit Python-managed state.
+4. **Honor** existing authorization. A mapped plan is already confirmed by the runtime; do not ask for approval again without a new decision.
+5. **Execute** the active task within its scope. Do not load or dispatch unrelated capabilities.
+6. **Record** outputs through `muro.py record` for a mapped step, passing the step's `map_id` and `capability`. Never write `state.json` or the managed map directly; only Python updates them under its writer lock.
 7. **Final evaluation** — run the `## Checks` of all executed capabilities and report results.
 
 ## Constraints
@@ -32,11 +34,11 @@ Generates and manages the local `.muro/map.md` work map for multi-step tasks.
 
 ## Checks
 
-- **map_structure_valid**: `.muro/map.md` contains `## Plan` and `## Outputs` sections.
-- **steps_have_capabilities**: every step in `## Plan` maps to an existing `capabilities/<id>.md`.
-- **no_orphan_steps**: no step references a missing prerequisite `after` capability.
+- **map_structure_valid**: a mapped task contains `## Plan` and `## Outputs`; a direct task correctly has no required map.
+- **steps_have_capabilities**: every mapped step (or the single direct step) names an existing capability.
+- **no_orphan_steps**: mapped prerequisites exist and are ordered; direct work has no hidden unfulfilled prerequisites.
 
 ## Sources
 
-- Source: wayfinder (mattpocock@4ae2317d) — `skills/engineering/wayfinder/SKILL.md`, `docs/engineering/wayfinder.md`
+- Source: wayfinder (mattpocock@d1478fcb, release v1.3.2) — `skills/engineering/wayfinder/SKILL.md`, `docs/engineering/wayfinder.md`, `skills/engineering/to-spec/SKILL.md`, `skills/engineering/to-tickets/SKILL.md`; requirements, specification and task handoffs map to `engineering.work-coordination`, without remote ticket creation.
 - Harmonized by: prompts/harmonizer.md — merged wayfinder protocol with Muro's 4-rule router

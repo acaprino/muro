@@ -30,7 +30,7 @@ def test_check_sources_accepts_pinned_mit_and_rejects_unlicensed_dir(tmp_path: P
         "sources": [{
             "id": "bad-local",
             "repo_path": str(unlicensed),
-            "commit": "a" * 40,
+            "commit": "a" * 40, "pin": "head",
             "license": "MIT",
             "selected_paths": ["SKILL.md"],
             "excluded_paths": [],
@@ -41,24 +41,15 @@ def test_check_sources_accepts_pinned_mit_and_rejects_unlicensed_dir(tmp_path: P
     assert any("LICENSE" in e or "commit" in e for e in errors)
 
 
-def test_resolve_plan_enforces_variant_filter_and_after_skip():
+def test_legacy_build_export_rejects_role_and_intent_token_routing():
     rows = [
         {"id": "visual-direction", "role": "art-direction", "when": "intent:ui", "after": [], "outputs": ["palette", "layout"]},
         {"id": "motion-principles", "role": "motion-spec", "when": "intent:animation", "after": ["visual-direction"], "outputs": ["motion-spec", "reduced-motion"]},
         {"id": "gsap-scrolltrigger", "role": "scroll-code", "when": "stack:gsap", "after": ["motion-principles"], "outputs": ["code-patch"]},
         {"id": "css-scroll", "role": "scroll-code", "when": "stack:css-only", "after": ["motion-principles"], "outputs": ["code-patch"]},
     ]
-    # EX-001: full chain with GSAP allowed
-    assert resolve_plan(rows, ["scroll-code"], {"intent:ui", "intent:animation", "stack:gsap"}, set()) == [
-        "visual-direction", "motion-principles", "gsap-scrolltrigger"
-    ]
-    # EX-002 skip rule: motion-spec + reduced-motion already in map.md ## Outputs
-    assert resolve_plan(rows, ["scroll-code"], {"stack:gsap"}, {"palette", "layout", "motion-spec", "reduced-motion"}) == [
-        "gsap-scrolltrigger"
-    ]
-    # EX-002 forbidden stack: neither gsap nor css-only allowed -> raises ValueError (no blind fallback to GSAP)
-    with pytest.raises(ValueError, match="scroll-code"):
-        resolve_plan(rows, ["scroll-code"], {"stack:forbidden"}, set())
+    with pytest.raises(ValueError, match="host AI classification"):
+        resolve_plan(rows, ["scroll-code"], {"intent:ui", "intent:animation", "stack:gsap"}, set())
 
 
 def test_repository_capabilities_and_router_are_valid():

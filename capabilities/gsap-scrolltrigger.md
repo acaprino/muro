@@ -1,7 +1,11 @@
 ---
 id: gsap-scrolltrigger
 role: scroll-code
+tools: [{"name":"file-access","purpose":"Inspect and patch the target components and dependencies.","required":true},{"name":"browser","purpose":"Verify scrub, pin, reduced motion and console output in the target UI.","required":true}]
+hooks: []
+conflicts: ["css-scroll"]
 when: stack:gsap
+intents: [{"id":"ui.scroll-animation","description":"Implement scroll-linked animation, scrub or pin behavior from a motion specification.","excludes":["Motion-only specifications and ordinary hover transitions do not require scroll code.","The presence of GSAP alone is not a request for animation."]}]
 after: ["motion-principles"]
 outputs: ["code-patch", "scroll-verified"]
 checks: ["scrub_accurate", "pin_stable", "reduced_motion_disables_pin", "no_console_errors"]
@@ -26,9 +30,13 @@ Generates production-ready GSAP ScrollTrigger code that implements the `motion-s
    }
    ```
 4. **Write Patch** — Output a unified diff or file replacement for the target component (e.g., `src/Hero.tsx`).
-5. **Record** — Write to `.muro/map.md ## Outputs`:
+5. **Record** — Prepare these output keys for the handoff below:
    - `code-patch`: path to modified file and diff summary
    - `scroll-verified`: checklist (scrub works, pin holds, reduced-motion disables, no console errors)
+
+## Output handoff
+
+Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from `.muro/map.md` only. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
 
 ## GSAP ScrollTrigger Specifics (from gsap-scrolltrigger skill)
 

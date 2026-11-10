@@ -30,12 +30,41 @@ def _git(path: Path, *args: str) -> bytes:
     return result.stdout
 
 
+PIN_MODES = ("release", "head", "static")
+_TAG_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*(?:/[A-Za-z0-9][A-Za-z0-9._+-]*)*")
+
+
+def pin_mode(src: dict[str, Any]) -> tuple[str, str | None]:
+    """How the pinned commit is anchored upstream (ADR-0009).
+
+    `release`: the commit a published tag points to. `head`: the upstream HEAD.
+    `static`: a reviewed commit that follows nothing. Never inferred or defaulted.
+    """
+    mode, tag = src.get("pin"), src.get("release")
+    if not isinstance(mode, str) or mode not in PIN_MODES:
+        raise ValueError("pin must be one of release, head, static")
+    if mode != "release":
+        if tag is not None:
+            raise ValueError("release is only allowed with pin release")
+        return mode, None
+    if not isinstance(tag, str) or not _TAG_NAME.fullmatch(tag) or ".." in tag:
+        raise ValueError("release must be the published tag name when pin is release")
+    return mode, tag
+
+
+def _tagged_commit(lines: str, tag: str) -> str | None:
+    """Commit behind a tag in ls-remote/show-ref output; an annotated tag is peeled."""
+    found = {parts[1]: parts[0] for parts in (line.split() for line in lines.splitlines()) if len(parts) == 2}
+    return found.get(f"refs/tags/{tag}^{{}}") or found.get(f"refs/tags/{tag}")
+
+
 @contextmanager
 def source_repository(src: dict[str, Any], base_dir: Path) -> Iterator[Path]:
     """Resolve a local repository or fetch the specified commit into a temporary bare repo."""
     commit = src.get("commit")
     if not isinstance(commit, str) or not COMMIT_PATTERN.fullmatch(commit):
         raise ValueError("commit must be a 40-character hexadecimal SHA")
+    mode, tag = pin_mode(src)
     local, remote = src.get("repo_path"), src.get("repo_url")
     if bool(local) == bool(remote):
         raise ValueError("exactly one of repo_path and repo_url is required")
@@ -46,9 +75,19 @@ def source_repository(src: dict[str, Any], base_dir: Path) -> Iterator[Path]:
             raise ValueError(f"repository not found: {path}")
         try:
             _git(path, "cat-file", "-e", f"{commit}^{{commit}}")
-            head = _git(path, "rev-parse", "HEAD").decode("ascii").strip()
-            if head != commit:
-                raise ValueError(f"pinned commit {commit} does not match local HEAD {head}")
+            if mode == "head":
+                head = _git(path, "rev-parse", "HEAD").decode("ascii").strip()
+                if head != commit:
+                    raise ValueError(f"pinned commit {commit} does not match local HEAD {head}")
+            elif mode == "release":
+                try:
+                    tagged = _git(path, "rev-parse", "--verify", "-q", f"refs/tags/{tag}^{{commit}}").decode("ascii").strip()
+                except ValueError:
+                    tagged = ""
+                if not tagged:
+                    raise ValueError(f"release {tag} not found in the local repository")
+                if tagged != commit:
+                    raise ValueError(f"pinned commit {commit} is not release {tag} ({tagged})")
         except ValueError as exc:
             raise ValueError(f"cannot verify pinned commit {commit}: {exc}") from exc
         yield path
@@ -60,9 +99,17 @@ def source_repository(src: dict[str, Any], base_dir: Path) -> Iterator[Path]:
             _git(path, "init", "--bare", "-q")
             _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
             _git(path, "cat-file", "-e", f"{commit}^{{commit}}")
-            remote_head = _git(path, "ls-remote", remote, "HEAD").decode("ascii").split()[0]
-            if remote_head != commit:
-                raise ValueError(f"pinned commit {commit} does not match remote HEAD {remote_head}")
+            if mode == "head":
+                remote_head = _git(path, "ls-remote", remote, "HEAD").decode("ascii").split()[0]
+                if remote_head != commit:
+                    raise ValueError(f"pinned commit {commit} does not match remote HEAD {remote_head}")
+            elif mode == "release":
+                listing = _git(path, "ls-remote", "--", remote, f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}")
+                tagged = _tagged_commit(listing.decode("ascii"), tag)
+                if not tagged:
+                    raise ValueError(f"release {tag} not found on the remote")
+                if tagged != commit:
+                    raise ValueError(f"pinned commit {commit} is not release {tag} ({tagged})")
             yield path
 
 
@@ -83,6 +130,46 @@ def _blob(repo: Path, commit: str, path: str) -> bytes:
     return _git(repo, "show", f"{commit}:{path}")
 
 
+_LICENSE_NAMES = ("LICENSE", "LICENSE.txt", "LICENSE.md", "LICENCE", "LICENCE.txt", "LICENCE.md", "COPYING")
+_APACHE_APPENDIX = "APPENDIX: How to apply the Apache License to your work."
+_APACHE_PLACEHOLDER = "Copyright [yyyy] [name of copyright owner]"
+_APACHE_NOTICE = re.compile(r"Copyright (?:\(c\) |© )?\d{4}(?:-\d{4})? [^\[\]\r\n]{1,100}")
+
+
+def _apache_template(text: str) -> str:
+    """Restore the appendix placeholder when it holds one plain copyright line.
+
+    The appendix asks licensors to replace its bracketed fields with their own
+    identifying information, so a filled notice is still the approved license.
+    Nothing else is normalized: the terms remain compared with the template.
+    """
+    head, found, appendix = text.partition(_APACHE_APPENDIX)
+    if not found or _APACHE_PLACEHOLDER in appendix:
+        return text
+    lines = appendix.splitlines()
+    notices = [index for index, line in enumerate(lines) if line.strip().startswith("Copyright")]
+    if len(notices) != 1 or not _APACHE_NOTICE.fullmatch(lines[notices[0]].strip()):
+        return text
+    lines[notices[0]] = _APACHE_PLACEHOLDER
+    return head + found + "\n".join(lines)
+
+
+def copyright_notices(data: bytes, license_type: str) -> list[str]:
+    """Copyright notices carried by a verified license, never its prose.
+
+    License terms contain wrapped lines that merely begin with "copyright";
+    only the MIT header and the filled Apache appendix line are notices.
+    """
+    text = data.decode("utf-8-sig")
+    if license_type == "MIT":
+        header = text.split("Permission is hereby granted, free of charge", 1)[0]
+        return [line.strip() for line in header.splitlines() if re.match(r"Copyright\b", line.strip(), re.I)]
+    if license_type == "Apache-2.0":
+        _, found, appendix = text.partition(_APACHE_APPENDIX)
+        return [line.strip() for line in appendix.splitlines() if _APACHE_NOTICE.fullmatch(line.strip())] if found else []
+    return []
+
+
 def _license_matches(data: bytes, license_type: str) -> bool:
     try:
         text = data.decode("utf-8-sig")
@@ -99,6 +186,7 @@ def _license_matches(data: bytes, license_type: str) -> bool:
         text = text[text.index(marker):]
         expected = _MIT_BODY_SHA
     elif license_type == "Apache-2.0":
+        text = _apache_template(text)
         expected = _APACHE_SHA
     else:
         return False
@@ -116,6 +204,14 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
         raise ValueError("selected_paths must be a nonempty list; excluded_paths must be a list")
     if not all(_safe_pattern(p) for p in selected + excluded):
         raise ValueError("unsafe source path or pattern")
+    # The license is the root LICENSE unless the source declares the file that
+    # licenses its own folder; that file then covers only what lies under it.
+    license_path = src.get("license_path", "LICENSE")
+    if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
+        raise ValueError("license_path must be a plain repository-relative file path")
+    scope = PurePosixPath(license_path).parent
+    rooted = str(scope) == "."
+    license_label = "root LICENSE" if license_path == "LICENSE" else f"license_path {license_path}"
     with source_repository(src, base_dir) as repo:
         raw = _git(repo, "ls-tree", "-r", "-z", commit)
         entries: dict[str, str] = {}
@@ -124,13 +220,14 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
                 continue
             metadata, name = item.split(b"\t", 1)
             entries[name.decode("utf-8")] = metadata.decode("ascii").split()[0]
-        if "LICENSE" not in entries:
-            raise ValueError("root LICENSE missing at pinned commit")
-        if entries["LICENSE"] != "100644" and entries["LICENSE"] != "100755":
-            raise ValueError("root LICENSE is not a regular file")
-        license_bytes = _blob(repo, commit, "LICENSE")
+        if license_path not in entries:
+            raise ValueError(f"{license_label} missing at pinned commit")
+        if entries[license_path] != "100644" and entries[license_path] != "100755":
+            raise ValueError(f"{license_label} is not a regular file")
+        license_bytes = _blob(repo, commit, license_path)
         if not _license_matches(license_bytes, src.get("license", "")):
-            raise ValueError("LICENSE does not match the complete approved MIT/Apache-2.0 template")
+            raise ValueError("LICENSE does not match the complete approved MIT/Apache-2.0 template"
+                             + ("" if rooted else f" (license_path {license_path})"))
         for pattern in selected:
             matches = [name for name in entries if _matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/")]
             if not matches:
@@ -142,9 +239,13 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
                     raise ValueError(f"selected path is binary media: {name}")
                 if any(_matches(name, pattern) for pattern in excluded):
                     raise ValueError(f"selected path matches excluded_paths: {name}")
-                # A nested license needs separate rights review; no silent inheritance.
                 parents = PurePosixPath(name).parents
-                if any(str(parent / "LICENSE") in entries for parent in parents if str(parent) != "."):
+                if not rooted and scope not in parents:
+                    raise ValueError(f"selected path is outside the folder covered by license_path: {name}")
+                # A license deeper than the verified one needs separate rights
+                # review; no silent inheritance. Declaring it is that review.
+                deeper = [parent for parent in parents if parent != scope and (rooted or scope in parent.parents)]
+                if any(str(parent / licence) in entries for parent in deeper for licence in _LICENSE_NAMES):
                     raise ValueError(f"nested LICENSE requires review for selected path: {name}")
                 try:
                     content = _blob(repo, commit, name).decode("utf-8-sig")
@@ -153,7 +254,9 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
                 headers = re.findall(r"SPDX-License-Identifier:\s*([^\r\n*<>]+)", content, re.I)
                 if any(header.strip() != src["license"] for header in headers):
                     raise ValueError(f"selected path has a conflicting SPDX license: {name}")
-        notice = _blob(repo, commit, "NOTICE") if "NOTICE" in entries else None
+        # The NOTICE that travels with a license is the one beside it.
+        notice_path = "NOTICE" if rooted else str(scope / "NOTICE")
+        notice = _blob(repo, commit, notice_path) if notice_path in entries else None
         return license_bytes, notice
 
 

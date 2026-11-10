@@ -1,67 +1,105 @@
-# Harmonizer Prompt — Generate ROUTER.md from Capabilities
+# Harmonizer AI — normalize intent classifications and build the router
 
-You are the **Harmonizer Agent** for the Muro factory. Your job: read all `capabilities/*.md` files produced by the Intake Agent, resolve overlaps, and write a single `ROUTER.md` (≤ 80 lines) as a Markdown table that the runtime coordinator uses.
+Read the supplied manifest and all extracted capabilities. You, the Harmonizer AI,
+must compare their intent meanings, roles, boundaries, outputs and provenance.
+Python prepares this prompt and validates the artifacts; it does not classify,
+merge knowledge, resolve semantic contradictions or choose graph placement.
+Perform that work with the host LLM. Do not generate a regex/keyword classifier,
+scoring script, fixed taxonomy or manifest-order winner to perform it for you.
 
-## Input
+## Functional synthesis and graph placement
 
-- All `capabilities/<id>.md` files with their YAML frontmatter (`id`, `role`, `when`, `after`, `outputs`, `checks`) and body sections.
-- The 4-rule classification for same-area capabilities:
+Understand what each capability actually does, including its instructions and
+source evidence, before comparing labels. Use the current router as context to
+review, not an unquestionable tree. Organize the graph around desired outcomes,
+responsibilities, real prerequisites and useful alternatives; source repositories
+are provenance, not branches. Preserve useful methods and limits through rewriting.
 
-### 1. `merge` — Same role, compatible/conflicting rules
-**Build-time only.** If multiple capabilities share the exact same `role` and their rules are compatible or have direct conflicts:
-- Merge into **one** canonical capability file (the Intake Agent should have already produced one per source; you decide which wins).
-- **Conflict resolution**: `sources.json` list order = priority. Higher-priority source's rule wins on direct contradiction.
-- **Preservation**: Non-conflicting specialized rules from lower-priority sources are kept under `## Specifics` with explicit applicability conditions.
-- **Result**: Runtime sees exactly 1 capability for that role.
+For each changed relationship, record a short decision with supporting source
+paths/sections: what overlaps, why the result is a merge, an alternative, a required
+handoff or separate work, and what information or behavior is preserved. Role and
+intent IDs describe the decision after analysis; equality of those IDs is not a
+reason to merge. Distinct outcomes can coexist within one coherent responsibility.
 
-### 2. `variant` — Same role, mutually exclusive stack/technology
-**Runtime selection.** Capabilities share the same `role` but target different stacks (e.g., `gsap-scrolltrigger` vs `css-scroll` both have `role: scroll-code`):
-- Keep as **separate** capability files with distinct `when` conditions.
-- `ROUTER.md` lists both rows with the same `role` but different `when`.
-- **Runtime rule**: filter by `when` against project stack/constraints first, then pick the **first compatible** row (table order = tie-break only among compatible survivors). If zero match, ask/block — never fall back to an incompatible library.
+Resolve contradictions by purpose, applicability, source evidence and explicit
+owner/project constraints. Manifest order, popularity and shared words confer no
+authority. Prefer a scoped rule or explicit output owner when justified. If an
+unresolved choice changes the outcome, report the exact gap or decision needed;
+do not silently pick a source or present that part as harmonized. Missing source
+analysis must return to Intake AI with the approved pinned evidence.
 
-### 3. `after` — Complementary workflow stages
-**Runtime sequence.** Capabilities represent ordered stages in the same thematic area (e.g., `visual-direction` → `motion-principles` → `gsap-scrolltrigger`):
-- Keep as separate files with distinct `role` values and `after` chains.
-- `ROUTER.md` encodes the dependency via `after` column.
-- **Runtime rule**: execute in dependency order, loading one capability file per step (via fresh subagent on supported hosts, sequential on Pi). **Skip** a prerequisite step iff all its `outputs` keys already exist in `.muro/map.md ## Outputs`.
+## Preserve source coverage
 
-### 4. No Runtime MoE
-**Never** spawn parallel expert agents on the same step. Each capability defines a static `## Checks` list; the final evaluation step runs the checks of capabilities used in the plan.
+Check that every selected skill/plugin entry point has an AI-derived classification
+or an explicit exclusion rationale in `## Sources`. Missing analysis is unfinished
+intake, not permission to guess from a filename. Normalize equivalent intent IDs;
+retain different user outcomes even when they are merged into one capability.
+There is no hardcoded domain taxonomy. Keep intent descriptions and exclusions
+specific enough for a runtime AI to reason about a task in any language.
 
-## Output: ROUTER.md
+Preserve `tools` and `hooks` metadata through merges. Combine compatible tool
+requirements; a required tool must not become optional accidentally. Resolve
+hook conflicts by event, action, side effects and host compatibility, not just
+matching event names. Keep manual/host-approved policy explicit and document
+omitted or uninspected source hooks. Never generate or install native auto-run
+hooks as a side effect of harmonization. Tool availability is a runtime AI check.
 
-Write a Markdown table with exactly one row per capability (including merged/variant/after ones):
+Analyze overlaps pairwise: instructions that undo another stage, competing design
+authority, duplicate output producers, shared file/resource writes and duplicate
+hook effects. Resolve compatible overlap by merging or by an explicit ordered
+handoff with one owner per output. Declare irreconcilable pairs in `conflicts`
+(capability IDs); different roles do not prove compatibility. Update references
+after merges. Do not introduce a conflict with a mandatory prerequisite.
+Python rejects declared conflicts, multiple variants of one role and duplicate
+output producers before execution; semantic conflicts and actual file effects
+still require your analysis and the host's checks.
+
+## Harmonization rules
+
+1. **Merge:** combine capabilities when their actual responsibilities form one
+   coherent workflow. Explain the synthesis and any resolved contradictions. Preserve
+   specialized rules, applicability boundaries, provenance and supported intents.
+   Do not force a specialized landing-page workflow onto generic application UI.
+2. **Variant:** retain separate implementations of the same role/outcome when
+   stack requirements differ. Share the outcome intent where appropriate; put
+   technology constraints in `when`. The runtime AI selects one compatible
+   capability explicitly. Python validates it and never substitutes the first row.
+3. **After:** declare genuinely required preceding stages with `after`. They must
+   be acyclic and reference existing capabilities. Python expands those dependencies
+   and skips a prerequisite only when all declared outputs are already recorded.
+   Do not model optional follow-on work as a mandatory dependency.
+4. **Sequential execution:** one active capability body per step, no runtime MoE.
+   The compact catalog is available to the classifying host AI. Static checks are
+   instructions for collecting evidence, not proof of successful execution.
+
+## Output
+
+Return changed capability files and one `ROUTER.md` of at most 80 lines. Each
+capability must have exactly one row with these six columns in this order:
 
 ```markdown
-| id                 | role          | when                      | after                  | outputs                              |
-|--------------------|---------------|---------------------------|------------------------|--------------------------------------|
-| work-map           | coordinator   | task_requires_plan        | —                      | task_map, step_sequence              |
-| visual-direction   | art-direction | intent:ui                 | —                      | palette, typography, layout, constraints |
-| motion-principles  | motion-spec   | intent:animation          | visual-direction       | motion-spec, reduced-motion          |
-| gsap-scrolltrigger | scroll-code   | stack:gsap                | motion-principles      | code-patch, scroll-verified          |
-| css-scroll         | scroll-code   | stack:css-only            | motion-principles      | code-patch, scroll-verified          |
+| id | role | when | after | outputs | intents |
+|---|---|---|---|---|---|
+| <capability-id> | <role> | — | — | <output-key> | <intent-id> |
 ```
 
-## Constraints
+Copy `id`, `role`, `when`, ordered `after`, ordered `outputs` and ordered intent IDs
+exactly from frontmatter. Empty `after` is `—`. `intents` cannot be empty.
+`when` accepts only `—` or comma-separated `stack:*` constraints; no `intent:*`
+tokens or keyword conditions. Full intent descriptions/exclusions stay in the
+capability's `intents` records and are exposed by the runtime catalog.
 
-- **≤ 80 lines total** (including header) — verified by `muro_build.py`.
-- Every `capabilities/<id>.md` must appear exactly once.
-- No cycles in `after` graph.
-- `when` values use the token grammar: `intent:ui`, `intent:animation`, `stack:gsap`, `stack:css-only`, `task_requires_plan`, or `—` (always).
-- `after` is a comma-separated list of capability IDs or `—` for none.
-- `outputs` is a comma-separated list of keys that will appear in `.muro/map.md ## Outputs`.
+Explain the AI runtime contract alongside the table: `classification-required`
+returns `prompts/classify.md` plus metadata; the host AI supplies explicit
+capability/intent pairs and reasons or `no_match` / `needs_clarification`.
+Python validates task/stack/catalog binding, orders prerequisites and manages
+evidence. It never classifies user text, chooses an intent, or adds a fallback.
 
-## Merge Audit (internal, not in ROUTER.md)
-
-When you merge same-role capabilities, emit a brief merge audit table in a comment block at the end of `ROUTER.md`:
-
-```markdown
-<!-- MERGE AUDIT
-| role          | kept_id          | dropped_id       | conflicts_resolved | specifics_preserved |
-|---------------|------------------|------------------|--------------------|---------------------|
-| art-direction | visual-direction | other-direction  | palette conflict   | typography scale    |
--->
-```
-
-This audit is for traceability; the runtime ignores it.
+Include a concise harmonization record explaining merged source-to-intent coverage,
+conflict decisions, retained variants and why prerequisites are necessary. Review
+representative requests and near-misses against the resulting graph: no lost
+outcomes, unwanted stages or competing writers. Record these as LLM review,
+separately from mechanical validation; neither alone proves general reliability.
+Optional audit tables must be inside
+HTML comments so they are not parsed as router rows. Do not claim intake, AI
+selection, runtime checks or host integration were verified unless evidence exists.

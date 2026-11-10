@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-import copy
 import json
 
 # ----------------------------------------------------------------------
@@ -42,6 +41,10 @@ class Capability:
     checks: list[str]
     body: str
     path: Path
+    intents: list[dict[str, Any]] = field(default_factory=list)
+    tools: list[dict[str, Any]] = field(default_factory=list)
+    hooks: list[dict[str, Any]] = field(default_factory=list)
+    conflicts: list[str] = field(default_factory=list)
 
     @property
     def after_str(self) -> str:
@@ -59,12 +62,16 @@ class RouterRow:
     when: str
     after: str  # stored as displayed string
     outputs: str
+    intents: str = ""
 
     def after_list(self) -> list[str]:
         return [d.strip() for d in self.after.split(",") if d.strip() and d.strip() != "—"]
 
     def outputs_list(self) -> list[str]:
         return [o.strip() for o in self.outputs.split(",") if o.strip()]
+
+    def intents_list(self) -> list[str]:
+        return [i.strip() for i in self.intents.split(",") if i.strip()]
 
 
 # ----------------------------------------------------------------------
@@ -127,7 +134,59 @@ def validate_plugin_identity(plugin: dict[str, Any], installed_roots: list[Path]
 # ----------------------------------------------------------------------
 # Capability Parsing
 # ----------------------------------------------------------------------
-CAP_FIELDS = ("id", "role", "when", "after", "outputs", "checks")
+CAP_FIELDS = ("id", "role", "when", "after", "outputs", "checks", "intents", "tools", "hooks", "conflicts")
+
+
+def validate_intents(intents: Any) -> list[str]:
+    """Validate the AI-authored catalog's shape, never its semantic classification."""
+    if not isinstance(intents, list) or not intents:
+        return ["intents must be a nonempty array of AI-authored records"]
+    errors = []
+    seen = set()
+    for item in intents:
+        if not isinstance(item, dict) or set(item) != {"id", "description", "excludes"}:
+            errors.append("each intent requires exactly id, description and excludes")
+            continue
+        identifier = item["id"]
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", identifier):
+            errors.append("intent id must be a lowercase dotted or kebab-case identifier")
+        elif identifier in seen:
+            errors.append(f"duplicate intent id: {identifier}")
+        else:
+            seen.add(identifier)
+        if not isinstance(item["description"], str) or not item["description"].strip():
+            errors.append("intent description must be nonempty")
+        if not isinstance(item["excludes"], list) or any(not isinstance(x, str) or not x.strip() for x in item["excludes"]):
+            errors.append("intent excludes must be a list of nonempty strings")
+    return errors
+
+def validate_operations(tools: Any, hooks: Any) -> list[str]:
+    """Host-independent operational metadata, not executable tool/hook wiring."""
+    errors = []
+    if not isinstance(tools, list):
+        return ["tools must be an array"]
+    names = set()
+    for tool in tools:
+        if (not isinstance(tool, dict) or set(tool) != {"name", "purpose", "required"}
+                or not isinstance(tool["name"], str) or not tool["name"].strip()
+                or not isinstance(tool["purpose"], str) or not tool["purpose"].strip()
+                or not isinstance(tool["required"], bool)):
+            errors.append("each tool requires name, purpose and boolean required")
+        elif tool["name"] in names:
+            errors.append(f"duplicate tool: {tool['name']}")
+        else:
+            names.add(tool["name"])
+    if not isinstance(hooks, list):
+        return errors + ["hooks must be an array"]
+    for hook in hooks:
+        if (not isinstance(hook, dict) or set(hook) != {"event", "action", "tools", "policy"}
+                or any(not isinstance(hook[k], str) or not hook[k].strip() for k in ("event", "action", "policy"))
+                or hook["policy"] not in {"manual", "host-approved"}
+                or not isinstance(hook["tools"], list)
+                or any(not isinstance(name, str) or name not in names for name in hook["tools"])):
+            errors.append("each hook requires event, action, declared tools and policy manual|host-approved")
+    return errors
+
 
 def parse_capability(path: Path) -> Capability:
     """Parse a capabilities/<id>.md file, return Capability dataclass."""
@@ -177,9 +236,16 @@ def parse_capability(path: Path) -> Capability:
     for key in ("id", "role", "when"):
         if not isinstance(front[key], str) or not front[key].strip():
             raise ValueError(f"{path}: {key} must be a nonempty string")
-    for key in ("after", "outputs", "checks"):
+    for key in ("after", "outputs", "checks", "conflicts"):
         if not isinstance(front[key], list) or any(not isinstance(x, str) or not x for x in front[key]):
             raise ValueError(f"{path}: {key} must be a list of nonempty strings")
+
+    intent_errors = validate_intents(front["intents"])
+    if intent_errors:
+        raise ValueError(f"{path}: {'; '.join(intent_errors)}")
+    operation_errors = validate_operations(front["tools"], front["hooks"])
+    if operation_errors:
+        raise ValueError(f"{path}: {'; '.join(operation_errors)}")
 
     if front["id"] != path.stem:
         raise ValueError(f"{path}: capability id '{front['id']}' does not match filename '{path.stem}'")
@@ -215,6 +281,10 @@ def parse_capability(path: Path) -> Capability:
         checks=checks_list,
         body=body,
         path=path,
+        intents=front["intents"],
+        tools=front["tools"],
+        hooks=front["hooks"],
+        conflicts=front["conflicts"],
     )
 
 
@@ -246,15 +316,15 @@ def parse_router(path: Path) -> list[RouterRow]:
         if not line.endswith("|"):
             raise ValueError(f"{path}: malformed router row: {line}")
         return [part.strip() for part in line.split("|")[1:-1]]
-    if cells(table[0]) != ["id", "role", "when", "after", "outputs"]:
-        raise ValueError(f"{path}: invalid router header")
-    if len(cells(table[1])) != 5 or any(not re.fullmatch(r":?-{3,}:?", x) for x in cells(table[1])):
+    if cells(table[0]) != ["id", "role", "when", "after", "outputs", "intents"]:
+        raise ValueError(f"{path}: invalid router header; regenerate with the AI harmonizer (six columns including intents)")
+    if len(cells(table[1])) != 6 or any(not re.fullmatch(r":?-{3,}:?", x) for x in cells(table[1])):
         raise ValueError(f"{path}: invalid table separator")
     rows = []
     for line in table[2:]:
         parts = cells(line)
-        if len(parts) != 5 or any(not p for p in parts):
-            raise ValueError(f"{path}: expected five nonempty columns: {line}")
+        if len(parts) != 6 or any(not p for p in parts):
+            raise ValueError(f"{path}: expected six nonempty columns: {line}")
         rows.append(RouterRow(*parts))
     return rows
 
@@ -300,6 +370,10 @@ def validate_capabilities_and_router(
                 errors.append(f"Capability {cap.id}: unregistered source(s): {', '.join(unknown)}")
     seen: set[str] = set()
     for c in capabilities:
+        errors.extend(f"Capability {c.id}: {error}" for error in validate_intents(c.intents))
+        errors.extend(f"Capability {c.id}: {error}" for error in validate_operations(c.tools, c.hooks))
+        if c.when != "—" and any(not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token.strip()) for token in c.when.split(",")):
+            errors.append(f"Capability {c.id}: when accepts only stack constraints or —; classify intents separately")
         if c.id in seen:
             errors.append(f"Duplicate capability id: {c.id}")
         seen.add(c.id)
@@ -314,12 +388,16 @@ def validate_capabilities_and_router(
     graph: dict[str, list[str]] = {c.id: c.after for c in capabilities}
     by_id = {c.id: c for c in capabilities}
     for c in capabilities:
+        for conflict in c.conflicts:
+            if conflict not in by_id or conflict == c.id:
+                errors.append(f"Capability {c.id}: invalid conflict reference {conflict}")
         for dep in c.after:
             if dep not in graph:
                 errors.append(f"Capability {c.id}: missing prerequisite {dep}")
     for r in router_rows:
         cap = by_id.get(r.id)
-        if cap and (r.role != cap.role or r.when != cap.when or r.after_list() != cap.after or r.outputs_list() != cap.outputs):
+        if cap and (r.role != cap.role or r.when != cap.when or r.after_list() != cap.after or r.outputs_list() != cap.outputs
+                    or r.intents_list() != [i["id"] for i in cap.intents if isinstance(i, dict) and "id" in i]):
             errors.append(f"Router row {r.id} disagrees with capability frontmatter")
 
     def has_cycle(node: str, visited: set[str], stack: set[str], path: list[str]) -> list[str] | None:
@@ -351,7 +429,7 @@ def validate_capabilities_and_router(
 
 
 # ----------------------------------------------------------------------
-# Plan Resolver (4-rule router)
+# Legacy API: fail closed instead of choosing capabilities by role.
 # ----------------------------------------------------------------------
 def resolve_plan(
     router_rows: list[RouterRow],
@@ -359,87 +437,9 @@ def resolve_plan(
     stack_tokens: set[str],
     satisfied_outputs: set[str]
 ) -> list[str]:
-    """
-    Apply the 4 rules:
-    1. merge handled at build-time (not here)
-    2. variant: filter by `when` against stack_tokens, pick first compatible
-    3. after: order by dependencies, skip if outputs already satisfied
-    4. No MoE (handled externally via static ## Checks)
-    """
-    # Accept the original dictionary interface as well as RouterRow instances.
-    def text(value: Any) -> str:
-        return ", ".join(value) if isinstance(value, list) else str(value)
-    router_rows = [RouterRow(r["id"], r["role"], r["when"], text(r["after"]), text(r["outputs"])) if isinstance(r, dict) else r for r in router_rows]
-    # Map role -> list of rows (preserve ROUTER.md order for tie-break)
-    if {"stack:gsap", "stack:css-only"}.issubset(stack_tokens):
-        raise ValueError("Conflicting stack constraints: stack:gsap and stack:css-only")
-    role_map: dict[str, list[RouterRow]] = {}
-    for r in router_rows:
-        role_map.setdefault(r.role, []).append(r)
-
-    # 1) Pick exactly one variant per required role
-    selected: list[RouterRow] = []
-    for role in roles_needed:
-        candidates = role_map.get(role, [])
-        if not candidates:
-            raise ValueError(f"No capability for required role: {role}")
-
-        # Filter by `when` condition
-        compatible: list[RouterRow] = []
-        for c in candidates:
-            when = c.when.strip()
-            if not when or when == "—":
-                compatible.append(c)
-                continue
-            # Simple token match: when="stack:gsap" -> check if "stack:gsap" in stack_tokens
-            # when="intent:ui,stack:gsap" -> all tokens must be present
-            required = [t.strip() for t in when.split(",")]
-            if all(tok in stack_tokens for tok in required):
-                compatible.append(c)
-
-        if not compatible:
-            # Detailed error with why each candidate failed
-            reasons = []
-            for c in candidates:
-                when = c.when.strip()
-                if when and when != "—":
-                    required = [t.strip() for t in when.split(",")]
-                    missing = [tok for tok in required if tok not in stack_tokens]
-                    reasons.append(f"{c.id}: missing tokens {missing}")
-                else:
-                    reasons.append(f"{c.id}: always compatible (unexpected)")
-            raise ValueError(
-                f"No compatible variant for role '{role}' with stack tokens {sorted(stack_tokens)}. "
-                f"Candidates: {'; '.join(reasons)}"
-            )
-
-        # Deep copy to avoid mutating original router_rows
-        selected.append(copy.deepcopy(compatible[0]))
-
-    by_id = {r.id: r for r in router_rows}
-    if len(by_id) != len(router_rows):
-        raise ValueError("Duplicate router id")
-    plan: list[str] = []
-    done: set[str] = set()
-    visiting: set[str] = set()
-    def visit(row: RouterRow) -> None:
-        if row.id in done:
-            return
-        if row.id in visiting:
-            raise ValueError(f"Cycle in prerequisites at {row.id}")
-        # Do not redo ancestors when a prerequisite's outputs are already present.
-        outputs = row.outputs_list()
-        if outputs and set(outputs).issubset(satisfied_outputs):
-            done.add(row.id)
-            return
-        visiting.add(row.id)
-        for dep_id in row.after_list():
-            if dep_id not in by_id:
-                raise ValueError(f"Missing prerequisite capability: {dep_id}")
-            visit(by_id[dep_id])
-        visiting.remove(row.id)
-        done.add(row.id)
-        plan.append(row.id)
-    for row in reversed(selected):
-        visit(row)
-    return plan
+    """Keep legacy imports usable, but never derive a selection from role names."""
+    raise ValueError(
+        "Role-based resolve_plan is disabled; request host AI classification through "
+        "Coordinator.propose or plan, then submit the explicit decision with --classification. "
+        "Roles, intent tokens and catalog order cannot select capabilities."
+    )

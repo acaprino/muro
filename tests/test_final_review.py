@@ -9,11 +9,13 @@ from muro import (
     build_release,
     check_sources,
     parse_router,
-    resolve_plan,
+    RouterRow,
     validate_plugin_identity,
 )
 from muro.runtime import Coordinator
+from muro.routing import resolve_selection
 from test_regressions import git
+from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -23,6 +25,7 @@ def runtime_package(tmp_path):
     root.mkdir()
     shutil.copytree(ROOT / "capabilities", root / "capabilities")
     shutil.copy2(ROOT / "ROUTER.md", root / "ROUTER.md")
+    copy_prompts(root)
     return root
 
 
@@ -31,11 +34,12 @@ def test_new_task_does_not_reuse_old_outputs_and_archives_previous_map(tmp_path)
     project = tmp_path / "consumer"
     coordinator = Coordinator(package, project)
     old = "Build a landing page with scroll animation"
-    coordinator._write_state({"task": old, "plan": ["visual-direction", "motion-principles", "gsap-scrolltrigger"],
+    old_route = decision(coordinator, old, ["gsap-scrolltrigger"], {"stack:gsap"})
+    coordinator._write_state({"schema_version": 2, "map_id": "previous-map", "classification": old_route, "task": old, "plan": ["visual-direction", "motion-principles", "gsap-scrolltrigger"],
                               "stack_tokens": ["stack:gsap"], "outputs": {"palette": "old", "motion-spec": "old"},
                               "results": []})
     new_task = "Create another landing page with scroll animation"
-    result = coordinator.propose(new_task, {"stack:gsap"})
+    result = proposed(coordinator, new_task, ["gsap-scrolltrigger"], {"stack:gsap"})
     assert result["plan"] == ["visual-direction", "motion-principles", "gsap-scrolltrigger"]
     coordinator.confirm(new_task, result["plan"], {"stack:gsap"})
     assert coordinator._state()["task"] == new_task
@@ -45,9 +49,9 @@ def test_new_task_does_not_reuse_old_outputs_and_archives_previous_map(tmp_path)
 
 def test_documented_merge_audit_comment_is_ignored(tmp_path):
     path = tmp_path / "ROUTER.md"
-    path.write_text("""| id | role | when | after | outputs |
-|---|---|---|---|---|
-| x | testing | — | — | x |
+    path.write_text("""| id | role | when | after | outputs | intents |
+|---|---|---|---|---|---|
+| x | testing | — | — | x | testing.verify |
 <!-- MERGE AUDIT
 | role | kept_id | dropped_id | conflicts_resolved | specifics_preserved |
 |------|---------|------------|--------------------|---------------------|
@@ -59,15 +63,15 @@ def test_documented_merge_audit_comment_is_ignored(tmp_path):
 
 
 def test_explicitly_conflicting_stacks_are_rejected():
-    rows = [{"id": "gsap", "role": "scroll-code", "when": "stack:gsap", "after": [], "outputs": ["code"]},
-            {"id": "css", "role": "scroll-code", "when": "stack:css-only", "after": [], "outputs": ["code"]}]
+    rows = [RouterRow("gsap", "scroll-code", "stack:gsap", "—", "code"),
+            RouterRow("css", "scroll-code", "stack:css-only", "—", "code")]
     with pytest.raises(ValueError, match="onflict"):
-        resolve_plan(rows, ["scroll-code"], {"stack:gsap", "stack:css-only"}, set())
+        resolve_selection(rows, ["gsap"], {"stack:gsap", "stack:css-only"}, set())
 
 
 def test_registered_provenance_and_intake_are_required(portable_project, tmp_path):
     (portable_project / "capabilities" / "x.md").write_text(
-        '---\nid: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: unregistered\n', encoding="utf-8")
+        '---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: unregistered\n', encoding="utf-8")
     with pytest.raises(ValueError, match="unregistered"):
         build_release(portable_project / "sources.json", portable_project, tmp_path / "output")
 
@@ -77,7 +81,7 @@ def test_outdated_local_head_is_rejected(repo, tmp_path):
     (root / "new.txt").write_text("advance", encoding="utf-8")
     git(root, "add", "new.txt")
     git(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "advance")
-    src = {"id": "demo", "repo_path": str(root), "commit": old, "license": "MIT",
+    src = {"id": "demo", "repo_path": str(root), "commit": old, "pin": "head", "license": "MIT",
            "selected_paths": ["SKILL.md"], "excluded_paths": []}
     assert any("HEAD" in e for e in check_sources({"sources": [src]}, tmp_path))
 
@@ -93,14 +97,15 @@ def test_helper_dependencies_keep_layout_and_must_be_selected(repo, tmp_path):
     (root / "library" / "type.json").write_text("{}", encoding="utf-8")
     git(root, "add", ".")
     git(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "helpers")
-    src = {"id": "demo", "repo_path": str(root), "commit": git(root, "rev-parse", "HEAD"),
+    src = {"id": "demo", "repo_path": str(root), "commit": git(root, "rev-parse", "HEAD"), "pin": "head",
            "license": "MIT", "selected_paths": ["scripts/start.mjs", "library/type.json"], "excluded_paths": []}
     project = tmp_path / "project"
     project.mkdir()
     (project / "capabilities").mkdir()
     (project / "capabilities" / "x.md").write_text(
-        '---\nid: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
-    (project / "ROUTER.md").write_text("| id | role | when | after | outputs |\n|---|---|---|---|---|\n| x | testing | — | — | x |\n", encoding="utf-8")
+        '---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (project / "ROUTER.md").write_text(ROUTER_HEADER + "| x | testing | — | — | x | testing.verify |\n", encoding="utf-8")
+    copy_prompts(project)
     shutil.copytree(ROOT / "muro", project / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     src["intake"] = {"goal": "test"}
     (project / "sources.json").write_text(json.dumps({"plugin": {"slug": "muro", "name": "Muro", "command": "muro", "version": "1"}, "sources": [src]}), encoding="utf-8")

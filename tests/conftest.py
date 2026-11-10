@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from test_regressions import MIT
+from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts
 
 
 @pytest.fixture
@@ -42,10 +43,11 @@ def portable_project(tmp_path):
     project.mkdir()
     cap = project / "capabilities"
     cap.mkdir()
-    (cap / "x.md").write_text('---\nid: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
-    (project / "ROUTER.md").write_text("| id | role | when | after | outputs |\n|---|---|---|---|---|\n| x | testing | — | — | x |\n", encoding="utf-8")
+    (cap / "x.md").write_text('---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (project / "ROUTER.md").write_text(ROUTER_HEADER + "| x | testing | — | — | x | testing.verify |\n", encoding="utf-8")
+    copy_prompts(project)
     manifest = {"plugin": {"slug": "muro", "name": "Muro", "command": "muro", "version": "0.1.0"},
-                "sources": [{"id": "demo", "repo_path": str(repo), "commit": git("rev-parse", "HEAD"),
+                "sources": [{"id": "demo", "repo_path": str(repo), "commit": git("rev-parse", "HEAD"), "pin": "head",
                              "license": "MIT", "selected_paths": ["SKILL.md"], "excluded_paths": [],
                              "runtime_deps": [{"name": "gsap", "license": "separate", "bundled": False}],
                              "intake": {"goal": "Extract deterministic test capability rules"}}]}

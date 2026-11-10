@@ -8,7 +8,7 @@ import shutil
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
 from .factory import copy_source_helpers
-from .sources import inspect_source, parse_capabilities
+from .sources import copyright_notices, inspect_source, parse_capabilities
 
 
 def build_release(manifest_path: Path, project_root: Path, out_root: Path,
@@ -28,6 +28,10 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     errors = validate_capabilities_and_router(capabilities, router_rows, {s.get("id") for s in sources})
     if errors:
         raise ValueError("Invalid router: " + "; ".join(errors))
+    for prompt in ("intake.md", "harmonizer.md", "classify.md"):
+        path = project_root / "prompts" / prompt
+        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
+            raise ValueError(f"Required AI prompt missing or empty: {path}")
     for src in sources:
         if not isinstance(src.get("intake"), dict) or not src["intake"].get("goal"):
             raise ValueError(f"Source {src.get('id')} has no registered intake.goal")
@@ -60,9 +64,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
                  "The following upstream works are adapted and merged into Muro:", ""]
         for src, license_bytes, upstream_notice in verified:
             lines.append(f"- {src['id']} — {src['license']} (see LICENSES/{src['id']}.txt)")
-            for line in license_bytes.decode("utf-8-sig").splitlines():
-                if line.strip().lower().startswith("copyright"):
-                    lines.append(f"  {line.strip()}")
+            lines += [f"  {notice}" for notice in copyright_notices(license_bytes, src["license"])]
             lines.append("  Modified and merged into Muro.")
             if upstream_notice:
                 lines.append(upstream_notice.decode("utf-8"))

@@ -1,0 +1,123 @@
+# Working on Muro
+
+## Product contract
+
+Muro is a factory that absorbs curated pinned skills/plugins into one multi-host
+coordinator. **AI owns semantic classification** at intake, harmonization and
+runtime. Never replace it with keyword lists, regex/substring task matching,
+hardcoded domain taxonomies or an automatic coordinator fallback.
+Intake and unification are performed by the host LLM, including comprehension,
+knowledge synthesis, conflict resolution and placement in the decision graph.
+Source order and matching role/name labels do not decide precedence or merges.
+Preparation only supplies evidence; it is not completed AI intake/harmonization.
+Record concise source-grounded reasons and unresolved gaps (ADR-0008).
+
+Read README.md, ROUTER.md, the relevant capability files and
+docs/adr/ADR-0003-ai-owned-intent-classification.md before changing routing.
+ADR-0001/0002 document the original architecture; ADR-0003 records the requested
+correction and its implemented contract (its text is not yet separately approved).
+Preserve local user changes and check Git status before editing. No commit, push,
+installation, publication or replacement of existing dist output without request.
+
+## Architecture and ownership
+
+- `sources.json`: source identity, pinned revision, license gate, selected paths,
+  exclusions, runtime dependencies and source-specific intake goal. Every source
+  declares `pin`: `release` (with `release`, the published tag its commit must
+  be), `head` or `static`. Owner rule of 2026-11-10: pin published releases, not
+  an arbitrary commit; an upstream without releases follows `head`, and `static`
+  freezes a reviewed commit (ADR-0009). The license
+  is the root `LICENSE` unless `license_path` names the file that licenses the
+  source's own folder; that file covers only paths under its folder, and a
+  license deeper than the verified one always needs review (ADR-0005, ADR-0006).
+- `prompts/intake.md`: AI reads selected source skills, classifies all their
+  supported outcomes and extracts capabilities with source-to-intent provenance.
+  `prompts/harmonizer.md`: AI normalizes intent meanings, merges overlapping roles
+  and defines alternatives/dependencies. Preparation commands do not call an LLM.
+- `capabilities/*.md`: ten frontmatter fields: id, role, when, after, outputs,
+  checks, intents, tools, hooks, conflicts. `intents` is nonempty `{id, description, excludes}`
+  data. `when` is only `—` or comma-separated stack constraints. Router rows must
+  match the capability exactly, including ordered intent IDs in column six.
+- `prompts/classify.md`: the host AI interprets the runtime task and actual project
+  context. `muro/routing.py` validates its structured decision and expands only
+  explicit prerequisites. `muro/runtime.py` handles confirmation, state and evidence.
+- `muro/adapters.py` and `muro/release.py`: every host's standalone skill folder
+  includes runtime, router, capabilities, prompts and license notices. Test the
+  packaged launcher outside the source checkout, not only Python imports.
+
+## Tools, hooks and execution
+
+Catalog logical tool requirements with purpose and required/optional status.
+Catalog adopted hooks with event, action, declared tools and manual/host-approved
+policy. Record original defaults, effects, portability and omitted/uninspected
+hooks in source provenance; do not assume omitted upstream files contain none.
+The host AI must map requirements to real tools and check availability/authorization.
+Catalog metadata is not executable native hook wiring and grants no permissions.
+Never install or automatically activate upstream hooks as part of intake/build.
+
+Owner decision of 2026-11-09 ("il plugin/skill dovrebbero installarli se
+necessario"): a capability installs a runtime dependency it needs and finds
+missing (a package, a command-line tool, an application) instead of stopping. It
+states in one line what is installed, from which official source and where; uses
+project or user scope before anything wider; checks the tool answers; and never
+substitutes another engine. A failed install, or the user's objection, blocks
+only the delivery that depends on it. The classifier does not treat such a
+dependency as a reason to stop. Intake records how each dependency is checked
+and installed; when the source gives no method, it says so. Intake and build
+still install nothing, the skill or plugin itself is never installed by a
+capability, and hooks stay passive (ADR-0007).
+
+Analyze contradictions and shared resource writes during harmonization and runtime
+selection. Use `conflicts` for incompatible capability IDs, not just role labels.
+Python must reject duplicate output producers and conflicting variants before
+execution. Preserve one owner per output and explicit sequential handoffs. Map
+mutations must hold the writer lock for the full read/modify/write operation.
+Evidence is bound to its map and step: `record`/`check` require the `map_id` and
+capability returned with the step, and reject anything else unchanged. Capability
+bodies hand outputs over in `## Output handoff`, never by writing the map, and
+reference helpers as `<package_root>/scripts/<source-id>/...`.
+
+Without an AI decision, `plan` returns classification-required and executes nothing.
+The host creates the JSON and submits --classification; users need not know skill
+names or write routing JSON. no_match and needs_clarification stop execution.
+Resume preserves the validated decision; stale/legacy maps require a new
+classification and --new, archiving prior evidence on confirmation. Never silently
+migrate old keyword decisions or reuse outputs for a changed classification.
+
+## Changes and verification
+
+Keep Python standard-library-only and host-neutral. Keep upstream code inert
+during intake. Respect license/provenance rules and the one-capability-per-step
+contract. Do not hand-edit generated dist copies; build to a fresh output location.
+
+For routing changes, cover the full chain: source prompt → capability schema →
+router/catalog → AI-response boundary → plan/state → portable host adapters.
+Test malformed/unknown/stale decisions, new non-UI intents, negation-sensitive
+examples supplied as AI fixtures, variant constraints, dependencies, state
+preservation, missing tools and passive hook metadata. A fixture does not prove
+AI reasoning quality. Report real and simulated integrations separately.
+
+Run `python -m pytest -q` and `python muro_build.py --validate`. For source/build
+changes also run `python muro_build.py --check-sources` and verify a fresh staged
+release. Source checks contact pinned Git remotes. Run targeted tests first for
+new behavior and preserve failure/success evidence in docs/verification/.
+
+## Adding or re-pinning a source
+
+Look for published releases first. Pin the newest non-draft, non-prerelease tag
+with `pin: release`; only an upstream with no release or tag gets `pin: head`.
+Before moving a pin, diff the selected paths, `LICENSE` and `NOTICE` between the
+old and new commit and check that no capability relies on what changed or
+disappeared. Write the pin and its release into each capability's `## Sources`
+line and into `tests/test_<source>_intake.py`. Record the release, the diff
+summary, the commands and their results in `docs/verification/`. A release
+proves packaging; say what was not executed.
+
+## Documentation
+
+Update README.md, ROUTER.md, affected prompts/capabilities and an ADR when the
+contract changes. Preserve historical decision/evidence records; distinguish
+owner requirements, implementation choices and separately approved text. Do not
+rewrite generated ADR/FRD index blocks by hand. If their generators are unavailable,
+add a clearly labeled note outside those blocks. Keep plans outside the repository;
+verification records belong in docs/verification/. Never write new docs/superpowers/.

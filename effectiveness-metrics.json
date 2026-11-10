@@ -4,14 +4,14 @@
   "counters": {
     "eligibleTurns": 0,
     "indexReadyTurns": 0,
-    "turnsWithIndex": 1,
-    "turnsWithFallback": 6,
-    "fallbackTurnsWithoutIndex": 5,
-    "indexCalls": 1,
+    "turnsWithIndex": 2,
+    "turnsWithFallback": 9,
+    "fallbackTurnsWithoutIndex": 7,
+    "indexCalls": 2,
     "emptyResults": 0,
     "resultErrors": 0,
-    "returnedTokenEstimate": 61,
-    "fallbackCalls": 131,
-    "fallbackTokenEstimate": 381001
+    "returnedTokenEstimate": 122,
+    "fallbackCalls": 267,
+    "fallbackTokenEstimate": 696865
   }
 }

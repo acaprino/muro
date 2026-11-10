@@ -1,4 +1,5 @@
 """Regression tests for the source gate, parser and router contracts."""
+import copy
 import json
 import subprocess
 import shutil
@@ -6,8 +7,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts
 
-from muro import build_release, check_sources, parse_router, resolve_plan, validate_capabilities_and_router
+from muro import RouterRow, build_release, check_sources, parse_router, validate_capabilities_and_router
+from muro.routing import resolve_selection
 
 
 MIT = '''MIT License
@@ -54,7 +57,7 @@ def repo(tmp_path):
 
 
 def source(root, commit, **changes):
-    entry = {"id": "demo", "repo_path": str(root), "commit": commit,
+    entry = {"id": "demo", "repo_path": str(root), "commit": commit, "pin": "head",
              "license": "MIT", "selected_paths": ["SKILL.md"], "excluded_paths": []}
     entry.update(changes)
     return {"sources": [entry]}
@@ -101,20 +104,29 @@ def test_router_rejects_wrong_header_and_columns(tmp_path):
 
 
 def test_resolver_orders_shared_dependencies_without_mutating_input():
-    rows = [{"id": "b", "role": "b", "when": "—", "after": ["a"], "outputs": ["b"]},
-            {"id": "c", "role": "c", "when": "—", "after": ["b"], "outputs": ["c"]},
-            {"id": "a", "role": "a", "when": "—", "after": [], "outputs": ["a"]}]
-    original = json.loads(json.dumps(rows))
-    assert resolve_plan(rows, ["b", "c"], set(), set()) == ["a", "b", "c"]
+    rows = [RouterRow("b", "b", "—", "a", "b"),
+            RouterRow("c", "c", "—", "b", "c"),
+            RouterRow("a", "a", "—", "—", "a")]
+    original = copy.deepcopy(rows)
+    assert resolve_selection(rows, ["b", "c"], set(), set()) == ["a", "b", "c"]
     assert rows == original
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_explicit_selection_is_preserved_regardless_of_catalog_order(reverse):
+    rows = [RouterRow("first", "analysis", "—", "—", "report"),
+            RouterRow("second", "analysis", "—", "—", "report")]
+    if reverse:
+        rows.reverse()
+    assert resolve_selection(rows, ["second"], set(), set()) == ["second"]
 
 
 def test_router_validator_rejects_dangling_prerequisite(tmp_path):
     cap = tmp_path / "capabilities"
     cap.mkdir()
-    (cap / "x.md").write_text('---\nid: x\nrole: testing\nwhen: "—"\nafter: ["missing"]\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (cap / "x.md").write_text('---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: ["missing"]\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
     router = tmp_path / "ROUTER.md"
-    router.write_text("| id | role | when | after | outputs |\n|---|---|---|---|---|\n| x | testing | — | missing | x |\n", encoding="utf-8")
+    router.write_text(ROUTER_HEADER + "| x | testing | — | missing | x | testing.verify |\n", encoding="utf-8")
     assert any("missing" in error for error in validate_capabilities_and_router(cap, router))
 
 
@@ -125,8 +137,9 @@ def build_project(repo, tmp_path):
     project.mkdir()
     cap = project / "capabilities"
     cap.mkdir()
-    (cap / "x.md").write_text('---\nid: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
-    (project / "ROUTER.md").write_text("| id | role | when | after | outputs |\n|---|---|---|---|---|\n| x | testing | — | — | x |\n", encoding="utf-8")
+    (cap / "x.md").write_text('---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (project / "ROUTER.md").write_text(ROUTER_HEADER + "| x | testing | — | — | x | testing.verify |\n", encoding="utf-8")
+    copy_prompts(project)
     manifest = source(root, commit)
     manifest["plugin"] = {"slug": "muro", "name": "Muro", "command": "muro", "version": "0.1.0"}
     manifest["sources"][0]["copyright"] = "Copyright (c) 2026 Example"
@@ -216,7 +229,7 @@ def test_mit_license_with_added_restrictions_is_not_accepted(repo, tmp_path):
 def test_frontmatter_delimiters_inside_quoted_value_are_not_separators(tmp_path):
     from muro import parse_capability
     file = tmp_path / "x.md"
-    file.write_text('---\nid: x\nrole: testing\nwhen: "intent:foo---bar"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    file.write_text('---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "intent:foo---bar"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
     assert parse_capability(file).when == "intent:foo---bar"
 
 
@@ -235,9 +248,9 @@ def test_cli_build_and_existing_output_fail_safely(portable_project):
 def test_new_domain_roles_do_not_require_editing_python(tmp_path):
     cap = tmp_path / "capabilities"
     cap.mkdir()
-    (cap / "x.md").write_text('---\nid: x\nrole: sql-analysis\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (cap / "x.md").write_text('---\n' + INTENTS + 'id: x\nrole: sql-analysis\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
     router = tmp_path / "ROUTER.md"
-    router.write_text("| id | role | when | after | outputs |\n|---|---|---|---|---|\n| x | sql-analysis | — | — | x |\n", encoding="utf-8")
+    router.write_text(ROUTER_HEADER + "| x | sql-analysis | — | — | x | testing.verify |\n", encoding="utf-8")
     assert validate_capabilities_and_router(cap, router) == []
 
 

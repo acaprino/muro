@@ -32,7 +32,7 @@ def test_check_sources_accepts_pinned_mit_and_rejects_unlicensed_dir(tmp_path: P
         "sources": [{
             "id": "bad-local",
             "repo_path": str(unlicensed),
-            "commit": "a" * 40,
+            "commit": "a" * 40, "pin": "head",
             "license": "MIT",
             "selected_paths": ["SKILL.md"],
             "excluded_paths": [],
@@ -43,25 +43,14 @@ def test_check_sources_accepts_pinned_mit_and_rejects_unlicensed_dir(tmp_path: P
     assert any("LICENSE" in e or "commit" in e for e in errors)
 
 
-def test_resolve_plan_enforces_variant_filter_and_after_skip():
-    from muro import RouterRow
+@pytest.mark.parametrize("candidate_count", [1, 2])
+def test_legacy_role_resolver_requires_host_ai_even_with_compatible_candidates(candidate_count):
     rows = [
-        RouterRow(id="visual-direction", role="art-direction", when="intent:ui", after="", outputs="palette, layout"),
-        RouterRow(id="motion-principles", role="motion-spec", when="intent:animation", after="visual-direction", outputs="motion-spec, reduced-motion"),
-        RouterRow(id="gsap-scrolltrigger", role="scroll-code", when="stack:gsap", after="motion-principles", outputs="code-patch"),
-        RouterRow(id="css-scroll", role="scroll-code", when="stack:css-only", after="motion-principles", outputs="code-patch"),
+        RouterRow(id="first", role="analysis", when="—", after="—", outputs="report"),
+        RouterRow(id="second", role="analysis", when="—", after="—", outputs="report"),
     ]
-    # EX-001: full chain with GSAP allowed
-    assert resolve_plan(rows, ["scroll-code"], {"intent:ui", "intent:animation", "stack:gsap"}, set()) == [
-        "visual-direction", "motion-principles", "gsap-scrolltrigger"
-    ]
-    # EX-002 skip rule: motion-spec + reduced-motion already in map.md ## Outputs
-    assert resolve_plan(rows, ["scroll-code"], {"stack:gsap"}, {"palette", "layout", "motion-spec", "reduced-motion"}) == [
-        "gsap-scrolltrigger"
-    ]
-    # EX-002 forbidden stack: neither gsap nor css-only allowed -> raises ValueError (no blind fallback to GSAP)
-    with pytest.raises(ValueError, match="scroll-code"):
-        resolve_plan(rows, ["scroll-code"], {"stack:forbidden"}, set())
+    with pytest.raises(ValueError, match="host AI classification"):
+        resolve_plan(rows[:candidate_count], ["analysis"], set(), set())
 
 
 def test_repository_capabilities_and_router_are_valid():
@@ -85,7 +74,7 @@ def test_repository_capabilities_and_router_are_valid():
             if len(parts) >= 5:
                 router_rows.append(RouterRow(
                     id=parts[0], role=parts[1], when=parts[2],
-                    after=parts[3], outputs=parts[4]
+                    after=parts[3], outputs=parts[4], intents=parts[5]
                 ))
     errors = validate_capabilities_and_router(capabilities, router_rows)
     assert errors == []
@@ -109,7 +98,7 @@ def test_build_release_emits_branded_package_and_notices(tmp_path: Path, portabl
             if len(parts) >= 5:
                 router_rows.append(RouterRow(
                     id=parts[0], role=parts[1], when=parts[2],
-                    after=parts[3], outputs=parts[4]
+                    after=parts[3], outputs=parts[4], intents=parts[5]
                 ))
     dist_dir = build_release(portable_project / "sources.json", portable_project, tmp_path / "dist", capabilities, router_rows)
     assert dist_dir == tmp_path / "dist" / "muro"

@@ -1,7 +1,11 @@
 ---
 id: motion-principles
 role: motion-spec
-when: intent:animation
+tools: [{"name":"file-access","purpose":"Read existing UI context and record the motion specification.","required":true},{"name":"browser","purpose":"Measure timing and reduced-motion behavior when implemented UI is available.","required":false}]
+hooks: []
+conflicts: []
+when: —
+intents: [{"id":"ui.motion-design","description":"Specify purposeful motion, transition timing, easing, choreography and reduced-motion behavior for UI elements.","excludes":["A static hero or page does not imply animation.","A motion specification or hover request does not imply scroll implementation."]}]
 after: ["visual-direction"]
 outputs: ["motion-spec", "reduced-motion"]
 checks: ["easing_consistent", "timing_matches_spec", "reduced_motion_respected", "no_orphan_animations"]
@@ -20,9 +24,13 @@ Defines the motion specification for animated elements: what moves, how it moves
    - Define duration range (150–500ms for micro, 500–1200ms for macro).
    - Define choreography: stagger, sequence, or parallel.
 3. **Reduced Motion** — For every motion, specify the `prefers-reduced-motion: reduce` fallback (disable scrub/pin, instant state change, fade only).
-4. **Record** — Write to `.muro/map.md ## Outputs`:
+4. **Record** — Prepare these output keys for the handoff below:
    - `motion-spec`: per-element table (element, category, easing, duration, choreography, trigger)
    - `reduced-motion`: global toggle + per-element fallbacks
+
+## Output handoff
+
+Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from `.muro/map.md` only. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
 
 ## Motion-Design Principles (from motion-design skill)
 
