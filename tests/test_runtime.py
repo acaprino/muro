@@ -37,10 +37,11 @@ def test_scroll_task_proposes_ordered_steps_without_writing_map(package, tmp_pat
 
 
 def test_single_step_needs_no_map_or_confirmation(package, tmp_path):
-    result = proposed(Coordinator(package, tmp_path / "consumer"), "Design a page", ["visual-direction"])
+    # A short step runs directly; a step the catalog declares resumable gets a map (ADR-0015).
+    result = proposed(Coordinator(package, tmp_path / "consumer"), "Describe hover timing", ["motion-principles"])
     assert result["mode"] == "direct"
-    assert result["capability"] == "visual-direction"
-    assert "# Visual Direction" in result["instructions"]
+    assert result["capability"] == "motion-principles"
+    assert "# Motion Principles" in result["instructions"]
 
 
 def test_confirm_then_record_advances_one_step_at_a_time(package, tmp_path):
@@ -92,7 +93,7 @@ def test_record_check_requires_evidence(package, tmp_path):
     coordinator = Coordinator(package, tmp_path / "consumer")
     task = "Design a page"
     proposal = proposed(coordinator, task, ["visual-direction"])
-    step = coordinator.confirm(task, [proposal["capability"]])
+    step = coordinator.confirm(task, proposal["plan"])
     with pytest.raises(ValueError, match="evidence"):
         coordinator.record_check({"name": "palette_applied", "status": "pass"}, step["map_id"], step["capability"])
 

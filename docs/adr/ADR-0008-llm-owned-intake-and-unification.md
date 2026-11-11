@@ -3,12 +3,32 @@ adr_id: ADR-0008
 version: 1
 title: LLM-owned intake, synthesis and graph placement
 status: Proposed
+author: Alfio Caprino
+scope:
+  paths:
+    - prompts/intake.md
+    - prompts/harmonizer.md
+    - muro/factory.py
+    - muro/core.py
+  modules: []
+  domains:
+    - factory
+    - intake
+    - harmonization
+governs_symbols: []
+depends_on:
+  - ADR-0003
+created_from_task: llm-owned-intake-and-unification
 proposed_on: 2026-11-10
 accepted_on: null
 proposed_at_sha: 2e0fa680e6efd66d29d2d088294d39baf7fcc761
 accepted_at_sha: null
 last_verified_sha: null
+retired_on: null
+retired_reason: null
 supersedes: []
+superseded_by: null
+changes: []
 ---
 
 # ADR-0008: LLM-owned intake and unification

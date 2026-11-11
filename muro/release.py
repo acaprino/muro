@@ -7,6 +7,7 @@ import shutil
 
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
+from .entries import ENTRIES_FILE, load_entries, validate_entries
 from .factory import copy_source_helpers, prompts_dir, runtime_source
 from .guide import write_release_guide
 from .sources import copyright_notices, inspect_source, parse_capabilities
@@ -26,7 +27,12 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     sources = manifest.get("sources", [])
     if not isinstance(sources, list) or not sources:
         raise ValueError("sources.json must contain at least one source")
-    errors = validate_capabilities_and_router(capabilities, router_rows, {s.get("id") for s in sources})
+    errors = validate_capabilities_and_router(
+        capabilities,
+        router_rows,
+        {s.get("id") for s in sources},
+        plugin_slug=plugin.get("slug"),
+    )
     if errors:
         raise ValueError("Invalid router: " + "; ".join(errors))
     for prompt in ("intake.md", "harmonizer.md", "classify.md"):
@@ -39,6 +45,11 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     ids = [src.get("id") for src in sources]
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate source id")
+    entries_doc = load_entries(project_root)
+    if entries_doc is not None:
+        errors = validate_entries(entries_doc, capabilities, plugin)
+        if errors:
+            raise ValueError("Invalid discovery entries: " + "; ".join(errors))
     target = out_root / plugin["slug"]
     if target.exists():
         raise FileExistsError(f"Output already exists: {target}")
@@ -54,6 +65,8 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
         shutil.copytree(prompts_dir(project_root), dist / "prompts")
         (dist / "sources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         shutil.copy2(project_root / "guide-examples.json", dist / "guide-examples.json")
+        if entries_doc is not None:
+            shutil.copy2(project_root / ENTRIES_FILE, dist / ENTRIES_FILE)
         for src in sources:
             copy_source_helpers(src, project_root, dist)
 
@@ -62,11 +75,11 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
         for src, license_bytes, _ in verified:
             (licenses / f"{src['id']}.txt").write_bytes(license_bytes)
         lines = [f"{name} v{version} — Aggregated NOTICE", "",
-                 "The following upstream works are adapted and merged into Muro:", ""]
+                 f"The following upstream works are adapted and merged into {name}:", ""]
         for src, license_bytes, upstream_notice in verified:
             lines.append(f"- {src['id']} — {src['license']} (see LICENSES/{src['id']}.txt)")
             lines += [f"  {notice}" for notice in copyright_notices(license_bytes, src["license"])]
-            lines.append("  Modified and merged into Muro.")
+            lines.append(f"  Modified and merged into {name}.")
             if upstream_notice:
                 lines.append(upstream_notice.decode("utf-8"))
             lines.append("")
@@ -84,7 +97,8 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             lines += ["Runtime Dependencies (Not Bundled):", *runtime_deps, ""]
         (dist / "NOTICE.md").write_text("\n".join(lines), encoding="utf-8")
         write_release_guide(dist, plugin, sources)
-        write_adapters(dist, plugin, runtime_source(project_root))
+        write_adapters(dist, plugin, runtime_source(project_root), capabilities=capabilities,
+                       entries=entries_doc["entries"] if entries_doc else None)
         dist.replace(target)
         completed = True
         return target

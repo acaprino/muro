@@ -10,11 +10,28 @@ from typing import Any
 from .core import Capability, RouterRow
 
 
-def validate_stack(tokens: set[str]) -> None:
+_DEFAULT_STACK_CONFLICTS = [{"stack:gsap", "stack:css-only"}]
+
+
+def step_capability(step_ref: str) -> str:
+    return step_ref.split("#", 1)[0]
+
+
+def step_output_keys(step_ref: str, declared: list[str]) -> list[str]:
+    return [f"{step_ref}.{key}" for key in declared] if "#" in step_ref else list(declared)
+
+
+def selection_step_id(selection: dict[str, Any]) -> str:
+    return selection.get("step_id") or selection["capability"]
+
+
+def validate_stack(tokens: set[str], conflict_groups: list[list[str]] | None = None) -> None:
     if any(not isinstance(token, str) or not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token) for token in tokens):
         raise ValueError("Only stack:* constraint tokens are accepted; intents must come from AI classification")
-    if {"stack:gsap", "stack:css-only"}.issubset(tokens):
-        raise ValueError("Conflicting stack constraints: stack:gsap and stack:css-only")
+    groups = [set(g) for g in conflict_groups] if conflict_groups is not None else _DEFAULT_STACK_CONFLICTS
+    for group in groups:
+        if len(group) >= 2 and group.issubset(tokens):
+            raise ValueError("Conflicting stack constraints: " + " and ".join(sorted(group)))
 
 
 def catalog_entries(rows: list[RouterRow], capabilities: dict[str, Capability]) -> list[dict[str, Any]]:
@@ -25,7 +42,8 @@ def catalog_entries(rows: list[RouterRow], capabilities: dict[str, Capability]) 
              "hooks": copy.deepcopy(capabilities[row.id].hooks),
              "conflicts": list(capabilities[row.id].conflicts),
              "reads": list(capabilities[row.id].reads),
-             "needs": copy.deepcopy(capabilities[row.id].needs)} for row in rows]
+             "needs": copy.deepcopy(capabilities[row.id].needs),
+             "resumable": capabilities[row.id].resumable} for row in rows]
 
 
 def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str) -> str:
@@ -53,26 +71,42 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
     selections = value["selections"]
     if not isinstance(selections, list) or bool(selections) != (value["status"] == "selected"):
         raise ValueError("Only selected classifications require nonempty selections")
-    seen = set()
-    order = [s.get("capability") for s in selections if isinstance(s, dict)]
-    for selection in selections:
-        if (not isinstance(selection, dict) or set(selection) - {"needs"} != {"capability", "intent", "reason"}
+    seen_steps: set[str] = set()
+    bare_seen: set[str] = set()
+    instanced_caps: set[str] = set()
+    order_caps = [s.get("capability") for s in selections if isinstance(s, dict)]
+    order_steps = [s.get("step_id") or s.get("capability") for s in selections if isinstance(s, dict)]
+    for idx, selection in enumerate(selections):
+        if (not isinstance(selection, dict) or set(selection) - {"needs", "step_id"} != {"capability", "intent", "reason"}
                 or any(not isinstance(selection[k], str) or not selection[k].strip() for k in ("capability", "intent", "reason"))):
             raise ValueError("Each selection requires capability, intent and reason strings")
         identifier = selection["capability"]
+        step_id = selection.get("step_id")
+        if step_id is not None:
+            if not isinstance(step_id, str) or not re.fullmatch(rf"{re.escape(identifier)}#[1-9][0-9]*", step_id):
+                raise ValueError(f"Invalid step_id '{step_id}': must match {identifier}#<n>")
+            if identifier in bare_seen:
+                raise ValueError(f"Cannot mix bare capability and step_id for {identifier}")
+            instanced_caps.add(identifier)
+            step_key = step_id
+        else:
+            if identifier in instanced_caps:
+                raise ValueError(f"Cannot mix bare capability and step_id for {identifier}")
+            bare_seen.add(identifier)
+            step_key = identifier
         if identifier in capabilities:
-            _validate_needs(selection, capabilities[identifier], order)
+            _validate_needs(selection, capabilities[identifier], order_caps, order_steps, idx)
         if identifier not in capabilities:
             raise ValueError(f"Unknown capability in AI classification: {identifier}")
-        if identifier in seen:
-            raise ValueError(f"Duplicate capability in AI classification: {identifier}")
-        seen.add(identifier)
+        if step_key in seen_steps:
+            raise ValueError(f"Duplicate capability in AI classification: {step_key}; use distinct step_id for repeated steps")
+        seen_steps.add(step_key)
         if selection["intent"] not in {i["id"] for i in capabilities[identifier].intents}:
             raise ValueError(f"Unknown intent for capability {identifier}: {selection['intent']}")
     return copy.deepcopy(value)
 
 
-def _validate_needs(selection: dict, capability: Capability, order: list) -> None:
+def _validate_needs(selection: dict, capability: Capability, order_caps: list, order_steps: list, self_idx: int) -> None:
     """The AI judged every declared conditional prerequisite; Python only holds it to that judgment."""
     identifier = capability.id
     declared = [need["capability"] for need in capability.needs]
@@ -84,22 +118,28 @@ def _validate_needs(selection: dict, capability: Capability, order: list) -> Non
             or not isinstance(item["requires"], str) or not isinstance(item["applies"], bool)
             or not isinstance(item["reason"], str) or not item["reason"].strip() for item in judged)):
         raise ValueError(f"Each needs judgment for {identifier} requires requires, boolean applies and a reason")
-    if sorted(item["requires"] for item in judged) != sorted(declared):
+    if sorted(step_capability(item["requires"]) for item in judged) != sorted(declared):
         raise ValueError(f"Selection {identifier} must judge exactly its declared conditional prerequisites: {declared}")
     for item in judged:
         if not item["applies"]:
             continue
         required = item["requires"]
-        if required not in order:
+        req_cap = step_capability(required)
+        if required in order_steps:
+            req_idx = order_steps.index(required)
+        elif req_cap in order_caps:
+            req_idx = order_caps.index(req_cap)
+        else:
             raise ValueError(f"{identifier} needs {required} for this task (applies: true), but it is not selected")
-        if order.index(required) > order.index(identifier):
+        if req_idx > self_idx:
             raise ValueError(f"{identifier} needs {required} first: select {required} before it")
 
 
 def resolve_selection(rows: list[RouterRow], selected: list[str], stack: set[str], outputs: set[str],
-                      conflicts: dict[str, list[str]] | None = None) -> list[str]:
+                      conflicts: dict[str, list[str]] | None = None,
+                      conflict_groups: list[list[str]] | None = None) -> list[str]:
     """Expand prerequisites only. Never choose a role, variant or additional intent."""
-    validate_stack(stack)
+    validate_stack(stack, conflict_groups=conflict_groups)
     by_id = {row.id: row for row in rows}
     plan: list[str] = []
     done: set[str] = set()
@@ -108,37 +148,38 @@ def resolve_selection(rows: list[RouterRow], selected: list[str], stack: set[str
     producers: dict[str, str] = {}
     conflicts = conflicts or {}
 
-    def visit(identifier: str) -> None:
-        if identifier in done:
+    def visit(step_ref: str) -> None:
+        if step_ref in done:
             return
-        if identifier in visiting:
-            raise ValueError(f"Cycle in prerequisites at {identifier}")
-        if identifier not in by_id:
-            raise ValueError(f"Unknown selected or prerequisite capability: {identifier}")
-        row = by_id[identifier]
+        if step_ref in visiting:
+            raise ValueError(f"Cycle in prerequisites at {step_ref}")
+        cap_id = step_capability(step_ref)
+        if cap_id not in by_id:
+            raise ValueError(f"Unknown selected or prerequisite capability: {step_ref}")
+        row = by_id[cap_id]
         required = {token.strip() for token in row.when.split(",") if token.strip() != "—"}
         if not required.issubset(stack):
-            raise ValueError(f"Incompatible constraints for {identifier}: missing {sorted(required - stack)}")
-        if row.role in roles and roles[row.role] != identifier:
-            raise ValueError(f"Conflicting variants for role {row.role}: {roles[row.role]}, {identifier}")
-        roles[row.role] = identifier
+            raise ValueError(f"Incompatible constraints for {cap_id}: missing {sorted(required - stack)}")
+        if row.role in roles and roles[row.role] != cap_id:
+            raise ValueError(f"Conflicting variants for role {row.role}: {roles[row.role]}, {cap_id}")
+        roles[row.role] = cap_id
         for other in roles.values():
-            if other in conflicts.get(identifier, []) or identifier in conflicts.get(other, []):
-                raise ValueError(f"Conflicting capabilities: {identifier}, {other}")
-        declared = row.outputs_list()
+            if other != cap_id and (other in conflicts.get(cap_id, []) or cap_id in conflicts.get(other, [])):
+                raise ValueError(f"Conflicting capabilities: {cap_id}, {other}")
+        declared = step_output_keys(step_ref, row.outputs_list())
         for output in declared:
-            if output in producers and producers[output] != identifier:
-                raise ValueError(f"Conflicting output producers for {output}: {producers[output]}, {identifier}")
-            producers[output] = identifier
+            if output in producers and producers[output] != step_ref:
+                raise ValueError(f"Conflicting output producers for {output}: {producers[output]}, {step_ref}")
+            producers[output] = step_ref
         if declared and set(declared).issubset(outputs):
-            done.add(identifier)
+            done.add(step_ref)
             return
-        visiting.add(identifier)
+        visiting.add(step_ref)
         for prerequisite in row.after_list():
             visit(prerequisite)
-        visiting.remove(identifier)
-        done.add(identifier)
-        plan.append(identifier)
+        visiting.remove(step_ref)
+        done.add(step_ref)
+        plan.append(step_ref)
 
     # Explicit roots whose outputs are complete do not force their ancestors again.
     for identifier in selected:

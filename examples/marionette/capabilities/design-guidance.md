@@ -32,7 +32,7 @@ Searches the packaged ui-ux-pro-max data offline for design-system candidates an
 
 ## Output handoff
 
-Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return both output keys as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return both output keys as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

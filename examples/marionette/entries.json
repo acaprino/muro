@@ -1,0 +1,46 @@
+{
+  "entries": [
+    {
+      "name": "marionette-web-design",
+      "description": "Use when designing, building or restyling a website or landing page (offer, copy, outline, palette, fonts, layout), when choosing a design system, palette, typography or accessibility and UX rules for an app screen, dashboard or component, or when creating or updating designs, components and tokens inside a Figma file.",
+      "capabilities": [
+        "visual-direction",
+        "design-guidance",
+        "figma-design"
+      ]
+    },
+    {
+      "name": "marionette-motion",
+      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
+      "capabilities": [
+        "motion-principles",
+        "gsap-scrolltrigger",
+        "css-scroll"
+      ]
+    },
+    {
+      "name": "marionette-office",
+      "description": "Use when producing a real PowerPoint deck, Word document, Excel workbook or PDF file from a brief, notes or data, or when reading, extracting from, editing, filling, converting or redlining an existing Word, Excel, PowerPoint or PDF file. Not for text wanted only in the chat or as Markdown.",
+      "capabilities": [
+        "office-deck",
+        "office-authoring",
+        "office-files"
+      ]
+    },
+    {
+      "name": "marionette-explainer",
+      "description": "Use when turning a paper, article, transcript, topic or one mechanism of a codebase into a self-contained interactive HTML explainer with figures the reader can operate, or when fact-checking an existing explainer or article claim by claim against its sources or code. Not for an explanation wanted in the chat.",
+      "capabilities": [
+        "interactive-explainer",
+        "explainer-fact-check"
+      ]
+    },
+    {
+      "name": "marionette-engineering",
+      "description": "Use when a software change is larger than one sitting or still has open decisions: agreeing the destination, resolving decisions with the user, writing a spec, slicing it into vertical tickets, then building and reviewing slice by slice with test evidence. Not for a small, already clear change such as a rename or a one-file fix.",
+      "capabilities": [
+        "work-map"
+      ]
+    }
+  ]
+}

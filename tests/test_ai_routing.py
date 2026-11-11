@@ -36,8 +36,8 @@ def test_ai_selects_static_hero_without_python_adding_motion(coordinator):
     task = "Design a static hero without animation"
     route = decision(coordinator, task, ["visual-direction"], {"stack:gsap"})
     result = coordinator.propose(task, {"stack:gsap"}, classification=route)
-    assert result["mode"] == "direct"
-    assert result["capability"] == "visual-direction"
+    # One step, nothing added; it is declared resumable, so it gets a map without asking approval.
+    assert result == {"mode": "confirm", "task": task, "plan": ["visual-direction"], "approval": "not-needed"}
 
 
 def test_motion_spec_does_not_imply_scroll_implementation(coordinator):
@@ -360,7 +360,7 @@ def test_active_bodies_deliver_outputs_without_direct_managed_map_writes(coordin
 
 
 def test_helper_commands_resolve_against_installed_package_not_consumer(coordinator):
-    result = proposed(coordinator, "Create a page", ["visual-direction"])
+    result = coordinator.confirm("Create a page", proposed(coordinator, "Create a page", ["visual-direction"])["plan"])
     assert result["package_root"] == str(coordinator.package_root)
     assert '<package_root>/scripts/taste-skill/scripts/start.mjs' in result["instructions"]
     assert 'scripts/taste-skill/start.mjs' not in result["instructions"]

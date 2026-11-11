@@ -91,3 +91,35 @@ only for a chosen path or intent, conditional subordination judged by the LLM,
 and generated labels of 5 words at most. Proposed: the decisions are the owner's,
 the wording is not separately approved. This manual note is outside the
 historical generated index.
+
+## Runtime lifecycle, discovery and factory-isolation amendment
+
+[ADR-0013 — Slug-neutral step handoff, map completion lifecycle, low-ceremony batch CLI and factory isolation](ADR-0013-runtime-lifecycle-discovery-and-factory-isolation.md)
+records the 2026-11-11 full audit remediation authorized by the owner: canonical
+`state_dir` and `recorded_outputs` handoffs, `active|completed` map lifecycle
+restoring `direct` mode, stale-digest isolation, domain-aware `SKILL.md`
+descriptions, atomic inline/stdin `step` batches, multi-instance `step_id`,
+manifest-driven stack rules, strict frontmatter validation, token-bound lock
+recovery, `--offline-pins`, configurable install policy and guide language.
+Proposed pending separate approval of the text. This manual note is outside the
+historical generated index.
+
+## Discovery entries amendment
+
+[ADR-0014 — Discovery entries](ADR-0014-discovery-entries.md) records the
+owner's 2026-11-11 choice of area entries after the live host test: AI-authored
+`entries.json` groups with sharp descriptions, emitted as extra skills that run the
+same coordinator, hidden from the Claude Code slash menu. Proposed: the choice is
+the owner's, the wording is not separately approved. This manual note is outside
+the historical generated index.
+
+## Design principles amendment
+
+[ADR-0015 — Design principles learned from the first audit and live host tests](ADR-0015-design-principles-from-first-real-use.md)
+turns the 2026-11-11 failures and successes into five principles with their
+mechanisms: design for the second time (`--amend`, rerunnable preparation,
+`--build --out`), declare do not infer (`resumable`, `plugin.replaces`), verify
+from outside (routing eval, live host run), fit the host, and keep AI semantics
+while shrinking ceremony. Proposed at the owner's request to learn from the
+evidence; the wording is not separately approved. This manual note is outside the
+historical generated index.

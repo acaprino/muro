@@ -39,7 +39,7 @@ Coordinates an engineering change with the wayfinder method: agree the destinati
 
 ## Output handoff
 
-Return `task_map` (the route chosen and, for a charted map, its index), `spec` (the spec text or its local path, or why the route needed none) and `step_sequence` (the approved slices with blocking edges, acceptance criteria and per-slice evidence) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. The wayfinder map is this capability's own output, not Muro's run map: do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return `task_map` (the route chosen and, for a charted map, its index), `spec` (the spec text or its local path, or why the route needed none) and `step_sequence` (the approved slices with blocking edges, acceptance criteria and per-slice evidence) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. The wayfinder map is this capability's own output, not the coordinator's run map: do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

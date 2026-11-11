@@ -3,7 +3,46 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.1.0"
+    "version": "0.1.0",
+    "language": "it",
+    "description": "Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, creating or updating Figma designs, specifying UI motion or implementing GSAP ScrollTrigger and CSS scroll animations, creating, editing or converting Word, Excel, PowerPoint and PDF Office files with GenOffice, coordinating multi-slice software specs, or authoring and fact-checking interactive HTML explainers.",
+    "replaces": [
+      "taste-skill",
+      "design-taste-frontend",
+      "landing-page-design",
+      "figma-designer",
+      "motion-design",
+      "gsap-scrolltrigger",
+      "ui-ux-pro-max",
+      "genoffice",
+      "creating-explainers",
+      "explaining-codebases",
+      "fact-checking-explainers"
+    ]
+  },
+  "stack": {
+    "detectors": [
+      {
+        "file": "package.json",
+        "json_keys": [
+          "dependencies",
+          "devDependencies",
+          "peerDependencies",
+          "optionalDependencies"
+        ],
+        "contains": "gsap",
+        "emits": "stack:gsap",
+        "unless": [
+          "stack:css-only"
+        ]
+      }
+    ],
+    "conflicts": [
+      [
+        "stack:gsap",
+        "stack:css-only"
+      ]
+    ]
   },
   "sources": [
     {

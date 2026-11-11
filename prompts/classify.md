@@ -32,8 +32,9 @@ existing artifacts and explicit non-goals. Select the smallest sufficient set of
 capabilities. The coordinator adds their `after` prerequisites mechanically.
 If a prerequisite's outputs exist, record/reuse them through the workflow rather
 than inventing completion. Do not select a capability just because its stack exists.
-A static hero does not imply motion; hover timing does not imply scroll code;
-mentioning Figma as inspiration does not request Figma editing.
+Do not extrapolate unrequested stages: a static layout does not imply animation;
+an interaction specification does not imply scroll or runtime code; mentioning an
+external design or document tool as inspiration does not request editing in it.
 
 Choose at most one variant per role, justified by the request and compatible stack.
 Respect `conflicts` for the whole selected/prerequisite graph. Compare actual
@@ -41,15 +42,15 @@ target artifacts, design authority and tool/hook side effects: never select two
 independent writers for the same resource or stages that undo approved work.
 Where an authorized sequential handoff is needed, make ownership and consumed
 outputs explicit. Python's output/conflict checks cannot detect undeclared effects.
-`stack:css-only` expresses an explicit implementation constraint, not an empty
-package.json. If needed, inspect the project and rerun `plan` with factual
-`--stack` tokens before authoring the classification. Never invent a stack token
-merely to make a preferred capability pass validation. `stack:gsap` names GSAP as
-the scroll engine: already in the project, or adopted because the request names
-no other library and nothing rules a JavaScript library out; its step then
-installs GSAP when it is missing. Never pass it against a CSS-only constraint.
-Tool availability (for example Figma MCP) must be checked before executing the
-capability. What a task needs installed is judged at runtime, case by case.
+Restrictive `stack:*-only` tokens express an explicit implementation constraint,
+not an empty project manifest. When a capability requires a `stack:*` token for
+an installable library that the task adopts and nothing rules out, pass that
+factual `--stack` token when submitting `--classification` (the `catalog_digest`
+does not depend on `stack_tokens`, so no extra `plan` rerun is needed) and set
+matching `stack_tokens` in the JSON; its step then installs the missing library.
+Never pass a library stack token against a conflicting constraint. External host
+integrations tied to user accounts must be checked before executing the capability.
+What a task needs installed is judged at runtime, case by case.
 
 ## Return JSON
 
@@ -70,7 +71,9 @@ and `catalog_digest`. Add exactly `status`, `selections`, `reason`, `questions`:
 }
 ```
 
-- `selected`: nonempty selections, one entry per capability, no questions.
+- `selected`: nonempty selections, one entry per step, no questions. When the
+  same capability must run multiple distinct operations in one plan, give each
+  occurrence an explicit `"step_id": "<capability>#<n>"` (for example `#1`, `#2`).
   Select complementary capabilities explicitly when both are requested, in
   execution order: a capability that consumes another's outputs comes after it.
   The catalog's `reads` lists the outputs each capability uses when recorded.
@@ -84,7 +87,7 @@ and `catalog_digest`. Add exactly `status`, `selections`, `reason`, `questions`:
   Decide from meaning and context; an already recorded output can make a
   condition false. Omit `needs` for capabilities that declare none.
 - `no_match`: empty selections/questions and a reason explaining the unsupported
-  outcome. Do not select work-map just because nothing else fits.
+  outcome. Never select a general coordination capability merely because nothing else fits.
 - `needs_clarification`: empty selections, nonempty targeted questions and a reason
   explaining the ambiguity or missing constraint. Ask the user, then classify
   the clarified task with a fresh context. Never silently route the confident part

@@ -7,6 +7,13 @@ lists, regex/substring matching, a fixed taxonomy, classification by repository 
 or a script that generates meaning, roles or relationships. The host LLM performs
 the intake; successful file preparation is not completed intake.
 
+## Scope comes from the sources
+
+The package does whatever its approved sources do. A source that works on code
+makes the package work on code; one that makes Office files makes it make Office
+files. Never narrow, question or defer a domain that a selected source covers:
+selecting the source was the decision.
+
 ## Understand purpose before extraction
 
 Read the selected entry points and their supplied supporting material as a whole.
@@ -69,6 +76,9 @@ conflicts: []
 one uses when they are already recorded, e.g. `reads: ["palette", "typography"]`.
 It documents data flow only. It never adds a step, never blocks a capability
 whose inputs are absent, and is not a substitute for `after`.
+
+`resumable: true` is optional: set it when the step is long or pauses for the
+user, so it gets a resumable map even as the only step. Never infer it from size.
 
 `needs` is an optional twelfth field for a prerequisite that holds only in some
 cases: `needs: [{"capability":"<id>","label":"<at most 5 words>","when":"<condition in plain language>","reason":"<why>"}]`.
@@ -134,11 +144,12 @@ tests/evidence are recorded at runtime, never automatically marked passed by
 this document.
 
 `## Output handoff` tells the host to return every declared output key as a JSON
-string and, for a mapped step, to submit them through the coordinator's `record`
-command with the step's `map_id` and `capability`. A capability may read earlier
-outputs, but must state that the host does not edit the managed map or state
-files: the coordinator is their only writer. Never instruct a capability to
-write outputs into the map itself.
+string and, for a mapped step, to submit them through the coordinator's `step`
+or `record` command with the step's `map_id` and `capability`. A capability may
+read earlier outputs from the returned `recorded_outputs` (or `<state_dir>/map.md`),
+but must state that the host does not edit `<state_dir>/map.md` or
+`<state_dir>/state.json`: the coordinator is their only writer. Never hardcode
+`.muro/` for a package slug or instruct a capability to write outputs into the map itself.
 
 Reference an approved helper as `<package_root>/scripts/<source-id>/<path>`,
 where `<path>` is its selected path without the leading `skills/<source-id>/` or

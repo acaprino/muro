@@ -260,7 +260,32 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
         return license_bytes, notice
 
 
-def check_sources(manifest: dict[str, Any], base_dir: Path) -> list[str]:
+def _validate_source_shape(src: dict[str, Any]) -> None:
+    if not isinstance(src.get("id"), str) or not SLUG_PATTERN.fullmatch(src["id"]):
+        raise ValueError("source id must be kebab-case")
+    commit = src.get("commit", "")
+    if not isinstance(commit, str) or not COMMIT_PATTERN.fullmatch(commit):
+        raise ValueError("commit must be a 40-character hexadecimal SHA")
+    pin_mode(src)
+    local, remote = src.get("repo_path"), src.get("repo_url")
+    if bool(local) == bool(remote):
+        raise ValueError("exactly one of repo_path and repo_url is required")
+    if remote and (not isinstance(remote, str) or remote.startswith("-") or not remote.startswith(("https://", "file://"))):
+        raise ValueError("repo_url must be an HTTPS or file URL")
+    if src.get("license") not in {"MIT", "Apache-2.0"}:
+        raise ValueError("license must be MIT or Apache-2.0")
+    selected = src.get("selected_paths")
+    excluded = src.get("excluded_paths", [])
+    if not isinstance(selected, list) or not selected or not isinstance(excluded, list):
+        raise ValueError("selected_paths must be a nonempty list; excluded_paths must be a list")
+    if not all(_safe_pattern(p) for p in selected + excluded):
+        raise ValueError("unsafe source path or pattern")
+    license_path = src.get("license_path", "LICENSE")
+    if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
+        raise ValueError("license_path must be a plain repository-relative file path")
+
+
+def check_sources(manifest: dict[str, Any], base_dir: Path, offline_pins: bool = False) -> list[str]:
     errors: list[str] = []
     sources = manifest.get("sources", [])
     if not isinstance(sources, list) or not sources:
@@ -276,6 +301,9 @@ def check_sources(manifest: dict[str, Any], base_dir: Path) -> list[str]:
             continue
         seen.add(sid)
         try:
+            _validate_source_shape(src)
+            if offline_pins and isinstance(src.get("repo_url"), str) and src["repo_url"].startswith("https://"):
+                continue
             inspect_source(src, base_dir)
         except (OSError, ValueError, UnicodeError) as exc:
             errors.append(f"[{sid}] {exc}")

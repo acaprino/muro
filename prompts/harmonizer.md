@@ -61,6 +61,41 @@ catalog changes. Preserve deliberate execution order and explain any collaborati
 do not turn an illustrative path into a mandatory dependency. These are documented
 human/LLM decisions, not executable browser classifications or semantic test proof.
 
+## Discovery entries
+
+Hosts choose a skill from its description, and a narrow description beats a broad
+one. Maintain `entries.json` as part of harmonization: a few discovery entries,
+each a group of capabilities that serves one kind of user request, with its own
+skill `name` (kebab-case, starting with `<plugin command>-`) and one-line
+`description` of at most 1024 characters. Start with "Use when", name the outcomes
+and artifacts in the words a user would use, and add a short "Not for …" when an
+exclusion prevents a likely false trigger. Group by what users ask for together,
+not by source repository. Every capability belongs to at least one entry: the
+package's scope is what its intake absorbed, so nothing absorbed is kept out of
+discovery. Narrowing the scope means removing a source, never hiding a
+capability or asking the owner whether a domain is allowed. Entries only help the host find the coordinator: the
+runtime still classifies against the whole catalog. Review the entries whenever
+capabilities, intents or exclusions change.
+
+## Step weight, replaced originals and eval cases
+
+Declare `resumable: true` on a capability whose step is long or asks the user
+something along the way (a build with review rounds, an approval pause): it then
+gets a resumable map even when it is the only step. Decide from what the body
+actually does; a lookup or a single conversion stays without it.
+
+List in `sources.json` `plugin.replaces` the names under which the absorbed
+skills and plugins are normally installed, taken from the sources' own manifests
+and skill names. The install notes tell the user to switch them off, because an
+installed original competes with the coordinator for the same requests.
+
+Maintain `eval-cases.json`: representative requests in the users' own language
+with the expected `status` and ordered capabilities, including near-misses and
+requests the catalog must refuse (`no_match`). Write them as a user would, never
+with capability or intent names. They are scored against a real model's decisions;
+when a case fails, decide whether the catalog wording or the expectation is wrong
+and record which.
+
 ## Preserve source coverage
 
 Check that every selected skill/plugin entry point has an AI-derived classification
@@ -122,8 +157,9 @@ still require your analysis and the host's checks.
 
 ## Output
 
-Return changed capability files, reviewed `guide-examples.json` and one
-`ROUTER.md` of at most 80 lines. Each capability must have exactly one row with
+Return changed capability files, reviewed `guide-examples.json`, `entries.json`
+and `eval-cases.json`, and one `ROUTER.md` of at most 80 lines. Write them in the package
+directory, beside `sources.json`: capabilities under `capabilities/`. Each capability must have exactly one row with
 these six columns in this order:
 
 ```markdown

@@ -29,7 +29,7 @@ Creates a new Word document, Excel workbook or PDF as a real file with the local
 
 ## Output handoff
 
-Return `office_file` (every path written) and `office_review` (check findings, what was looked at, warnings) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return `office_file` (every path written) and `office_review` (check findings, what was looked at, warnings) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

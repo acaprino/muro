@@ -3,6 +3,7 @@ id: visual-direction
 role: art-direction
 tools: [{"name":"shell","purpose":"Run the packaged taste-skill dealer (start.mjs) and screenshot script (shoot.mjs) with Node 22 or later.","required":true},{"name":"file-access","purpose":"Read the brief's material and the project's stack, and write the page in it.","required":true},{"name":"browser","purpose":"Chrome, Edge or Chromium, run headless by shoot.mjs for the screenshot review.","required":true}]
 hooks: []
+resumable: true
 conflicts: []
 when: —
 intents: [{"id":"ui.visual-direction","description":"Design and build, or restyle, a company website or landing page with one dealt visual system (palette, type pairing, radius, layout by screens, hero and moments) fitted to the kind of business, in the project's own stack or as a static page; or stop at the recorded direction when only that is asked.","excludes":["A motion request does not by itself require redesign.","A static hero does not imply animation.","An app screen, dashboard, settings view or component library is interface work for design guidance, not a website page.","Slide decks, Office files, Figma files and interactive explainer articles have their own style steps."]},{"id":"ui.landing-strategy","description":"Define a landing page's offer, audience, one primary action, risk reversal, proof beside each claim, objections and a conversion-oriented outline and copy, alone or before the page is built.","excludes":["App screens do not require a sales funnel.","Copy for an email, an ad or a social post is not a landing page."]}]
@@ -37,7 +38,7 @@ Plans, deals and builds a company website or landing page the way the pinned tas
 
 ## Output handoff
 
-Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

@@ -50,6 +50,9 @@ class Capability:
     # Conditional prerequisites: {capability, label, when, reason}. The host AI judges `when` per task;
     # `label` is its AI-written summary for graph arrows, at most 5 words.
     needs: list[dict[str, str]] = field(default_factory=list)
+    output_types: dict[str, str] = field(default_factory=dict)
+    # AI-declared: a long or interactive step that gets a map even when it is the only step.
+    resumable: bool = False
 
     @property
     def after_str(self) -> str:
@@ -112,6 +115,18 @@ def validate_plugin_identity(plugin: dict[str, Any], installed_roots: list[Path]
     if not isinstance(version, str) or not version.strip():
         errors.append("plugin.version is required")
 
+    install_policy = plugin.get("install_policy", "auto")
+    if not isinstance(install_policy, str) or install_policy not in {"auto", "confirm"}:
+        errors.append("plugin.install_policy must be auto or confirm")
+
+    language = plugin.get("language", "en")
+    if not isinstance(language, str) or language not in {"en", "it"}:
+        errors.append("plugin.language must be en or it")
+
+    replaces = plugin.get("replaces", [])
+    if not isinstance(replaces, list) or any(not isinstance(r, str) or not r.strip() for r in replaces):
+        errors.append("plugin.replaces must be a list of skill or plugin names this package absorbs")
+
     for root in installed_roots or []:
         if not root.is_dir():
             errors.append(f"installed host root not found: {root}")
@@ -140,6 +155,7 @@ def validate_plugin_identity(plugin: dict[str, Any], installed_roots: list[Path]
 # Capability Parsing
 # ----------------------------------------------------------------------
 CAP_FIELDS = ("id", "role", "when", "after", "outputs", "checks", "intents", "tools", "hooks", "conflicts")
+ALLOWED_CAP_FIELDS = frozenset(CAP_FIELDS) | {"reads", "needs", "output_types", "resumable"}
 
 
 def validate_intents(intents: Any) -> list[str]:
@@ -211,6 +227,8 @@ def parse_capability(path: Path) -> Capability:
         line = line.strip()
         if not line:
             continue
+        if line == "-" or line.startswith("- "):
+            raise ValueError(f"{path}:{line_num}: multiline YAML block lists are not supported in capability frontmatter; use single-line JSON arrays")
         if ":" not in line:
             raise ValueError(f"{path}:{line_num}: frontmatter line must contain ':': {line}")
         k, raw_v = line.split(":", 1)
@@ -234,6 +252,9 @@ def parse_capability(path: Path) -> Capability:
             raise ValueError(f"{path}:{line_num}: duplicate frontmatter key: {k}")
         front[k] = v
 
+    unknown_fields = sorted(set(front) - ALLOWED_CAP_FIELDS)
+    if unknown_fields:
+        raise ValueError(f"{path}: unknown frontmatter fields: {unknown_fields}")
     missing = [f for f in CAP_FIELDS if f not in front]
     if missing:
         raise ValueError(f"{path}: missing frontmatter fields: {missing}")
@@ -243,6 +264,15 @@ def parse_capability(path: Path) -> Capability:
             raise ValueError(f"{path}: {key} must be a nonempty string")
     front.setdefault("reads", [])  # optional eleventh field
     front.setdefault("needs", [])  # optional twelfth field: AI-judged conditional prerequisites
+    front.setdefault("resumable", False)  # optional: declared step weight, never inferred from step count
+    if not isinstance(front["resumable"], bool):
+        raise ValueError(f"{path}: resumable must be true or false")
+    front.setdefault("output_types", {})  # optional thirteenth field: output verification hints
+    if not isinstance(front["output_types"], dict) or any(
+        not isinstance(k, str) or k not in front.get("outputs", []) or v not in {"path", "text", "external"}
+        for k, v in front["output_types"].items()
+    ):
+        raise ValueError(f"{path}: output_types must map declared output keys to path, text or external")
     for need in front["needs"] if isinstance(front["needs"], list) else [None]:
         if (not isinstance(need, dict) or set(need) != {"capability", "label", "when", "reason"}
                 or any(not isinstance(v, str) or not v.strip() for v in need.values())):
@@ -300,6 +330,8 @@ def parse_capability(path: Path) -> Capability:
         conflicts=front["conflicts"],
         reads=[key.strip() for key in front["reads"]],
         needs=front["needs"],
+        output_types=dict(front["output_types"]),
+        resumable=front["resumable"],
     )
 
 
@@ -348,6 +380,7 @@ def validate_capabilities_and_router(
     capabilities: list[Capability],
     router_rows: list[RouterRow],
     registered_sources: set[str] | None = None,
+    plugin_slug: str | None = None,
 ) -> list[str]:
     """Validate capabilities and router rows; return list of errors."""
     errors: list[str] = []
@@ -383,6 +416,12 @@ def validate_capabilities_and_router(
             unknown = sorted(sources - registered_sources)
             if unknown:
                 errors.append(f"Capability {cap.id}: unregistered source(s): {', '.join(unknown)}")
+    if plugin_slug is not None and plugin_slug != "muro":
+        for cap in capabilities:
+            if ".muro/" in cap.body:
+                errors.append(
+                    f"Capability {cap.id}: hardcodes .muro/ path for plugin slug '{plugin_slug}'; use <state_dir>/ or recorded_outputs"
+                )
     seen: set[str] = set()
     for c in capabilities:
         errors.extend(f"Capability {c.id}: {error}" for error in validate_intents(c.intents))

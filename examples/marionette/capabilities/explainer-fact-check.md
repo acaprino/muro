@@ -25,7 +25,7 @@ No explainer ships with an unverified factual claim. Every checkable claim is su
 
 ## Output handoff
 
-Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return `verification_report` (the table) and `verification_verdict` (the PASS or FAIL line, and whether fixes were applied) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Resolve `<package_root>` with the `package_root` returned beside these instructions, never against the consumer project. Return `verification_report` (the table) and `verification_verdict` (the PASS or FAIL line, and whether fixes were applied) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

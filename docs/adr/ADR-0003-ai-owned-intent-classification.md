@@ -3,12 +3,32 @@ adr_id: ADR-0003
 version: 1
 title: AI-owned intent classification from intake to runtime
 status: Proposed
+author: Alfio Caprino
+scope:
+  paths:
+    - prompts/**
+    - muro/routing.py
+    - muro/runtime.py
+  modules: []
+  domains:
+    - factory
+    - routing
+    - coordinator
+governs_symbols: []
+depends_on:
+  - ADR-0001
+  - ADR-0002
+created_from_task: ai-owned-intent-classification
 proposed_on: 2026-11-09
 accepted_on: null
 proposed_at_sha: 2e0fa680e6efd66d29d2d088294d39baf7fcc761
 accepted_at_sha: null
 last_verified_sha: null
+retired_on: null
+retired_reason: null
 supersedes: []
+superseded_by: null
+changes: []
 ---
 
 # ADR-0003: AI-owned intent classification

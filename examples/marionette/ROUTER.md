@@ -66,6 +66,8 @@ are illustrations: selecting a node or example never classifies or activates wor
   stack differs. css-scroll has no upstream source (Muro-authored).
 - work-map follows wayfinder, to-spec and to-tickets locally, plus the build and
   review its intake goal adds; never a fallback.
+- visual-direction is `resumable`: a site build with screenshot rounds gets a map
+  even as the only step (2026-11-11, ADR-0015).
 - Office and explainer roles are unchanged and separate from UI. A PDF of an
   existing file is office-files' conversion, not office-authoring's.
 

@@ -27,7 +27,7 @@ Builds a new PowerPoint deck with GenOffice's staged pipeline: the host AI write
 
 ## Output handoff
 
-Return `deck_outline` (outline path and page count), `deck_file` (the .pptx path) and `deck_review` (audit result, rendered shots, anything left as is) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return `deck_outline` (outline path and page count), `deck_file` (the .pptx path) and `deck_review` (audit result, rendered shots, anything left as is) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

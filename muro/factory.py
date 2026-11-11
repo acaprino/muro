@@ -55,9 +55,26 @@ def _catalog_context(project_root: Path) -> str:
     examples = project_root / "guide-examples.json"
     if examples.is_file():
         parts.append(f"\n### Current illustrative paths (guide-examples.json)\n\n{examples.read_text(encoding='utf-8')}")
+    cases = project_root / "eval-cases.json"
+    if cases.is_file():
+        parts.append(f"\n### Current eval cases (eval-cases.json)\n\n{cases.read_text(encoding='utf-8')}")
+    entries = project_root / "entries.json"
+    if entries.is_file():
+        parts.append(f"\n### Current discovery entries (entries.json)\n\n{entries.read_text(encoding='utf-8')}")
     if len(parts) == 1:
         parts.append("\nNo existing catalog supplied. Derive responsibilities from source evidence.\n")
     return "".join(parts)
+
+
+def _fresh_workbench(directory: Path, generated: set[str]) -> None:
+    """Replace a previous preparation, but only when everything in it was written by Muro."""
+    if directory.exists():
+        foreign = sorted(p.name for p in directory.iterdir() if p.name not in generated)
+        if foreign:
+            raise ValueError(f"{directory} holds files Muro did not write ({', '.join(foreign)}); move them first")
+        import shutil
+        shutil.rmtree(directory)
+    directory.mkdir(parents=True)
 
 
 def _selected(repo: Path, commit: str, patterns: list[str]) -> dict[str, bytes]:
@@ -91,7 +108,7 @@ def prepare_intake(src: dict[str, Any], project_root: Path, output_dir: Path) ->
     output_dir = output_dir / src["id"]
     with source_repository(src, project_root) as repo:
         files = _selected(repo, src["commit"], src["selected_paths"])
-    output_dir.mkdir(parents=True, exist_ok=False)
+    _fresh_workbench(output_dir, {"PROMPT.md", "source.json", "files"})
     for relative, content in files.items():
         target = output_dir / "files" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -159,6 +176,6 @@ def harmonize_prompt(project_root: Path, output_dir: Path) -> Path:
     prompt += (project_root / "sources.json").read_text(encoding="utf-8")
     prompt += _catalog_context(project_root)
     prompt += f"\n\n{_HARMONIZE_PROTOCOL}\n"
-    output_dir.mkdir(parents=True, exist_ok=False)
+    _fresh_workbench(output_dir, {"PROMPT.md"})
     (output_dir / "PROMPT.md").write_text(prompt, encoding="utf-8")
     return output_dir

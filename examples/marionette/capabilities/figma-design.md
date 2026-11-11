@@ -21,7 +21,7 @@ Builds or updates a design inside Figma with real variables, text styles, auto l
 
 1. **Check integration first.** Before any `use_figma` call, verify that Figma MCP and `figma-use` are available. If unavailable, report that limitation and **do not simulate** Figma changes, screenshots or completed screens.
 2. **Check the file.** List local variable collections and text styles and search the file's libraries for variables, styles and components. Reuse what exists before creating anything. Do not move or delete existing user layers without approval.
-3. **Read the direction.** If `.muro/map.md ## Outputs` holds `palette`, `typography`, `layout`, `constraints`, `offer` and `page_outline` from `visual-direction`, apply them. A landing page with no recorded or supplied outline should have reached this step after `visual-direction` (declared in `needs`, judged by the classifying AI); if it did not, do not plan its sections: report that the landing strategy is missing.
+3. **Read the direction.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `palette`, `typography`, `layout`, `constraints`, `offer` and `page_outline` from `visual-direction`, apply them. A landing page with no recorded or supplied outline should have reached this step after `visual-direction` (declared in `needs`, judged by the classifying AI); if it did not, do not plan its sections: report that the landing strategy is missing.
 4. **Set up foundations if missing** and record them in `foundations`: color variables with light and dark modes (semantic tokens over raw palette values), text styles, spacing and radius variables, and a Foundations frame whose samples are bound to the variables.
 5. **Plan components** in `component_map`: names, variants, component properties, responsive behavior and states (Default, Hover, Pressed, Focus, Disabled; Error and Filled where relevant).
 6. **Build screens section by section** and record them in `screen_plan`: hero first, then one section at a time, every frame in auto layout with bound padding and gaps. Take and inspect a screenshot after each section before the next.
@@ -29,7 +29,7 @@ Builds or updates a design inside Figma with real variables, text styles, auto l
 
 ## Output handoff
 
-Return `foundations`, `component_map` and `screen_plan` as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from `.muro/map.md` only. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return `foundations`, `component_map` and `screen_plan` as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from the step's `recorded_outputs` or `<state_dir>/map.md` only. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

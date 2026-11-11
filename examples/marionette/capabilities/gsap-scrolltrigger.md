@@ -18,7 +18,7 @@ Implements scroll-driven animation with GSAP ScrollTrigger in a project that use
 
 ## Behavior
 
-1. **Read the behavior.** If `.muro/map.md ## Outputs` holds `motion-spec` and `reduced-motion`, implement their scroll-linked rows with their durations and eases. Otherwise implement the behavior the user stated (what is pinned, what is scrubbed, over which range). Do not invent a choreography the user did not ask for.
+1. **Read the behavior.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `motion-spec` and `reduced-motion`, implement their scroll-linked rows with their durations and eases. Otherwise implement the behavior the user stated (what is pinned, what is scrubbed, over which range). Do not invent a choreography the user did not ask for.
 2. **Register once.** `gsap.registerPlugin(ScrollTrigger)` before any ScrollTrigger use.
 3. **Build the triggers.**
    - Put `scrollTrigger` on a timeline or a top-level tween only, never on a child tween inside a timeline and never nested in a parent timeline.
@@ -37,7 +37,7 @@ Implements scroll-driven animation with GSAP ScrollTrigger in a project that use
 
 ## Output handoff
 
-Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from `.muro/map.md` only. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return every required output key as a JSON string. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Read earlier outputs from the step's `recorded_outputs` or `<state_dir>/map.md` only. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

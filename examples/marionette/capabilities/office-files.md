@@ -31,7 +31,7 @@ Works on Office and PDF files that already exist: reads their structure and text
 
 ## Output handoff
 
-Return `file_reading` (what was read: structure, ids, sizes) and `file_result` (paths written, batch status and warnings, or that the request was read-only and no file changed) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `.muro/map.md` or `.muro/state.json`; the coordinator is their only writer.
+Return `file_reading` (what was read: structure, ids, sizes) and `file_result` (paths written, batch status and warnings, or that the request was read-only and no file changed) as JSON strings. For a mapped step, submit them through the coordinator's `record` command with the step's `map_id` and `capability`. Do not edit `<state_dir>/map.md` or `<state_dir>/state.json`; the coordinator is their only writer.
 
 ## Specifics
 

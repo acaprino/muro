@@ -41,7 +41,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(prog="muro_build")
     parser.add_argument("--manifest", type=Path, default=Path("sources.json"))
     parser.add_argument("--check-sources", action="store_true", help="Validate sources and exit")
+    parser.add_argument("--offline-pins", action="store_true", help="With --check-sources: validate manifest pins and local repos without remote HTTPS fetches")
     parser.add_argument("--build", action="store_true", help="Build release into dist/<slug>/")
+    parser.add_argument("--out", type=Path, help="With --build: stage the release under this folder instead of dist/")
+    parser.add_argument("--prepare-eval", action="store_true", help="Prepare the routing eval prompt and cases for the host AI")
+    parser.add_argument("--score-eval", type=Path, metavar="DECISIONS", help="Score the host AI's eval decisions against eval-cases.json")
     parser.add_argument("--validate", action="store_true", help="Validate capabilities and ROUTER.md")
     parser.add_argument("--prepare-intake", metavar="SOURCE_ID", help="Export verified source and source-specific prompt")
     parser.add_argument("--harmonize", action="store_true", help="Prepare the harmonization prompt for an agent")
@@ -58,12 +62,19 @@ def main() -> int:
 
     if args.check_sources:
         errs = validate_plugin_identity(manifest.get("plugin", {}))
-        errs += check_sources(manifest, project_root)
+        errs += check_sources(manifest, project_root, offline_pins=args.offline_pins)
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
             return 1
-        print("OK: all sources and plugin identity valid")
+        skipped = args.offline_pins and any(
+            isinstance(s, dict) and isinstance(s.get("repo_url"), str) and s["repo_url"].startswith("https://")
+            for s in manifest.get("sources", [])
+        )
+        if skipped:
+            print("OK: manifest pins and local sources valid; skipped remote fetch (--offline-pins)")
+        else:
+            print("OK: all sources and plugin identity valid")
         return 0
 
     if args.validate:
@@ -72,7 +83,15 @@ def main() -> int:
         capabilities = _load_capabilities(cap_dir)
         router_rows = _load_router(router_path)
         from .core import validate_capabilities_and_router
-        errs = validate_capabilities_and_router(capabilities, router_rows)
+        errs = validate_capabilities_and_router(
+            capabilities,
+            router_rows,
+            plugin_slug=manifest.get("plugin", {}).get("slug"),
+        )
+        from .entries import load_entries, validate_entries
+        entries_doc = load_entries(project_root)
+        if entries_doc is not None:
+            errs += validate_entries(entries_doc, capabilities, manifest.get("plugin", {}))
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)
@@ -82,12 +101,26 @@ def main() -> int:
 
     if args.build:
         try:
-            dist = build_release(manifest_path, project_root, project_root / "dist", host_roots=args.host_root)
+            dist = build_release(manifest_path, project_root, args.out.resolve() if args.out else project_root / "dist",
+                                 host_roots=args.host_root)
             print(f"Built {dist}")
             return 0
         except Exception as e:
             print(f"Build failed: {e}", file=sys.stderr)
             return 1
+
+    if args.prepare_eval or args.score_eval:
+        from .evals import prepare_eval, score_eval
+        try:
+            if args.prepare_eval:
+                print(prepare_eval(project_root, project_root / ".muro" / "factory" / "eval"))
+                return 0
+            report = score_eval(project_root, args.score_eval.resolve())
+        except (OSError, ValueError) as e:
+            print(f"Eval failed: {e}", file=sys.stderr)
+            return 1
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report["passed"] == report["total"] else 1
 
     if args.prepare_intake:
         source = next((s for s in manifest.get("sources", []) if s.get("id") == args.prepare_intake), None)

@@ -12,6 +12,13 @@ Source order and matching role/name labels do not decide precedence or merges.
 Preparation only supplies evidence; it is not completed AI intake/harmonization.
 Record concise source-grounded reasons and unresolved gaps (ADR-0008).
 
+Owner correction of 2026-11-11: a package's scope is set by intake and by nothing
+else. Whatever the absorbed skills and plugins do, the generated plugin does, in
+any domain (code, design, documents, anything a harness can run). Never ask
+whether a package "should" cover a domain its sources cover, never hide an
+absorbed capability from discovery, and never treat a domain as a pending
+decision: to change the scope, add or remove a source (ADR-0015).
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin
@@ -76,6 +83,16 @@ installation, publication or replacement of existing dist output without request
   by a person or host LLM, maintained with the catalog and packaged beside the
   guide. Validate explicit decisions with runtime rules and expand declared
   prerequisites only; never derive example meanings or selections by script.
+- `entries.json` (optional): discovery entries the harmonizing AI authors, each a
+  named group of capabilities with a sharp "Use when" description. The build
+  emits one extra skill per entry that runs the same coordinator against the
+  whole catalog, hidden from the slash menu on Claude Code. Python checks names,
+  references, length and that every capability has an entry; it never groups
+  capabilities or writes descriptions (ADR-0014).
+- `eval-cases.json` (optional): AI-authored requests with expected status and
+  ordered capabilities. `--prepare-eval` gives the host AI rules, catalog and
+  contexts without the expectations; `--score-eval <decisions.json>` validates
+  and compares. Python never classifies a case (ADR-0015).
 
 ## Tools, hooks and execution
 
@@ -140,6 +157,34 @@ examples/marionette/sources.json --validate`. For source/build changes also run
 the same command with `--check-sources` and verify a fresh staged
 release. Source checks contact pinned Git remotes. Run targeted tests first for
 new behavior and preserve failure/success evidence in docs/verification/.
+
+## Principles from the first real use (ADR-0015)
+
+- Design for the second time: specify and test every flow on its second pass
+  (second turn, task, run, version, package). Preparation commands are
+  rerunnable; a refined request uses `plan --amend`, never a silent restart.
+- Declare, do not infer: what the runtime needs to know about meaning is
+  AI-authored data (`resumable`, `needs`, `entries.json`, `plugin.replaces`) or
+  an AI judgment. No Python proxy such as step count or string equality.
+- Verify from outside: fixtures prove mechanics only. Test package behaviour
+  with a slug other than `muro`. Run the routing eval after catalog or prompt
+  changes. A change to the host protocol is run once in a real host first.
+- Fit the host: one-line calls, JSON written with the host's file tool, output
+  small enough to stay inline, pre-approval through the host's own field.
+- State the per-task cost (calls, tokens, denials) of every safeguard you add.
+
+Live host recipe (Claude Code, leaves the owner's configuration untouched):
+stage a release with `--build --out <scratch>`, then in an empty test project run
+`claude -p "<request>" --plugin-dir <scratch>/<slug>/adapters/claude-code
+--permission-mode dontAsk --allowedTools "Skill" --output-format stream-json
+--verbose --max-budget-usd 2 --no-session-persistence`. Read the transcript for
+skills invoked, runtime calls, permission denials and cost; record them, with the
+sample size, in `docs/verification/`. First confirm the host loaded what you
+built: hidden entries are absent from the init event, so ask one session to list
+the package's skills and compare with `entries.json`; a skill with invalid
+frontmatter is dropped silently. Start sessions one at a time: sessions started
+in parallel loaded no marketplace plugins. Delete the session folders the run leaves
+under `~/.claude/projects/`.
 
 ## Adding or re-pinning a source
 
