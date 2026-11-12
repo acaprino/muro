@@ -18,19 +18,22 @@ Implements scroll-driven animation with GSAP ScrollTrigger in a project that use
 
 ## Behavior
 
+Before working, read `<package_root>/scripts/gsap-scrolltrigger/SKILL.source.md` whole. It is the method in the source's own words, with the config table and code examples that the steps below only index. Where this body and that file differ, the file wins, except for the changes listed in the Sources section below under "Changes for coexistence".
+
 1. **Read the behavior.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `motion-spec` and `reduced-motion`, implement their scroll-linked rows with their durations and eases. Otherwise implement the behavior the user stated (what is pinned, what is scrubbed, over which range). Do not invent a choreography the user did not ask for.
-2. **Register once.** `gsap.registerPlugin(ScrollTrigger)` before any ScrollTrigger use.
-3. **Build the triggers.**
+2. **Register once.** "**gsap.registerPlugin(ScrollTrigger)** once before any ScrollTrigger usage." (`## Registering the Plugin`).
+3. **Build the triggers** from `## Basic Trigger`, `## Key config options`, `## Scrub`, `## Pinning` and `## Timeline + ScrollTrigger` (start and end formats, `clamp()`, `snap`, `once`, `toggleClass`, callbacks and standalone `ScrollTrigger.create()` are there).
    - Put `scrollTrigger` on a timeline or a top-level tween only, never on a child tween inside a timeline and never nested in a parent timeline.
-   - Choose `scrub` (`true` = direct, a number = seconds the playhead takes to catch up) for scroll-linked progress, or `toggleActions` for discrete play/reverse; never both on one trigger.
+   - Choose `scrub` (`true` = direct, a number = seconds the playhead takes to catch up) for scroll-linked progress, or `toggleActions` for discrete play/reverse; never both on one trigger ("If both exist, **scrub** wins.").
    - `pin: true` pins the trigger: animate its children, not the pinned element. `pinSpacing` is `true` by default; set `false` only when the layout is handled separately. A pinned trigger starts at `"top top"` by default.
-   - Fake horizontal scroll: pin the panel, move an inner wrapper on `x`/`xPercent` with `ease: "none"`, and point nested triggers at it with `containerAnimation`. Pinning and snapping are not available on those nested triggers.
+   - Fake horizontal scroll (`## Horizontal scroll (containerAnimation)`): pin the panel, move an inner wrapper on `x`/`xPercent` with `ease: "none"`, and point nested triggers at it with `containerAnimation`. "**Caveats:** Pinning and snapping are not available on ScrollTriggers that use **containerAnimation**. The container animation must use **ease: "none"**. Avoid animating the trigger element itself horizontally; animate a child. If the trigger is moved, **start**/**end** must be offset accordingly."
    - A scrollable container other than the viewport goes in `scroller`.
-   - Use `ScrollTrigger.batch()` only for callback-driven reveals of many similar elements; it takes no `scrub`, `snap` or `toggleActions`.
-4. **Order and refresh.** Create triggers top to bottom in page order, or set `refreshPriority` when they are created out of order. Call `ScrollTrigger.refresh()` after DOM or layout changes that move triggers (new content, images, fonts); viewport resize is handled automatically.
-5. **Clean up.** Kill the instances when their elements go away: `ScrollTrigger.getById(id)?.kill()` or each instance from `ScrollTrigger.getAll()`. In React use `useGSAP()` when the project already has `@gsap/react`; otherwise revert a `gsap.context()` in the `useEffect`/`useLayoutEffect` cleanup.
+   - `ScrollTrigger.batch()` (`## ScrollTrigger.batch()`): "Use it to coordinate an animation (e.g. with staggers) for all elements that fire a similar callback around the same time". In its vars, "Do **not** pass `trigger` (targets are the triggers) or animation-related options: `animation`, `invalidateOnRefresh`, `onSnapComplete`, `onScrubComplete`, `scrub`, `snap`, `toggleActions`."
+   - A third-party smooth-scrolling or custom scroll library goes through `## ScrollTrigger.scrollerProxy()`: "**Critical:** When the third-party scroller updates its position, ScrollTrigger must be notified. Register **ScrollTrigger.update** as a listener".
+4. **Order and refresh** (`## Refresh and Cleanup`). Create triggers top to bottom in page order, or set `refreshPriority` when they are created out of order ("first section on page = lower number"). Call `ScrollTrigger.refresh()` "after DOM/layout changes (new content, images, fonts) that affect trigger positions"; on viewport resize it "is automatically called (debounced 200ms)".
+5. **Clean up.** Kill the instances when their elements go away: `ScrollTrigger.getById(id)?.kill()` or each instance from `ScrollTrigger.getAll()`. "In React, use the `useGSAP()` hook to ensure that all ScrollTriggers and GSAP animations are reverted and cleaned up when necessary, or use a `gsap.context()` to do it manually in a useEffect/useLayoutEffect cleanup function."
 6. **Reduced motion.** Create the pin and scrub triggers only when `window.matchMedia("(prefers-reduced-motion: reduce)")` does not match, and apply the recorded `reduced-motion` alternative (static positions, opacity only).
-7. **Verify** in a browser: scroll the range, check pins, toggle reduced motion and read the console. Remove `markers: true` before handing over.
+7. **Verify** in a browser against the source's `## Official GSAP best practices` and `## Do Not` lists: scroll the range, check pins, toggle reduced motion and read the console. "Remove or set **markers: false** for production."
 8. **Record** for the handoff below:
    - `code-patch`: the files changed and a short diff summary.
    - `scroll-verified`: what was checked in the browser and the result, or not-tested with the reason.
@@ -58,7 +61,15 @@ Return every required output key as a JSON string. For a mapped step, submit the
 ## Sources
 
 - AI intent mapping: gsap-scrolltrigger → ui.scroll-animation, from its "When to Use This Skill", key config options, batch, horizontal scroll, refresh and cleanup, best practices and "Do Not" sections.
-- Source: gsap-scrolltrigger (greensock/gsap-skills@aed9cfd3) — `skills/gsap-scrolltrigger/SKILL.md`, the only selected file, packaged under `<package_root>/scripts/gsap-scrolltrigger/`.
+- Source: gsap-scrolltrigger (greensock/gsap-skills@aed9cfd3) — `skills/gsap-scrolltrigger/SKILL.md`, the only selected file, packaged whole as `<package_root>/scripts/gsap-scrolltrigger/SKILL.source.md` and read at run time as the method.
+- Changes for coexistence (ADR-0017):
+  - The source's frontmatter (`name`, `description` with its "Use when" list) and `## When to Use This Skill` are not used to activate anything: the coordinator classifies the task by meaning, and the file is packaged as `SKILL.source.md` so no host registers it as a skill.
+  - "Recommend GSAP ... when no library is specified" is carried as adopting GSAP under `stack:gsap`, but never against a CSS-only constraint: `css-scroll` is the other variant of the same role and the two conflict.
+  - "**Related skills:**" (gsap-core, gsap-timeline, gsap-react, gsap-plugins) is not followed: those skills are not selected and not packaged, so there is nothing to hand over to. ScrollSmoother and scroll-to, which the source sends to gsap-plugins, have no method in this package.
+  - Step 6 is added: the source does not mention reduced motion. `motion-principles` owns `reduced-motion` and motion-design requires "Parallax" to become "Static positioning" and "remove spatial movement"; without the guard this step would undo that recorded output.
+  - Eases and durations come from a recorded `motion-spec` (owner: `motion-principles`) and not from the values in the source's examples. Against motion-design's "Never linear for spatial movement", the source's rule wins for the horizontal tween of a `containerAnimation`: "The horizontal tween/timeline **must** use **ease: "none"**".
+  - Installing `gsap` when it is missing, with the command recorded below, is the owner's rule (ADR-0007); the source gives no install step.
+  - The outputs `code-patch` and `scroll-verified` and step 7's browser check are this package's evidence contract, not steps of the source.
 - Runtime dependencies: gsap 3, required (GSAP Standard License — target project dependency, not bundled by Muro), and `@gsap/react`, optional for `useGSAP()`. The source gives no install command; `npm install gsap` and `npm install @gsap/react` come from GSAP's official installation and React pages.
 - Adopted with the 2026-11-10 owner decision: the source's advice to use GSAP and ScrollTrigger when the user asks for scroll animation without naming a library. The related gsap-core, gsap-timeline, gsap-react and gsap-plugins skills are not selected.
 - Reduced motion: the source does not mention it. The matchMedia guard comes from this source's intake goal ("respecting reduced motion") and the motion-design reduced-motion rules; it is a Muro implementation choice.
