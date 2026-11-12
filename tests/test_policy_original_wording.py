@@ -110,6 +110,7 @@ def test_each_change_is_explained_as_coexistence_in_the_delivery_decisions(polic
 @pytest.mark.parametrize("prompt", ["intake.md", "harmonizer.md", "delivery.md"])
 def test_the_factory_prompts_state_the_rule(prompt):
     text = " ".join((ROOT / "prompts" / prompt).read_text(encoding="utf-8").split())
-    assert "own words" in text
+    # Owner correction of the same day: the generated text is the LLM's, the substance is the source's.
+    assert "weaken" in text and "source's" in text
     assert "harmonization and coexistence" in text
     assert "never for size" in text
