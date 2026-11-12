@@ -27,12 +27,25 @@ owners of one output, contradictory rules of two sources, routing or activation
 that competes with the coordinator, a step no host can run. Size, style and
 taste are never reasons; when content does not fit a limit, its form changes,
 not its words. Every change is recorded with the collision that required it
-(ADR-0017). A capability body is an index into the packaged originals: it
-names the files the host reads whole, says the original wins, quotes the source
-where it states a rule and lists every difference with its collision in
-`## Sources` under "Changes for coexistence (ADR-0017)". Name packaged paths as
-the release lays them out (the factory drops `skills/<source-id>/`) and never
-write the heading literal of the Sources section inside a step.
+(ADR-0017).
+
+Owner correction of the same day, after that rule was applied word for word
+("hai preso troppo alla lettera"): "il contenuto si altera o addirittura si
+rigenera tramite llm per creare l'hook, il prompt di ingresso o la descrizione
+di selezione [...] ma poi se attivata va a fare riferimento alla sua versione
+integrale, ed è integrale solo in relazione a ciò che serve". So there are two
+layers. What selects and starts a capability (intent and entry descriptions,
+the capability body as its entry prompt, hook text) is written by the host LLM
+in its own words, compact, for this package. What the rule protects is the
+substance: a generated text never drops, weakens, strengthens or invents a
+rule, number, condition or exception of the source. Once activated, the body
+sends the host to the packaged original, which stays whole and untouched, for
+the parts the task at hand needs, named by file and section; it does not
+require reading everything first and does not need to quote. The original wins
+where the two differ, except for the differences listed with their collision
+in `## Sources` under "Changes for coexistence (ADR-0017)". Name packaged paths
+as the release lays them out (the factory drops `skills/<source-id>/`) and
+never write the heading literal of the Sources section inside a step.
 
 Owner decision of 2026-11-12 ("io eliminerei in generale questo limite per tutto muro"): Muro adds no limit of
 its own on what an absorbed tool or command may send off the machine (a file,

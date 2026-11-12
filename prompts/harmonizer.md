@@ -13,8 +13,10 @@ Understand what each capability actually does, including its instructions and
 source evidence, before comparing labels. Use the current router as context to
 review, not an unquestionable tree. Organize the graph around desired outcomes,
 responsibilities, real prerequisites and useful alternatives; source repositories
-are provenance, not branches. Preserve methods and limits in the source's own words.
-Rewrite only where harmonization and coexistence require it (two owners of one
+are provenance, not branches. Bodies and descriptions are your words; the methods and
+limits are the source's and none is dropped, weakened or invented, and the packaged
+original stays the full version a body points to for what a task needs.
+Change what a source prescribes only where harmonization and coexistence require it (two owners of one
 output, contradictory rules, competing routing), never for size, style or taste,
 and record each rewrite with the collision that required it. Never add a
 restriction on data leaving the machine that the source does not state; say

@@ -180,12 +180,17 @@ the release").
 
 ## Extraction rules
 
-Carry the source's content in its own words. Rewrite only for harmonization and
-coexistence under the package's principles (Delivery protocol, "The content
-stays the source's"), never for size, style or taste, and record each change
-with the collision that required it in `## Sources`. A short body that sends
-the host to the packaged original for the full method changes the place of the
-content, not the content. Add no limit of your own on what a source's tool or
+Two layers (owner, 2026-11-12). You write the capability body, its intent
+descriptions and any hook text in your own words: they are the entry prompt and
+the selection text of this package, compact and made for it. The substance is
+the source's: never drop, weaken, strengthen or invent a rule, number,
+condition or exception. The packaged original stays whole and untouched, and
+the body sends the host to it, by file and section, for the parts the task
+needs; it does not make the host read everything first. Change what the source
+prescribes only for harmonization and coexistence under the package's
+principles (Delivery protocol, "The content stays the source's"), never for
+size, style or taste, and record each such change with the collision that
+required it in `## Sources`. Add no limit of your own on what a source's tool or
 command may send off the machine: carry the source's own statement of what
 leaves it, and leave permission to the host and the user.
 

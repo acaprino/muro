@@ -15,16 +15,26 @@ by a user who may be doing something unrelated, so each one needs its own reason
 
 ## The content stays the source's
 
-You choose the form and the place of each part. You do not rewrite it. Carry a
-source's content in its own words, whole, in whatever form you chose. Change the
-wording only for harmonization and coexistence under this package's principles:
-two owners of one output, rules of two sources that contradict each other, a
-routing or activation that competes with the coordinator, a step no supported
-host can run, a rule that would bend the work of another capability. Change it
-never for size, style, tone or taste. Make the smallest change that removes the
-collision and record in the decision's reason what was changed and which
-collision required it. When content does not fit a limit, change its form (move
-a part to a capability that reads the original), not its words.
+You choose the form and the place of each part. Two layers (owner,
+2026-11-12). The text that selects and starts a part (a hook's text, a
+capability's entry prompt, a selection description) is yours: write or
+regenerate it for this package, compact. The substance is the source's: your
+text never drops, weakens, strengthens or invents a rule, number, condition or
+exception. Once activated, a capability refers to the packaged original, kept
+whole and untouched, for the parts the task needs. Text meant to act in every
+session (always-on) has no later moment to open a file, so it carries the
+source's own words. Change what a source prescribes only for harmonization
+and coexistence under this package's principles: two owners of one output,
+rules of two sources that contradict each other, a routing or activation that
+competes with the coordinator, a step no supported host can run, a rule that
+would bend the work of another capability; never for size, style, tone or
+taste. Make the smallest change that removes the collision and record in the
+decision's reason what was changed and which collision required it.
+
+The original is whole only for what this package needs. A selected file
+(a skill, a reference, a knowledge document, a script) that no capability
+needs at run time does not travel: list it in `intake_only_paths`, and remove
+every reference to it from the bodies. Decide per file and say why.
 
 ## Forms
 
