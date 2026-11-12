@@ -52,7 +52,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 ## Sources
 
 - AI intent mapping: creating-explainers → explainer.source-walkthrough and explainer.topic-research (its files and research intakes; mixed intake belongs to both); explaining-codebases → explainer.codebase-walkthrough; fact-checking-explainers → the two gates here and the standalone intent of `explainer-fact-check`.
-- Source: explain-this (analyticalmonk/explain-this@f64dab45, plugin 0.1.1) — the three `SKILL.md` (each packaged as `SKILL.source.md`), their `references/**` and `skills/creating-explainers/assets/article-template.html`, packaged unchanged under `<package_root>/scripts/explain-this/skills/`.
+- Source: explain-this (analyticalmonk/explain-this@f64dab45, plugin 0.1.1) — the three `SKILL.md` (`creating-explainers` and `fact-checking-explainers` packaged as `SKILL.source.md`; `explaining-codebases/SKILL.md` read at intake and not packaged, because its workflow is in this body and in `code-intake.md`), their `references/**` and `skills/creating-explainers/assets/article-template.html`, packaged unchanged under `<package_root>/scripts/explain-this/skills/`.
 - Changes for coexistence (ADR-0017):
   - The originals' frontmatter triggers and "When to Use" lists are not followed: routing is the coordinator's, by meaning, from this capability's intents.
   - "Use `fact-checking-explainers`", "Use `creating-explainers`" and "use `explaining-codebases` instead" invoke no skill: the originals are not registered, so the gates are steps 2 and 7 here and the codebase workflow is these eight steps with code intake as step 1 (one capability per step).

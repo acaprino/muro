@@ -128,7 +128,10 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Extract motion principles, timing, easing, choreography and accessibility constraints; do not include unrelated GSAP library implementation."
-      }
+      },
+      "intake_only_paths": [
+        "skills/motion-design/reference/troubleshooting.md"
+      ]
     },
     {
       "id": "gsap-scrolltrigger",
@@ -247,7 +250,11 @@
       ],
       "intake": {
         "goal": "Understand local design-system search, stack-specific UX and accessibility guidance, and assess their functional relationship with the existing catalog before proposing placement. Preserve the offline search script and data without premium assets, install flows or unverified recommendations; search results are candidates for AI judgment, not automatic catalog decisions."
-      }
+      },
+      "intake_only_paths": [
+        "src/ui-ux-pro-max/data/catalog-summary.json",
+        "src/ui-ux-pro-max/data/phosphor-icons-upstream.json"
+      ]
     },
     {
       "id": "genoffice",
@@ -313,7 +320,10 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Classify every outcome of the three skills: an interactive single-file HTML explainer built from documents, from topic research or from a codebase, and the claim-by-claim fact-check of an explainer. Keep the article template and the references as packaged helpers, keep the zero-dependency rule and the blocking fact-check gate, and drop the plugin manifests, host agent files, evals and upstream planning documents."
-      }
+      },
+      "intake_only_paths": [
+        "skills/explaining-codebases/SKILL.md"
+      ]
     },
     {
       "id": "open-paper-skills",
@@ -460,7 +470,14 @@
       ],
       "intake": {
         "goal": "Absorb TokenEconomizer's control surface and engine: the status, micro-skills, tool-pruning, settings and repository-state commands as one capability, with the engine packaged unchanged so those commands run from this plugin. Catalog its six default hooks as passive, host-approved entries and make registering or removing them an explicit user-requested action that first discloses their effects. Leave out the upstream plugin manifests, slash commands and skills as files, the Pi extension, experiments and tests."
-      }
+      },
+      "intake_only_paths": [
+        "tokeneconomizer/loopguard/README.md",
+        "tokeneconomizer/microskills/README.md",
+        "tokeneconomizer/plugin/README.md",
+        "tokeneconomizer/toolprune/README.md",
+        "tokeneconomizer/trace/README.md"
+      ]
     },
     {
       "id": "claude-design-system-prompt",
