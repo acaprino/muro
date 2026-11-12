@@ -1,4 +1,6 @@
-<h1 align="center">Muro</h1>
+<h1 align="center">
+  <img src="docs/assets/branding/muro-logo-oni.png" alt="Muro" width="800">
+</h1>
 
 <p align="center"><strong>A factory for AI-routed skill packages</strong></p>
 

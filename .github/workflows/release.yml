@@ -1,0 +1,65 @@
+name: Release
+
+# Publishes the factory (muro-v<version>) and/or the Marionette package
+# (marionette-v<version>) from the commit it runs on. See AGENTS.md, "Releasing".
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to release
+        type: choice
+        options: [both, marionette, muro]
+        default: both
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MANIFEST: examples/marionette/sources.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Read versions
+        run: |
+          echo "MURO_TAG=muro-v$(python -c 'import muro; print(muro.__version__)')" >> "$GITHUB_ENV"
+          echo "PKG_VERSION=$(python -c 'import json,os; print(json.load(open(os.environ["MANIFEST"]))["plugin"]["version"])')" >> "$GITHUB_ENV"
+      - name: Refuse a tag that already exists
+        run: |
+          PKG_TAG="marionette-v$PKG_VERSION"
+          echo "PKG_TAG=$PKG_TAG" >> "$GITHUB_ENV"
+          git fetch --tags --quiet
+          for tag in "$MURO_TAG" "$PKG_TAG"; do
+            case "${{ inputs.target }}:$tag" in
+              marionette:muro-*|muro:marionette-*) continue ;;
+            esac
+            if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+              echo "::error::$tag already exists; bump the version instead"; exit 1
+            fi
+          done
+      - name: Validate, check sources and build
+        run: |
+          python muro_build.py --manifest "$MANIFEST" --validate
+          python muro_build.py --manifest "$MANIFEST" --check-sources
+          python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/release"
+          cd "$RUNNER_TEMP/release"
+          python -c "import shutil; shutil.make_archive('marionette-$PKG_VERSION', 'zip', '.', 'marionette')"
+          sha256sum "marionette-$PKG_VERSION.zip" | tee "marionette-$PKG_VERSION.zip.sha256"
+      - name: Publish Marionette
+        if: inputs.target != 'muro'
+        run: |
+          notes="docs/releases/$PKG_TAG.md"
+          if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
+          gh release create "$PKG_TAG" --target "$GITHUB_SHA" --title "Marionette $PKG_VERSION" "$@" \
+            "$RUNNER_TEMP/release/marionette-$PKG_VERSION.zip" "$RUNNER_TEMP/release/marionette-$PKG_VERSION.zip.sha256"
+      - name: Publish Muro
+        if: inputs.target != 'marionette'
+        run: |
+          notes="docs/releases/$MURO_TAG.md"
+          if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
+          gh release create "$MURO_TAG" --target "$GITHUB_SHA" --title "Muro ${MURO_TAG#muro-v}" "$@"
