@@ -337,7 +337,7 @@ version bump without the owner's request.
 5. Do not commit `dist/`, and do not push tags by hand from a session whose
    access is limited to its own branch: the workflow is the way.
 
-The README header shows `docs/assets/branding/muro-logo-oni.png`. Keep that
+The README header shows `docs/assets/branding/muro-logo.png`. Keep that
 line and that file when rewriting the README.
 
 ## Documentation
