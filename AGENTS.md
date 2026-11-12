@@ -312,6 +312,34 @@ each part of the source became and why, and review the earlier decisions. Record
 summary, the commands and their results in `docs/verification/`. A release
 proves packaging; say what was not executed.
 
+## Releasing
+
+Two products are released from this repository, each with its own tag: the
+factory as `muro-v<version>` (version in `muro/__init__.py`, `__version__`) and
+a package as `<slug>-v<version>` (version in its `sources.json`,
+`plugin.version`; Marionette is `marionette-v<version>`). No release, tag or
+version bump without the owner's request.
+
+1. Bump the version of what is being released, in a pull request to `main`. A
+   package changes version whenever its catalog, policy or packaged files
+   changed: hosts cache an installed plugin by version.
+2. Write `docs/releases/<tag>.md`: what changed for a user, the verification
+   results, and what was not executed. Without that file GitHub generates the
+   notes from the merged pull requests.
+3. On the merged commit run `python -m pytest -q`, `--validate` and
+   `--check-sources`, and stage a fresh build with `--build --out <scratch>`.
+4. Run the `Release` workflow (GitHub, Actions, "Run workflow" on `main`, or
+   `gh workflow run release.yml -f target=<muro|marionette|both>`). It repeats
+   validation, source checks and the build, creates the tags on that commit and
+   publishes the GitHub releases; the package release carries
+   `<slug>-<version>.zip` with its SHA-256. It refuses a tag that already
+   exists: a published release is never replaced, bump the version instead.
+5. Do not commit `dist/`, and do not push tags by hand from a session whose
+   access is limited to its own branch: the workflow is the way.
+
+The README header shows `docs/assets/branding/muro-logo-oni.png`. Keep that
+line and that file when rewriting the README.
+
 ## Documentation
 
 Update README.md, ROUTER.md, affected prompts/capabilities and an ADR when the
