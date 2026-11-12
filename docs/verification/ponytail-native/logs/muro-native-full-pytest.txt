@@ -1,0 +1,410 @@
+..F..................................................................... [ 18%]
+.....F........................E......................................... [ 36%]
+........................................................................ [ 54%]
+s....ss..s...............................F....................s......... [ 73%]
+..F.F.F.F.........F.F.....F................F.......F.................... [ 91%]
+...........................EE...F                                        [100%]
+=================================== ERRORS ====================================
+_ ERROR at setup of test_release_packages_the_source_as_reference_and_registers_nothing _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _trace=<pluggy._tracing.TagT...7CE0>, _basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def release(tmp_path_factory):
+        """One real build for the module: it verifies every pinned remote, so it is slow."""
+>       return build_release(PACKAGE / "sources.json", PACKAGE, tmp_path_factory.mktemp("release") / "out")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_claude_design_intake.py:240: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/alfio/AppData/Local/Packages/openai.codex_2p2nqsd0c76g0/AC/#!sandbox.{a7456aa4-1518-4f19-9044-c7102f39afda}/Temp/muro-source-mah1x6hr')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'https://github.com/Leonxlnx/taste-skill.git', 'f6b76575f949707b4e3c37cd86cb44b0b98643e8')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: unable to access 'https://github.com/Leonxlnx/taste-skill.git/': Could not resolve host: github.com
+
+muro\sources.py:29: ValueError
+_ ERROR at setup of test_release_packages_the_engine_and_keeps_the_hooks_passive _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _trace=<pluggy._tracing.TagT...7CE0>, _basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def release(tmp_path_factory):
+        """One real build for the module: it verifies every pinned remote, so it is slow."""
+>       return build_release(PACKAGE / "sources.json", PACKAGE, tmp_path_factory.mktemp("release") / "out")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_tokeneconomizer_intake.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/alfio/AppData/Local/Packages/openai.codex_2p2nqsd0c76g0/AC/#!sandbox.{a7456aa4-1518-4f19-9044-c7102f39afda}/Temp/muro-source-4k9by2x7')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'https://github.com/Leonxlnx/taste-skill.git', 'f6b76575f949707b4e3c37cd86cb44b0b98643e8')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: unable to access 'https://github.com/Leonxlnx/taste-skill.git/': Could not resolve host: github.com
+
+muro\sources.py:29: ValueError
+_ ERROR at setup of test_packaged_engine_answers_from_the_release_without_touching_the_users_state _
+
+tmp_path_factory = TempPathFactory(_given_basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _trace=<pluggy._tracing.TagT...7CE0>, _basetemp=WindowsPath('D:/workspace/muro-full-native-20261112-v1'), _retention_count=3, _retention_policy='all')
+
+    @pytest.fixture(scope="module")
+    def release(tmp_path_factory):
+        """One real build for the module: it verifies every pinned remote, so it is slow."""
+>       return build_release(PACKAGE / "sources.json", PACKAGE, tmp_path_factory.mktemp("release") / "out")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_tokeneconomizer_intake.py:92: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/alfio/AppData/Local/Packages/openai.codex_2p2nqsd0c76g0/AC/#!sandbox.{a7456aa4-1518-4f19-9044-c7102f39afda}/Temp/muro-source-4k9by2x7')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'https://github.com/Leonxlnx/taste-skill.git', 'f6b76575f949707b4e3c37cd86cb44b0b98643e8')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: unable to access 'https://github.com/Leonxlnx/taste-skill.git/': Could not resolve host: github.com
+
+muro\sources.py:29: ValueError
+================================== FAILURES ===================================
+______________ test_live_ai_design_source_license_and_paths_pass ______________
+
+    def test_live_ai_design_source_license_and_paths_pass():
+        manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
+        source = next(s for s in manifest["sources"] if s["id"] == "ai-design-skills")
+>       assert check_sources({"sources": [source]}, PACKAGE) == []
+E       assert ['[ai-design-...: github.com'] == []
+E         
+E         Left contains one more item: "[ai-design-skills] fatal: unable to access 'https://github.com/elayadesign/ai-design-skills/': Could not resolve host: github.com"
+E         Use -v to get more diff
+
+tests\test_ai_design_intake.py:34: AssertionError
+_____ test_skill_md_synthesizes_domain_rich_bounded_discovery_description _____
+
+    def test_skill_md_synthesizes_domain_rich_bounded_discovery_description():
+        manifest = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))
+        caps = parse_capabilities(MARIONETTE / "capabilities")
+        skill_text = _skill(manifest["plugin"], "opencode", capabilities=caps)
+        fm = skill_text.split("---")[1]
+        desc_line = next(line for line in fm.splitlines() if line.startswith("description:"))
+        desc = desc_line.split(":", 1)[1].strip()
+        assert len(desc) <= 1024
+        assert "Use when" in desc
+        for keyword in ("landing", "Figma", "scroll", "Office", "explainer"):
+>           assert keyword.lower() in desc.lower(), keyword
+E           AssertionError: Office
+E           assert 'office' in 'use when designing or building websites and landing pages, searching ui/ux and accessibility guidance, wireframing, p...assify requests by meaning before selecting work; load one capability per step. never invoke original absorbed skills.'
+E            +  where 'office' = <built-in method lower of str object at 0x0000019F711A6C70>()
+E            +    where <built-in method lower of str object at 0x0000019F711A6C70> = 'Office'.lower
+E            +  and   'use when designing or building websites and landing pages, searching ui/ux and accessibility guidance, wireframing, p...assify requests by meaning before selecting work; load one capability per step. never invoke original absorbed skills.' = <built-in method lower of str object at 0x0000019F70942850>()
+E            +    where <built-in method lower of str object at 0x0000019F70942850> = 'Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, wireframing, p...assify requests by meaning before selecting work; load one capability per step. Never invoke original absorbed skills.'.lower
+
+tests\test_audit_p0.py:179: AssertionError
+_____ test_release_never_ships_a_file_named_skill_md_below_a_skill_folder _____
+
+    def test_release_never_ships_a_file_named_skill_md_below_a_skill_folder():
+>       release = build_release(MARIONETTE / "sources.json", MARIONETTE, Path(pytest.importorskip("tempfile").mkdtemp()) / "out")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_live_host_fixes.py:27: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/alfio/AppData/Local/Packages/openai.codex_2p2nqsd0c76g0/AC/#!sandbox.{a7456aa4-1518-4f19-9044-c7102f39afda}/Temp/muro-source-q99v2wy8')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'https://github.com/Leonxlnx/taste-skill.git', 'f6b76575f949707b4e3c37cd86cb44b0b98643e8')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: unable to access 'https://github.com/Leonxlnx/taste-skill.git/': Could not resolve host: github.com
+
+muro\sources.py:29: ValueError
+_ test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.0-True] _
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_pin_accepts_the_t1/source'), 'b354ed8be9773b7eb8a2efc9d4cde5d5fb3423be', '775635076a838944fd78a83fab6bb02cebf89839')
+remote = True, tag = 'v1.0.0'
+
+    @pytest.mark.parametrize("remote", [False, True])
+    @pytest.mark.parametrize("tag", ["v1.0.0", "v1.0.1"])
+    def test_release_pin_accepts_the_tagged_commit_although_head_moved(repo, remote, tag):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="release", release=tag) == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:57: AssertionError
+_ test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.1-True] _
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_pin_accepts_the_t3/source'), 'f845e857b5da96001090aaccb20ee0030cc3d0c3', '6ca0bb67f6b1368ddf71731c1c525da046b9bd69')
+remote = True, tag = 'v1.0.1'
+
+    @pytest.mark.parametrize("remote", [False, True])
+    @pytest.mark.parametrize("tag", ["v1.0.0", "v1.0.1"])
+    def test_release_pin_accepts_the_tagged_commit_although_head_moved(repo, remote, tag):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="release", release=tag) == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:57: AssertionError
+_________ test_release_pin_rejects_a_commit_that_is_not_the_tag[True] _________
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_pin_rejects_a_com1/source'), '6cb3f923101d5ee2ac41469c00d040900f7c9c91', '5169fc346b17741fd8d9f7a6b05941309b2b8b99')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_release_pin_rejects_a_commit_that_is_not_the_tag(repo, remote):
+        root, released, head = repo
+        found = errors(root, head, remote, pin="release", release="v1.0.0")
+>       assert found and f"is not release v1.0.0 ({released})" in found[0]
+E       AssertionError: assert (['[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'] and 'is not release v1.0.0 (6cb3f923101d5ee2ac41469c00d040900f7c9c91)' in '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.')
+
+tests\test_pin_modes.py:64: AssertionError
+________________ test_release_pin_rejects_an_unknown_tag[True] ________________
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_pin_rejects_an_un1/source'), '84b5a14ab3bd38b00e60b16f86bf9a02533c728d', 'e37b30d94260cd50a0923e456124da4fc480df29')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_release_pin_rejects_an_unknown_tag(repo, remote):
+        root, released, _ = repo
+        found = errors(root, released, remote, pin="release", release="v9.9.9")
+>       assert found and "release v9.9.9 not found" in found[0]
+E       AssertionError: assert (['[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'] and 'release v9.9.9 not found' in '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.')
+
+tests\test_pin_modes.py:71: AssertionError
+__________ test_head_pin_follows_head_and_fails_when_it_moved[True] ___________
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_head_pin_follows_head_and1/source'), '354b2f4f69d633e2cc289db814464844325caa9f', '6f26ef22f3adb549228f621cdb20f2f1be224953')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_head_pin_follows_head_and_fails_when_it_moved(repo, remote):
+        root, released, head = repo
+>       assert errors(root, head, remote, pin="head") == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:98: AssertionError
+_________ test_static_pin_accepts_a_reviewed_commit_behind_head[True] _________
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_static_pin_accepts_a_revi1/source'), '115c25e0175d8493d60bb4056397f5776b2c3f8d', 'dfbe0818e3e824436fa7429d97ecb8735211633e')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_static_pin_accepts_a_reviewed_commit_behind_head(repo, remote):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="static") == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:106: AssertionError
+_______________ test_manifest_declares_a_mode_for_every_source ________________
+
+    def test_manifest_declares_a_mode_for_every_source():
+        sources = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))["sources"]
+        modes = {src["id"]: (src.get("pin"), src.get("release")) for src in sources}
+>       assert modes == {
+            "open-paper-skills": ("head", None),
+            "tokeneconomizer": ("release", "v0.1.0"),
+            "taste-skill": ("release", "v2.5.1"),
+            "wayfinder": ("release", "v1.3.2"),
+            "ui-ux-pro-max": ("release", "v2.15.0"),
+            "genoffice": ("release", "v0.12.852"),
+            # These upstreams publish no release or tag: the owner follows their HEAD.
+            "motion-design": ("head", None),
+            "gsap-scrolltrigger": ("head", None),
+            "ai-design-skills": ("head", None),
+            "explain-this": ("head", None),
+            "claude-design-system-prompt": ("head", None),
+        }
+E       AssertionError: assert {'taste-skill...v1.3.2'), ...} == {'open-paper-...v1.3.2'), ...}
+E         
+E         Omitting 10 identical items, use -vv to show
+E         Left contains 1 more item:
+E         {'claude-design-system-prompt': ('head', None)}
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:125: AssertionError
+______________ test_remote_commit_fetch_and_glob_validate_files _______________
+
+repo = (WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_remote_commit_fetch_and_g0/source'), 'af0aff527b8fb575edaa9902457adb3c30d76d39')
+tmp_path = WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_remote_commit_fetch_and_g0')
+
+    def test_remote_commit_fetch_and_glob_validate_files(repo, tmp_path):
+        root, commit = repo
+        entry = source(root, commit, selected_paths=["references/**"])["sources"][0]
+        del entry["repo_path"]
+        entry["repo_url"] = root.as_uri()
+        errors = check_sources({"sources": [entry]}, tmp_path)
+>       assert any("photo.png" in error for error in errors)
+E       assert False
+E        +  where False = any(<generator object test_remote_commit_fetch_and_glob_validate_files.<locals>.<genexpr> at 0x0000019F7270CBA0>)
+
+tests\test_regressions.py:79: AssertionError
+_________________ test_release_copies_verified_remote_license _________________
+
+build_project = WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_copies_verified_r0/project')
+tmp_path = WindowsPath('D:/workspace/muro-full-native-20261112-v1/test_release_copies_verified_r0')
+
+    def test_release_copies_verified_remote_license(build_project, tmp_path):
+        manifest_path = build_project / "sources.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        source_path = Path(manifest["sources"][0].pop("repo_path"))
+        manifest["sources"][0]["repo_url"] = source_path.as_uri()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+>       result = build_release(manifest_path, build_project, tmp_path / "output")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_regressions.py:159: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Users/alfio/AppData/Local/Packages/openai.codex_2p2nqsd0c76g0/AC/#!sandbox.{a7456aa4-1518-4f19-9044-c7102f39afda}/Temp/muro-source-0jwcvyti')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'file:///D:/workspace/muro-full-native-20261112-v1/test_release_copies_verified_r0/source', '6d9de9d1d226bb2d9403ad9ca12eb46c59e4b614')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: Could not read from remote repository.
+E           
+E           Please make sure you have the correct access rights
+E           and the repository exists.
+
+muro\sources.py:29: ValueError
+_____________ test_live_ui_ux_pro_max_source_passes_license_gate ______________
+
+    def test_live_ui_ux_pro_max_source_passes_license_gate():
+        manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
+        src = next(s for s in manifest["sources"] if s["id"] == "ui-ux-pro-max")
+>       assert check_sources({"sources": [src]}, PACKAGE) == []
+E       assert ['[ui-ux-pro-...: github.com'] == []
+E         
+E         Left contains one more item: "[ui-ux-pro-max] fatal: unable to access 'https://github.com/nextlevelbuilder/ui-ux-pro-max-skill/': Could not resolve host: github.com"
+E         Use -v to get more diff
+
+tests\test_ui_ux_pro_max_intake.py:41: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_ai_design_intake.py::test_live_ai_design_source_license_and_paths_pass
+FAILED tests/test_audit_p0.py::test_skill_md_synthesizes_domain_rich_bounded_discovery_description
+FAILED tests/test_live_host_fixes.py::test_release_never_ships_a_file_named_skill_md_below_a_skill_folder
+FAILED tests/test_pin_modes.py::test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.0-True]
+FAILED tests/test_pin_modes.py::test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.1-True]
+FAILED tests/test_pin_modes.py::test_release_pin_rejects_a_commit_that_is_not_the_tag[True]
+FAILED tests/test_pin_modes.py::test_release_pin_rejects_an_unknown_tag[True]
+FAILED tests/test_pin_modes.py::test_head_pin_follows_head_and_fails_when_it_moved[True]
+FAILED tests/test_pin_modes.py::test_static_pin_accepts_a_reviewed_commit_behind_head[True]
+FAILED tests/test_pin_modes.py::test_manifest_declares_a_mode_for_every_source
+FAILED tests/test_regressions.py::test_remote_commit_fetch_and_glob_validate_files
+FAILED tests/test_regressions.py::test_release_copies_verified_remote_license
+FAILED tests/test_ui_ux_pro_max_intake.py::test_live_ui_ux_pro_max_source_passes_license_gate
+ERROR tests/test_claude_design_intake.py::test_release_packages_the_source_as_reference_and_registers_nothing
+ERROR tests/test_tokeneconomizer_intake.py::test_release_packages_the_engine_and_keeps_the_hooks_passive
+ERROR tests/test_tokeneconomizer_intake.py::test_packaged_engine_answers_from_the_release_without_touching_the_users_state
+13 failed, 372 passed, 5 skipped, 3 errors in 355.96s (0:05:55)

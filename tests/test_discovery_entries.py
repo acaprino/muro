@@ -82,10 +82,10 @@ def test_release_emits_one_hidden_entry_skill_per_area_that_drives_the_same_runt
         if host == "claude-code":
             assert "user-invocable: false" in front
             assert "Bash(python ${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py *)" in front
-            assert "${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py plan --compact" in body
+            assert "${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py plan --compact --focus x --task" in body
         else:
             assert "user-invocable" not in front
-            assert "<skill-directory>/../muro/muro.py plan --compact" in body
+            assert "<skill-directory>/../muro/muro.py plan --compact --focus x --task" in body
             assert (entry.parent / "muro" / "muro.py").is_file()
         install = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
         assert "muro-testing" in install

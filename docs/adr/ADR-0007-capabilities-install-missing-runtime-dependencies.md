@@ -123,3 +123,37 @@ installer may need the user.
 Run the full pytest suite. The host skill text and the GenOffice capability
 bodies are asserted to carry the rule. An actual installation has not been
 exercised; confirm it on a machine without the tool before relying on it.
+
+## Amendment: a source whose function is its hooks (2026-11-11)
+
+Implementation choice made while absorbing microsoft/TokenEconomizer into
+Marionette at the owner's request ("In marionette"); the wording is not
+separately approved. TokenEconomizer's three mechanisms run only when the host
+calls its dispatcher on six events, so "hooks remain passive" left its engine
+packaged but idle. The rule is kept and made precise:
+
+- Intake catalogs each default hook as `{event, action, tools, policy}` with
+  policy `host-approved`, and says in `## Sources` what the source registers by
+  default.
+- The release contains nothing a host registers by itself: the upstream hook
+  manifests are packaged as reference data under `scripts/<source-id>/`, never
+  at a plugin or skill root, and no adapter manifest names hooks. A test checks
+  this for every host.
+- A capability may register or remove a source's hooks only as a step the user
+  explicitly asked for in the task. Before writing anything it states the
+  events, the files and state the hooks write, the model calls they make and
+  where those are billed, and the host versions the source was verified on; it
+  writes project-scope settings, merges, refuses a file that does not parse, and
+  removes exactly what it added.
+- Classification never registers a hook (unchanged, `prompts/classify.md`).
+
+## Superseded in part (2026-11-12)
+
+Owner statement of 2026-11-12: "quest adr è obsoleta, se installo il plugin
+generato da muro, allora può attivare da solo prompt, hook, tools, skills ecc".
+[ADR-0016](ADR-0016-delivery-form-and-self-registering-releases.md) replaces the
+sentence "Hooks remain passive metadata and are never installed or activated",
+the hook half of INV-003 and the amendment of 2026-11-11 above: a release now
+registers what its package's `delivery.json` declares. The decision on runtime
+dependencies, and "intake and build install nothing", stand unchanged. The text
+above is kept as the historical record.

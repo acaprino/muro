@@ -1,0 +1,92 @@
+{
+  "url": "https://api.github.com/repos/LottieFiles/motion-design-skill/commits/HEAD",
+  "response": {
+    "sha": "f9a8a041b85185ee4881b3471d3415e939aac772",
+    "node_id": "C_kwDORlCGJ9oAKGY5YThhMDQxYjg1MTg1ZWU0ODgxYjM0NzFkMzQxNWU5MzlhYWM3NzI",
+    "commit": {
+      "author": {
+        "name": "Nattu Adnan",
+        "email": "nattu@reallynattu.com",
+        "date": "2026-05-18T11:30:13Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-05-18T11:30:13Z"
+      },
+      "message": "Update README.md",
+      "tree": {
+        "sha": "f20218c742fe9aa9c73e4ba7654187ac4d402488",
+        "url": "https://api.github.com/repos/LottieFiles/motion-design-skill/git/trees/f20218c742fe9aa9c73e4ba7654187ac4d402488"
+      },
+      "url": "https://api.github.com/repos/LottieFiles/motion-design-skill/git/commits/f9a8a041b85185ee4881b3471d3415e939aac772",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqCvhFCRC1aQ7uu5UhlAAAcVkQAJr2skY4Vq1G/p22JJsopnt+\nBFMfuNtAtv1guDDGCsDIhoe6D6woKcCC6CMz2vKhky2QTkH7GPKiLPbVEhddwJwN\nOsovjJY12iMO0hcG+NW6gRyrD5/FkoudaRnECctB4+ujOzI/4HhHZuHyAaKMDxeb\nLCqie9FNDcWDlO4pgn3sCdTa3uX2YSZeG4o1+jhGvekhpsybxBB+fr5QDL/0w1no\nEQy7mfw4So7623RWkTkub4C6no4E2jqHzVC+OLwfDsTdCHAJ0JwUVEq/tjUqEZfI\nboMyqMKv4vKue7W2UC3K/vbE2RatzLfdenShkYBgZmeW/+cCXNEOokAtm1dwSvWg\nQgtASQFmWMVtAE4RSiRBYc1Rlq9xEQYyj3p1bK55JYzOVK/J1UHs1iRjbdbZIfL0\n7/9nmvianbV5Mg56R1Fjn1Z2gPCWfrg5MkJQeoimPccOmBqGLNjk/Crz7M6CeH0F\nDqFawnnMJ5ZWhGvPNo4NG4zQzqqQrnniZoJTJDiBo7v3GD41i7fFdnNfKEb63N2T\nTaiDWq7jWQVa7IkHbkcPU6BUdqhR3sFS7vTb9wsqxKJqs6RpIKfrzCIb/f9q/eyc\nC059gU8SJZljZs2vaTF4zfuSBfzmvgivmnhPhVswbqs+S1x0T6972FRM1OpfrKUo\n8MsLBNW47D61k0PZJuK1\n=BiFh\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree f20218c742fe9aa9c73e4ba7654187ac4d402488\nparent ec715ee57ae78b7b6305ba3ec21a2dda4910efd7\nauthor Nattu Adnan <nattu@reallynattu.com> 1779103813 +0900\ncommitter GitHub <noreply@github.com> 1779103813 +0900\n\nUpdate README.md",
+        "verified_at": "2026-05-18T11:30:14Z"
+      }
+    },
+    "url": "https://api.github.com/repos/LottieFiles/motion-design-skill/commits/f9a8a041b85185ee4881b3471d3415e939aac772",
+    "html_url": "https://github.com/LottieFiles/motion-design-skill/commit/f9a8a041b85185ee4881b3471d3415e939aac772",
+    "comments_url": "https://api.github.com/repos/LottieFiles/motion-design-skill/commits/f9a8a041b85185ee4881b3471d3415e939aac772/comments",
+    "author": {
+      "login": "reallynattu",
+      "id": 2539454,
+      "node_id": "MDQ6VXNlcjI1Mzk0NTQ=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2539454?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/reallynattu",
+      "html_url": "https://github.com/reallynattu",
+      "followers_url": "https://api.github.com/users/reallynattu/followers",
+      "following_url": "https://api.github.com/users/reallynattu/following{/other_user}",
+      "gists_url": "https://api.github.com/users/reallynattu/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/reallynattu/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/reallynattu/subscriptions",
+      "organizations_url": "https://api.github.com/users/reallynattu/orgs",
+      "repos_url": "https://api.github.com/users/reallynattu/repos",
+      "events_url": "https://api.github.com/users/reallynattu/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/reallynattu/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "ec715ee57ae78b7b6305ba3ec21a2dda4910efd7",
+        "url": "https://api.github.com/repos/LottieFiles/motion-design-skill/commits/ec715ee57ae78b7b6305ba3ec21a2dda4910efd7",
+        "html_url": "https://github.com/LottieFiles/motion-design-skill/commit/ec715ee57ae78b7b6305ba3ec21a2dda4910efd7"
+      }
+    ],
+    "stats": {
+      "total": 2,
+      "additions": 1,
+      "deletions": 1
+    }
+  },
+  "omitted_commit_file_patch_count": 1,
+  "archive_note": "Commit file patch payloads omitted; release/ref/commit verification metadata retained."
+}

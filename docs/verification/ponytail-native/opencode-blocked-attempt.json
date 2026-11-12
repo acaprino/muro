@@ -1,0 +1,48 @@
+{
+  "status": "blocked-before-native-plugin-loading",
+  "host": "OpenCode 2.2.5",
+  "command": ["C:\\Users\\alfio\\AppData\\Roaming\\npm\\node_modules\\@opencode\\cli\\bin\\opencode.exe", "plugin", "list", "--standalone"],
+  "cwd": "D:/workspace/muro-opencode-offline-probe/project",
+  "adapter": "D:/workspace/muro-ponytail-probe/release-native-v2/ponytail-probe/adapters/opencode",
+  "temporary_config": "D:/workspace/muro-opencode-offline-probe/config/opencode/opencode.json",
+  "environment": {
+    "XDG_DATA_HOME": "D:/workspace/muro-opencode-offline-probe/data",
+    "XDG_CACHE_HOME": "D:/workspace/muro-opencode-offline-probe/cache",
+    "XDG_CONFIG_HOME": "D:/workspace/muro-opencode-offline-probe/config",
+    "XDG_STATE_HOME": "D:/workspace/muro-opencode-offline-probe/state",
+    "OPENCODE_TEST_HOME": "D:/workspace/muro-opencode-offline-probe/home",
+    "OPENCODE_CONFIG_DIR": "D:/workspace/muro-opencode-offline-probe/config/opencode",
+    "OPENCODE_DISABLE_MODELS_FETCH": "1",
+    "OPENCODE_DISABLE_AUTOUPDATE": "1",
+    "OPENCODE_DISABLE_FREE_MODELS": "1",
+    "OPENCODE_CONFIG_PROJECT_DISABLE": "1",
+    "OPENCODE_DISABLE_CLAUDE_CODE": "1",
+    "OPENCODE_DISABLE_FILEWATCHER": "1",
+    "TEMP": "D:/workspace/muro-opencode-offline-probe/tmp",
+    "TMP": "D:/workspace/muro-opencode-offline-probe/tmp"
+  },
+  "inherited_environment_names": ["PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "PROCESSOR_ARCHITECTURE", "NUMBER_OF_PROCESSORS", "OS", "USERPROFILE", "PROGRAMFILES", "PROGRAMFILES(X86)"],
+  "provider_credentials_inherited": false,
+  "observations": [
+    "CLI started at 2026-11-12T11:31:50.564Z.",
+    "CLI spawned its own serve --stdio --port 0 process at 11:31:50.592Z.",
+    "Private server bootstrapped 59 database migrations in scratch at 11:31:52.379Z.",
+    "CLI-to-private-server HTTP transport failed EACCES at 11:31:52.513Z.",
+    "No plugin-loading entry, generated skill listing, or system-hook dispatch was observed.",
+    "No model session was requested; no provider inference call was initiated."
+  ],
+  "error": "ClientError: Transport: EACCES: Unable to connect. Is the computer able to access the url?",
+  "cleanup": {
+    "timeout_seconds": 45,
+    "action": "Runner attempted taskkill /PID <owned CLI pid> /T /F at timeout. Its final communicate timed out after 5 seconds; the tool session was then interrupted with Ctrl-C and returned exit code 1.",
+    "verification": "Subsequent PowerShell Get-Process -Name opencode reported zero visible matching processes.",
+    "configuration_scope": "Only the isolated scratch roots above were written; no host installation or user configuration was changed."
+  },
+  "log": "D:/workspace/muro-opencode-offline-probe/data/opencode/log/opencode.log",
+  "limitations": [
+    "This attempt does not close the actual OpenCode loader verification gap.",
+    "Native system-hook dispatch remains a generated-module conformance test, not real host/model evidence.",
+    "The initial unredirected --help call failed EPERM when opening the user's OpenCode log; redirected --help subsequently succeeded.",
+    "No retry against the newer v3 artifact was made because the failure occurred before package loading and the root instructed stopping at EACCES."
+  ]
+}

@@ -2,11 +2,30 @@
   "entries": [
     {
       "name": "marionette-web-design",
-      "description": "Use when designing, building or restyling a website or landing page (offer, copy, outline, palette, fonts, layout), when choosing a design system, palette, typography or accessibility and UX rules for an app screen, dashboard or component, or when creating or updating designs, components and tokens inside a Figma file.",
+      "description": "Use when designing, building or restyling a website or landing page (offer, copy, outline, palette, fonts, layout), when asking which design system, palette, typography or accessibility and UX rules suit an app screen, dashboard or component, or when creating or updating designs, components and tokens inside a Figma file. Not for a clickable prototype of app screens in HTML.",
       "capabilities": [
         "visual-direction",
         "design-guidance",
         "figma-design"
+      ]
+    },
+    {
+      "name": "marionette-product-design",
+      "description": "Use when sketching wireframes or a few low-fidelity layouts of a screen or flow, choosing a look for an app or product that has no brand or design system, building a clickable hi-fi prototype or mockup of app screens in HTML, wanting several design variations or a live tweak panel to play with colours, fonts and layout, or making a slide deck as an HTML page that runs in the browser. Not for a company website or landing page, a PowerPoint file, or shipping the screen in the product's production code.",
+      "capabilities": [
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "html-deck"
+      ]
+    },
+    {
+      "name": "marionette-design-review",
+      "description": "Use when checking and fixing an existing HTML design or web interface before it is shown or shipped: accessibility (contrast, keyboard, focus, labels), a generic AI-made look, visual hierarchy and spacing rhythm, missing hover, focus, disabled or loading states, or a full polish pass; or when extracting design tokens from a brand, codebase, site or screenshots into a tokens file, or listing the reusable components of a design as an inventory. Not for a code review of logic, for fact-checking content or for changes inside a Figma file.",
+      "capabilities": [
+        "design-review",
+        "design-system-extract"
       ]
     },
     {
@@ -37,9 +56,49 @@
     },
     {
       "name": "marionette-engineering",
-      "description": "Use when a software change is larger than one sitting or still has open decisions: agreeing the destination, resolving decisions with the user, writing a spec, slicing it into vertical tickets, then building and reviewing slice by slice with test evidence. Not for a small, already clear change such as a rename or a one-file fix.",
+      "description": "Use when implementing a software change, fixing a bug, or coordinating a larger change: agreeing the destination, resolving open decisions, writing a spec, slicing vertical tickets, then building and reviewing with test evidence; or when recording, preparing or resuming a HANDOFF.md across sessions. A clear small change is implemented directly. Not for a report-only code review or a shortcut inventory.",
       "capabilities": [
-        "work-map"
+        "work-map",
+        "session-handoff"
+      ]
+    },
+    {
+      "name": "marionette-papers",
+      "description": "Use when finding research papers, related work or prior art, reading a paper from its arXiv id, DOI or PubMed id, adding papers to a paper wiki with topic and concept pages and validating it, or making a publication-quality paper figure: an editable draw.io method or architecture diagram, or a matplotlib plot from results data. Not for a web search on a non-academic subject or a chart for a dashboard.",
+      "capabilities": [
+        "paper-search",
+        "paper-wiki",
+        "paper-figure"
+      ]
+    },
+    {
+      "name": "marionette-research",
+      "description": "Use when planning ML or AI research (choosing a problem, a research plan, an experiment loop, a reading plan, a research log), debugging a training run or an evaluation that misbehaves, or pitching and positioning research for an advisor, reviewer, collaborator or talk audience without overclaiming, including checking a pitch for claims the evidence does not support.",
+      "capabilities": [
+        "research-practice",
+        "research-pitch"
+      ]
+    },
+    {
+      "name": "marionette-token-economy",
+      "description": "Use when the user asks what TokenEconomizer learned or saved in this repository or what their agent sessions cost, wants to see or change its repository facts (micro-skills), its tool pruning deny list or its loop guard, to give pruned tools back, to change its settings, or to turn its automatic mode on or off for a project. Not for questions about model pricing or for shrinking a prompt by hand.",
+      "capabilities": [
+        "token-economy"
+      ]
+    },
+    {
+      "name": "marionette-code-review",
+      "description": "Use when reviewing code changes for correctness, reliability and unnecessary complexity, auditing the whole repository beyond the diff, or listing deliberate shortcut comments with their limits and upgrade triggers. Reports findings; applies no fixes unless implementation is also requested. Not for visual design reviews, research fact-checking or agent session cost reports.",
+      "capabilities": [
+        "engineering-review",
+        "engineering-debt"
+      ]
+    },
+    {
+      "name": "marionette-working-method",
+      "description": "Use when asking how the absorbed Ponytail working method works, what its lite, full and ultra preferences mean, or what its published benchmark measured and what its limits are. Not for measuring current repository savings, changing a persistent source-plugin mode or reviewing code.",
+      "capabilities": [
+        "engineering-guidance"
       ]
     }
   ]

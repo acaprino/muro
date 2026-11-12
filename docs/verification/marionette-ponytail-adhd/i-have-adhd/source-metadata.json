@@ -1,0 +1,1341 @@
+{
+  "fetched_at": "2026-11-12",
+  "repository": {
+    "id": 1238120057,
+    "node_id": "R_kgDOScw2eQ",
+    "name": "i-have-adhd",
+    "full_name": "ayghri/i-have-adhd",
+    "private": false,
+    "owner": {
+      "login": "ayghri",
+      "id": 32200675,
+      "node_id": "MDQ6VXNlcjMyMjAwNjc1",
+      "avatar_url": "https://avatars.githubusercontent.com/u/32200675?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/ayghri",
+      "html_url": "https://github.com/ayghri",
+      "followers_url": "https://api.github.com/users/ayghri/followers",
+      "following_url": "https://api.github.com/users/ayghri/following{/other_user}",
+      "gists_url": "https://api.github.com/users/ayghri/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/ayghri/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/ayghri/subscriptions",
+      "organizations_url": "https://api.github.com/users/ayghri/orgs",
+      "repos_url": "https://api.github.com/users/ayghri/repos",
+      "events_url": "https://api.github.com/users/ayghri/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/ayghri/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "html_url": "https://github.com/ayghri/i-have-adhd",
+    "description": "A skill to stop your coding agent from burying the answer. ADHD-friendly output.",
+    "fork": false,
+    "url": "https://api.github.com/repos/ayghri/i-have-adhd",
+    "forks_url": "https://api.github.com/repos/ayghri/i-have-adhd/forks",
+    "keys_url": "https://api.github.com/repos/ayghri/i-have-adhd/keys{/key_id}",
+    "collaborators_url": "https://api.github.com/repos/ayghri/i-have-adhd/collaborators{/collaborator}",
+    "teams_url": "https://api.github.com/repos/ayghri/i-have-adhd/teams",
+    "hooks_url": "https://api.github.com/repos/ayghri/i-have-adhd/hooks",
+    "issue_events_url": "https://api.github.com/repos/ayghri/i-have-adhd/issues/events{/number}",
+    "events_url": "https://api.github.com/repos/ayghri/i-have-adhd/events",
+    "assignees_url": "https://api.github.com/repos/ayghri/i-have-adhd/assignees{/user}",
+    "branches_url": "https://api.github.com/repos/ayghri/i-have-adhd/branches{/branch}",
+    "tags_url": "https://api.github.com/repos/ayghri/i-have-adhd/tags",
+    "blobs_url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs{/sha}",
+    "git_tags_url": "https://api.github.com/repos/ayghri/i-have-adhd/git/tags{/sha}",
+    "git_refs_url": "https://api.github.com/repos/ayghri/i-have-adhd/git/refs{/sha}",
+    "trees_url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees{/sha}",
+    "statuses_url": "https://api.github.com/repos/ayghri/i-have-adhd/statuses/{sha}",
+    "languages_url": "https://api.github.com/repos/ayghri/i-have-adhd/languages",
+    "stargazers_url": "https://api.github.com/repos/ayghri/i-have-adhd/stargazers",
+    "contributors_url": "https://api.github.com/repos/ayghri/i-have-adhd/contributors",
+    "subscribers_url": "https://api.github.com/repos/ayghri/i-have-adhd/subscribers",
+    "subscription_url": "https://api.github.com/repos/ayghri/i-have-adhd/subscription",
+    "commits_url": "https://api.github.com/repos/ayghri/i-have-adhd/commits{/sha}",
+    "git_commits_url": "https://api.github.com/repos/ayghri/i-have-adhd/git/commits{/sha}",
+    "comments_url": "https://api.github.com/repos/ayghri/i-have-adhd/comments{/number}",
+    "issue_comment_url": "https://api.github.com/repos/ayghri/i-have-adhd/issues/comments{/number}",
+    "contents_url": "https://api.github.com/repos/ayghri/i-have-adhd/contents/{+path}",
+    "compare_url": "https://api.github.com/repos/ayghri/i-have-adhd/compare/{base}...{head}",
+    "merges_url": "https://api.github.com/repos/ayghri/i-have-adhd/merges",
+    "archive_url": "https://api.github.com/repos/ayghri/i-have-adhd/{archive_format}{/ref}",
+    "downloads_url": "https://api.github.com/repos/ayghri/i-have-adhd/downloads",
+    "issues_url": "https://api.github.com/repos/ayghri/i-have-adhd/issues{/number}",
+    "pulls_url": "https://api.github.com/repos/ayghri/i-have-adhd/pulls{/number}",
+    "milestones_url": "https://api.github.com/repos/ayghri/i-have-adhd/milestones{/number}",
+    "notifications_url": "https://api.github.com/repos/ayghri/i-have-adhd/notifications{?since,all,participating}",
+    "labels_url": "https://api.github.com/repos/ayghri/i-have-adhd/labels{/name}",
+    "releases_url": "https://api.github.com/repos/ayghri/i-have-adhd/releases{/id}",
+    "deployments_url": "https://api.github.com/repos/ayghri/i-have-adhd/deployments",
+    "created_at": "2026-05-13T20:42:06Z",
+    "updated_at": "2026-11-12T11:37:46Z",
+    "pushed_at": "2026-10-19T19:46:23Z",
+    "git_url": "git://github.com/ayghri/i-have-adhd.git",
+    "ssh_url": "git@github.com:ayghri/i-have-adhd.git",
+    "clone_url": "https://github.com/ayghri/i-have-adhd.git",
+    "svn_url": "https://github.com/ayghri/i-have-adhd",
+    "homepage": "",
+    "size": 442,
+    "stargazers_count": 60950,
+    "watchers_count": 60950,
+    "language": "Python",
+    "has_issues": true,
+    "has_projects": true,
+    "has_downloads": false,
+    "has_wiki": true,
+    "has_pages": false,
+    "has_discussions": false,
+    "forks_count": 3569,
+    "mirror_url": null,
+    "archived": false,
+    "disabled": false,
+    "open_issues_count": 98,
+    "license": {
+      "key": "mit",
+      "name": "MIT License",
+      "spdx_id": "MIT",
+      "url": "https://api.github.com/licenses/mit",
+      "node_id": "MDc6TGljZW5zZTEz"
+    },
+    "allow_forking": true,
+    "is_template": false,
+    "web_commit_signoff_required": false,
+    "has_pull_requests": true,
+    "pull_request_creation_policy": "all",
+    "topics": [
+      "adhd",
+      "claude-",
+      "claude-code-plugin",
+      "claude-skills",
+      "developer-tools",
+      "productivity"
+    ],
+    "visibility": "public",
+    "forks": 3569,
+    "open_issues": 98,
+    "watchers": 60950,
+    "default_branch": "main",
+    "permissions": {
+      "admin": false,
+      "maintain": false,
+      "push": false,
+      "triage": false,
+      "pull": true
+    },
+    "network_count": 3569,
+    "subscribers_count": 166
+  },
+  "releases": [
+    {
+      "url": "https://api.github.com/repos/ayghri/i-have-adhd/releases/417678998",
+      "assets_url": "https://api.github.com/repos/ayghri/i-have-adhd/releases/417678998/assets",
+      "upload_url": "https://uploads.github.com/repos/ayghri/i-have-adhd/releases/417678998/assets{?name,label}",
+      "html_url": "https://github.com/ayghri/i-have-adhd/releases/tag/v0.4.1",
+      "id": 417678998,
+      "author": {
+        "login": "ayghri",
+        "id": 32200675,
+        "node_id": "MDQ6VXNlcjMyMjAwNjc1",
+        "avatar_url": "https://avatars.githubusercontent.com/u/32200675?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/ayghri",
+        "html_url": "https://github.com/ayghri",
+        "followers_url": "https://api.github.com/users/ayghri/followers",
+        "following_url": "https://api.github.com/users/ayghri/following{/other_user}",
+        "gists_url": "https://api.github.com/users/ayghri/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/ayghri/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/ayghri/subscriptions",
+        "organizations_url": "https://api.github.com/users/ayghri/orgs",
+        "repos_url": "https://api.github.com/users/ayghri/repos",
+        "events_url": "https://api.github.com/users/ayghri/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/ayghri/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "node_id": "RE_kwDOScw2ec4Y5UaW",
+      "tag_name": "v0.4.1",
+      "target_commitish": "main",
+      "name": "v0.4.1",
+      "draft": false,
+      "immutable": false,
+      "prerelease": false,
+      "created_at": "2026-10-11T16:03:54Z",
+      "updated_at": "2026-10-19T19:46:23Z",
+      "published_at": "2026-10-19T19:46:23Z",
+      "assets": [],
+      "tarball_url": "https://api.github.com/repos/ayghri/i-have-adhd/tarball/v0.4.1",
+      "zipball_url": "https://api.github.com/repos/ayghri/i-have-adhd/zipball/v0.4.1",
+      "body": "## Changes\r\n\r\n- Replaced the illustrative npm installation command with a direct file-edit example in the skill and README.\r\n- Synchronized the example across all translated READMEs.\r\n- Added a French README and French language-navigation links.\r\n- Bumped plugin versions so existing Claude Code installations can receive the updated skill.\r\n\r\n\r\n## New Contributors (since v0.0.0)\r\n* @seonghobae made their first contribution in https://github.com/ayghri/i-have-adhd/pull/1\r\n* @DeJayDev made their first contribution in https://github.com/ayghri/i-have-adhd/pull/14\r\n* @ojusave made their first contribution in https://github.com/ayghri/i-have-adhd/pull/5\r\n* @jeremyinthebay made their first contribution in https://github.com/ayghri/i-have-adhd/pull/10\r\n* @jai-dewani made their first contribution in https://github.com/ayghri/i-have-adhd/pull/12\r\n* @BobbyWang0120 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/17\r\n* @AdinathChaudhari made their first contribution in https://github.com/ayghri/i-have-adhd/pull/21\r\n* @thejesh23 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/36\r\n* @gabecodez made their first contribution in https://github.com/ayghri/i-have-adhd/pull/23\r\n* @PeterM45 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/25\r\n* @isatimur made their first contribution in https://github.com/ayghri/i-have-adhd/pull/9\r\n* @jabrahamtech made their first contribution in https://github.com/ayghri/i-have-adhd/pull/30\r\n* @Arpit-Khandelwal made their first contribution in https://github.com/ayghri/i-have-adhd/pull/63\r\n* @tura-ai-agent made their first contribution in https://github.com/ayghri/i-have-adhd/pull/67\r\n* @awscullinan made their first contribution in https://github.com/ayghri/i-have-adhd/pull/66\r\n* @sigco3111 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/72\r\n* @Jarvis911 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/76\r\n* @andermoreira made their first contribution in https://github.com/ayghri/i-have-adhd/pull/80\r\n* @Ruxiu0409 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/81\r\n* @greekr4 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/85\r\n* @commie70 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/101\r\n* @Souptik96 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/71\r\n* @nishuzumi made their first contribution in https://github.com/ayghri/i-have-adhd/pull/78\r\n* @mnofresno made their first contribution in https://github.com/ayghri/i-have-adhd/pull/73\r\n* @Y0lan made their first contribution in https://github.com/ayghri/i-have-adhd/pull/107\r\n* @rimonhanna made their first contribution in https://github.com/ayghri/i-have-adhd/pull/110\r\n* @kevinkavi2001 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/115\r\n* @nslatour made their first contribution in https://github.com/ayghri/i-have-adhd/pull/121\r\n* @cateim made their first contribution in https://github.com/ayghri/i-have-adhd/pull/123\r\n* @datfooldive made their first contribution in https://github.com/ayghri/i-have-adhd/pull/126\r\n* @Defaultuser361 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/97\r\n* @DovahkiinYuzuko made their first contribution in https://github.com/ayghri/i-have-adhd/pull/122\r\n* @SillyDark made their first contribution in https://github.com/ayghri/i-have-adhd/pull/100\r\n* @FekyBaz made their first contribution in https://github.com/ayghri/i-have-adhd/pull/146\r\n* @wakqasahmed made their first contribution in https://github.com/ayghri/i-have-adhd/pull/149\r\n* @Lipkin10 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/125\r\n* @vardhans07 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/174\r\n* @FenjuFu made their first contribution in https://github.com/ayghri/i-have-adhd/pull/169\r\n* @Matthew-Selvam made their first contribution in https://github.com/ayghri/i-have-adhd/pull/165\r\n* @lg114 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/198\r\n* @webdevtodayjason made their first contribution in https://github.com/ayghri/i-have-adhd/pull/180\r\n* @MHAlikhani made their first contribution in https://github.com/ayghri/i-have-adhd/pull/192\r\n* @aitorvv made their first contribution in https://github.com/ayghri/i-have-adhd/pull/209\r\n* @yrooogerg made their first contribution in https://github.com/ayghri/i-have-adhd/pull/69\r\n* @mvanhorn made their first contribution in https://github.com/ayghri/i-have-adhd/pull/95\r\n* @Benziza made their first contribution in https://github.com/ayghri/i-have-adhd/pull/196\r\n* @flessan made their first contribution in https://github.com/ayghri/i-have-adhd/pull/211\r\n* @mo1998 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/240\r\n* @2arian3 made their first contribution in https://github.com/ayghri/i-have-adhd/pull/238\r\n* @AxelBriche made their first contribution in https://github.com/ayghri/i-have-adhd/pull/251\r\n\r\n**Full Changelog**: https://github.com/ayghri/i-have-adhd/commits/v0.4.1",
+      "reactions": {
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/releases/417678998/reactions",
+        "total_count": 10,
+        "+1": 7,
+        "-1": 0,
+        "laugh": 0,
+        "hooray": 0,
+        "confused": 0,
+        "heart": 0,
+        "rocket": 0,
+        "eyes": 3
+      },
+      "mentions_count": 50
+    }
+  ],
+  "tag": {
+    "ref": "refs/tags/v0.4.1",
+    "node_id": "REF_kwDOScw2ebByZWZzL3RhZ3MvdjAuNC4x",
+    "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/refs/tags/v0.4.1",
+    "object": {
+      "sha": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+      "type": "commit",
+      "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/commits/1ecea1993b7fce257ffbd686c070948b5e07eda6"
+    }
+  },
+  "commit": {
+    "sha": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+    "node_id": "C_kwDOScw2edoAKDFlY2VhMTk5M2I3ZmNlMjU3ZmZiZDY4NmMwNzA5NDhiNWUwN2VkYTY",
+    "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/commits/1ecea1993b7fce257ffbd686c070948b5e07eda6",
+    "html_url": "https://github.com/ayghri/i-have-adhd/commit/1ecea1993b7fce257ffbd686c070948b5e07eda6",
+    "author": {
+      "name": "Ayoub Ghriss",
+      "email": "develop@ayghri.me",
+      "date": "2026-10-11T16:03:54Z"
+    },
+    "committer": {
+      "name": "GitHub",
+      "email": "noreply@github.com",
+      "date": "2026-10-11T16:03:54Z"
+    },
+    "tree": {
+      "sha": "d4775095f471d938babccea77838d43b7fd39bc3",
+      "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/d4775095f471d938babccea77838d43b7fd39bc3"
+    },
+    "message": "Merge pull request #251 from AxelBriche/docs/french-translation\n\ndocs: add French translation of README",
+    "parents": [
+      {
+        "sha": "723af7d9afaf43eb871dbcce6129e2bf80de90d5",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/commits/723af7d9afaf43eb871dbcce6129e2bf80de90d5",
+        "html_url": "https://github.com/ayghri/i-have-adhd/commit/723af7d9afaf43eb871dbcce6129e2bf80de90d5"
+      },
+      {
+        "sha": "29139ff31a87ac74c04f4ef9cccdee3234e2512c",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/commits/29139ff31a87ac74c04f4ef9cccdee3234e2512c",
+        "html_url": "https://github.com/ayghri/i-have-adhd/commit/29139ff31a87ac74c04f4ef9cccdee3234e2512c"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "reason": "valid",
+      "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqy7NqCRC1aQ7uu5UhlAAA6YMQAInKyoyhAW1tbkUwK7+xvTtw\nFTNdJBSzEwqLniKl0c68iPl3ssJpSdg3vFbssOeyQ0F2XXCthdHKeWTl2/y+uzL2\nPMlGoFb+9b0qdkDVRZrGtap4CvQsJwWw6puh7cEhyNsP+T+riMjSrJGVNHhXoGO9\nnVOkwjCQXMtfjVKDzWazZPKBg0j4/VJ778kd+Nl4xz5Q81ffNhbCSNTLBrCQeeMU\n/tfwSuEC8Hlnqgcl48SCs7Xjg4f2Z+jOmnhj0mWe6uUDedO0OPOnKp/EfxD/AbjP\n4OfmlTBx4SjHWr6+vE7m93wNePLKosP6YfmqosJvYv50CwRiWDsMtymIykJfm4RC\n32CohH8fKOMp1qmQW7a3GPxKozP/BRIRfie4YR9wyee9Vi1b/2arYzHh/dQvOfG7\n2hflvmcTEsZ8ngN/7wf/TcMaK7KEDFpTzCK0N+CeGu5z2yjoKovzh1lfxD6FxRjL\nG4hZeS3lMaAQTzYQh+PHkXYTrIYuPS0E6T/uSr837DkN/lE2Wm4O3Bp58qPzOfEB\nyBA5bFoeSl4+XGni+XVT8MGCfhWZ2auAUrjwFbpXYimPRs7nuetG/6gJbx4HiRdV\nBeFA6Ypo8y/I4wSqiFR1lu5Jc6dAqQogC8xXwE2vyWcqjERK8nvFugIjOTm+IGLY\ntxiebelmcIVDnCf09n5r\n=U8+q\n-----END PGP SIGNATURE-----\n",
+      "payload": "tree d4775095f471d938babccea77838d43b7fd39bc3\nparent 723af7d9afaf43eb871dbcce6129e2bf80de90d5\nparent 29139ff31a87ac74c04f4ef9cccdee3234e2512c\nauthor Ayoub Ghriss <develop@ayghri.me> 1791734634 -0500\ncommitter GitHub <noreply@github.com> 1791734634 -0500\n\nMerge pull request #251 from AxelBriche/docs/french-translation\n\ndocs: add French translation of README",
+      "verified_at": "2026-10-11T16:03:55Z"
+    }
+  },
+  "tree": {
+    "sha": "d4775095f471d938babccea77838d43b7fd39bc3",
+    "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/d4775095f471d938babccea77838d43b7fd39bc3",
+    "tree": [
+      {
+        "path": ".agents",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "2392342d15f692d018d49d51a8f300ad7efd5502",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/2392342d15f692d018d49d51a8f300ad7efd5502"
+      },
+      {
+        "path": ".agents/plugins",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "e8c8546a6a5fa4e42841e81496d37a3e45ce71ae",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/e8c8546a6a5fa4e42841e81496d37a3e45ce71ae"
+      },
+      {
+        "path": ".agents/plugins/marketplace.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6f0ab8f97af04d9ebc52119eccdbcd7474417493",
+        "size": 414,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/6f0ab8f97af04d9ebc52119eccdbcd7474417493"
+      },
+      {
+        "path": ".claude-plugin",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "7abd3aa6b87b76f8a84f59bd801348eeda13f64b",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/7abd3aa6b87b76f8a84f59bd801348eeda13f64b"
+      },
+      {
+        "path": ".claude-plugin/marketplace.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3423df78c524e05b528b4440b60a32d1dfb5f27a",
+        "size": 450,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/3423df78c524e05b528b4440b60a32d1dfb5f27a"
+      },
+      {
+        "path": ".claude-plugin/plugin.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7379dc588ab74587b0d572d377265b70e54d30f3",
+        "size": 291,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/7379dc588ab74587b0d572d377265b70e54d30f3"
+      },
+      {
+        "path": ".codex-plugin",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "c0ea99485e016b12140a202f830ece3e025c7baf",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/c0ea99485e016b12140a202f830ece3e025c7baf"
+      },
+      {
+        "path": ".codex-plugin/plugin.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "805485ba33d1868dc9549a6ca00177746a31263a",
+        "size": 1278,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/805485ba33d1868dc9549a6ca00177746a31263a"
+      },
+      {
+        "path": ".cursor",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "dd01ad3941952014d321779768ec6a8772fa99b1",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/dd01ad3941952014d321779768ec6a8772fa99b1"
+      },
+      {
+        "path": ".cursor/skills",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "82e81b68d4517fc7f1626bd87597ff5515e04979",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/82e81b68d4517fc7f1626bd87597ff5515e04979"
+      },
+      {
+        "path": ".cursor/skills/i-have-adhd",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "b2182370461a563e28b057ba025ef08355ed9631",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/b2182370461a563e28b057ba025ef08355ed9631"
+      },
+      {
+        "path": ".cursor/skills/i-have-adhd/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6c42757ffae37e442adfb52fbba2a8609f1cff00",
+        "size": 7201,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/6c42757ffae37e442adfb52fbba2a8609f1cff00"
+      },
+      {
+        "path": ".github",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "1cdb241ad268b536a5a1ee2eaa3f5f65067960a8",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/1cdb241ad268b536a5a1ee2eaa3f5f65067960a8"
+      },
+      {
+        "path": ".github/install",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "1a1ad56cdeb64732625bad4fb98ac4298a6c676a",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/1a1ad56cdeb64732625bad4fb98ac4298a6c676a"
+      },
+      {
+        "path": ".github/install/INSTALL.ar.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c5130332a90c7a879105168e1954f20545c66f26",
+        "size": 39186,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/c5130332a90c7a879105168e1954f20545c66f26"
+      },
+      {
+        "path": ".github/install/INSTALL.fa.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "823541db64487137de2cf92f4b1bd79c96b4ea86",
+        "size": 35283,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/823541db64487137de2cf92f4b1bd79c96b4ea86"
+      },
+      {
+        "path": ".github/install/INSTALL.id.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "df70eb1ec4b931d6f93ad8bc9f5b00bfc5cc9924",
+        "size": 25025,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/df70eb1ec4b931d6f93ad8bc9f5b00bfc5cc9924"
+      },
+      {
+        "path": ".github/install/INSTALL.ja.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ae46e2205529ea5bf58485c489e3677cc937adb1",
+        "size": 31951,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/ae46e2205529ea5bf58485c489e3677cc937adb1"
+      },
+      {
+        "path": ".github/install/INSTALL.ko.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cbda8412d1d6ca2c7bd5d3879d0a6852f175c646",
+        "size": 26517,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/cbda8412d1d6ca2c7bd5d3879d0a6852f175c646"
+      },
+      {
+        "path": ".github/install/INSTALL.pt-BR.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "41921d0c6db070216deb299fb7522bf4785e570a",
+        "size": 23306,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/41921d0c6db070216deb299fb7522bf4785e570a"
+      },
+      {
+        "path": ".github/install/INSTALL.vi.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc2c5eb55b9967a71332ad40edbcb8446f9de0fe",
+        "size": 26243,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/dc2c5eb55b9967a71332ad40edbcb8446f9de0fe"
+      },
+      {
+        "path": ".github/install/INSTALL.zh-CN.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "09915b13807378f566dcc37f453e523beb8d3a48",
+        "size": 25025,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/09915b13807378f566dcc37f453e523beb8d3a48"
+      },
+      {
+        "path": ".github/pull_request_template.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bfd62e9eca7706d0e0a4ffdc632c1622468ed123",
+        "size": 2834,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/bfd62e9eca7706d0e0a4ffdc632c1622468ed123"
+      },
+      {
+        "path": ".github/readme",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "4786895ff9873158b73518dcfaed278969e3b6a8",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/4786895ff9873158b73518dcfaed278969e3b6a8"
+      },
+      {
+        "path": ".github/readme/README.ar.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4430a321b9a0122c1a92a4305a69d2153e346748",
+        "size": 5238,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/4430a321b9a0122c1a92a4305a69d2153e346748"
+      },
+      {
+        "path": ".github/readme/README.es.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d411eed6fc635de7989caeafa9605076dbd7d917",
+        "size": 4034,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/d411eed6fc635de7989caeafa9605076dbd7d917"
+      },
+      {
+        "path": ".github/readme/README.fa.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "18700750d4cae7f75a40998375baa78647e610eb",
+        "size": 5307,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/18700750d4cae7f75a40998375baa78647e610eb"
+      },
+      {
+        "path": ".github/readme/README.fr.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b0e91160c87e31fb3b3f4dc54a8a4ef9a8e7a703",
+        "size": 4556,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/b0e91160c87e31fb3b3f4dc54a8a4ef9a8e7a703"
+      },
+      {
+        "path": ".github/readme/README.id.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "052cb9cf1e9373b3d2944cde56d9d7546fa463af",
+        "size": 3854,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/052cb9cf1e9373b3d2944cde56d9d7546fa463af"
+      },
+      {
+        "path": ".github/readme/README.ja.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47815b9ea037c3e60bc417cb7630da84a3a4cf31",
+        "size": 4925,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/47815b9ea037c3e60bc417cb7630da84a3a4cf31"
+      },
+      {
+        "path": ".github/readme/README.ko.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3bc83caacb067e720161a9e8981a7dcde7db018a",
+        "size": 4135,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/3bc83caacb067e720161a9e8981a7dcde7db018a"
+      },
+      {
+        "path": ".github/readme/README.pt-BR.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "629d3e7334c4c5a615d567379bbf7360b4aa488e",
+        "size": 3878,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/629d3e7334c4c5a615d567379bbf7360b4aa488e"
+      },
+      {
+        "path": ".github/readme/README.th.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7a2a75d1d1b5359c0ccaaa0d21960d36f2322aa3",
+        "size": 7258,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/7a2a75d1d1b5359c0ccaaa0d21960d36f2322aa3"
+      },
+      {
+        "path": ".github/readme/README.vi.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f422d828ef73e82f7b49b03defd32e60fce7fc35",
+        "size": 4570,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/f422d828ef73e82f7b49b03defd32e60fce7fc35"
+      },
+      {
+        "path": ".github/readme/README.zh-CN.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "415e2c6d9cb841c2c6f1d3ed2ae4f89843b798f9",
+        "size": 3895,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/415e2c6d9cb841c2c6f1d3ed2ae4f89843b798f9"
+      },
+      {
+        "path": ".github/workflows",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "3135f45a136b5d05ac91494360eca30c76fc7d22",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/3135f45a136b5d05ac91494360eca30c76fc7d22"
+      },
+      {
+        "path": ".github/workflows/claude.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "532188d8378db380a86de12333759692cccdac5d",
+        "size": 1395,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/532188d8378db380a86de12333759692cccdac5d"
+      },
+      {
+        "path": ".github/workflows/cursor-skill-sync.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a912662cf5b4ee02f1af5194b44fff841e6a46fd",
+        "size": 814,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/a912662cf5b4ee02f1af5194b44fff841e6a46fd"
+      },
+      {
+        "path": ".github/workflows/pi-load-check.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "77c0e1ed23d4d7aff297a0fa2c2bb284d9cd7d9b",
+        "size": 723,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/77c0e1ed23d4d7aff297a0fa2c2bb284d9cd7d9b"
+      },
+      {
+        "path": ".github/workflows/plugin-load-check.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56c4b8f2988c588e26496e96e6300814dd573d94",
+        "size": 1529,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/56c4b8f2988c588e26496e96e6300814dd573d94"
+      },
+      {
+        "path": ".gitignore",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "500acd79ba43fe149f3e73dc7e9cd398440c0a8d",
+        "size": 48,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/500acd79ba43fe149f3e73dc7e9cd398440c0a8d"
+      },
+      {
+        "path": ".opencode",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "958d6b17b0ebcad6b80ef4eb784d5d236fe89721",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/958d6b17b0ebcad6b80ef4eb784d5d236fe89721"
+      },
+      {
+        "path": ".opencode/command",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "de4e0d6b46c3dd7b0db7b250a8c44be3d3d6a0c9",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/de4e0d6b46c3dd7b0db7b250a8c44be3d3d6a0c9"
+      },
+      {
+        "path": ".opencode/command/i-have-adhd.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab0e00bbe62aacd169cab020c238a79f9d422a1",
+        "size": 409,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/7ab0e00bbe62aacd169cab020c238a79f9d422a1"
+      },
+      {
+        "path": ".opencode/plugins",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "f8fac9d8506a14f0eba925a390bfcbf76af9ce53",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/f8fac9d8506a14f0eba925a390bfcbf76af9ce53"
+      },
+      {
+        "path": ".opencode/plugins/i-have-adhd.js",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62aee3464180f9f3aa8196d2a57e4f9c731a4113",
+        "size": 125,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/62aee3464180f9f3aa8196d2a57e4f9c731a4113"
+      },
+      {
+        "path": ".opencode/plugins/i-have-adhd.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "79672d19ee25a008d817097bc66889b923ed8e23",
+        "size": 4377,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/79672d19ee25a008d817097bc66889b923ed8e23"
+      },
+      {
+        "path": "AGENTS.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "49a84d2088b0943517b199347065f8c45487dac8",
+        "size": 5199,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/49a84d2088b0943517b199347065f8c45487dac8"
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cecd11db86691ff662d3b5ca3555fc6f3e2c3a0e",
+        "size": 7144,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/cecd11db86691ff662d3b5ca3555fc6f3e2c3a0e"
+      },
+      {
+        "path": "GEMINI.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "760b7c9c1ff1c36caaac15a7c4e143bfb599cf96",
+        "size": 314,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/760b7c9c1ff1c36caaac15a7c4e143bfb599cf96"
+      },
+      {
+        "path": "INSTALL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2d5d039a9c683595ce61b5c69f1ced7aabcc8a01",
+        "size": 27516,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/2d5d039a9c683595ce61b5c69f1ced7aabcc8a01"
+      },
+      {
+        "path": "LICENSE",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "19db5f1b0ca65e277c158bd4c4263139ccfd859c",
+        "size": 1069,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/19db5f1b0ca65e277c158bd4c4263139ccfd859c"
+      },
+      {
+        "path": "README.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d784a4359d68ae959e85ac7cd22bbebef42cc682",
+        "size": 3995,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/d784a4359d68ae959e85ac7cd22bbebef42cc682"
+      },
+      {
+        "path": "evals",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "0d0f5a5ed32e8413f0936affec2c0be0ac5d8c6c",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/0d0f5a5ed32e8413f0936affec2c0be0ac5d8c6c"
+      },
+      {
+        "path": "evals/README.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "98780bd30e54aab468eb3d0ca72335e82612e906",
+        "size": 5829,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/98780bd30e54aab468eb3d0ca72335e82612e906"
+      },
+      {
+        "path": "evals/RESULTS.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3379f3cbad4469640448850e2211614ff0124c4c",
+        "size": 4915,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/3379f3cbad4469640448850e2211614ff0124c4c"
+      },
+      {
+        "path": "evals/cases.jsonl",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "64b6ca61a4e518b495399a0d7f0558e615182ff9",
+        "size": 4005,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/64b6ca61a4e518b495399a0d7f0558e615182ff9"
+      },
+      {
+        "path": "evals/rubric.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0bd5424d60222f89acb7fa376a6d426bee9bb640",
+        "size": 1409,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/0bd5424d60222f89acb7fa376a6d426bee9bb640"
+      },
+      {
+        "path": "evals/runners.example.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "44f9552c204811aa7c38a75a7b004b41b1fdf845",
+        "size": 610,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/44f9552c204811aa7c38a75a7b004b41b1fdf845"
+      },
+      {
+        "path": "evals/scenarios",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "abcb92962e69bbbc4f21d8fa1dc99264c84bf071",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/abcb92962e69bbbc4f21d8fa1dc99264c84bf071"
+      },
+      {
+        "path": "evals/scenarios/persistence-topic-switch-stop",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "38e879ec428f66c77c05c1e1cdc4980a13fc5aff",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/38e879ec428f66c77c05c1e1cdc4980a13fc5aff"
+      },
+      {
+        "path": "evals/scenarios/persistence-topic-switch-stop/case.jsonl",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7deb6f137568559dceb49848535f13f784c4bc12",
+        "size": 1688,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/7deb6f137568559dceb49848535f13f784c4bc12"
+      },
+      {
+        "path": "evals/scenarios/persistence-topic-switch-stop/story.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3256e71fb9799ccd39730b755682dd1708d7504b",
+        "size": 2975,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/3256e71fb9799ccd39730b755682dd1708d7504b"
+      },
+      {
+        "path": "extensions",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "02cccf271d26af3fa9f48893ec8a42cc2aed03fc",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/02cccf271d26af3fa9f48893ec8a42cc2aed03fc"
+      },
+      {
+        "path": "extensions/context-compat.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "83eb6a6663a961c263a15fb095f305ffaaf7645e",
+        "size": 1667,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/83eb6a6663a961c263a15fb095f305ffaaf7645e"
+      },
+      {
+        "path": "extensions/i-have-adhd.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc73610a66e5cbc2d643fc46d302ab6f7b741dd4",
+        "size": 6470,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/cc73610a66e5cbc2d643fc46d302ab6f7b741dd4"
+      },
+      {
+        "path": "gemini-extension.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea60743db1e5dcc480b5779fd65c30c1a783d2bc",
+        "size": 242,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/ea60743db1e5dcc480b5779fd65c30c1a783d2bc"
+      },
+      {
+        "path": "hooks",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "0d2a2bd708ac635d6ffec0b0a50d02bb06262484",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/0d2a2bd708ac635d6ffec0b0a50d02bb06262484"
+      },
+      {
+        "path": "hooks/always-on.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8295ab423197671c6cb2b4400499489aad03a3dd",
+        "size": 1766,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/8295ab423197671c6cb2b4400499489aad03a3dd"
+      },
+      {
+        "path": "hooks/always-on.ps1",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cac27bd74f14a43eaefc28699b63aefe0b96f198",
+        "size": 1651,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/cac27bd74f14a43eaefc28699b63aefe0b96f198"
+      },
+      {
+        "path": "hooks/always-on.sh",
+        "mode": "100755",
+        "type": "blob",
+        "sha": "f433bd01d05e48581d41815bb119876c28548aca",
+        "size": 1685,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/f433bd01d05e48581d41815bb119876c28548aca"
+      },
+      {
+        "path": "hooks/hooks.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5d713cd7841ebea63b98a8924d548d49802f977d",
+        "size": 549,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/5d713cd7841ebea63b98a8924d548d49802f977d"
+      },
+      {
+        "path": "kimi.plugin.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fd1f05dd38a1f520b363593afa9351ceb4bd7de2",
+        "size": 483,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/fd1f05dd38a1f520b363593afa9351ceb4bd7de2"
+      },
+      {
+        "path": "logo.png",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1ddc33aefc2f4f61b0eecf26139dd988fcfa79a0",
+        "size": 95884,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/1ddc33aefc2f4f61b0eecf26139dd988fcfa79a0"
+      },
+      {
+        "path": "package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5f8d09d5dd7e8a38ed06690ce46907d58d2c744",
+        "size": 537,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/a5f8d09d5dd7e8a38ed06690ce46907d58d2c744"
+      },
+      {
+        "path": "plugin.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "403125166a56e6d4c4df1ca4d1ddfa1e4c5c62e6",
+        "size": 187,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/403125166a56e6d4c4df1ca4d1ddfa1e4c5c62e6"
+      },
+      {
+        "path": "qwen-extension.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e2cac9fbf11e17249dc84cf6654c3d655e78ac84",
+        "size": 201,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/e2cac9fbf11e17249dc84cf6654c3d655e78ac84"
+      },
+      {
+        "path": "scripts",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "fe05cadc4183d811ccb0818c554e807f26fa8ba5",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/fe05cadc4183d811ccb0818c554e807f26fa8ba5"
+      },
+      {
+        "path": "scripts/check_context_compat.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5645fc72935cf41a0dae76ebcfc9725260eea352",
+        "size": 1951,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/5645fc72935cf41a0dae76ebcfc9725260eea352"
+      },
+      {
+        "path": "scripts/check_pi_extension.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cd3fa6ce55c6b03dd0bc83ebca867798a2173c3",
+        "size": 14725,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/1cd3fa6ce55c6b03dd0bc83ebca867798a2173c3"
+      },
+      {
+        "path": "scripts/judge.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "85c6de958bad02c129dd5bb6f38eeeb0dd8e5392",
+        "size": 13191,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/85c6de958bad02c129dd5bb6f38eeeb0dd8e5392"
+      },
+      {
+        "path": "scripts/run_evals.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58175386e413e767d8211e7c349dc35ad7980c19",
+        "size": 23212,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/58175386e413e767d8211e7c349dc35ad7980c19"
+      },
+      {
+        "path": "scripts/run_scenario_eval.py",
+        "mode": "100755",
+        "type": "blob",
+        "sha": "c21296084dca3c78b1971fb1e532d762e69d31a0",
+        "size": 6453,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/c21296084dca3c78b1971fb1e532d762e69d31a0"
+      },
+      {
+        "path": "skills",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "495d5f3a7f89bfe3911ed3445999962b14712f7f",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/495d5f3a7f89bfe3911ed3445999962b14712f7f"
+      },
+      {
+        "path": "skills/i-have-adhd",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "759f1e56d0d2fdd3819d2a53b81e72767c08d914",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/759f1e56d0d2fdd3819d2a53b81e72767c08d914"
+      },
+      {
+        "path": "skills/i-have-adhd/SKILL.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6c42757ffae37e442adfb52fbba2a8609f1cff00",
+        "size": 7201,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/6c42757ffae37e442adfb52fbba2a8609f1cff00"
+      },
+      {
+        "path": "skills/i-have-adhd/agents",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "3e6622ad3011866a3d257f9a92fa180f77a86d6e",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/3e6622ad3011866a3d257f9a92fa180f77a86d6e"
+      },
+      {
+        "path": "skills/i-have-adhd/agents/gemini.toml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a7d766c9dbf5188f3adadfe59cbf6aa1de3bc4ca",
+        "size": 2157,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/a7d766c9dbf5188f3adadfe59cbf6aa1de3bc4ca"
+      },
+      {
+        "path": "skills/i-have-adhd/agents/openai.yaml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e8285b9bb854e7ee4c25f4c48f593a87e9eb85d",
+        "size": 238,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/0e8285b9bb854e7ee4c25f4c48f593a87e9eb85d"
+      },
+      {
+        "path": "tests",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "455669f724a7882942f48b53ee27d8d95d45a2b9",
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/trees/455669f724a7882942f48b53ee27d8d95d45a2b9"
+      },
+      {
+        "path": "tests/opencode_plugin_driver.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "379fad02428de719b47a2ba844dd119451ed318e",
+        "size": 2392,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/379fad02428de719b47a2ba844dd119451ed318e"
+      },
+      {
+        "path": "tests/test_always_on_hooks.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62e4a731a70fbbbd152bcb23ae3190a23ac3dd86",
+        "size": 6785,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/62e4a731a70fbbbd152bcb23ae3190a23ac3dd86"
+      },
+      {
+        "path": "tests/test_install_docs.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9515bba1cdd2113f71a2242c0234f6f36f451fe9",
+        "size": 3158,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/9515bba1cdd2113f71a2242c0234f6f36f451fe9"
+      },
+      {
+        "path": "tests/test_judge.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7e6e86e2b0a2f3ad8a7fab8337e6e4b3aa1ed357",
+        "size": 16429,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/7e6e86e2b0a2f3ad8a7fab8337e6e4b3aa1ed357"
+      },
+      {
+        "path": "tests/test_omp_package.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "51d9f7ab36bc0d6ef7d2336fe4000cbe7ca4084f",
+        "size": 958,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/51d9f7ab36bc0d6ef7d2336fe4000cbe7ca4084f"
+      },
+      {
+        "path": "tests/test_opencode_plugin.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a4ddd7f00f4872dca31e6785453b07eb4dc2c9de",
+        "size": 10970,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/a4ddd7f00f4872dca31e6785453b07eb4dc2c9de"
+      },
+      {
+        "path": "tests/test_run_evals.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2efc853c9997f793b622ec2fc1ec51260d75a581",
+        "size": 21278,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/2efc853c9997f793b622ec2fc1ec51260d75a581"
+      },
+      {
+        "path": "tests/test_run_scenario_eval.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00c12d76d086ddc402aa08c4e3ecdc113971cd16",
+        "size": 8283,
+        "url": "https://api.github.com/repos/ayghri/i-have-adhd/git/blobs/00c12d76d086ddc402aa08c4e3ecdc113971cd16"
+      }
+    ],
+    "truncated": false
+  },
+  "inspected_files": {
+    ".claude-plugin/plugin.json": {
+      "encoding": "utf-8",
+      "sha": "7379dc588ab74587b0d572d377265b70e54d30f3",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.claude-plugin/plugin.json",
+      "display_title": "plugin.json",
+      "utf8_bytes": 291,
+      "content_sha256": "34a9cc83c1c7421e3a7a91df0eb7f565f4bbd6fbd3ad006c4cbf057c46cf42eb"
+    },
+    ".codex-plugin/plugin.json": {
+      "encoding": "utf-8",
+      "sha": "805485ba33d1868dc9549a6ca00177746a31263a",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.codex-plugin/plugin.json",
+      "display_title": "plugin.json",
+      "utf8_bytes": 1278,
+      "content_sha256": "e4d0b0579d295bc2fddb6be04e12926d6b714b8beee427ee33b8d255d275b408"
+    },
+    ".opencode/command/i-have-adhd.md": {
+      "encoding": "utf-8",
+      "sha": "7ab0e00bbe62aacd169cab020c238a79f9d422a1",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.opencode/command/i-have-adhd.md",
+      "display_title": "i-have-adhd.md",
+      "utf8_bytes": 409,
+      "content_sha256": "a155f9fa512cda17537fc2d5de77036c1ed20a479f2afd996dc8cb75d0ddf706"
+    },
+    ".opencode/plugins/i-have-adhd.js": {
+      "encoding": "utf-8",
+      "sha": "62aee3464180f9f3aa8196d2a57e4f9c731a4113",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.opencode/plugins/i-have-adhd.js",
+      "display_title": "i-have-adhd.js",
+      "utf8_bytes": 125,
+      "content_sha256": "2e2186406ed40dda2b74a0b66cdc5d6e0582b1a471cbdae32c804ce266088ddb"
+    },
+    ".opencode/plugins/i-have-adhd.mjs": {
+      "encoding": "utf-8",
+      "sha": "79672d19ee25a008d817097bc66889b923ed8e23",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.opencode/plugins/i-have-adhd.mjs",
+      "display_title": "i-have-adhd.mjs",
+      "utf8_bytes": 4377,
+      "content_sha256": "1bd5dc8d1950f5da852344f876a520f3e6e60ea1dfe29167539a95d95fd27f70"
+    },
+    "AGENTS.md": {
+      "encoding": "utf-8",
+      "sha": "49a84d2088b0943517b199347065f8c45487dac8",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/AGENTS.md",
+      "display_title": "AGENTS.md",
+      "utf8_bytes": 5199,
+      "content_sha256": "bc6d10b93029db96af7cea78bcd178605792f9db126f15b5719f0bd6f53356d5"
+    },
+    "GEMINI.md": {
+      "encoding": "utf-8",
+      "sha": "760b7c9c1ff1c36caaac15a7c4e143bfb599cf96",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/GEMINI.md",
+      "display_title": "GEMINI.md",
+      "utf8_bytes": 314,
+      "content_sha256": "0b4f944b67b3e2467ccc2c3941fe23e7f819ad7a5b0bc46313f15b58cb840f35"
+    },
+    "INSTALL.md": {
+      "encoding": "utf-8",
+      "sha": "2d5d039a9c683595ce61b5c69f1ced7aabcc8a01",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/INSTALL.md",
+      "display_title": "INSTALL.md",
+      "utf8_bytes": 27516,
+      "content_sha256": "585be7e42443bfa366f377050ec7c7b42046df729fd2eed064117220cb847e74"
+    },
+    "LICENSE": {
+      "encoding": "utf-8",
+      "sha": "19db5f1b0ca65e277c158bd4c4263139ccfd859c",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/LICENSE",
+      "display_title": "LICENSE",
+      "utf8_bytes": 1069,
+      "content_sha256": "8acbb618089b738404f76ac60fca1aaa995d9a87995eddf95f0b777acd7f7d2c"
+    },
+    "README.md": {
+      "encoding": "utf-8",
+      "sha": "d784a4359d68ae959e85ac7cd22bbebef42cc682",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/README.md",
+      "display_title": "README.md",
+      "utf8_bytes": 3995,
+      "content_sha256": "e9a043ffdcf59bc85a618d4be8ca20b2e89eca71b91408e8a51d14efe4d0225c"
+    },
+    "evals/README.md": {
+      "encoding": "utf-8",
+      "sha": "98780bd30e54aab468eb3d0ca72335e82612e906",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/README.md",
+      "display_title": "README.md",
+      "utf8_bytes": 5829,
+      "content_sha256": "051ea779aba184892f3bff4855bd355235fd880b0be4df686fd8adf760b47b6b"
+    },
+    "evals/RESULTS.md": {
+      "encoding": "utf-8",
+      "sha": "3379f3cbad4469640448850e2211614ff0124c4c",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/RESULTS.md",
+      "display_title": "RESULTS.md",
+      "utf8_bytes": 4915,
+      "content_sha256": "a9f0375594a94d2e1c4205aa6047d0213a45d9dc163ff1a63c12a534a7941b8f"
+    },
+    "evals/rubric.md": {
+      "encoding": "utf-8",
+      "sha": "0bd5424d60222f89acb7fa376a6d426bee9bb640",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/rubric.md",
+      "display_title": "rubric.md",
+      "utf8_bytes": 1409,
+      "content_sha256": "ba3887f8dbb0492cabac58ef07b9be57df71085a2324a97768103efe2676241a"
+    },
+    "evals/scenarios/persistence-topic-switch-stop/story.md": {
+      "encoding": "utf-8",
+      "sha": "3256e71fb9799ccd39730b755682dd1708d7504b",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/scenarios/persistence-topic-switch-stop/story.md",
+      "display_title": "story.md",
+      "utf8_bytes": 2975,
+      "content_sha256": "9cbd508ee1b2109eed1c0aec830567e184ffb8f96916502854fbb7e699a82410"
+    },
+    "extensions/context-compat.ts": {
+      "encoding": "utf-8",
+      "sha": "83eb6a6663a961c263a15fb095f305ffaaf7645e",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/extensions/context-compat.ts",
+      "display_title": "context-compat.ts",
+      "utf8_bytes": 1667,
+      "content_sha256": "4418da2385f8dc748483301e8883624d1330fecbbe8642750b7f0562ef2953ca"
+    },
+    "extensions/i-have-adhd.ts": {
+      "encoding": "utf-8",
+      "sha": "cc73610a66e5cbc2d643fc46d302ab6f7b741dd4",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/extensions/i-have-adhd.ts",
+      "display_title": "i-have-adhd.ts",
+      "utf8_bytes": 6470,
+      "content_sha256": "dfadae48d96d5f06ad0560aa216c37a07064b9807c69ae20668523555f0f1f91"
+    },
+    "gemini-extension.json": {
+      "encoding": "utf-8",
+      "sha": "ea60743db1e5dcc480b5779fd65c30c1a783d2bc",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/gemini-extension.json",
+      "display_title": "gemini-extension.json",
+      "utf8_bytes": 242,
+      "content_sha256": "37b0e8069384a423a2deeea764862b7fd791a66d6348ee02261f16efec3e27cc"
+    },
+    "hooks/always-on.mjs": {
+      "encoding": "utf-8",
+      "sha": "8295ab423197671c6cb2b4400499489aad03a3dd",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/hooks/always-on.mjs",
+      "display_title": "always-on.mjs",
+      "utf8_bytes": 1766,
+      "content_sha256": "2c7c04a2e6f877ccec3bba5cca8ecadc235f051029233c30980aba60f43efb45"
+    },
+    "hooks/always-on.ps1": {
+      "encoding": "utf-8",
+      "sha": "cac27bd74f14a43eaefc28699b63aefe0b96f198",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/hooks/always-on.ps1",
+      "display_title": "always-on.ps1",
+      "utf8_bytes": 1651,
+      "content_sha256": "657563ab147358487b1a71aeacd9a548a1032425a32e2a1de34211f6fc67a52c"
+    },
+    "hooks/always-on.sh": {
+      "encoding": "utf-8",
+      "sha": "f433bd01d05e48581d41815bb119876c28548aca",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/hooks/always-on.sh",
+      "display_title": "always-on.sh",
+      "utf8_bytes": 1685,
+      "content_sha256": "2cb2c461968fe5d59b474ee7419fbce057935fe06b6dd594bccafda531c38c87"
+    },
+    "hooks/hooks.json": {
+      "encoding": "utf-8",
+      "sha": "5d713cd7841ebea63b98a8924d548d49802f977d",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/hooks/hooks.json",
+      "display_title": "hooks.json",
+      "utf8_bytes": 549,
+      "content_sha256": "56a32bd5074889df04d2d2ad28ad3c15167240fa4ec777ebb55841093e4b9717"
+    },
+    "kimi.plugin.json": {
+      "encoding": "utf-8",
+      "sha": "fd1f05dd38a1f520b363593afa9351ceb4bd7de2",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/kimi.plugin.json",
+      "display_title": "kimi.plugin.json",
+      "utf8_bytes": 483,
+      "content_sha256": "f96c3e7617d2024eeec1eecc8095b702be3c925b9ca20f2202234ae22d73799b"
+    },
+    "package.json": {
+      "encoding": "utf-8",
+      "sha": "a5f8d09d5dd7e8a38ed06690ce46907d58d2c744",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/package.json",
+      "display_title": "package.json",
+      "utf8_bytes": 537,
+      "content_sha256": "09fb6f99487b916461efab877729fb53e926f1c0e670823bea5009edf95f6cbf"
+    },
+    "plugin.json": {
+      "encoding": "utf-8",
+      "sha": "403125166a56e6d4c4df1ca4d1ddfa1e4c5c62e6",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/plugin.json",
+      "display_title": "plugin.json",
+      "utf8_bytes": 187,
+      "content_sha256": "e362f93783ab179e610762c9c022debc31d460d5d3cff2259d9dbd61278fd3d9"
+    },
+    "qwen-extension.json": {
+      "encoding": "utf-8",
+      "sha": "e2cac9fbf11e17249dc84cf6654c3d655e78ac84",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/qwen-extension.json",
+      "display_title": "qwen-extension.json",
+      "utf8_bytes": 201,
+      "content_sha256": "789f11fccd05f6a40ece7d38fecb5e336f7cf8cdc85fc9273a1213e7018040ba"
+    },
+    "scripts/check_context_compat.ts": {
+      "encoding": "utf-8",
+      "sha": "5645fc72935cf41a0dae76ebcfc9725260eea352",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/scripts/check_context_compat.ts",
+      "display_title": "check_context_compat.ts",
+      "utf8_bytes": 1951,
+      "content_sha256": "2f2856e3f381da8a47309f4d764d216efb27edbb26d76554a917775f96d6d4e5"
+    },
+    "scripts/check_pi_extension.py": {
+      "encoding": "utf-8",
+      "sha": "1cd3fa6ce55c6b03dd0bc83ebca867798a2173c3",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/scripts/check_pi_extension.py",
+      "display_title": "check_pi_extension.py",
+      "utf8_bytes": 14725,
+      "content_sha256": "61288c6ced224d99a08a656f8ae8f51c358ecaed1193681a2b047dfeb960dd79"
+    },
+    "scripts/judge.py": {
+      "encoding": "utf-8",
+      "sha": "85c6de958bad02c129dd5bb6f38eeeb0dd8e5392",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/scripts/judge.py",
+      "display_title": "judge.py",
+      "utf8_bytes": 13191,
+      "content_sha256": "6b24530f7be89f7730e621063c945ec9465a33d42014c15dc7d172b0a30784a6"
+    },
+    "scripts/run_evals.py": {
+      "encoding": "utf-8",
+      "sha": "58175386e413e767d8211e7c349dc35ad7980c19",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/scripts/run_evals.py",
+      "display_title": "run_evals.py",
+      "utf8_bytes": 23212,
+      "content_sha256": "8f5342e7d55eb268bd99b80ea6d18102c953f6991295a63feb178cd79a5b530e"
+    },
+    "scripts/run_scenario_eval.py": {
+      "encoding": "utf-8",
+      "sha": "c21296084dca3c78b1971fb1e532d762e69d31a0",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/scripts/run_scenario_eval.py",
+      "display_title": "run_scenario_eval.py",
+      "utf8_bytes": 6453,
+      "content_sha256": "8c7efcf005544476c42cfbe6dac58a91816706b9c09edd658d4bd284e849f02f"
+    },
+    "skills/i-have-adhd/SKILL.md": {
+      "encoding": "utf-8",
+      "sha": "6c42757ffae37e442adfb52fbba2a8609f1cff00",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/skills/i-have-adhd/SKILL.md",
+      "display_title": "SKILL.md",
+      "utf8_bytes": 7201,
+      "content_sha256": "88955c019bbb1419ff4b49dbb1f80a867467de6233d7865af2e06a7d7b76c7d3"
+    },
+    "skills/i-have-adhd/agents/gemini.toml": {
+      "encoding": "utf-8",
+      "sha": "a7d766c9dbf5188f3adadfe59cbf6aa1de3bc4ca",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/skills/i-have-adhd/agents/gemini.toml",
+      "display_title": "gemini.toml",
+      "utf8_bytes": 2157,
+      "content_sha256": "5108a6123beb9df24846e0dd3f902c652d18522dfbc56e5762032ea383041c62"
+    },
+    "skills/i-have-adhd/agents/openai.yaml": {
+      "encoding": "utf-8",
+      "sha": "0e8285b9bb854e7ee4c25f4c48f593a87e9eb85d",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/skills/i-have-adhd/agents/openai.yaml",
+      "display_title": "openai.yaml",
+      "utf8_bytes": 238,
+      "content_sha256": "2c51291283dcefdca43ca6b0c08172f225c7c26a9783ec444d6bdfa51ca96f8f"
+    },
+    ".agents/plugins/marketplace.json": {
+      "encoding": "utf-8",
+      "sha": "6f0ab8f97af04d9ebc52119eccdbcd7474417493",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.agents/plugins/marketplace.json",
+      "display_title": "marketplace.json",
+      "utf8_bytes": 414,
+      "content_sha256": "776b5c4738b6dbc3e37a26e45cb8726d7d29e45682b46666c85807351af5a74b"
+    },
+    ".claude-plugin/marketplace.json": {
+      "encoding": "utf-8",
+      "sha": "3423df78c524e05b528b4440b60a32d1dfb5f27a",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.claude-plugin/marketplace.json",
+      "display_title": "marketplace.json",
+      "utf8_bytes": 450,
+      "content_sha256": "3c6a93bff7491685591677f6fcbcc3c4a5e4e1c7a4ef2d6d492673b9395d5eed"
+    },
+    ".github/workflows/claude.yml": {
+      "encoding": "utf-8",
+      "sha": "532188d8378db380a86de12333759692cccdac5d",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.github/workflows/claude.yml",
+      "display_title": "claude.yml",
+      "utf8_bytes": 1395,
+      "content_sha256": "029d8a7f85b716f60dd76ed1275a9b30b35f2804647842c6bd061d0dd0238093"
+    },
+    ".github/workflows/cursor-skill-sync.yml": {
+      "encoding": "utf-8",
+      "sha": "a912662cf5b4ee02f1af5194b44fff841e6a46fd",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.github/workflows/cursor-skill-sync.yml",
+      "display_title": "cursor-skill-sync.yml",
+      "utf8_bytes": 814,
+      "content_sha256": "964dd66419f3cabcdc4984f67cce24e828ce620de275350092f78afc8f717a76"
+    },
+    ".github/workflows/pi-load-check.yml": {
+      "encoding": "utf-8",
+      "sha": "77c0e1ed23d4d7aff297a0fa2c2bb284d9cd7d9b",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.github/workflows/pi-load-check.yml",
+      "display_title": "pi-load-check.yml",
+      "utf8_bytes": 723,
+      "content_sha256": "2be3f763fe1ae4790a57c6e0aff16ecb3fff9e947949a8c73e27dca82f52281e"
+    },
+    ".github/workflows/plugin-load-check.yml": {
+      "encoding": "utf-8",
+      "sha": "56c4b8f2988c588e26496e96e6300814dd573d94",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/.github/workflows/plugin-load-check.yml",
+      "display_title": "plugin-load-check.yml",
+      "utf8_bytes": 1529,
+      "content_sha256": "e53f5147240b2911d9032b04b301b0c3873d4e747a1732cd61944c017fc1a9e2"
+    },
+    "evals/runners.example.json": {
+      "encoding": "utf-8",
+      "sha": "44f9552c204811aa7c38a75a7b004b41b1fdf845",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/runners.example.json",
+      "display_title": "runners.example.json",
+      "utf8_bytes": 610,
+      "content_sha256": "f3ced9855ab3416e7d56614cd56c663042f1a206e3a1cad9aa5c676a8927d7d1"
+    },
+    "evals/cases.jsonl": {
+      "encoding": "utf-8",
+      "sha": "64b6ca61a4e518b495399a0d7f0558e615182ff9",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/cases.jsonl",
+      "display_title": "cases.jsonl",
+      "utf8_bytes": 4005,
+      "content_sha256": "05ba81a77bca9165c4a364f7ddb03ddc74dcf76428de3fc87a6e2d649c7d850d"
+    },
+    "evals/scenarios/persistence-topic-switch-stop/case.jsonl": {
+      "encoding": "utf-8",
+      "sha": "7deb6f137568559dceb49848535f13f784c4bc12",
+      "display_url": "https://github.com/ayghri/i-have-adhd/blob/1ecea1993b7fce257ffbd686c070948b5e07eda6/evals/scenarios/persistence-topic-switch-stop/case.jsonl",
+      "display_title": "case.jsonl",
+      "utf8_bytes": 1688,
+      "content_sha256": "ca143e3b1c1d4a70e0d8df83a41d925994d26ac604d07575648f3b18a4c1db9c"
+    }
+  },
+  "archive_note": "Raw text bulk for unselected files omitted. Exact selected-source bytes are archived separately; this metadata preserves release/tag/signed commit/tree and inspected file identities."
+}

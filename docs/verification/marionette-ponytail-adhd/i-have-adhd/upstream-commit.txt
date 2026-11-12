@@ -1,0 +1,26 @@
+tree d4775095f471d938babccea77838d43b7fd39bc3
+parent 723af7d9afaf43eb871dbcce6129e2bf80de90d5
+parent 29139ff31a87ac74c04f4ef9cccdee3234e2512c
+author Ayoub Ghriss <develop@ayghri.me> 1791734634 -0500
+committer GitHub <noreply@github.com> 1791734634 -0500
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ wsFcBAABCAAQBQJqy7NqCRC1aQ7uu5UhlAAA6YMQAInKyoyhAW1tbkUwK7+xvTtw
+ FTNdJBSzEwqLniKl0c68iPl3ssJpSdg3vFbssOeyQ0F2XXCthdHKeWTl2/y+uzL2
+ PMlGoFb+9b0qdkDVRZrGtap4CvQsJwWw6puh7cEhyNsP+T+riMjSrJGVNHhXoGO9
+ nVOkwjCQXMtfjVKDzWazZPKBg0j4/VJ778kd+Nl4xz5Q81ffNhbCSNTLBrCQeeMU
+ /tfwSuEC8Hlnqgcl48SCs7Xjg4f2Z+jOmnhj0mWe6uUDedO0OPOnKp/EfxD/AbjP
+ 4OfmlTBx4SjHWr6+vE7m93wNePLKosP6YfmqosJvYv50CwRiWDsMtymIykJfm4RC
+ 32CohH8fKOMp1qmQW7a3GPxKozP/BRIRfie4YR9wyee9Vi1b/2arYzHh/dQvOfG7
+ 2hflvmcTEsZ8ngN/7wf/TcMaK7KEDFpTzCK0N+CeGu5z2yjoKovzh1lfxD6FxRjL
+ G4hZeS3lMaAQTzYQh+PHkXYTrIYuPS0E6T/uSr837DkN/lE2Wm4O3Bp58qPzOfEB
+ yBA5bFoeSl4+XGni+XVT8MGCfhWZ2auAUrjwFbpXYimPRs7nuetG/6gJbx4HiRdV
+ BeFA6Ypo8y/I4wSqiFR1lu5Jc6dAqQogC8xXwE2vyWcqjERK8nvFugIjOTm+IGLY
+ txiebelmcIVDnCf09n5r
+ =U8+q
+ -----END PGP SIGNATURE-----
+ 
+
+Merge pull request #251 from AxelBriche/docs/french-translation
+
+docs: add French translation of README

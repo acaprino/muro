@@ -34,6 +34,14 @@ facts from adaptation choices and unresolved gaps. If a necessary reference is
 outside the approved snapshot or absent, name it and leave that conclusion open;
 never claim to have read it. No script or schema check can supply this analysis.
 
+## Form of delivery
+
+Not every part of a source becomes a capability. Before extracting, decide with
+the Delivery protocol appended below what each part becomes in this package: an
+on-demand capability, text for every session, an active hook, or nothing. Record
+the decisions in `delivery.json` and account in `## Sources` for the parts that
+were delivered in another form or dropped.
+
 ## Source coverage and intent analysis
 
 Inventory every selected skill/plugin entry point, including separate skills in
@@ -52,6 +60,11 @@ including its intent mapping or an explicit reason it supplied no runtime capabi
 Preserve classifications through extraction; the Harmonizer will normalize overlaps.
 
 ## Capability contract
+
+Extract a capability only for an actual on-demand responsibility. A selected
+source may instead supply permanent guidance recorded in delivery.json. A
+valid policy-only package needs no fabricated capability; follow the Delivery
+protocol for its empty catalog, authored examples and omitted discovery entries.
 
 Produce one Markdown capability per distinct functional responsibility. Let the
 source's meaning determine the number; do not impose a quota or merge distinct
@@ -104,12 +117,14 @@ whether required, not guessed host API signatures. The host AI maps these to too
 actually available in its session. Include tools needed by adopted hooks.
 
 For each adopted hook use exactly `{event, action, tools, policy}`: a nonempty
-event/action description, an array of declared tool names and policy `manual` or
-`host-approved`. Describe the original trigger, changed files/external effects,
-host limitations and adaptation in `## Specifics`/`## Sources`. Never copy an
-upstream auto-run instruction as authorization: default to manual execution unless
-the target host and user already authorize the event and effect. These records
-are catalog data, not executable native hook registration.
+event/action description, an array of declared tool names and policy `manual`,
+`host-approved` or `active`. Describe the original trigger, changed files/external
+effects, host limitations and adaptation in `## Specifics`/`## Sources`. An
+upstream default is not a decision: whether a hook runs by itself in the generated
+plugin is judged with the Delivery protocol and recorded in `delivery.json`. Use
+`active` only for a hook that decision registers; a `manual` or `host-approved`
+hook is run or registered only inside a task that asks for it. The frontmatter
+record describes the hook; the wiring a release registers lives in `delivery.json`.
 
 Both arrays are mandatory; `[]` means no tool/hook was adopted from this selected
 scope, not proof that the upstream repository has none. If important hook manifests
@@ -134,8 +149,8 @@ the installed tool answers, and never substitutes another engine or writes the
 file by another route. A failed installation, or the user's objection, blocks
 only the deliveries that depend on it and is reported. The host's own permission
 prompts still apply. This rule covers dependencies only: installing the skill or
-plugin itself is dropped, hooks stay passive metadata, and intake and build
-install nothing.
+plugin itself is dropped, and intake and build install and register nothing.
+What the released plugin registers by itself comes only from `delivery.json`.
 
 The body contains `# Title`, `## Behavior`, `## Output handoff`, optional
 `## Specifics`, `## Checks` and mandatory `## Sources`. Keep it concise, normally
@@ -154,9 +169,30 @@ but must state that the host does not edit `<state_dir>/map.md` or
 Reference an approved helper as `<package_root>/scripts/<source-id>/<path>`,
 where `<path>` is its selected path without the leading `skills/<source-id>/` or
 `src/<source-id>/` prefix. The runtime returns the real `package_root` with each
-step; a helper path must never resolve against the consumer project.
+step; a helper path must never resolve against the consumer project. A selected
+file named `SKILL.md` is packaged as `SKILL.source.md` (hosts such as Codex would
+otherwise register it as a live skill beside the coordinator): refer to it by that
+name in the body. `## Sources` lines keep the upstream file names.
+
+A file listed in the source's `intake_only_paths` is evidence, not a helper: it is
+not packaged, so never reference it from a body (Delivery protocol, "Originals in
+the release").
 
 ## Extraction rules
+
+Two layers (owner, 2026-11-12). You write the capability body, its intent
+descriptions and any hook text in your own words: they are the entry prompt and
+the selection text of this package, compact and made for it. The substance is
+the source's: never drop, weaken, strengthen or invent a rule, number,
+condition or exception. The packaged original stays whole and untouched, and
+the body sends the host to it, by file and section, for the parts the task
+needs; it does not make the host read everything first. Change what the source
+prescribes only for harmonization and coexistence under the package's
+principles (Delivery protocol, "The content stays the source's"), never for
+size, style or taste, and record each such change with the collision that
+required it in `## Sources`. Add no limit of your own on what a source's tool or
+command may send off the machine: carry the source's own statement of what
+leaves it, and leave permission to the host and the user.
 
 Preserve actionable knowledge and source-specific limits. Strip upstream public
 commands, installation of the skill or plugin itself and competing routing

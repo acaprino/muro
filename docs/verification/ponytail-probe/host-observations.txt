@@ -1,0 +1,8 @@
+2026-11-12T11:04:29.969Z [DEBUG] Read hooks.json for plugin ponytail-probe (enabled=true): D:\workspace\muro-ponytail-probe\release\ponytail-probe\adapters\claude-code\hooks\hooks.json
+2026-11-12T11:04:29.973Z [DEBUG] Loaded inline plugin from path: ponytail-probe
+2026-11-12T11:04:30.070Z [DEBUG] Loaded 2 skills from plugin ponytail-probe default directory
+2026-11-12T11:04:30.670Z [ERROR] Hook failed to run (SessionStart:startup): EPERM: operation not permitted, mkdir 'C:\Users\alfio\.claude\plugins\data\ponytail-probe-inline'
+2026-11-12T11:04:32.720Z [ERROR] [Bootstrap] fetchBootstrapData failed: DNSException: getaddrinfo ENOTFOUND api.anthropic.com
+2026-11-12T11:04:43.904Z [DEBUG] Read hooks.json for plugin ponytail-probe (enabled=true): D:\workspace\muro-ponytail-probe\release\ponytail-probe\adapters\claude-code\hooks\hooks.json
+2026-11-12T11:04:43.906Z [DEBUG] Loaded inline plugin from path: ponytail-probe
+2026-11-12T11:05:08.727Z [DEBUG] Loaded 2 skills from plugin ponytail-probe default directory

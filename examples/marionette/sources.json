@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.1.0",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, creating or updating Figma designs, specifying UI motion or implementing GSAP ScrollTrigger and CSS scroll animations, creating, editing or converting Word, Excel, PowerPoint and PDF Office files with GenOffice, coordinating multi-slice software specs, or authoring and fact-checking interactive HTML explainers.",
+    "description": "Use when designing or building websites and landing pages, looking up UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, making design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, specifying motion or implementing GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF Office files; implementing software changes, coordinating specs and handoffs, reviewing changes or auditing a repository, reporting deliberate shortcut debt or explaining the Ponytail method and published benchmark; authoring and fact-checking interactive HTML explainers; finding and reading papers, keeping a paper wiki, making paper figures, planning experiments and pitching research; or steering what TokenEconomizer learns and saves.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -17,7 +17,36 @@
       "genoffice",
       "creating-explainers",
       "explaining-codebases",
-      "fact-checking-explainers"
+      "fact-checking-explainers",
+      "paper-search",
+      "paper-wiki-manager",
+      "drawio-paper",
+      "codex-paper-figure-skill",
+      "research-bible",
+      "sell-research-honestly",
+      "session-handoff",
+      "tokeneconomizer",
+      "discovery-questions",
+      "frontend-aesthetic-direction",
+      "wireframe",
+      "make-a-deck",
+      "make-a-prototype",
+      "make-tweakable",
+      "generate-variations",
+      "design-system-extract",
+      "component-extract",
+      "accessibility-audit",
+      "ai-slop-check",
+      "hierarchy-rhythm-review",
+      "interaction-states-pass",
+      "polish-pass",
+      "ponytail",
+      "ponytail-review",
+      "ponytail-audit",
+      "ponytail-debt",
+      "ponytail-gain",
+      "ponytail-help",
+      "i-have-adhd"
     ]
   },
   "stack": {
@@ -99,7 +128,10 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Extract motion principles, timing, easing, choreography and accessibility constraints; do not include unrelated GSAP library implementation."
-      }
+      },
+      "intake_only_paths": [
+        "skills/motion-design/reference/troubleshooting.md"
+      ]
     },
     {
       "id": "gsap-scrolltrigger",
@@ -218,7 +250,11 @@
       ],
       "intake": {
         "goal": "Understand local design-system search, stack-specific UX and accessibility guidance, and assess their functional relationship with the existing catalog before proposing placement. Preserve the offline search script and data without premium assets, install flows or unverified recommendations; search results are candidates for AI judgment, not automatic catalog decisions."
-      }
+      },
+      "intake_only_paths": [
+        "src/ui-ux-pro-max/data/catalog-summary.json",
+        "src/ui-ux-pro-max/data/phosphor-icons-upstream.json"
+      ]
     },
     {
       "id": "genoffice",
@@ -284,7 +320,277 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Classify every outcome of the three skills: an interactive single-file HTML explainer built from documents, from topic research or from a codebase, and the claim-by-claim fact-check of an explainer. Keep the article template and the references as packaged helpers, keep the zero-dependency rule and the blocking fact-check gate, and drop the plugin manifests, host agent files, evals and upstream planning documents."
+      },
+      "intake_only_paths": [
+        "skills/explaining-codebases/SKILL.md"
+      ]
+    },
+    {
+      "id": "open-paper-skills",
+      "repo_url": "https://github.com/pengqianhan/open-paper-skills",
+      "commit": "f85fd3dc80720dfa42fb5ab069f232f28c831109",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 pengqianhan",
+      "selected_paths": [
+        "skills/paper-search/SKILL.md",
+        "skills/paper-search/scripts/paper_search.py",
+        "skills/paper-wiki-manager/SKILL.md",
+        "skills/paper-wiki-manager/assets/**",
+        "skills/paper-wiki-manager/references/**",
+        "skills/paper-wiki-manager/scripts/create_paper_body_profile.py",
+        "skills/paper-wiki-manager/scripts/generate_viz.py",
+        "skills/paper-wiki-manager/scripts/set_status.py",
+        "skills/paper-wiki-manager/scripts/validate_paper_wiki.py",
+        "skills/paper-wiki-manager/scripts/static/**",
+        "skills/paper-wiki-manager/scripts/templates/**",
+        "skills/paper-wiki-manager/scripts/vendor/README.md",
+        "skills/drawio-paper/SKILL.md",
+        "skills/drawio-paper/neurips2025_diagram_style_guide.md",
+        "skills/drawio-paper/neurips2025_plot_style_guide.md",
+        "skills/drawio-paper/scripts/extract_bench.py",
+        "skills/codex-paper-figure-skill/SKILL.md",
+        "skills/research-bible/SKILL.md",
+        "skills/sell-research-honestly/SKILL.md",
+        "skills/sell-research-honestly/references/**",
+        "skills/session-handoff/SKILL.md",
+        "skills/session-handoff/references/**"
+      ],
+      "excluded_paths": [
+        "collected-skills/**",
+        "skills/research-bible/references/**",
+        "skills/paper-wiki-manager/scripts/vendor/cytoscape.min.js",
+        "skills/paper-wiki-manager/scripts/vendor/layout-base.js",
+        "skills/paper-wiki-manager/scripts/vendor/cose-base.js",
+        "skills/paper-wiki-manager/scripts/vendor/cytoscape-fcose.js",
+        "skills/paper-wiki-manager/scripts/vendor/marked.min.js",
+        "skills/paper-wiki-manager/scripts/test_set_status.py",
+        "skills/paper-wiki-manager/scripts/test_validate_paper_wiki.py",
+        "skills/paper-search/scripts/test_paper_search.py",
+        "skills/drawio-paper/evals/**",
+        "skills/paper-wiki-manager/agents/**",
+        "skills/codex-paper-figure-skill/agents/**",
+        "skills/research-bible/agents/**",
+        "skills/sell-research-honestly/agents/**",
+        "skills/discover-academic-skills/**",
+        "skills/explain-anything-html/**",
+        "skills/explain-paper-html/**",
+        "skills/filetree-simple/**",
+        "skills/human-cognition-cache/**",
+        "skills/karpathy-coding-rules/**",
+        "skills/map-then-territory/**",
+        "skills/okf-repo-organizer/**",
+        "skills/project-dispatch/**",
+        "skills/research-project-manager/**",
+        "skills/skill-organizer/**",
+        "skills/task-file-builder/**",
+        "skills/uv-env/**",
+        "skills/writing-great-prompt/**",
+        "scripts/**",
+        "assets/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "uv, or Python 3.11+ (standard library; optional truststore)",
+          "license": "External runtime, not bundled by Muro; installed at runtime from astral.sh when missing and wanted",
+          "bundled": false
+        },
+        {
+          "name": "cytoscape 3.28.1, layout-base 2.0.1, cose-base 2.2.0, cytoscape-fcose 2.2.0, marked 12.0.0",
+          "license": "MIT (third-party viewer libraries, not bundled by Muro; fetched at runtime from the jsDelivr npm mirror)",
+          "bundled": false
+        },
+        {
+          "name": "PaperBananaBench reference dataset",
+          "license": "Apache-2.0 (about 266 MB, not bundled by Muro; downloaded at runtime from Hugging Face)",
+          "bundled": false
+        },
+        {
+          "name": "matplotlib, numpy, pillow",
+          "license": "Their own open-source licences (target environment packages, not bundled by Muro)",
+          "bundled": false
+        },
+        {
+          "name": "draw.io desktop command line",
+          "license": "Apache-2.0 (external application, not bundled by Muro)",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Classify every outcome of the author's own research skills that stand on their own: literature search and paper reading with per-source switches, the OKF paper wiki with its viewer and validator, publication diagrams and plots (the two figure skills as one method), research-practice guidance, honest research communication, and the cross-session HANDOFF.md. Keep the scripts, references and style guides as packaged helpers. Leave out collected-skills (other authors' work), the third-party essays under research-bible/references, the vendored viewer libraries (fetched at runtime), and the skills that operate the author's own Research OS or repeat a need another source already serves."
       }
+    },
+    {
+      "id": "tokeneconomizer",
+      "repo_url": "https://github.com/microsoft/TokenEconomizer",
+      "commit": "ec8ff5ec7ed5924520ee71b705a920ee64fe2918",
+      "pin": "release",
+      "release": "v0.1.0",
+      "license": "Apache-2.0",
+      "copyright": "TokenEconomizer authors (the upstream LICENSE carries no copyright line)",
+      "selected_paths": [
+        "tokeneconomizer/**",
+        "plugin/scripts/te_bootstrap.py",
+        "plugin/hooks/hooks.json",
+        "plugin/hooks/codex-hooks.json",
+        "plugin/hooks/copilot-hooks.json",
+        "plugin/README.md",
+        "docs/PLUGIN.md"
+      ],
+      "excluded_paths": [
+        "plugin/.claude-plugin/**",
+        "plugin/.codex-plugin/**",
+        "plugin/.github/**",
+        ".claude-plugin/**",
+        "plugin/slash-commands/**",
+        "plugin/codex-skills/**",
+        "plugin/pi/**",
+        "plugin/lib/tokeneconomizer",
+        "plugin/scripts/te",
+        "plugin/scripts/te-hook",
+        "plugin/package.json",
+        "experiments/**",
+        "tests/**",
+        "scripts/**",
+        "docs/assets/**",
+        "docs/ARCHITECTURE.md",
+        "CLAUDE.md"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Python 3.10+ (standard library)",
+          "license": "PSF runtime prerequisite, not bundled by Muro",
+          "bundled": false
+        },
+        {
+          "name": "The user's own agent command line (claude, codex, copilot or pi) for the loop guard's judge and the fact proposer",
+          "license": "External host application, not bundled by Muro; called only by hooks the user registered",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Absorb TokenEconomizer's control surface and engine: the status, micro-skills, tool-pruning, settings and repository-state commands as one capability, with the engine packaged unchanged so those commands run from this plugin. Catalog its six default hooks as passive, host-approved entries and make registering or removing them an explicit user-requested action that first discloses their effects. Leave out the upstream plugin manifests, slash commands and skills as files, the Pi extension, experiments and tests."
+      },
+      "intake_only_paths": [
+        "tokeneconomizer/loopguard/README.md",
+        "tokeneconomizer/microskills/README.md",
+        "tokeneconomizer/plugin/README.md",
+        "tokeneconomizer/toolprune/README.md",
+        "tokeneconomizer/trace/README.md"
+      ]
+    },
+    {
+      "id": "claude-design-system-prompt",
+      "repo_url": "https://github.com/Trystan-SA/claude-design-system-prompt",
+      "commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Trystan Sarrade",
+      "selected_paths": [
+        "claude/system-prompt.md",
+        "claude/skills/**"
+      ],
+      "excluded_paths": [
+        "codex/**",
+        "README.md"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Read the system prompt chapter by chapter and the fourteen procedural skills, and decide the delivery form of each part with the delivery protocol. Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the system prompt is not injected into every session; its content becomes capabilities found from context, harmonized and coordinated with the others. Compare its design rules, review passes and production procedures with the existing design, motion, deck and explainer capabilities and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Leave out the Codex variant and the source's own list of when to invoke which skill. Record that the upstream describes itself as a reverse-engineered rendition of Anthropic's Claude Design system prompt, and carry its methods in the source's own words (owner rule of 2026-11-12, ADR-0017, which replaces the earlier instruction to restate them): the capabilities read the packaged skills and the chapters of the prompt they apply, and change wording only for a recorded collision."
+      }
+    },
+    {
+      "id": "ponytail",
+      "repo_url": "https://github.com/DietrichGebert/ponytail.git",
+      "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "pin": "release",
+      "release": "v5.3.3",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 DietrichGebert",
+      "selected_paths": [
+        ".agents/rules/ponytail.md",
+        "skills/ponytail/SKILL.md",
+        "skills/ponytail-review/SKILL.md",
+        "skills/ponytail-audit/SKILL.md",
+        "skills/ponytail-debt/SKILL.md",
+        "skills/ponytail-gain/SKILL.md",
+        "skills/ponytail-help/SKILL.md",
+        "benchmarks/results/2026-10-07-agentic.md"
+      ],
+      "excluded_paths": [
+        "hooks/**",
+        ".claude-plugin/**",
+        ".codex-plugin/**",
+        ".opencode/**",
+        "pi-extension/**",
+        "__init__.py",
+        "plugin.yaml",
+        "plugin.json",
+        "package.json",
+        "scripts/**",
+        ".cursor/**",
+        ".github/**",
+        ".openclaw/**",
+        "assets/**",
+        "i18n/**",
+        "tests/**",
+        "benchmarks/agentic/**",
+        "benchmarks/arms/**",
+        ".agents/plugins/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. Owner rule of 2026-11-12: the source's own rules file is carried in its own words as permanent policy, active by default and scoped to code work; its wording changes only where coexistence with another source or the catalog requires it, each change recorded in delivery.json. The intake also enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. The on-demand skills are packaged and read in their own words (ADR-0017). For the whole source slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
+      },
+      "intake_only_paths": [
+        ".agents/rules/ponytail.md"
+      ]
+    },
+    {
+      "id": "i-have-adhd",
+      "repo_url": "https://github.com/ayghri/i-have-adhd.git",
+      "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+      "pin": "release",
+      "release": "v0.4.1",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Ayoub Ghriss",
+      "selected_paths": [
+        "skills/i-have-adhd/SKILL.md",
+        "README.md"
+      ],
+      "excluded_paths": [
+        "skills/i-have-adhd/agents/**",
+        ".agents/**",
+        ".claude-plugin/**",
+        ".codex-plugin/**",
+        ".cursor/**",
+        ".github/**",
+        ".opencode/**",
+        "hooks/**",
+        "extensions/**",
+        "scripts/**",
+        "tests/**",
+        "evals/**",
+        "INSTALL.md",
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "GEMINI.md",
+        "package.json",
+        "plugin.json",
+        "gemini-extension.json",
+        "qwen-extension.json",
+        "kimi.plugin.json",
+        "logo.png",
+        ".gitignore"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Owner rule of 2026-11-12: carry the source's communication policy in its own words as permanent policy, active by default: the whole SKILL.md body with its rules, numeric limits, examples and exceptions. Change its wording only where coexistence with another source or the catalog requires it and record each change in delivery.json. Drop only redundant source activation/routing and source plugin installation. Preserve all supported communication outcomes without inventing an on-demand capability. Source-native hooks, transport, developer QA and installation instructions were statically inspected and are accounted for in delivery and verification evidence; none are executed or registered."
+      },
+      "intake_only_paths": [
+        "skills/i-have-adhd/SKILL.md",
+        "README.md"
+      ]
     }
   ]
 }

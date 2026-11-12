@@ -139,4 +139,5 @@ def test_release_ships_the_declared_license_and_the_notice_beside_it(portable_pr
     assert "Copyright 2026 Example, PBC." in notice
     assert "Notice shipped beside the folder license" in notice
     assert "Root notice that belongs to other folders" not in notice
-    assert (result / "scripts" / "demo" / "SKILL.md").read_text(encoding="utf-8") == "# Demo"
+    # A packaged source SKILL.md is stored as SKILL.source.md (live host runs, 2026-11-12).
+    assert (result / "scripts" / "demo" / "SKILL.source.md").read_text(encoding="utf-8") == "# Demo"

@@ -1,0 +1,101 @@
+{
+  "ponytail": {
+    "id": "ponytail",
+    "repo_url": "https://github.com/DietrichGebert/ponytail.git",
+    "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+    "pin": "release",
+    "release": "v5.3.3",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 DietrichGebert",
+    "selected_paths": [
+      ".agents/rules/ponytail.md",
+      "skills/ponytail/SKILL.md",
+      "skills/ponytail-review/SKILL.md",
+      "skills/ponytail-audit/SKILL.md",
+      "skills/ponytail-debt/SKILL.md",
+      "skills/ponytail-gain/SKILL.md",
+      "skills/ponytail-help/SKILL.md",
+      "benchmarks/results/2026-10-07-agentic.md"
+    ],
+    "excluded_paths": [
+      "hooks/**",
+      ".claude-plugin/**",
+      ".codex-plugin/**",
+      ".opencode/**",
+      "pi-extension/**",
+      "__init__.py",
+      "plugin.yaml",
+      "plugin.json",
+      "package.json",
+      "scripts/**",
+      ".cursor/**",
+      ".github/**",
+      ".openclaw/**",
+      "assets/**",
+      "i18n/**",
+      "tests/**",
+      "benchmarks/agentic/**",
+      "benchmarks/arms/**",
+      ".agents/plugins/**"
+    ],
+    "runtime_deps": [],
+    "intake": {
+      "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. The host AI synthesizes neutral permanent working guidance, retains full scope and safety before minimization, enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. Original persona, compulsory wording, slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
+    },
+    "intake_only_paths": [
+      ".agents/rules/ponytail.md",
+      "skills/ponytail/SKILL.md",
+      "skills/ponytail-review/SKILL.md",
+      "skills/ponytail-audit/SKILL.md",
+      "skills/ponytail-debt/SKILL.md",
+      "skills/ponytail-gain/SKILL.md",
+      "skills/ponytail-help/SKILL.md"
+    ]
+  },
+  "i-have-adhd": {
+    "id": "i-have-adhd",
+    "repo_url": "https://github.com/ayghri/i-have-adhd.git",
+    "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+    "pin": "release",
+    "release": "v0.4.1",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Ayoub Ghriss",
+    "selected_paths": [
+      "skills/i-have-adhd/SKILL.md",
+      "README.md"
+    ],
+    "excluded_paths": [
+      "skills/i-have-adhd/agents/**",
+      ".agents/**",
+      ".claude-plugin/**",
+      ".codex-plugin/**",
+      ".cursor/**",
+      ".github/**",
+      ".opencode/**",
+      "hooks/**",
+      "extensions/**",
+      "scripts/**",
+      "tests/**",
+      "evals/**",
+      "INSTALL.md",
+      "AGENTS.md",
+      "CONTRIBUTING.md",
+      "GEMINI.md",
+      "package.json",
+      "plugin.json",
+      "gemini-extension.json",
+      "qwen-extension.json",
+      "kimi.plugin.json",
+      "logo.png",
+      ".gitignore"
+    ],
+    "runtime_deps": [],
+    "intake": {
+      "goal": "Absorb the source's communication policy as flexible permanent guidance: clear useful answers, bounded steps where helpful, concrete progress, complete explanations and uncertainty preserved, and no delegation of authorized agent-owned work. Respect the user's demonstrated knowledge and current constraints, including requests for realistic examples or diagrams when they help understanding. Drop diagnostic assumptions, mandatory response templates, redundant source activation/routing and source plugin installation. Preserve all supported communication outcomes without inventing an on-demand capability. Source-native hooks, transport, developer QA and installation instructions were statically inspected and are accounted for in delivery and verification evidence; none are executed or registered."
+    },
+    "intake_only_paths": [
+      "skills/i-have-adhd/SKILL.md",
+      "README.md"
+    ]
+  }
+}

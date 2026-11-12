@@ -82,16 +82,31 @@ def main() -> int:
         router_path = project_root / "ROUTER.md"
         capabilities = _load_capabilities(cap_dir)
         router_rows = _load_router(router_path)
+        from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
+        delivery_doc = load_delivery(project_root)
+        source_ids = {s.get("id") for s in manifest.get("sources", []) if isinstance(s, dict)}
         from .core import validate_capabilities_and_router
         errs = validate_capabilities_and_router(
             capabilities,
             router_rows,
             plugin_slug=manifest.get("plugin", {}).get("slug"),
+            allow_empty=allows_empty_catalog(delivery_doc, capabilities, source_ids),
         )
         from .entries import load_entries, validate_entries
         entries_doc = load_entries(project_root)
         if entries_doc is not None:
             errs += validate_entries(entries_doc, capabilities, manifest.get("plugin", {}))
+        if delivery_doc is None:
+            errs += unregistered_active_hooks(capabilities)
+        else:
+            errs += validate_delivery(delivery_doc, capabilities, source_ids)
+        # Without the repository only plain intake-only paths can be checked here; the build checks every match.
+        from .factory import _helper_name, unpackaged_reference_errors
+        for src in manifest.get("sources", []):
+            if isinstance(src, dict) and isinstance(src.get("intake_only_paths"), list):
+                plain = [_helper_name(src.get("id", ""), p) for p in src["intake_only_paths"]
+                         if isinstance(p, str) and not any(char in p for char in "*?[")]
+                errs += unpackaged_reference_errors(capabilities, src.get("id", ""), plain)
         if errs:
             for e in errs:
                 print(e, file=sys.stderr)

@@ -1,0 +1,52 @@
+{
+  "decisions": {
+    "review-report": {
+      "task": "Controlla se questa PR introduce regressioni e dammi un elenco motivato, senza toccare il codice.",
+      "stack_tokens": [],
+      "catalog_digest": "2b1a6d2eb24d3ff692a045f86f389b61a9057919cf711c6993ea94abad68f266",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "change-review",
+          "intent": "code.change-review",
+          "reason": "La richiesta chiede un rapporto motivato sulle regressioni introdotte da una PR, senza modificare il codice; coincide con la revisione di una modifica software e del codice collegato."
+        }
+      ],
+      "reason": "Il risultato richiesto e un rapporto di revisione software. La capacita selezionata rispetta il vincolo di sola lettura; il file-access richiesto e disponibile tramite gli strumenti del host, e nessun hook e dichiarato.",
+      "questions": []
+    },
+    "implement-no-review": {
+      "task": "Non voglio una revisione: correggi direttamente il parser e aggiorna i test.",
+      "stack_tokens": [],
+      "catalog_digest": "2b1a6d2eb24d3ff692a045f86f389b61a9057919cf711c6993ea94abad68f266",
+      "status": "no_match",
+      "selections": [],
+      "reason": "La richiesta esclude esplicitamente una revisione e richiede correzioni al parser e ai test. Il catalogo offre solo un rapporto senza modifiche e ne esclude l uso per implementare le correzioni; applicare la politica di lavoro non crea una capacita di implementazione.",
+      "questions": []
+    },
+    "review-lean": {
+      "task": "Leggi le modifiche attuali e dimmi dove abbiamo aggiunto astrazioni inutili; proponi interventi concreti senza applicarli.",
+      "stack_tokens": [],
+      "catalog_digest": "2b1a6d2eb24d3ff692a045f86f389b61a9057919cf711c6993ea94abad68f266",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "change-review",
+          "intent": "code.change-review",
+          "reason": "La richiesta riguarda modifiche software esistenti e vuole un rapporto su astrazioni non necessarie, con interventi concreti proposti ma non applicati; la complessita superflua rientra nell intento di revisione."
+        }
+      ],
+      "reason": "Una sola revisione delle modifiche e sufficiente e conserva il vincolo di non applicare le proposte. Il file-access richiesto e disponibile tramite gli strumenti del host; non occorre selezionare una fase di implementazione e non sono dichiarati hook.",
+      "questions": []
+    },
+    "non-code": {
+      "task": "Rivedi questo invito di compleanno per renderlo più affettuoso.",
+      "stack_tokens": [],
+      "catalog_digest": "2b1a6d2eb24d3ff692a045f86f389b61a9057919cf711c6993ea94abad68f266",
+      "status": "no_match",
+      "selections": [],
+      "reason": "Il risultato richiesto e una riscrittura affettuosa di un invito personale. La capacita disponibile riguarda modifiche software ed esclude la revisione generale di testi non collegati a tali modifiche; il verbo rivedere non basta a selezionarla.",
+      "questions": []
+    }
+  }
+}

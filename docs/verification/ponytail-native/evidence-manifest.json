@@ -1,0 +1,163 @@
+{
+  "scope": "Saved existing bounded Ponytail native-policy evidence; no tests, builds, source execution or host sessions run by this archival step.",
+  "release_checks": {
+    "passed": 54,
+    "total": 54
+  },
+  "routing_eval": {
+    "passed": 4,
+    "total": 4,
+    "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+  },
+  "offline_followup": {
+    "status": "incomplete",
+    "last_recorded_progress_percent": 36,
+    "result": null,
+    "log": "logs/muro-native-offline-pytest.txt"
+  },
+  "manifest_note": "sources.executed.json is the exact local-mirror manifest. sources.json changes only repo_path to the previously verified HTTPS repo_url; intake wording remains exact and describes the original execution.",
+  "records": [
+    {
+      "path": "ROUTER.md",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\ROUTER.md",
+      "bytes": 946,
+      "sha256": "a1bcaa112ed8c44be977719e5f51265539246650bd4d826d732a35dc7ef620ee"
+    },
+    {
+      "path": "delivery.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\delivery.json",
+      "bytes": 4221,
+      "sha256": "da341d18ccee8d3cb3ba94cba0b46dca5f49b09fb28519be0c10986b273b3bc6"
+    },
+    {
+      "path": "entries.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\entries.json",
+      "bytes": 334,
+      "sha256": "837f6466776d823b569883a9654db5723d055345a3a0bbd82c9c741346e4bf12"
+    },
+    {
+      "path": "eval-cases.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\eval-cases.json",
+      "bytes": 1124,
+      "sha256": "83b2088995f9b55f254d96c01a57301e67207ebe284c0ddca6908c93da2f71e0"
+    },
+    {
+      "path": "guide-examples.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\guide-examples.json",
+      "bytes": 956,
+      "sha256": "3a249dcabe9144a4ad169d0c87ef2b3fa428f5bb15cd1991bad267799b1d087a"
+    },
+    {
+      "path": "capabilities/change-review.md",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\capabilities\\change-review.md",
+      "bytes": 4336,
+      "sha256": "3984cbc41cf77e0456f3547b73100fc85c08effdc1b53070ebb7042279e897fe"
+    },
+    {
+      "path": "sources.executed.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+      "bytes": 1357,
+      "sha256": "7588547dfa1b2e184739a6b1e26de429b291992c618089f87f4dc6aa6d328f96"
+    },
+    {
+      "path": "sources.json",
+      "bytes": 1387,
+      "sha256": "ebeeca73f4d1bf607f9eb007f70242d214b35de54251ecca577c0327d9bfe2f5",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+      "source_bytes": 1357,
+      "source_sha256": "7588547dfa1b2e184739a6b1e26de429b291992c618089f87f4dc6aa6d328f96"
+    },
+    {
+      "path": "native-eval-v3/decisions.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\decisions.json",
+      "bytes": 3054,
+      "sha256": "4f8bfaba9c0956707b9f6a75b75a45c7046ee4fba1aabe20deb83dd640125e32"
+    },
+    {
+      "path": "native-eval-v3/results.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\results.json",
+      "bytes": 144,
+      "sha256": "01bc9dc6b3aa6fdf98f46355890efc40c7b390e1f7d4d3a60ef24c784439bfb6"
+    },
+    {
+      "path": "native-eval-v3/command-evidence.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\command-evidence.json",
+      "bytes": 1859,
+      "sha256": "2d2349ffa9bb3327d2fe22f687069e0071f4453fa41943439b1beaf3b1530488"
+    },
+    {
+      "path": "native-eval-v3/contexts/PROMPT.md",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\contexts\\PROMPT.md",
+      "bytes": 10966,
+      "sha256": "8d1de57b6575fff8b737278cbe4e28e3a8d153f78a94e1c9c762e5141ae5bd06"
+    },
+    {
+      "path": "native-eval-v3/contexts/contexts.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\contexts\\contexts.json",
+      "bytes": 969,
+      "sha256": "dc483770e167245707b54c02ece1e9f4b3d5fcd2851a90cee612b0e566ad278f"
+    },
+    {
+      "path": "native-release-v3-results.json",
+      "bytes": 30304,
+      "sha256": "f0d055af345a33813c086f9fb1443ddec1f52c6cff8cb259698af1ff42138668",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-release-v3-results.json",
+      "source_bytes": 59674,
+      "source_sha256": "da4c3a4651afd4fa71daa1c8fa41d70bfbe9cb5d3f3179dbbadf4332f371729b"
+    },
+    {
+      "path": "native-package-results.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-package-results.json",
+      "bytes": 587,
+      "sha256": "71efe8b7733df246cae3b97e518da3cbbc0dfa136b7c27ff19ad6d18a4648ae3"
+    },
+    {
+      "path": "native-release-results.json",
+      "source": "D:\\workspace\\muro-ponytail-probe\\native-release-results.json",
+      "bytes": 756,
+      "sha256": "263a4b21a79e9ca6a0226edc59b28aa5b98db7c8a676ef56af56a1918e5a6cfc"
+    },
+    {
+      "path": "logs/muro-native-full-pytest.txt",
+      "source": "D:\\workspace\\muro-native-full-pytest.txt",
+      "bytes": 26552,
+      "sha256": "0039d510c7509deb8641c991cf74f99268cd2a5648331f3c7e43db94f9d37767"
+    },
+    {
+      "path": "logs/muro-native-source-followup.txt",
+      "source": "D:\\workspace\\muro-native-source-followup.txt",
+      "bytes": 10343,
+      "sha256": "13d49e3e36ca9b8f00ebb43c1825769812d703f1498f1c1d52d95c9e199be4f3"
+    },
+    {
+      "path": "logs/muro-native-final-pytest.txt",
+      "source": "D:\\workspace\\muro-native-final-pytest.txt",
+      "bytes": 205,
+      "sha256": "a2db90ac78580dd786479761354455af78f6c3cd92abd2f82923c96c296c4491"
+    },
+    {
+      "path": "logs/muro-native-hosts-pytest.txt",
+      "source": "D:\\workspace\\muro-native-hosts-pytest.txt",
+      "bytes": 123,
+      "sha256": "04193245cb03ee3c8001f48a64f80312d255fcc285bd5d2c293e292f035e387b"
+    },
+    {
+      "path": "logs/muro-native-offline-pytest.txt",
+      "source": "D:\\workspace\\muro-native-offline-pytest.txt",
+      "bytes": 162,
+      "sha256": "6ac46e113f42856e85d16fc53796c69769adbc7184bdd230760a0c2a6e0b2415"
+    },
+    {
+      "path": "opencode-blocked-attempt.json",
+      "source": "D:\\workspace\\muro-opencode-offline-probe\\result.json",
+      "bytes": 3244,
+      "sha256": "b14c3ca899ae36ebb6853893647e2a1764ba0713c97f4eb3bb8d94d0ed977adc"
+    },
+    {
+      "path": "logs/opencode.log",
+      "source": "D:\\workspace\\muro-opencode-offline-probe\\data\\opencode\\log\\opencode.log",
+      "bytes": 1428,
+      "sha256": "2281b39db9a516b63607e5e4c2be4b7e01068879463b130af66a00f79df27ceb"
+    }
+  ]
+}

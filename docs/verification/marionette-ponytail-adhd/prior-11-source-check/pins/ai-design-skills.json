@@ -1,0 +1,92 @@
+{
+  "url": "https://api.github.com/repos/elayadesign/ai-design-skills/commits/HEAD",
+  "response": {
+    "sha": "456d9e0d3e2d84c748bb143c6ca3d90c45e16213",
+    "node_id": "C_kwDOTm1W0NoAKDQ1NmQ5ZTBkM2UyZDg0Yzc0OGJiMTQzYzZjYTNkOTBjNDVlMTYyMTM",
+    "commit": {
+      "author": {
+        "name": "Claude",
+        "email": "noreply@anthropic.com",
+        "date": "2026-11-01T23:24:09Z"
+      },
+      "committer": {
+        "name": "Claude",
+        "email": "noreply@anthropic.com",
+        "date": "2026-11-01T23:24:09Z"
+      },
+      "message": "README: SlopScan banner\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_017GzKYVoLuK4bRyvkHRxRxK",
+      "tree": {
+        "sha": "19409610c38d36cce5b84a912db5660391cb1bd5",
+        "url": "https://api.github.com/repos/elayadesign/ai-design-skills/git/trees/19409610c38d36cce5b84a912db5660391cb1bd5"
+      },
+      "url": "https://api.github.com/repos/elayadesign/ai-design-skills/git/commits/456d9e0d3e2d84c748bb143c6ca3d90c45e16213",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgrLzsfFISF4by8Q+FKz27YpkK1USsBB+m\namu1QkJnbDsAAAADZ2l0AAAAAAAAAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5AAAAQD1/XjEH\nV3uAP6tcbOodi+HzRuprS3mo+pftKgiuGOKavk4uM7n78ikj6fXQET6tQ9cr12JiL9mIxY3Fisbl\n3w0=\n-----END SSH SIGNATURE-----",
+        "payload": "tree 19409610c38d36cce5b84a912db5660391cb1bd5\nparent 30af9dc730311b02217fdd5664139e9d37f2a1c6\nauthor Claude <noreply@anthropic.com> 1793575449 +0400\ncommitter Claude <noreply@anthropic.com> 1793575449 +0400\n\nREADME: SlopScan banner\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_017GzKYVoLuK4bRyvkHRxRxK\n",
+        "verified_at": "2026-11-01T23:24:11Z"
+      }
+    },
+    "url": "https://api.github.com/repos/elayadesign/ai-design-skills/commits/456d9e0d3e2d84c748bb143c6ca3d90c45e16213",
+    "html_url": "https://github.com/elayadesign/ai-design-skills/commit/456d9e0d3e2d84c748bb143c6ca3d90c45e16213",
+    "comments_url": "https://api.github.com/repos/elayadesign/ai-design-skills/commits/456d9e0d3e2d84c748bb143c6ca3d90c45e16213/comments",
+    "author": {
+      "login": "claude",
+      "id": 81847,
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/claude",
+      "html_url": "https://github.com/claude",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "claude",
+      "id": 81847,
+      "node_id": "MDQ6VXNlcjgxODQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/81847?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/claude",
+      "html_url": "https://github.com/claude",
+      "followers_url": "https://api.github.com/users/claude/followers",
+      "following_url": "https://api.github.com/users/claude/following{/other_user}",
+      "gists_url": "https://api.github.com/users/claude/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/claude/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/claude/subscriptions",
+      "organizations_url": "https://api.github.com/users/claude/orgs",
+      "repos_url": "https://api.github.com/users/claude/repos",
+      "events_url": "https://api.github.com/users/claude/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/claude/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "30af9dc730311b02217fdd5664139e9d37f2a1c6",
+        "url": "https://api.github.com/repos/elayadesign/ai-design-skills/commits/30af9dc730311b02217fdd5664139e9d37f2a1c6",
+        "html_url": "https://github.com/elayadesign/ai-design-skills/commit/30af9dc730311b02217fdd5664139e9d37f2a1c6"
+      }
+    ],
+    "stats": {
+      "total": 2,
+      "additions": 1,
+      "deletions": 1
+    }
+  },
+  "omitted_commit_file_patch_count": 2,
+  "archive_note": "Commit file patch payloads omitted; release/ref/commit verification metadata retained."
+}

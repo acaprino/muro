@@ -1,0 +1,23 @@
+{
+  "scope": "Fresh bounded Ponytail native-policy release verification; isolated stage, no host configuration writes.",
+  "stage": "D:\\workspace\\muro-ponytail-probe\\release-native-v2",
+  "commands": [
+    {
+      "timestamp_utc": "2026-11-12T11:30:52.687565+00:00",
+      "cwd": "D:\\Projects\\Muro",
+      "command": [
+        "python",
+        "muro_build.py",
+        "--manifest",
+        "D:\\workspace\\muro-ponytail-probe\\package\\sources.json",
+        "--build",
+        "--out",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v2"
+      ],
+      "exit_code": 0,
+      "stdout": "Built D:\\workspace\\muro-ponytail-probe\\release-native-v2\\ponytail-probe\n",
+      "stderr": ""
+    }
+  ],
+  "checks": []
+}

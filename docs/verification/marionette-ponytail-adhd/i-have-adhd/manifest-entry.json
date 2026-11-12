@@ -1,0 +1,42 @@
+{
+  "id": "i-have-adhd",
+  "repo_url": "https://github.com/ayghri/i-have-adhd.git",
+  "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+  "pin": "release",
+  "release": "v0.4.1",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Ayoub Ghriss",
+  "selected_paths": [
+    "skills/i-have-adhd/SKILL.md",
+    "README.md"
+  ],
+  "excluded_paths": [
+    "skills/i-have-adhd/agents/**",
+    ".agents/**",
+    ".claude-plugin/**",
+    ".codex-plugin/**",
+    ".cursor/**",
+    ".github/**",
+    ".opencode/**",
+    "hooks/**",
+    "extensions/**",
+    "scripts/**",
+    "tests/**",
+    "evals/**",
+    "INSTALL.md",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "GEMINI.md",
+    "package.json",
+    "plugin.json",
+    "gemini-extension.json",
+    "qwen-extension.json",
+    "kimi.plugin.json",
+    "logo.png",
+    ".gitignore"
+  ],
+  "runtime_deps": [],
+  "intake": {
+    "goal": "Absorb the source's communication policy as flexible permanent guidance: clear useful answers, bounded steps where helpful, concrete progress, complete explanations and uncertainty preserved, and no delegation of authorized agent-owned work. Respect the user's demonstrated knowledge and current constraints, including requests for realistic examples or diagrams when they help understanding. Drop diagnostic assumptions, mandatory response templates, redundant source activation/routing and source plugin installation. Preserve all supported communication outcomes without inventing an on-demand capability. Source-native hooks, transport, developer QA and installation instructions were statically inspected and are accounted for in delivery and verification evidence; none are executed or registered."
+  }
+}

@@ -16,6 +16,7 @@ from typing import Any
 import uuid
 
 from .core import parse_capability, parse_router, validate_capabilities_and_router
+from .delivery import allows_empty_catalog, load_delivery, validate_delivery, unregistered_active_hooks
 from .routing import (
     catalog_entries,
     catalog_digest,
@@ -81,6 +82,26 @@ def compact_catalog(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for entry in catalog]
 
 
+def focused_catalog(catalog: list[dict[str, Any]], focus: set[str]) -> list[dict[str, Any]]:
+    """Compact catalog with full detail for `focus` and an index line for every other capability.
+
+    Nothing is hidden: a brief entry keeps its role and intent descriptions so the classifier can
+    see that it exists and ask for it. Its exclusions, tools and constraints come with --focus.
+    """
+    known = {entry["id"] for entry in catalog}
+    unknown = sorted(focus - known)
+    if unknown:
+        raise ValueError("--focus names unknown capability: " + ", ".join(unknown))
+    result = []
+    for entry in compact_catalog(catalog):
+        if entry["id"] in focus:
+            result.append(entry)
+        else:
+            result.append({"id": entry["id"], "role": entry["role"], "brief": True,
+                           "intents": [{"id": i["id"], "description": i["description"]} for i in entry["intents"]]})
+    return result
+
+
 class Coordinator:
     def __init__(self, package_root: Path, project_root: Path):
         self.package_root = package_root.resolve()
@@ -99,10 +120,18 @@ class Coordinator:
         stack_cfg = manifest.get("stack") if isinstance(manifest.get("stack"), dict) else None
         self.stack_rules: list[dict[str, Any]] | None = stack_cfg.get("detectors") if stack_cfg is not None else None
         self.stack_conflicts: list[list[str]] | None = stack_cfg.get("conflicts") if stack_cfg is not None else None
+        capabilities = list(self.capabilities.values())
+        delivery = load_delivery(self.package_root)
+        source_ids = {source.get("id") for source in manifest.get("sources", [])}
+        delivery_errors = (unregistered_active_hooks(capabilities) if delivery is None
+                           else validate_delivery(delivery, capabilities, source_ids))
+        if delivery_errors:
+            raise ValueError("Invalid delivery: " + "; ".join(delivery_errors))
         errors = validate_capabilities_and_router(
             list(self.capabilities.values()),
             self.rows,
             plugin_slug=slug if plugin_meta else None,
+            allow_empty=allows_empty_catalog(delivery, capabilities, source_ids),
         )
         if errors:
             raise ValueError("Invalid AI catalog: " + "; ".join(errors))
@@ -111,7 +140,7 @@ class Coordinator:
             raise ValueError("Missing AI classification prompt")
         self.catalog = catalog_entries(self.rows, self.capabilities)
         self.conflicts = {key: cap.conflicts for key, cap in self.capabilities.items()}
-        self.digest = catalog_digest(self.catalog, self.capabilities, self.routing_prompt)
+        self.digest = catalog_digest(self.catalog, self.capabilities, self.routing_prompt, delivery)
         self.state_dir = self.project_root / f".{slug}"
         self._last_stack: set[str] | None = None
         self._last_classification: dict | None = None
@@ -336,7 +365,15 @@ class Coordinator:
         if not plan:
             return self._checks_result(state)
         merged_outputs = {**self._direct_outputs(), **state["outputs"]}
-        return self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs)
+        result = self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs)
+        remaining = list(plan[1:])
+        result["remaining_steps"] = remaining
+        later = ", ".join(remaining) if remaining else "none"
+        result["scope"] = (f"This step is {plan[0]} only. Later steps: {later}. Do not start their work now: submit this "
+                           "step first; the result is the next step.")
+        result["submit"] = (f'step --project "{self.project_root}" --map-id {state["map_id"]} --capability {plan[0]} '
+                            f'--step-data "{self.state_dir / "step.json"}"')
+        return result
 
     def _instruction(
         self,
@@ -401,6 +438,9 @@ class Coordinator:
             "output_attestation": self._output_attestation(state),
             "checks": list(dict.fromkeys(check for checks in owners.values() for check in checks)),
             "checks_by_capability": owners,
+            "submit_check": (f'check --project "{self.project_root}" --map-id {state["map_id"]} --capability <owner> '
+                             f'--result "{self.state_dir / "checks.json"}"'),
+            "submit_complete": f'complete --project "{self.project_root}" --map-id {state["map_id"]}',
         }
 
     def _all_checks_passing_or_not_tested(self, state: dict[str, Any]) -> tuple[list[str], list[str]]:
@@ -438,6 +478,7 @@ class Coordinator:
         classification: dict | None = None,
         compact: bool = False,
         amend: bool = False,
+        focus: set[str] | None = None,
     ) -> dict[str, Any]:
         # amend: the same conversation refined its request; plan against the new decision, keep valid work.
         self._new_map = new or amend
@@ -456,9 +497,13 @@ class Coordinator:
                     "context": context,
                     "instructions": ("Classify with the rules under 'Classification rules' in this skill's SKILL.md "
                                      "(prompts/classify.md). Write the decision JSON with your file tool to "
-                                     "classification_path, then rerun plan on one line with --classification <that file>."),
+                                     "classification_path, then rerun plan on one line with --classification <that file>."
+                                     + ("" if focus is None else
+                                        " Entries marked brief show role and intents only: before selecting one, or when "
+                                        "the task may need one, rerun plan --compact with --focus <ids> (comma-separated, "
+                                        "together with the ones already in focus) to read its exclusions, tools and constraints.")),
                     "classification_path": str(self.classification_path),
-                    "catalog": compact_catalog(self.catalog),
+                    "catalog": compact_catalog(self.catalog) if focus is None else focused_catalog(self.catalog, focus),
                 }
             return {
                 "mode": "classification-required",
@@ -831,13 +876,18 @@ def runtime_main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-    parser.add_argument("action", choices=("plan", "resume", "record", "check", "complete", "step", "unlock"))
+    parser.add_argument("action", choices=("plan", "resume", "record", "check", "complete", "step", "unlock",
+                                           "session-context"))
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--task", default="")
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--compact", action="store_true",
                         help="plan without a decision: return context and a compact catalog only (rules live in SKILL.md)")
+    parser.add_argument("--focus", metavar="IDS",
+                        help="with --compact: comma-separated capabilities returned in full; the others as a brief index")
+    parser.add_argument("--brief", action="store_true",
+                        help="with --compact: return every capability as a brief index (role and intents)")
     parser.add_argument("--new", action="store_true", help="Start a fresh map, archiving any previous map")
     parser.add_argument("--amend", action="store_true",
                         help="The request was refined in the same conversation: replan and keep outputs that are still valid")
@@ -856,7 +906,36 @@ def runtime_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--classification", help="JSON classification file or '-' for stdin")
     parser.add_argument("--classification-json", help="Inline JSON classification string")
     parser.add_argument("--token", help="Lock recovery token for unlock")
+    parser.add_argument("--hook-event", choices=("SessionStart", "SubagentStart"),
+                        help="session-context: emit Codex's JSON context envelope for this hook event")
     args = parser.parse_args(argv)
+    if args.hook_event and args.action != "session-context":
+        parser.error("--hook-event requires session-context")
+    if args.action == "session-context":
+        # Explicit JSON keeps policy starting with { or [ from becoming hook controls.
+        # Invalid declared text must be visible
+        # as a hook failure instead of a successful session silently missing its policy.
+        try:
+            from .delivery import always_on_limit
+            document = load_delivery(args.package)
+            if document is not None and not isinstance(document, dict):
+                raise ValueError("delivery.json must be an object")
+            text = (document or {}).get("always_on", "")
+            limit = always_on_limit(document)
+            if not isinstance(text, str) or len(text) > limit:
+                raise ValueError(f"always_on must be text of at most {limit} characters "
+                                 "(one allowance for each source with an always-on decision)")
+        except (OSError, ValueError) as exc:
+            print(f"Invalid delivery session policy: {exc}", file=sys.stderr)
+            return 1
+        if text.strip():
+            if args.hook_event:
+                print(json.dumps({"hookSpecificOutput": {
+                    "hookEventName": args.hook_event, "additionalContext": text,
+                }}, ensure_ascii=False))
+            else:
+                print(text)
+        return 0
     try:
         stdin_consumers = sum(
             1 for val in (args.classification, args.outputs, args.result, args.step_data) if val == "-"
@@ -877,8 +956,14 @@ def runtime_main(argv: list[str] | None = None) -> int:
             if args.classification not in (None, "-") and Path(args.classification).resolve().parent == coordinator.state_dir:
                 coordinator.ensure_gitignore()
             preserved = [s.strip() for s in args.preserve_completed.split(",") if s.strip()] or None
+            focus = None
+            if args.focus is not None or args.brief:
+                if not args.compact:
+                    raise ValueError("--focus and --brief need --compact")
+                focus = {s.strip() for s in (args.focus or "").split(",") if s.strip()}
             result = coordinator.propose(args.task, stack, new=args.new or bool(preserved),
-                                         classification=classification, compact=args.compact, amend=args.amend)
+                                         classification=classification, compact=args.compact, amend=args.amend,
+                                         focus=focus)
             if args.confirm:
                 if result["mode"] == "classification-required":
                     raise ValueError("AI classification is required before confirmation; run plan without --confirm first")

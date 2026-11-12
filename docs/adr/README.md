@@ -123,3 +123,31 @@ from outside (routing eval, live host run), fit the host, and keep AI semantics
 while shrinking ceremony. Proposed at the owner's request to learn from the
 evidence; the wording is not separately approved. This manual note is outside the
 historical generated index.
+
+## Delivery form amendment
+
+[ADR-0016 — Delivery form per intake and releases that register what they need](ADR-0016-delivery-form-and-self-registering-releases.md)
+records the owner's 2026-11-12 decisions: installing a generated plugin is the
+consent, so a release may register session text and hooks by itself; what each
+absorbed part becomes is an AI judgment with its own prompt, recorded with
+reasons in `delivery.json`; and a broad package does not let one source's system
+prompt take over every session. It supersedes the passive-hook rule of ADR-0007.
+Proposed: the decisions are the owner's, the wording is not separately approved.
+This manual note is outside the historical generated index.
+
+The 2026-11-12 native-policy correction updates ADR-0016 to version 2: five
+explicit host instruction channels, policy-only packages without a fabricated
+skill, delivery-bound classification/eval and literal hook arguments. The
+earlier host table remains marked as historical. See the
+[verification and limits](../verification/2026-11-12-native-policy-delivery.md).
+
+## Unaltered content amendment
+
+[ADR-0017 — Absorbed content is not altered, except for harmonization and coexistence](ADR-0017-absorbed-content-is-not-altered.md)
+records the owner rule of 2026-11-12: the AI chooses the form and the place of
+each absorbed part, the words stay the source's, and wording changes only for a
+recorded collision. ADR-0016 gained three amendments the same day: a transformed
+original is not shipped, the always-on limit is proportional to the contributing
+sources, and an adapter installs with its host's own command. Proposed: the
+rule is the owner's, the wording is not separately approved. This manual note
+is outside the historical generated index.

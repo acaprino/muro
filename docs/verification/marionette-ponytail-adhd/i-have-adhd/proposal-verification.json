@@ -1,0 +1,21 @@
+{
+  "check_sources": "passed using local exact-object mirror",
+  "inspect_source": "passed MIT template, selected bytes, tag/commit binding, nested-license gate",
+  "remote_url": "https://github.com/ayghri/i-have-adhd.git",
+  "release": "v0.4.1",
+  "published_at": "2026-10-19T19:46:23Z",
+  "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+  "license_sha256": "8acbb618089b738404f76ac60fca1aaa995d9a87995eddf95f0b777acd7f7d2c",
+  "notice": "absent",
+  "policy_characters": 1283,
+  "selected_paths": [
+    "skills/i-have-adhd/SKILL.md",
+    "README.md"
+  ],
+  "inspection_file_count": 42,
+  "limits": [
+    "No upstream code, hook, installation or model evaluation executed",
+    "Partial mirror omits unselected blob bytes and parent history",
+    "GitHub connector verified metadata; shell remote fetch was not used"
+  ]
+}

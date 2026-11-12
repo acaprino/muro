@@ -13,7 +13,14 @@ Understand what each capability actually does, including its instructions and
 source evidence, before comparing labels. Use the current router as context to
 review, not an unquestionable tree. Organize the graph around desired outcomes,
 responsibilities, real prerequisites and useful alternatives; source repositories
-are provenance, not branches. Preserve useful methods and limits through rewriting.
+are provenance, not branches. Bodies and descriptions are your words; the methods and
+limits are the source's and none is dropped, weakened or invented, and the packaged
+original stays the full version a body points to for what a task needs.
+Change what a source prescribes only where harmonization and coexistence require it (two owners of one
+output, contradictory rules, competing routing), never for size, style or taste,
+and record each rewrite with the collision that required it. Never add a
+restriction on data leaving the machine that the source does not state; say
+what leaves, in the source's words, and nothing more.
 
 For each changed relationship, record a short decision with supporting source
 paths/sections: what overlaps, why the result is a merge, an alternative, a required
@@ -42,7 +49,7 @@ and conflict decisions with their source-grounded rationale. This is part of
 harmonization, not a second semantic classifier in the guide generator.
 
 Keep these explanations aligned with `after`, `outputs`, `conflicts`, tools and
-passive hook policy. Do not imply collaboration merely because names, intent IDs
+hook policy. Do not imply collaboration merely because names, intent IDs
 or outputs match. The release renderer displays declared relationships and the
 existing runtime command contract; it cannot repair missing meaning. Do not
 write or edit generated HTML yourself, or claim the guide proves execution.
@@ -77,6 +84,16 @@ capability or asking the owner whether a domain is allowed. Entries only help th
 runtime still classifies against the whole catalog. Review the entries whenever
 capabilities, intents or exclusions change.
 
+## Delivery form
+
+Maintain `delivery.json` with the Delivery protocol appended below: what each
+part of each source became, and why. Review every earlier decision against the
+catalog as it is now, not only the new source's. A package that widened makes
+text or a hook that suited every session wrong for most of them; a package that
+narrowed can justify the opposite. Every source keeps at least one decision, and
+a form with nothing behind it (always-on without text, a hook without a wiring)
+is rejected.
+
 ## Step weight, replaced originals and eval cases
 
 Declare `resumable: true` on a capability whose step is long or asks the user
@@ -108,9 +125,10 @@ specific enough for a runtime AI to reason about a task in any language.
 Preserve `tools` and `hooks` metadata through merges. Combine compatible tool
 requirements; a required tool must not become optional accidentally. Resolve
 hook conflicts by event, action, side effects and host compatibility, not just
-matching event names. Keep manual/host-approved policy explicit and document
-omitted or uninspected source hooks. Never generate or install native auto-run
-hooks as a side effect of harmonization. Tool availability is a runtime AI check.
+matching event names. Keep each hook's policy explicit and document omitted or
+uninspected source hooks. A hook becomes `active` only through a delivery
+decision with its reason and wiring, never as a side effect of a merge. Tool
+availability is a runtime AI check.
 
 Analyze overlaps pairwise: instructions that undo another stage, competing design
 authority, duplicate output producers, shared file/resource writes and duplicate
@@ -157,8 +175,15 @@ still require your analysis and the host's checks.
 
 ## Output
 
-Return changed capability files, reviewed `guide-examples.json`, `entries.json`
-and `eval-cases.json`, and one `ROUTER.md` of at most 80 lines. Write them in the package
+When the validated delivery consists of permanent guidance without any
+on-demand procedure, emit no capability files or discovery skills. Keep a
+header-only ROUTER.md, omit entries.json, and preserve nonempty authored guide
+examples with no_match and empty selections. Do not make a dummy capability to
+satisfy the usual catalog shape. Review the policy against the same source
+coverage and authority rules as a mixed package.
+
+Return changed capability files, reviewed `guide-examples.json`, `entries.json`,
+`eval-cases.json` and `delivery.json`, and one `ROUTER.md` whose text stays within 80 lines (the catalog table's rows are not counted). Write them in the package
 directory, beside `sources.json`: capabilities under `capabilities/`. Each capability must have exactly one row with
 these six columns in this order:
 

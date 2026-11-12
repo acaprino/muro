@@ -1,0 +1,28 @@
+{
+  "examples": [
+    {
+      "title": "Review a change",
+      "task": "Rivedi le modifiche correnti e i chiamanti coinvolti; segnala problemi concreti senza modificare codice.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "change-review",
+          "intent": "code.change-review",
+          "reason": "The user requests a report on software changes and callers, without implementation."
+        }
+      ],
+      "reason": "A bounded change review; the ambient principles add no separate step.",
+      "questions": []
+    },
+    {
+      "title": "Unrelated writing",
+      "task": "Scrivi un breve invito alla mia cena di compleanno.",
+      "stack_tokens": [],
+      "status": "no_match",
+      "selections": [],
+      "reason": "A birthday invitation is outside the sole on-demand software review procedure; ambient guidance cannot create a fallback.",
+      "questions": []
+    }
+  ]
+}

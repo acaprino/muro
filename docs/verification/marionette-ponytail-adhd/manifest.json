@@ -1,0 +1,387 @@
+{
+  "created_on": "2026-11-12",
+  "scope": "Selected-source inspection and AI integration evidence; final package validation remains separately pending.",
+  "policy": {
+    "characters": 1986,
+    "utf8_bytes": 1986,
+    "sha256": "3c802ce60404ec046badc5c3713c142885b7d02b11616167ed9386c6fb0103fe"
+  },
+  "payload_files": 48,
+  "payload_bytes": 383865,
+  "files": [
+    {
+      "path": "combined-policy.md",
+      "bytes": 1994,
+      "sha256": "d24a304d96238977014e2046244870becc12e0094ebc9219e76a7aa1721a410d",
+      "origin": "D:\\workspace\\muro-integration-20261112\\combined-policy.md",
+      "category": "Current consolidated policy; trailing newline is presentation only"
+    },
+    {
+      "path": "harmonization-audit.md",
+      "bytes": 14340,
+      "sha256": "ca16822493f94e71e30523ca0d68a722ed7eb385ca79b42174062a2813975cab",
+      "origin": "D:\\workspace\\muro-integration-20261112\\harmonization-audit.md",
+      "category": "AI-authored whole-catalog semantic audit"
+    },
+    {
+      "path": "i-have-adhd/delivery-proposal.json",
+      "bytes": 5876,
+      "sha256": "121b031d8f81789849f03fac7ab6a77e9bd377811026efeec8bb97b8816f7983",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\delivery-proposal.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "i-have-adhd/intake-proposal.md",
+      "bytes": 12610,
+      "sha256": "841a34b7cadff70e28fd1be70e4d20efac5239b2ff6cbc0dc2035c131789c2a6",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\intake-proposal.md",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "i-have-adhd/manifest-entry.json",
+      "bytes": 1691,
+      "sha256": "7b2123dcf10becaa1c71f4e687040f3ce70b6f5fb652fdd48c4274f08a871be5",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\manifest-entry.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "i-have-adhd/object-verification.json",
+      "bytes": 414,
+      "sha256": "13771f4425348b147b21c7e173d7ea80b27c1b186bd5e5a228523c554f37bdb1",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\object-verification.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "i-have-adhd/proposal-verification.json",
+      "bytes": 850,
+      "sha256": "258bdfb2d83bb97ac585d95d8fd4f1bdd847e231a7ee1750391b8b1360d210de",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\proposal-verification.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "i-have-adhd/selected-source/LICENSE",
+      "bytes": 1069,
+      "sha256": "8acbb618089b738404f76ac60fca1aaa995d9a87995eddf95f0b777acd7f7d2c",
+      "origin": "https://github.com/ayghri/i-have-adhd.git @ 1ecea1993b7fce257ffbd686c070948b5e07eda6:LICENSE",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "LICENSE",
+      "git_blob": "19db5f1b0ca65e277c158bd4c4263139ccfd859c",
+      "intake_only": false
+    },
+    {
+      "path": "i-have-adhd/selected-source/README.md",
+      "bytes": 3995,
+      "sha256": "e9a043ffdcf59bc85a618d4be8ca20b2e89eca71b91408e8a51d14efe4d0225c",
+      "origin": "https://github.com/ayghri/i-have-adhd.git @ 1ecea1993b7fce257ffbd686c070948b5e07eda6:README.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "README.md",
+      "git_blob": "d784a4359d68ae959e85ac7cd22bbebef42cc682",
+      "intake_only": true
+    },
+    {
+      "path": "i-have-adhd/selected-source/skills/i-have-adhd/SKILL.txt",
+      "bytes": 7201,
+      "sha256": "88955c019bbb1419ff4b49dbb1f80a867467de6233d7865af2e06a7d7b76c7d3",
+      "origin": "https://github.com/ayghri/i-have-adhd.git @ 1ecea1993b7fce257ffbd686c070948b5e07eda6:skills/i-have-adhd/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/i-have-adhd/SKILL.md",
+      "git_blob": "6c42757ffae37e442adfb52fbba2a8609f1cff00",
+      "intake_only": true
+    },
+    {
+      "path": "i-have-adhd/source-metadata.json",
+      "bytes": 64697,
+      "sha256": "76909918d7dd84d01f88de7236d34b304745bfc68d74646c3579be9500067ba1",
+      "origin": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\evidence-bundle.json with unselected text payloads removed",
+      "category": "Connector metadata and exact object identities"
+    },
+    {
+      "path": "i-have-adhd/upstream-commit.txt",
+      "bytes": 1183,
+      "sha256": "1748237d72787dc6d47e83e9c0083873720f73085cb5b1b5efc105ceb580e5a2",
+      "origin": "git cat-file commit 1ecea1993b7fce257ffbd686c070948b5e07eda6 from exact scratch mirror",
+      "category": "Exact original Git commit object body",
+      "git_commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6"
+    },
+    {
+      "path": "ponytail/INTAKE.md",
+      "bytes": 11544,
+      "sha256": "07f24c82273b965d7269704ed5df2cef32a357f64727cd8d7fd2a28536957321",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\INTAKE.md",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "ponytail/automation/analysis.md",
+      "bytes": 13548,
+      "sha256": "0c856e841ef481dfc2392ed6e42664db3bc0cd39b7bc9b7327b6c4059aa64828",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\automation\\analysis.md",
+      "category": "Static inspection of deliberately unselected original automation"
+    },
+    {
+      "path": "ponytail/automation/verified-blobs.json",
+      "bytes": 11127,
+      "sha256": "750a2107ad759cac800bb1124f5fdcde0337d0e884a22941843b09fcc6d7aa7e",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\automation\\verified-blobs.json",
+      "category": "Static inspection of deliberately unselected original automation"
+    },
+    {
+      "path": "ponytail/delivery-proposal.json",
+      "bytes": 6709,
+      "sha256": "f17a79317ec8f125223464c1e2c86b31f84802c2661ce09cb0240b4c4280edb7",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\delivery-proposal.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "ponytail/materialization-results.json",
+      "bytes": 10381,
+      "sha256": "a342f23b3f038e638d9372b6dbe56c115dfba4148633e350b011a90b6e2b5d3c",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\materialization-results.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "ponytail/proposed-capabilities/engineering-debt.md",
+      "bytes": 4210,
+      "sha256": "e77d25d2fd0a892d7f9612380f3585118622dee8386a8993070070d25cd5e4cf",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\proposed-capabilities\\engineering-debt.md",
+      "category": "AI-authored draft; production consolidation is authoritative"
+    },
+    {
+      "path": "ponytail/proposed-capabilities/engineering-guidance.md",
+      "bytes": 6391,
+      "sha256": "f34a6ba9c4b651bfc99115c667dcc4ccbcd3a730ce81a702805de0de3ef2c368",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\proposed-capabilities\\engineering-guidance.md",
+      "category": "AI-authored draft; production consolidation is authoritative"
+    },
+    {
+      "path": "ponytail/proposed-capabilities/engineering-review.md",
+      "bytes": 6751,
+      "sha256": "2eb12506e77d365efc270a81294ed94808a1ae5f2ea5e3f53446bc3e0525810a",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\proposed-capabilities\\engineering-review.md",
+      "category": "AI-authored draft; production consolidation is authoritative"
+    },
+    {
+      "path": "ponytail/selected-source/.agents/rules/ponytail.md",
+      "bytes": 2623,
+      "sha256": "ca99e5958383063029b206c7c50a0eaad1c29914a362bedd46033ec16b537e1e",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:.agents/rules/ponytail.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": ".agents/rules/ponytail.md",
+      "git_blob": "b314fa6ea92e5ee4f3557f374e9d64213c95bb61",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/LICENSE",
+      "bytes": 1071,
+      "sha256": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:LICENSE",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "LICENSE",
+      "git_blob": "715d483338cea4365f0d91a27799cf61226d6bcf",
+      "intake_only": false
+    },
+    {
+      "path": "ponytail/selected-source/benchmarks/results/2026-10-07-agentic.md",
+      "bytes": 11079,
+      "sha256": "a985555ce1835e82c17aa425f2d3743e0373345c8e73ad761923a700dcc341e0",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:benchmarks/results/2026-10-07-agentic.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "benchmarks/results/2026-10-07-agentic.md",
+      "git_blob": "d016bbf73fd7e49906ff2ff2b3f2e7f4023b7ea1",
+      "intake_only": false
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail-audit/SKILL.txt",
+      "bytes": 5417,
+      "sha256": "2b3223a02c386d1263e1b08343cb8eb3a53e444cdafb1d79e26c8ec2a8fcad28",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-audit/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail-audit/SKILL.md",
+      "git_blob": "ff9a95480700600fe2664d2d0906a4d750b2da0b",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail-debt/SKILL.txt",
+      "bytes": 1769,
+      "sha256": "b5ec2762f6ba8c4af9ea7173aa6c9f91b88655a25e43f9de0264f6ce8722b25f",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-debt/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail-debt/SKILL.md",
+      "git_blob": "3124f520a65d2a4fa75a2f5db6225c38ebdb8620",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail-gain/SKILL.txt",
+      "bytes": 2164,
+      "sha256": "231034a896d6762e4b5c8468287083422c56b499119976ec9f76821f7d083090",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-gain/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail-gain/SKILL.md",
+      "git_blob": "1edff0e461fad6b671733ea6796aea9e417e266b",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail-help/SKILL.txt",
+      "bytes": 3188,
+      "sha256": "86ab0ce0af70cbeeeef499d5c884873b393f87f86401dcc45553662ce2c1eff9",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-help/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail-help/SKILL.md",
+      "git_blob": "34fccb3ff542b3b8d4d131e6120a1812c9c4617a",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail-review/SKILL.txt",
+      "bytes": 5143,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-review/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail-review/SKILL.md",
+      "git_blob": "a50e3ac6ded6fccc9edae34ce37877bbce11e3fa",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/selected-source/skills/ponytail/SKILL.txt",
+      "bytes": 3496,
+      "sha256": "9badd22a32e19cb884e46dfa8d3aae82bb81dfa5484105b8b4f0262df823a509",
+      "origin": "https://github.com/DietrichGebert/ponytail.git @ 7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail/SKILL.md",
+      "category": "Exact selected upstream bytes",
+      "upstream_path": "skills/ponytail/SKILL.md",
+      "git_blob": "d64edd32265ba21cbf5270158f04e97d96925f27",
+      "intake_only": true
+    },
+    {
+      "path": "ponytail/source-evidence.json",
+      "bytes": 93021,
+      "sha256": "df8fe1367ead7476f51ea433ba1e5457680fa0a092b7785f18e1eb8ecaa6e2dc",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\source-evidence.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "ponytail/source-proposal.json",
+      "bytes": 2219,
+      "sha256": "a8e2a01c9bc422637f4b7daf6a3334bc0b3df3732b5463adf0c6111d8cd6fcf0",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\source-proposal.json",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "ponytail/upstream-commit.txt",
+      "bytes": 1131,
+      "sha256": "42c5fe6a35011efa609c781c73dce75459883827d0152ac8c06b59283436266b",
+      "origin": "git cat-file commit 7801d061243d7b753bad0e0b3c057cd250b11755 from exact scratch mirror",
+      "category": "Exact original Git commit object body",
+      "git_commit": "7801d061243d7b753bad0e0b3c057cd250b11755"
+    },
+    {
+      "path": "ponytail/work-map-addendum.md",
+      "bytes": 2506,
+      "sha256": "7d99ab807d1172e0f9a75f386252d941c745044cd9ba4f3f0f2840932d785617",
+      "origin": "D:\\workspace\\muro-integration-20261112\\ponytail\\work-map-addendum.md",
+      "category": "AI proposal / source verification record"
+    },
+    {
+      "path": "prior-11-source-check/mirror-index.json",
+      "bytes": 6060,
+      "sha256": "8bacda22bd01e00de9b51931f2f7ce8af153564753643e5fef116aa9e0f62865",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\mirror-index.json",
+      "category": "Earlier eleven-source mirror check, not final thirteen-source verification"
+    },
+    {
+      "path": "prior-11-source-check/pins/ai-design-skills.json",
+      "bytes": 5024,
+      "sha256": "7fd43065b196b320d75f86591be5604d32d88b44de320d0013a7711d0eb241e2",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\ai-design-skills.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/claude-design-system-prompt.json",
+      "bytes": 6988,
+      "sha256": "9d12ddf370adce8fc82b34faf196ca8f75ee9d9b06f48e5b69ad79394a458722",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\claude-design-system-prompt.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/explain-this.json",
+      "bytes": 5935,
+      "sha256": "7fdd45f41056010f1cc9090c366e4cdcbca7be252b1bc860882b5de3b59ff0f8",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\explain-this.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/genoffice.json",
+      "bytes": 514,
+      "sha256": "b2a607f831871f4910075ea5929b9c758fe58985c7353b057f9c7497f80ae4e7",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\genoffice.json",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/gsap-scrolltrigger.json",
+      "bytes": 5361,
+      "sha256": "30ff5884d7a323bc337a7c133d670cecdb2db4051249ad80a1bad5a505ff316a",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\gsap-scrolltrigger.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/motion-design.json",
+      "bytes": 5393,
+      "sha256": "30f8af1e23b97af5adcb8abb4b23df9f4d57cdc35ccee6c941289d157ac75e30",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\motion-design.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/open-paper-skills.json",
+      "bytes": 4755,
+      "sha256": "5c6d922a7ed79d7adb8d8a5874de5105aa5f0c1a547ea39795d75acf63307f96",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\open-paper-skills.json with commit file patch payload removed",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/taste-skill.json",
+      "bytes": 1326,
+      "sha256": "4964c645497d1885ecf1053595bff1b167d51d64fb8d1b58492267f99aff22c4",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\taste-skill.json",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/tokeneconomizer.json",
+      "bytes": 1354,
+      "sha256": "bc1075d4ed4599c67517d4c82681094cc4d8432167b860df326debd18b734237",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\tokeneconomizer.json",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/ui-ux-pro-max.json",
+      "bytes": 551,
+      "sha256": "93f0b5360b9b9400a29956f9df56eb42e5b71747f04aa68522720854149928a1",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\ui-ux-pro-max.json",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/pins/wayfinder.json",
+      "bytes": 1345,
+      "sha256": "bc3d00393763af9a2a25324ff6c784964bf92f12c604517dd01c0a90d7e7efc1",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\wayfinder.json",
+      "category": "Earlier pin metadata, not a fresh remote fetch"
+    },
+    {
+      "path": "prior-11-source-check/source-check-results.json",
+      "bytes": 493,
+      "sha256": "19c83fe97bf469822dbeb8bd0d923f2a3bd030be6978bc81af3ce00da11c155c",
+      "origin": "D:\\workspace\\muro-marionette-mirrors\\source-check-results.json",
+      "category": "Earlier eleven-source mirror check, not final thirteen-source verification"
+    },
+    {
+      "path": "production-delivery-excerpt.json",
+      "bytes": 12899,
+      "sha256": "86c1f095628e79f9112170361956b7b45ed5c8dd0d89ef162bb7300e42249fe0",
+      "origin": "examples/marionette/delivery.json at archive checkpoint",
+      "category": "Exact production excerpt"
+    },
+    {
+      "path": "production-source-entries.json",
+      "bytes": 4459,
+      "sha256": "43e1978dde8797468cc6852dcaa94eb3f0115d82264b737970794f59b49e9216",
+      "origin": "examples/marionette/sources.json at archive checkpoint",
+      "category": "Exact production excerpt"
+    }
+  ]
+}

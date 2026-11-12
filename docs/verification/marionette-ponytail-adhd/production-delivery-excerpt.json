@@ -1,0 +1,98 @@
+{
+  "decisions": [
+    {
+      "source": "ponytail",
+      "content": ".agents/rules/ponytail.md and skills/ponytail/SKILL.md: duplicated scope-before-minimization, reuse ladder, completeness and non-negotiable safeguards",
+      "form": "always-on",
+      "targets": [],
+      "reason": "The owner requested permanent working guidance. The rule file and central skill express the same working method and merge into one neutral policy, not two copies or another capability. Complete scope, understandable reuse and truthful limits apply across Marionette outcomes; code clauses are explicitly scoped and required engines/design authority are preserved. The host AI authored the synthesis. Its per-session character cost is the final combined policy length, not separate per-source charges; native system channels on Claude Code/Pi/OpenCode/Hermes and developer additionalContext on Codex are described by the current factory. No extra model call or source hook is declared. Combined cost: 1986 characters of policy, shared once rather than charged per source. Native system sections on Claude Code, Pi, OpenCode and Hermes add no per-event subprocess or model call; Codex session/subagent hooks use two local Python processes per event to supply developer context. No source hook, telemetry or user-file write is declared. Host trust and permissions remain authoritative. The selected source originals are intake-only: their methods are restated in this policy or capability bodies; only the Ponytail benchmark reference is carried for an explicit runtime read."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail/SKILL.md: concrete code-change procedure, caller tracing, root-cause fix, scoped reuse, tests and shortcut comments",
+      "form": "capability",
+      "targets": [
+        "work-map"
+      ],
+      "reason": "The existing work-map already owns direct engineering implementation and per-slice build/review. These methods improve its build step without creating a parallel code writer or making planning mandatory. Existing approved scope, test seams, slices and named dependencies remain authoritative; the source's detailed code method is loaded where it is used."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-review/SKILL.md and skills/ponytail-audit/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-review"
+      ],
+      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents retains the diff default, whole-repo mapping, expected-load assumptions, concrete-case gate, full finding explanation and audit's 20-finding display default with an omitted count; all material risks and explicitly requested full findings remain visible through grouping or additional detail. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-debt/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-debt"
+      ],
+      "reason": "A requested ledger of deliberate shortcut comments is a separate read-only artifact, not the session-handoff's task arc or TokenEconomizer's costs. Preserve custom/legacy markers, ignore rules, ceilings and upgrade triggers, no-trigger tags and optional blame. Persist a ledger only when requested."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-help/SKILL.md, skills/ponytail-gain/SKILL.md and benchmarks/results/2026-10-07-agentic.md",
+      "form": "capability",
+      "targets": [
+        "engineering-guidance"
+      ],
+      "reason": "A method reference and a published benchmark explanation answer genuine user requests without changing code or mode. Preserve level meanings as task-scoped preferences, transparent mapping to Marionette's procedures and the measured scoreboard with its date/model/sample/limits. Never claim these are Marionette measurements or current-repository savings. Help explicitly says the original plugin's runtime mode toggles and optional UI infrastructure are not included."
+    },
+    {
+      "source": "ponytail",
+      "content": "Selected skills' lazy-senior persona, forced closing lines, English-only templates, original slash-skill routing, plugin self-install/update and persistent mode controls",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Persona/format claims would override host and user preferences; source activation commands would compete with Marionette classification or promise state the native package does not keep. Preserve concise evidence, disclosures and lite/full/ultra behavioral choices through task-scoped guidance. Source plugin installation is excluded by the factory contract. Changing a released permanent policy is not falsely presented as toggling an upstream mode."
+    },
+    {
+      "source": "ponytail",
+      "content": "Inspected but unselected original plugin infrastructure: lifecycle mode hooks, startup code map, status badge, native Claude band, board/import/export/webhook and other host registrations",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The curated goal is working and communication methods, not installation of Ponytail's original UI/telemetry product. These paths are explicitly outside selected_paths after inspection of their outcomes and costs: defaults write mode flags/statusline artifacts and task CSV/HTML records; optional webhooks can transmit task names; the native TSX band needs Claude-only APIs. They are not needed to deliver any selected review/audit/debt/benchmark method. No source command hook, background process, host config mutation or telemetry is emitted. Full effect inventory is preserved in intake provenance."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "skills/i-have-adhd/SKILL.md: rules 1-10, When to break the rules 1/4/5/6, Pre-send check; README.md: what it does and no-diagnosis framing",
+      "form": "always-on",
+      "targets": [],
+      "reason": "Breadth: clear, complete and actionable communication is useful across Marionette's design, Office, engineering and research sessions, including ordinary answers before a capability is selected. Timing: response framing applies from the first reply. Fit: it governs conversational presentation, not a new output producer or routing authority. Adapt the source's own task/harness exceptions into flexible guidance that honors user expertise, requested depth, uncertainty and authorized autonomy. Merge with Ponytail's complementary collaboration policy; no parallel skill. Combined cost: 1986 characters of policy, shared once rather than charged per source. Native system sections on Claude Code, Pi, OpenCode and Hermes add no per-event subprocess or model call; Codex session/subagent hooks use two local Python processes per event to supply developer context. No source hook, telemetry or user-file write is declared. Host trust and permissions remain authoritative. The selected source originals are intake-only: their methods are restated in this policy or capability bodies; only the Ponytail benchmark reference is carried for an explicit runtime read."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "SKILL.md diagnostic opening and What ADHD changes about reading; absolute every-turn action/progress/numbering, five-item/two-minute limits, compelled estimates and exact stop phrases",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Authority: the requested adaptation must respect the person and current context, not diagnose the user or impose a rigid form. The source itself says completeness, explanation requests, the task and the harness win (When to break the rules; rule 9; Pre-send check). Keep useful communication goals, omit unsupported identity/cognitive claims and fixed numeric constraints. Honor ordinary user style changes semantically; do not add a Python phrase detector. Do not invent a cause or a time estimate merely to fill a template."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "hooks/hooks.json; hooks/always-on.{mjs,sh,ps1}; .opencode/plugins/i-have-adhd.{mjs,js}; extensions/{i-have-adhd,context-compat}.ts; source mode flags, persisted state and status",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Function: these mechanisms inject the same policy or toggle its source-specific mode; none performs separate user work. Original defaults are manual/flag-gated, with saved Pi session state and opt-in CLI/config. The inspected Claude hook reads a flag and prints policy at startup/resume/clear/compact; OpenCode adds config/skill/command registrations and per-turn system text; Pi/OMP registers commands/input/session handlers, stores mode entries and displays status. They would duplicate native delivery and introduce Node/Pi dependencies and competing activation/state. The factory native policy channel supplies the synthesized guidance, so no source executable/hook is copied, registered or run."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "skills/i-have-adhd/agents/*; .cursor canonical skill duplicate; .agents/.claude-plugin/.codex-plugin manifests; .opencode/command; package/plugin/Gemini/Qwen/Kimi manifests; GEMINI.md; INSTALL.md",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The manifests, slash commands, global-instruction edits and install/uninstall recipes package or activate the original source itself. They do not add a communication outcome beyond the canonical skill. Dropping competing routing and source installation follows the intake contract. Add i-have-adhd to plugin.replaces; Marionette's generated adapters own discovery and native policy. Cursor's SKILL.md has the exact canonical blob SHA. No separate review-response capability is inferred from the Codex default prompt."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "scripts/*; evals/*; tests/*; .github/workflows/*; AGENTS.md/CONTRIBUTING.md; translated docs and branding",
+      "form": "dropped",
+      "targets": [],
+      "reason": "These are source development, QA, CI, installation translations and branding, not end-user skill procedures. Static audit inspected all runtime/developer helper files and eval protocol/rubric/results/cases, with uninspected test bodies and translations explicitly recorded. Eval runners call paid host CLIs and write JSONL; Pi smoke script installs the source into a temporary configuration; CI may install tools/run models. None is executed or adopted. The reported upstream candidate gate failure is a caution to preserve uncertainty, not evidence this adaptation passed behavioral testing."
+    }
+  ],
+  "always_on": "Complete the requested work, including its affected scope and required deliverables. Use context and settled decisions; ask only for missing information that blocks a sound result, and continue independent authorized work. Carry out actions within your tools and authority instead of merely telling the user how.\n\nKeep conversation direct and easy to scan. Lead with the result or useful action; use short paragraphs or numbered steps when helpful. Group long lists without dropping items. Match the user's language, style, expertise and requested depth. Explain complex steps with a concrete example or diagram when useful. Avoid filler, repetition, tangents and imposed status templates. Track the goal, decisions, progress and open work; give one small next action only when work remains for the user. Describe observed errors neutrally with a recovery step; do not invent causes. Estimate effort only when useful, with concrete units and stated assumptions. Do not infer a diagnosis or personal traits.\n\nBrevity never reduces scope, artifact completeness, design fidelity, required engines, evidence, accessibility, security, hardware calibration, validation, checks or honest disclosures. Preserve each task's required format and approval gates; reuse approval already given. Preserve uncertainty; distinguish verified results from assumptions and untested work.\n\nFor code changes, inspect the affected path: callers, tests, fixtures, configuration and exports. Fix the shared cause with the smallest readable change; retain existing conventions and safeguards. Prefer suitable project components, then platform features, then installed dependencies; preserve required engines and behavior. Avoid speculative features and unnecessary wrappers or abstractions. Test meaningful changed behavior and report what was checked. Mark a deliberate shortcut as `shortcut: <limit>, <upgrade trigger>` when relevant; do not invent debt. Never claim unmeasured savings or fabricate benchmarks.",
+  "hooks": []
+}

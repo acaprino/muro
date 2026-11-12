@@ -126,6 +126,16 @@ def _safe_pattern(pattern: Any) -> bool:
     return all(part not in (".", "..", "") for part in pattern.split("/")) and not re.match(r"^[A-Za-z]:", pattern)
 
 
+def _intake_only_patterns(src: dict[str, Any]) -> list[str]:
+    """Selected files the intake AI declared as evidence only: read at intake, never packaged."""
+    patterns = src.get("intake_only_paths", [])
+    if not isinstance(patterns, list):
+        raise ValueError("intake_only_paths must be a list")
+    if not all(_safe_pattern(pattern) for pattern in patterns):
+        raise ValueError("unsafe source path or pattern")
+    return patterns
+
+
 def _blob(repo: Path, commit: str, path: str) -> bytes:
     return _git(repo, "show", f"{commit}:{path}")
 
@@ -204,6 +214,8 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
         raise ValueError("selected_paths must be a nonempty list; excluded_paths must be a list")
     if not all(_safe_pattern(p) for p in selected + excluded):
         raise ValueError("unsafe source path or pattern")
+    intake_only = _intake_only_patterns(src)
+    selected_names: set[str] = set()
     # The license is the root LICENSE unless the source declares the file that
     # licenses its own folder; that file then covers only what lies under it.
     license_path = src.get("license_path", "LICENSE")
@@ -232,6 +244,7 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
             matches = [name for name in entries if _matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/")]
             if not matches:
                 raise ValueError(f"selected path/glob matched no files: {pattern}")
+            selected_names.update(matches)
             for name in matches:
                 if entries[name] not in ("100644", "100755"):
                     raise ValueError(f"selected path is not a regular file: {name}")
@@ -254,6 +267,9 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
                 headers = re.findall(r"SPDX-License-Identifier:\s*([^\r\n*<>]+)", content, re.I)
                 if any(header.strip() != src["license"] for header in headers):
                     raise ValueError(f"selected path has a conflicting SPDX license: {name}")
+        for pattern in intake_only:
+            if not any(_matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/") for name in selected_names):
+                raise ValueError(f"intake_only_paths matched no selected file: {pattern}")
         # The NOTICE that travels with a license is the one beside it.
         notice_path = "NOTICE" if rooted else str(scope / "NOTICE")
         notice = _blob(repo, commit, notice_path) if notice_path in entries else None
@@ -280,6 +296,7 @@ def _validate_source_shape(src: dict[str, Any]) -> None:
         raise ValueError("selected_paths must be a nonempty list; excluded_paths must be a list")
     if not all(_safe_pattern(p) for p in selected + excluded):
         raise ValueError("unsafe source path or pattern")
+    _intake_only_patterns(src)
     license_path = src.get("license_path", "LICENSE")
     if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
         raise ValueError("license_path must be a plain repository-relative file path")

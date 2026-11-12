@@ -26,8 +26,13 @@ def selection_step_id(selection: dict[str, Any]) -> str:
 
 
 def validate_stack(tokens: set[str], conflict_groups: list[list[str]] | None = None) -> None:
-    if any(not isinstance(token, str) or not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token) for token in tokens):
-        raise ValueError("Only stack:* constraint tokens are accepted; intents must come from AI classification")
+    bad = [token for token in tokens
+           if not isinstance(token, str) or not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token)]
+    if bad:
+        example = next((f"stack:{t}" for t in bad if isinstance(t, str) and re.fullmatch(r"[a-z0-9]+(?:[.-][a-z0-9]+)*", t)),
+                       "stack:css-only")
+        raise ValueError(f"--stack takes stack:* constraint tokens such as {example}; got "
+                         + ", ".join(repr(t) for t in bad) + ". Intents come from the AI classification, not --stack.")
     groups = [set(g) for g in conflict_groups] if conflict_groups is not None else _DEFAULT_STACK_CONFLICTS
     for group in groups:
         if len(group) >= 2 and group.issubset(tokens):
@@ -46,9 +51,13 @@ def catalog_entries(rows: list[RouterRow], capabilities: dict[str, Capability]) 
              "resumable": capabilities[row.id].resumable} for row in rows]
 
 
-def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str) -> str:
+def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str,
+                   delivery: dict | None = None) -> str:
     payload = {"catalog": catalog, "bodies": {key: cap.body for key, cap in sorted(capabilities.items())},
                "checks": {key: cap.checks for key, cap in sorted(capabilities.items())}, "prompt": prompt}
+    # Absent delivery preserves existing catalog bindings; declared policy and hooks belong to the release contract.
+    if delivery is not None:
+        payload["delivery"] = delivery
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 

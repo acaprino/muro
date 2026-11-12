@@ -1,0 +1,7 @@
+timestamp=2026-11-12T11:30:12.443Z level=INFO run=67959d6a message="cli starting" version=2.2.5 channel=latest local=false args="[\"--help\"]" role=cli
+timestamp=2026-11-12T11:31:50.564Z level=INFO run=8ad34622 message="cli starting" version=2.2.5 channel=latest local=false args="[\"plugin\",\"list\",\"--standalone\"]" role=cli
+timestamp=2026-11-12T11:31:50.592Z level=INFO run=8ad34622 message="spawning process" command="C:\\Users\\alfio\\AppData\\Roaming\\npm\\node_modules\\@opencode\\cli\\bin\\opencode.exe" args="[\"serve\",\"--stdio\",\"--port\",\"0\"]" cwd="D:\\workspace\\muro-opencode-offline-probe\\project" role=cli
+timestamp=2026-11-12T11:31:51.389Z level=INFO run=79f45c27 message="cli starting" version=2.2.5 channel=latest local=false args="[\"serve\",\"--stdio\",\"--port\",\"0\"]" role=cli
+timestamp=2026-11-12T11:31:52.336Z level=INFO run=79f45c27 message="database schema bootstrap started" migrations=59 role=server
+timestamp=2026-11-12T11:31:52.379Z level=INFO run=79f45c27 message="database schema bootstrap completed" migrations=59 durationMs=43 role=server
+timestamp=2026-11-12T11:31:52.513Z level=ERROR run=8ad34622 message="cli process failed" cause="Cause([Die(ClientError: Transport: EACCES: Unable to connect. Is the computer able to access the url? (cause: TypeError: EACCES: Unable to connect. Is the computer able to access the url?))])" args="[\"plugin\",\"list\",\"--standalone\"]" role=cli

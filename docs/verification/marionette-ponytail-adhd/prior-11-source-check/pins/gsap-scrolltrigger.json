@@ -1,0 +1,92 @@
+{
+  "url": "https://api.github.com/repos/greensock/gsap-skills/commits/HEAD",
+  "response": {
+    "sha": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+    "node_id": "C_kwDORec43doAKGFlZDljZmQzMjc3NzQwNzU1ZjZiZmMxMTU1YzdhYTY0NTQwM2I3NjA",
+    "commit": {
+      "author": {
+        "name": "jackdoyle",
+        "email": "jack@greensock.com",
+        "date": "2026-04-21T23:47:02Z"
+      },
+      "committer": {
+        "name": "jackdoyle",
+        "email": "jack@greensock.com",
+        "date": "2026-04-21T23:47:02Z"
+      },
+      "message": "Added Google Antigravity Support",
+      "tree": {
+        "sha": "445734a57cd547b25fbf81ba635468ab450048f4",
+        "url": "https://api.github.com/repos/greensock/gsap-skills/git/trees/445734a57cd547b25fbf81ba635468ab450048f4"
+      },
+      "url": "https://api.github.com/repos/greensock/gsap-skills/git/commits/aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\niQIzBAABCAAdFiEEPT9FMrfnz/aMa8oI709IPqBFNwwFAmnoDHYACgkQ709IPqBF\nNwyECw//ZvMxEyhteKpstnsbTJO4lggWPn1+JmkmVZJyoHTFxEjsq8T9TCbKycqw\n8641gpkE7WvTvfCdwa9/aW6q2wMYI1OpcfqXX/S1ko0bw7OuJpYNpy1xjFIBn32h\nmVIApcfQ3FwbwwDVYbqrgmg2dieVWmHkjtd1FjCpz5gZxS669ULXAJoIhOhuvHC2\ngX01O13KMyufwv0GcVXIRYhxepSxJaRCmpVCSK2N/CsNHg9prBrQ7wvORDUa8iKi\nLhDBgYGBUA9Dd2WNhkc9KKaJ479TLLXbwcvktot2jyg6JNGXuvI/92R54A15u/te\nQ4MKxCdH2h0R7tdIynVCyKqkL55Uwk4UaIWTiwIhAZam8wUm7dUQsHYAH7iUWdmm\nMzMM0YEVSpzQHLqMLxVnXeIzxb0UfQ8Tc9mYCZ+xBGXh/HRRXlkXv4ToRCdftSZo\nMywMRuHfEhPzNbX2/5GVPOLdakG0fYKLsk4uFd56zB1zFfi3GLWU5tLr3wj+WF+U\nIDaXBtWe7FmqS710KKIGruX7Xw/I1IZlDPr6UT1qOBIx73efqYG8Xld9di6LwMZN\nmY55Uwvhxph5MHbOvq8JYW2Z3dngn5xEl5xjzPGWL7a7dAAitesVHfjloa4/mdEz\nGK2Ma8Ui4YTued3MLxXZ9S69B3+0pWmP/pb7O1ChtdclWfqQqkw=\n=/Q5i\n-----END PGP SIGNATURE-----",
+        "payload": "tree 445734a57cd547b25fbf81ba635468ab450048f4\nparent a9d6270b6a09827c74ac2d7bfe2a55adaf5fd597\nauthor jackdoyle <jack@greensock.com> 1776815222 -0500\ncommitter jackdoyle <jack@greensock.com> 1776815222 -0500\n\nAdded Google Antigravity Support\n",
+        "verified_at": "2026-04-21T23:47:11Z"
+      }
+    },
+    "url": "https://api.github.com/repos/greensock/gsap-skills/commits/aed9cfd3277740755f6bfc1155c7aa645403b760",
+    "html_url": "https://github.com/greensock/gsap-skills/commit/aed9cfd3277740755f6bfc1155c7aa645403b760",
+    "comments_url": "https://api.github.com/repos/greensock/gsap-skills/commits/aed9cfd3277740755f6bfc1155c7aa645403b760/comments",
+    "author": {
+      "login": "jackdoyle",
+      "id": 2389714,
+      "node_id": "MDQ6VXNlcjIzODk3MTQ=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2389714?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/jackdoyle",
+      "html_url": "https://github.com/jackdoyle",
+      "followers_url": "https://api.github.com/users/jackdoyle/followers",
+      "following_url": "https://api.github.com/users/jackdoyle/following{/other_user}",
+      "gists_url": "https://api.github.com/users/jackdoyle/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/jackdoyle/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/jackdoyle/subscriptions",
+      "organizations_url": "https://api.github.com/users/jackdoyle/orgs",
+      "repos_url": "https://api.github.com/users/jackdoyle/repos",
+      "events_url": "https://api.github.com/users/jackdoyle/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/jackdoyle/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "jackdoyle",
+      "id": 2389714,
+      "node_id": "MDQ6VXNlcjIzODk3MTQ=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/2389714?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/jackdoyle",
+      "html_url": "https://github.com/jackdoyle",
+      "followers_url": "https://api.github.com/users/jackdoyle/followers",
+      "following_url": "https://api.github.com/users/jackdoyle/following{/other_user}",
+      "gists_url": "https://api.github.com/users/jackdoyle/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/jackdoyle/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/jackdoyle/subscriptions",
+      "organizations_url": "https://api.github.com/users/jackdoyle/orgs",
+      "repos_url": "https://api.github.com/users/jackdoyle/repos",
+      "events_url": "https://api.github.com/users/jackdoyle/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/jackdoyle/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "a9d6270b6a09827c74ac2d7bfe2a55adaf5fd597",
+        "url": "https://api.github.com/repos/greensock/gsap-skills/commits/a9d6270b6a09827c74ac2d7bfe2a55adaf5fd597",
+        "html_url": "https://github.com/greensock/gsap-skills/commit/a9d6270b6a09827c74ac2d7bfe2a55adaf5fd597"
+      }
+    ],
+    "stats": {
+      "total": 11,
+      "additions": 10,
+      "deletions": 1
+    }
+  },
+  "omitted_commit_file_patch_count": 2,
+  "archive_note": "Commit file patch payloads omitted; release/ref/commit verification metadata retained."
+}

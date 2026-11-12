@@ -114,7 +114,7 @@ def test_landing_strategy_runs_before_motion_when_both_are_selected(package, tmp
     assert "offer" in step["required_outputs"]
     assert "page_outline" in step["required_outputs"]
     assert "the one main action" in step["instructions"]
-    assert "proof directly beside each claim" in step["instructions"]
+    assert "Put proof directly beside the claim it supports" in step["instructions"]
 
 
 def test_scroll_request_with_stated_behavior_needs_no_motion_or_design_step(package, tmp_path):

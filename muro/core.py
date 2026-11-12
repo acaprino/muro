@@ -202,10 +202,10 @@ def validate_operations(tools: Any, hooks: Any) -> list[str]:
     for hook in hooks:
         if (not isinstance(hook, dict) or set(hook) != {"event", "action", "tools", "policy"}
                 or any(not isinstance(hook[k], str) or not hook[k].strip() for k in ("event", "action", "policy"))
-                or hook["policy"] not in {"manual", "host-approved"}
+                or hook["policy"] not in {"manual", "host-approved", "active"}
                 or not isinstance(hook["tools"], list)
                 or any(not isinstance(name, str) or name not in names for name in hook["tools"])):
-            errors.append("each hook requires event, action, declared tools and policy manual|host-approved")
+            errors.append("each hook requires event, action, declared tools and policy manual|host-approved|active")
     return errors
 
 
@@ -340,8 +340,10 @@ def parse_capability(path: Path) -> Capability:
 # ----------------------------------------------------------------------
 def parse_router(path: Path) -> list[RouterRow]:
     raw_lines = path.read_text(encoding="utf-8").splitlines()
-    if len(raw_lines) > 80:
-        raise ValueError(f"{path}: router exceeds 80 lines")
+    # The cap keeps the router's text short. Catalog rows are one per capability and grow with
+    # every absorbed source, so they do not count (ADR-0015).
+    if sum(1 for line in raw_lines if not line.lstrip().startswith("|")) > 80:
+        raise ValueError(f"{path}: router exceeds 80 lines of text (catalog rows are not counted)")
     # Harmonizer merge audits are documentation, never router rows.
     lines = []
     in_comment = False
@@ -376,13 +378,18 @@ def parse_router(path: Path) -> list[RouterRow]:
     return rows
 
 
+_PACKAGED_SKILL_MD = re.compile(r"<(?:package_root|[A-Z]{2})>[^\s`'\")]*SKILL\.md")
+
+
 def validate_capabilities_and_router(
     capabilities: list[Capability],
     router_rows: list[RouterRow],
     registered_sources: set[str] | None = None,
     plugin_slug: str | None = None,
+    *,
+    allow_empty: bool = False,
 ) -> list[str]:
-    """Validate capabilities and router rows; return list of errors."""
+    """Validate capabilities and router rows; allow empty only after validating declared session delivery."""
     errors: list[str] = []
     if isinstance(capabilities, Path) and isinstance(router_rows, Path):
         try:
@@ -391,9 +398,9 @@ def validate_capabilities_and_router(
         except (OSError, ValueError) as exc:
             return [str(exc)]
 
-    if not capabilities:
+    if not capabilities and not allow_empty:
         errors.append("no capabilities provided")
-    if not router_rows:
+    if not router_rows and not allow_empty:
         errors.append("no router rows provided")
 
     # 1-to-1 correspondence
@@ -416,6 +423,11 @@ def validate_capabilities_and_router(
             unknown = sorted(sources - registered_sources)
             if unknown:
                 errors.append(f"Capability {cap.id}: unregistered source(s): {', '.join(unknown)}")
+    for cap in capabilities:
+        packaged = _PACKAGED_SKILL_MD.search(cap.body)
+        if packaged:
+            errors.append(f"Capability {cap.id}: {packaged.group(0)} is a packaged helper; packaged source skills are "
+                          "stored as SKILL.source.md, so refer to that name")
     if plugin_slug is not None and plugin_slug != "muro":
         for cap in capabilities:
             if ".muro/" in cap.body:

@@ -1,0 +1,92 @@
+{
+  "url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/commits/HEAD",
+  "response": {
+    "sha": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+    "node_id": "C_kwDOSN80U9oAKDNjM2RkYjA3ZDdhYTNmZWYwNTFkODM2MDg1OTY0NzBjOTVjZmQ4ZmU",
+    "commit": {
+      "author": {
+        "name": "Trystan SARRADE",
+        "email": "trystansarrade@gmail.com",
+        "date": "2026-07-06T15:45:18Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-07-06T15:45:18Z"
+      },
+      "message": "Condense all 28 skills to reduce context usage (~30%) (#3)\n\nCut boilerplate without losing operational content: known enumerations\n(atomic-design taxonomy, 80-line tokens.css example), verbose Summarize\nphases, repeated identify-the-surface preambles, and redundant\njustifications.\n\nPreserved intact: WCAG thresholds and concrete values, coverage-first\nreview instructions (claude/), the warm-editorial house-style guard,\nmake-tweakable's host protocol, tool references, and all skill triggers.\nThe claude/codex divergences are kept; the four shared files remain\nbyte-identical across variants.\n\nAlso fixes two stale \"Wait for all four agents\" phrasings in codex\npolish-pass and hierarchy-rhythm-review, which contradicted that\nvariant's sequential-pass framing.",
+      "tree": {
+        "sha": "6b8329dcc4b24c505ce50775ca693dc7828eebfd",
+        "url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/git/trees/6b8329dcc4b24c505ce50775ca693dc7828eebfd"
+      },
+      "url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/git/commits/3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJqS82OCRC1aQ7uu5UhlAAAM60QAJt+xtbC+ZELlAVYkimF/dLE\nLi8JUFAvKm0T3nCsu/YNEW9WkH4ygOqsMlX5Ke5NS8+u+derEoMk3JaxHAiNMEXO\nySc4Pvs2Lq6YWx58vfiNpbrrqa+7ouit4xo9gBmbPe+Q7quZJ74BGI4ZEn3U3Hd+\nLvyvCxNbn+vJDMd+cbHbdouF9DMa6JM2ZXSHUGWdyuoLD17Cd2B9bQtbl5Rpw3WK\nQgXAiJU8CzLyugdfhXSgxxCTDGNLOcwwS9SaU+o7J5oNVu/hJBqITtuX3nQDXc7N\nynSucYpYOell0wavS9jmp3rYs3mdK2n0hgz1rBIHCMmGPIpBmNNo33YgnkEsTTZJ\nqk4gXtsmS7ZdMEATFD+Fy/MSNHmheb1MaUbI7VS8sF4bl0oUxG4NabfOmbK2fmJH\nKG2UdsYn/xwcbnqlHeR52Tdhd3nSEbdzye0ENMLAh4vZGWX6gp7LABzZql8AdWpQ\nEnLvOyWVb8yvOJy098FJuO1BSgVC5at6wakQSvpwfXmaZJb62aUIisSocCirAKJx\nQvHyQDyQLUzoOeZ4AOnqrAn9/AhGpRPZ6HZoiTlhS6SHaC7JHTZXKNq0lRtv7sDe\ngwM9c4/Ck4hHuq7ziATbrPvdTA4k3xqcs1sbh2Xd2gVnrecfuu5ILwvwH3CvQDUb\nJfkSiXL8a76pTVION7Ld\n=Ms6h\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 6b8329dcc4b24c505ce50775ca693dc7828eebfd\nparent f00a5108f4a7c7a8b05027ea6e631a1f6c8a1ea4\nauthor Trystan SARRADE <trystansarrade@gmail.com> 1783352718 +0200\ncommitter GitHub <noreply@github.com> 1783352718 +0200\n\nCondense all 28 skills to reduce context usage (~30%) (#3)\n\nCut boilerplate without losing operational content: known enumerations\n(atomic-design taxonomy, 80-line tokens.css example), verbose Summarize\nphases, repeated identify-the-surface preambles, and redundant\njustifications.\n\nPreserved intact: WCAG thresholds and concrete values, coverage-first\nreview instructions (claude/), the warm-editorial house-style guard,\nmake-tweakable's host protocol, tool references, and all skill triggers.\nThe claude/codex divergences are kept; the four shared files remain\nbyte-identical across variants.\n\nAlso fixes two stale \"Wait for all four agents\" phrasings in codex\npolish-pass and hierarchy-rhythm-review, which contradicted that\nvariant's sequential-pass framing.",
+        "verified_at": "2026-07-06T15:45:19Z"
+      }
+    },
+    "url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/commits/3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+    "html_url": "https://github.com/Trystan-SA/claude-design-system-prompt/commit/3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+    "comments_url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/commits/3c3ddb07d7aa3fef051d83608596470c95cfd8fe/comments",
+    "author": {
+      "login": "Trystan-SA",
+      "id": 43876044,
+      "node_id": "MDQ6VXNlcjQzODc2MDQ0",
+      "avatar_url": "https://avatars.githubusercontent.com/u/43876044?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Trystan-SA",
+      "html_url": "https://github.com/Trystan-SA",
+      "followers_url": "https://api.github.com/users/Trystan-SA/followers",
+      "following_url": "https://api.github.com/users/Trystan-SA/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Trystan-SA/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/Trystan-SA/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Trystan-SA/subscriptions",
+      "organizations_url": "https://api.github.com/users/Trystan-SA/orgs",
+      "repos_url": "https://api.github.com/users/Trystan-SA/repos",
+      "events_url": "https://api.github.com/users/Trystan-SA/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/Trystan-SA/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "f00a5108f4a7c7a8b05027ea6e631a1f6c8a1ea4",
+        "url": "https://api.github.com/repos/Trystan-SA/claude-design-system-prompt/commits/f00a5108f4a7c7a8b05027ea6e631a1f6c8a1ea4",
+        "html_url": "https://github.com/Trystan-SA/claude-design-system-prompt/commit/f00a5108f4a7c7a8b05027ea6e631a1f6c8a1ea4"
+      }
+    ],
+    "stats": {
+      "total": 2948,
+      "additions": 615,
+      "deletions": 2333
+    }
+  },
+  "omitted_commit_file_patch_count": 28,
+  "archive_note": "Commit file patch payloads omitted; release/ref/commit verification metadata retained."
+}

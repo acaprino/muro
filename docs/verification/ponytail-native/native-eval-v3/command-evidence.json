@@ -1,0 +1,57 @@
+[
+  {
+    "timestamp_utc": "2026-11-12T11:32:22.247503+00:00",
+    "cwd": "D:\\Projects\\Muro",
+    "command": [
+      "python",
+      "muro_build.py",
+      "--manifest",
+      "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+      "--validate"
+    ],
+    "exit_code": 0,
+    "stdout": "OK: capabilities and ROUTER.md valid\n",
+    "stderr": ""
+  },
+  {
+    "timestamp_utc": "2026-11-12T11:32:23.071542+00:00",
+    "cwd": "D:\\Projects\\Muro",
+    "command": [
+      "python",
+      "muro_build.py",
+      "--manifest",
+      "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+      "--check-sources"
+    ],
+    "exit_code": 0,
+    "stdout": "OK: all sources and plugin identity valid\n",
+    "stderr": ""
+  },
+  {
+    "timestamp_utc": "2026-11-12T11:32:23.523888+00:00",
+    "cwd": "D:\\Projects\\Muro",
+    "command": [
+      "python",
+      "-c",
+      "from pathlib import Path; from muro.evals import prepare_eval; print(prepare_eval(Path(r'D:\\workspace\\muro-ponytail-probe\\native-package'), Path(r'D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\contexts')))"
+    ],
+    "exit_code": 0,
+    "stdout": "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\contexts\n",
+    "stderr": ""
+  },
+  {
+    "timestamp_utc": "2026-11-12T11:32:47.903987+00:00",
+    "cwd": "D:\\Projects\\Muro",
+    "command": [
+      "python",
+      "muro_build.py",
+      "--manifest",
+      "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+      "--score-eval",
+      "D:\\workspace\\muro-ponytail-probe\\native-eval-v3\\decisions.json"
+    ],
+    "exit_code": 0,
+    "stdout": "{\n  \"total\": 4,\n  \"passed\": 4,\n  \"catalog_digest\": \"36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4\",\n  \"failures\": []\n}\n",
+    "stderr": ""
+  }
+]

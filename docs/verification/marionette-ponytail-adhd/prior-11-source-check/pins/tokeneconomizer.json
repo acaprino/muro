@@ -1,0 +1,37 @@
+{
+  "url": "https://api.github.com/repos/microsoft/TokenEconomizer/git/ref/tags/v0.1.0",
+  "response": {
+    "ref": "refs/tags/v0.1.0",
+    "node_id": "REF_kwDOVG0zYLByZWZzL3RhZ3MvdjAuMS4w",
+    "url": "https://api.github.com/repos/microsoft/TokenEconomizer/git/refs/tags/v0.1.0",
+    "object": {
+      "sha": "3f0e063c07f63a742fe5a7e2efcaf3220c7b53e7",
+      "type": "tag",
+      "url": "https://api.github.com/repos/microsoft/TokenEconomizer/git/tags/3f0e063c07f63a742fe5a7e2efcaf3220c7b53e7"
+    }
+  },
+  "tag": {
+    "node_id": "TA_kwDOVG0zYNoAKDNmMGUwNjNjMDdmNjNhNzQyZmU1YTdlMmVmY2FmMzIyMGM3YjUzZTc",
+    "sha": "3f0e063c07f63a742fe5a7e2efcaf3220c7b53e7",
+    "url": "https://api.github.com/repos/microsoft/TokenEconomizer/git/tags/3f0e063c07f63a742fe5a7e2efcaf3220c7b53e7",
+    "tagger": {
+      "name": "Aaron",
+      "email": "aaronjli@berkeley.edu",
+      "date": "2026-10-26T16:58:29Z"
+    },
+    "object": {
+      "sha": "ec8ff5ec7ed5924520ee71b705a920ee64fe2918",
+      "type": "commit",
+      "url": "https://api.github.com/repos/microsoft/TokenEconomizer/git/commits/ec8ff5ec7ed5924520ee71b705a920ee64fe2918"
+    },
+    "tag": "v0.1.0",
+    "message": "TokenEconomizer 0.1.0\n",
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  }
+}
