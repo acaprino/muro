@@ -145,6 +145,23 @@ a limit that stops the next intake is a second lever on scope.
   more `plan --compact` call when the task needs a capability outside the focus.
   Classification is still validated against the whole catalog and its digest.
 
+## Amendment after the first run on every host (2026-11-12)
+
+Codex, OpenCode and Pi ran Marionette live for the first time
+([record](../verification/2026-11-12-all-hosts-live.md)). Two findings changed
+the build and the runtime, both under principle 4 (fit the host):
+
+- **No live copies of absorbed originals.** Codex registers every `SKILL.md`
+  under a skills folder, at any depth, so the source skills packaged as helpers
+  became 19 competing skills, and one run read an original instead of the
+  coordinator. Packaged source skills are now `SKILL.source.md`; capability
+  bodies use that name and validation enforces it.
+- **A step states its scope and its submission.** Pi confirmed a two-step map,
+  did both steps and never submitted. Each mapped step now returns `scope`,
+  `remaining_steps` and the exact `submit` arguments, and `checks` returns
+  `submit_check` and `submit_complete`. In the next run every host, Pi included,
+  closed the map. Cost: a few hundred characters per step result.
+
 ## Enforceable Invariants
 
 - **INV-000**: every capability in a package's catalog is reachable through a
@@ -163,6 +180,10 @@ a limit that stops the next intake is a second lever on scope.
 - **INV-007**: a focused or brief catalog lists every capability of the package;
   a focused entry equals its full compact entry; an unknown focus id fails.
 - **INV-008**: the router cap counts text lines only, never catalog rows.
+- **INV-009**: no file named `SKILL.md` exists below a host skill folder of a
+  release except each skill's own.
+- **INV-010**: a mapped step result names its remaining steps and the exact
+  arguments that submit it.
 
 ## Open questions for the owner
 

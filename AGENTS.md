@@ -140,7 +140,12 @@ mutations must hold the writer lock for the full read/modify/write operation.
 Evidence is bound to its map and step: `record`/`check` require the `map_id` and
 capability returned with the step, and reject anything else unchanged. Capability
 bodies hand outputs over in `## Output handoff`, never by writing the map, and
-reference helpers as `<package_root>/scripts/<source-id>/...`.
+reference helpers as `<package_root>/scripts/<source-id>/...`. A packaged source
+`SKILL.md` is stored as `SKILL.source.md`, so no host registers an absorbed
+original as a skill; validation rejects a body that names the old file. A mapped
+step's result carries `scope`, `remaining_steps` and the exact `submit`
+arguments; `checks` carries `submit_check` and `submit_complete` (live runs,
+2026-11-12).
 
 Without an AI decision, `plan` returns classification-required and executes nothing.
 The host creates the JSON and submits --classification; users need not know skill

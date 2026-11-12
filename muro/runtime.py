@@ -356,7 +356,15 @@ class Coordinator:
         if not plan:
             return self._checks_result(state)
         merged_outputs = {**self._direct_outputs(), **state["outputs"]}
-        return self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs)
+        result = self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs)
+        remaining = list(plan[1:])
+        result["remaining_steps"] = remaining
+        later = ", ".join(remaining) if remaining else "none"
+        result["scope"] = (f"This step is {plan[0]} only. Later steps: {later}. Do not start their work now: submit this "
+                           "step first; the result is the next step.")
+        result["submit"] = (f'step --project "{self.project_root}" --map-id {state["map_id"]} --capability {plan[0]} '
+                            f'--step-data "{self.state_dir / "step.json"}"')
+        return result
 
     def _instruction(
         self,
@@ -421,6 +429,9 @@ class Coordinator:
             "output_attestation": self._output_attestation(state),
             "checks": list(dict.fromkeys(check for checks in owners.values() for check in checks)),
             "checks_by_capability": owners,
+            "submit_check": (f'check --project "{self.project_root}" --map-id {state["map_id"]} --capability <owner> '
+                             f'--result "{self.state_dir / "checks.json"}"'),
+            "submit_complete": f'complete --project "{self.project_root}" --map-id {state["map_id"]}',
         }
 
     def _all_checks_passing_or_not_tested(self, state: dict[str, Any]) -> tuple[list[str], list[str]]:

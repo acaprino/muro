@@ -121,7 +121,8 @@ def test_every_helper_path_named_by_a_capability_is_a_selected_path():
             if any(marker in match for marker in runtime_installed) and not match.endswith("vendor/README.md"):
                 continue
             found += 1
-            assert selected(f"skills/{match}"), (name, match)
+            upstream = match[: -len("SKILL.source.md")] + "SKILL.md" if match.endswith("SKILL.source.md") else match
+            assert selected(f"skills/{upstream}"), (name, match)
     assert found >= 12
 
 

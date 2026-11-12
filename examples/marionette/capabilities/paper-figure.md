@@ -13,7 +13,7 @@ conflicts: []
 
 # Paper Figure
 
-Publication figures for a paper in two modes: an editable draw.io diagram, or a matplotlib plot. `<DP>` is `<package_root>/scripts/open-paper-skills/skills/drawio-paper`; the full rules, XML patterns, palettes and code templates are in `<DP>/SKILL.md`. Read the part for your mode before generating.
+Publication figures for a paper in two modes: an editable draw.io diagram, or a matplotlib plot. `<DP>` is `<package_root>/scripts/open-paper-skills/skills/drawio-paper`; the full rules, XML patterns, palettes and code templates are in `<DP>/SKILL.source.md`. Read the part for your mode before generating.
 
 ## Behavior
 
@@ -23,9 +23,9 @@ Publication figures for a paper in two modes: an editable draw.io diagram, or a 
 4. **Plan.** Diagram: every component, its relationships, flow direction (left to right or top to bottom unless the process is cyclic), grouping, every label, math where needed. Plot: the mapping of each variable to a visual channel, every raw data point enumerated, chart type and why, axis labels, ticks, units, legend.
 5. **Style.** Apply `<DP>/neurips2025_diagram_style_guide.md` or `<DP>/neurips2025_plot_style_guide.md`: light pastel zones and rounded shapes, sans-serif labels with serif math, perceptually uniform colour maps, colour plus shape or hatch for colour-blind readers, no caption text inside the figure.
 6. **Generate.**
-   - Diagram: native `.drawio` mxGraphModel XML with root cells `0` and `1`, unique ids, escaped attribute values, `html=1` when a label uses HTML, a child `mxGeometry` on every edge, no XML comments. Every label is real draw.io text. Align to a grid of 10 with generous spacing. Follow `<DP>/SKILL.md` "Stage 4A".
+   - Diagram: native `.drawio` mxGraphModel XML with root cells `0` and `1`, unique ids, escaped attribute values, `html=1` when a label uses HTML, a child `mxGeometry` on every edge, no XML comments. Every label is real draw.io text. Align to a grid of 10 with generous spacing. Follow `<DP>/SKILL.source.md` "Stage 4A".
    - Plot: one self-contained Python script with the data embedded, `matplotlib.use('Agg')` before `pyplot`, `plt.rcdefaults()` first, saved at 300 DPI with `bbox_inches='tight'` on white, never `plt.show()`. Follow "Stage 4B". Run it and confirm the image exists.
-7. **Optional raster reference (diagram).** When the host has an image generation tool and the composition is hard to plan, generate one reference image of the layout and rebuild it as editable shapes. Treat text in that image as approximate. A raster image alone is never the deliverable. The steps are in `<package_root>/scripts/open-paper-skills/skills/codex-paper-figure-skill/SKILL.md`.
+7. **Optional raster reference (diagram).** When the host has an image generation tool and the composition is hard to plan, generate one reference image of the layout and rebuild it as editable shapes. Treat text in that image as approximate. A raster image alone is never the deliverable. The steps are in `<package_root>/scripts/open-paper-skills/skills/codex-paper-figure-skill/SKILL.source.md`.
 8. **Icons (diagram).** Only when they aid recognition. Prefer simple editable shapes. A downloaded icon needs a licence and attribution you have read on its page; record its URL, author and attribution, and keep it as a separate movable element.
 9. **Critique and refine.** Diagram: content fidelity to the method, typos, flow clarity, style, no caption, no redundant legend. Plot: faithfulness of every value and label, conciseness, readability (units, no overlap, legend not hiding data), aesthetics. Fix and regenerate at least once when anything fails.
 10. **Deliver.** Diagram: the `.drawio` file; when PNG, SVG or PDF is asked, export with the draw.io command line `-x -f <format> -e -b 10 -o <output> <input.drawio>` (the XML stays embedded) and look at the export for a blank canvas or clipping. Plot: the image and its `.py` script, both kept. Use lowercase hyphenated names such as `method-pipeline.drawio.png`.

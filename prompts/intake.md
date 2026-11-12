@@ -154,7 +154,10 @@ but must state that the host does not edit `<state_dir>/map.md` or
 Reference an approved helper as `<package_root>/scripts/<source-id>/<path>`,
 where `<path>` is its selected path without the leading `skills/<source-id>/` or
 `src/<source-id>/` prefix. The runtime returns the real `package_root` with each
-step; a helper path must never resolve against the consumer project.
+step; a helper path must never resolve against the consumer project. A selected
+file named `SKILL.md` is packaged as `SKILL.source.md` (hosts such as Codex would
+otherwise register it as a live skill beside the coordinator): refer to it by that
+name in the body. `## Sources` lines keep the upstream file names.
 
 ## Extraction rules
 

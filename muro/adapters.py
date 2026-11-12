@@ -137,7 +137,8 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    against this host's actual integrations and permissions; never auto-register hooks.
    Write the decision, copying context.task, context.stack_tokens and
    context.catalog_digest exactly, to `<current project>/{state}/classification.json`
-   (the returned `classification_path`), then run, with the same stack options:
+   (the returned `classification_path`), then run, with the same stack options
+   (a stack token is passed whole, prefix included: `--stack stack:css-only`):
    `python {launcher} plan --task "<same task>" --project "<current project>" --classification "<current project>/{state}/classification.json"`.
    A `no_match` or `needs_clarification` result stops execution; explain or ask its
    questions. Never silently substitute a coordinator or another variant.
@@ -163,14 +164,18 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    `fork_turns: "none"`, OpenCode `subagent`, Hermes `delegate_task`) only when it
    asks the user nothing; a step that asks for approval or missing material runs in
    the main session. Pi executes every step sequentially in the main session.
-5. For a mapped step, write `{{"outputs": {{...}}, "checks": [...]}}` to `{state}/step.json`
-   and submit outputs and checks in one atomic call; the result is the next step:
+5. A mapped step covers one capability. Its result names the `remaining_steps` and gives
+   the exact launcher arguments in `submit`. Do not start the work of a later step before
+   this one is submitted, even when the user approved the whole plan. Write
+   `{{"outputs": {{...}}, "checks": [...]}}` to `{state}/step.json` and run the launcher with
+   `submit`; the result is the next step, until `checks`. That is:
    `python {launcher} step --project "<current project>" --map-id <map_id> --capability <step_id_or_capability> --step-data "<current project>/{state}/step.json"`
    (outputs alone: `record --project "<current project>" --map-id <map_id> --capability <capability> --outputs <json-file>`).
    Never edit `{state}/map.md` or `{state}/state.json` yourself, invent outputs or
    overwrite earlier ones. A stale map or wrong-step error means the evidence belongs
    to other work: stop and report it; never resubmit it under another binding.
-6. At completion run the returned `## Checks` with real tools. Checks not sent inside
+6. At completion (`checks`) run the returned `## Checks` with real tools; `submit_check` and
+   `submit_complete` give the exact arguments. Checks not sent inside
    `step` go, as one object or an array in a JSON file, to
    `check --project "<current project>" --map-id <map_id> --capability <owner> --result <json-file>`,
    taking the owner from `checks_by_capability`; then close the map with

@@ -29,8 +29,8 @@ Coordinates an engineering change with the wayfinder method: agree the destinati
    - Resolve one item per session (research items may run in parallel). A HITL item is resolved only with the user; never answer the user's side.
    - After each answer, add one line to Decisions so far, graduate fog that became specifiable, and rule out items beyond the destination.
    - A `task` item only unblocks a decision; it never builds part of the destination. The map plans and does not build.
-4. **Write the spec** once nothing is left to decide. Explore the repository in its own vocabulary and respect its ADRs. Agree the test seams with the user: existing and as high as possible, ideally one. Use the template in `<WF>/skills/engineering/to-spec/SKILL.md`: Problem Statement, Solution, User Stories, Implementation Decisions, Testing Decisions, Out of Scope, Further Notes. No file paths or code snippets, except a decision-rich prototype snippet.
-5. **Slice it** with `<WF>/skills/engineering/to-tickets/SKILL.md`.
+4. **Write the spec** once nothing is left to decide. Explore the repository in its own vocabulary and respect its ADRs. Agree the test seams with the user: existing and as high as possible, ideally one. Use the template in `<WF>/skills/engineering/to-spec/SKILL.source.md`: Problem Statement, Solution, User Stories, Implementation Decisions, Testing Decisions, Out of Scope, Further Notes. No file paths or code snippets, except a decision-rich prototype snippet.
+5. **Slice it** with `<WF>/skills/engineering/to-tickets/SKILL.source.md`.
    - Tracer-bullet vertical slices, each through every layer, verifiable on its own and sized to one fresh context window, prefactoring first.
    - Each slice lists its blocking slices; a wide refactor is sequenced expand, migrate, contract.
    - Show the breakdown (title, blocked by, what it delivers) and iterate until the user approves it.

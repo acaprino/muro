@@ -378,6 +378,9 @@ def parse_router(path: Path) -> list[RouterRow]:
     return rows
 
 
+_PACKAGED_SKILL_MD = re.compile(r"<(?:package_root|[A-Z]{2})>[^\s`'\")]*SKILL\.md")
+
+
 def validate_capabilities_and_router(
     capabilities: list[Capability],
     router_rows: list[RouterRow],
@@ -418,6 +421,11 @@ def validate_capabilities_and_router(
             unknown = sorted(sources - registered_sources)
             if unknown:
                 errors.append(f"Capability {cap.id}: unregistered source(s): {', '.join(unknown)}")
+    for cap in capabilities:
+        packaged = _PACKAGED_SKILL_MD.search(cap.body)
+        if packaged:
+            errors.append(f"Capability {cap.id}: {packaged.group(0)} is a packaged helper; packaged source skills are "
+                          "stored as SKILL.source.md, so refer to that name")
     if plugin_slug is not None and plugin_slug != "muro":
         for cap in capabilities:
             if ".muro/" in cap.body:

@@ -14,7 +14,7 @@ conflicts: []
 
 # Paper Wiki
 
-Maintains an Open Knowledge Format (OKF) paper wiki as Markdown files with YAML frontmatter. `<PW>` is `<package_root>/scripts/open-paper-skills/skills/paper-wiki-manager`; `$PS` is `<package_root>/scripts/open-paper-skills/skills/paper-search/scripts/paper_search.py`. The source skill is `<PW>/SKILL.md`: read its section for the page type you are editing before you write.
+Maintains an Open Knowledge Format (OKF) paper wiki as Markdown files with YAML frontmatter. `<PW>` is `<package_root>/scripts/open-paper-skills/skills/paper-wiki-manager`; `$PS` is `<package_root>/scripts/open-paper-skills/skills/paper-search/scripts/paper_search.py`. The source skill is `<PW>/SKILL.source.md`: read its section for the page type you are editing before you write.
 
 ## Behavior
 
@@ -24,7 +24,7 @@ Maintains an Open Knowledge Format (OKF) paper wiki as Markdown files with YAML 
 4. **Fetch.** `uv run $PS fetch <arxiv_id>` writes the full text to the file its report names and fills the metadata. Sources the user switched off stay off on every route. Prefer arXiv for bibliographic facts.
 5. **Write the paper page.** Read `<PW>/assets/paper-wiki.toml` (or the wiki's own config when it has one): list its `paper_body.profiles`, use `default_profile` unless the user or the paper type calls for another, and use `section_descriptions` as drafting guidance without copying them into the note. New pages get `status: unread`.
 6. **Fidelity pass.** Before finishing a note, locate every load-bearing number, taxonomy branch, named example and comparative claim in the fetched text or a source listed under `# Citations`. Mark reader-made examples and inferences as such; remove what cannot be located. The validator cannot check this.
-7. **Chinese mirror.** When `[localized_notes].enabled` is true in the config (the packaged default), create or update `papers_zh/<arxiv_id>.md` after the English note, as `<PW>/SKILL.md` "Chinese Paper Notes" describes; it is never indexed or linked as a node. If the user does not want mirrors, use a wiki config with it set to false.
+7. **Chinese mirror.** When `[localized_notes].enabled` is true in the config (the packaged default), create or update `papers_zh/<arxiv_id>.md` after the English note, as `<PW>/SKILL.source.md` "Chinese Paper Notes" describes; it is never indexed or linked as a node. If the user does not want mirrors, use a wiki config with it set to false.
 8. **Topics and concepts.** Update 1 to 3 important themes as topic pages (`# Scope`, `# Papers`, `# Open Questions`); reuse an existing topic when it means the same. Create a concept page only for an entity two or more wiki papers reference, a durable field-level entity, or one the user asks to track. Links are bidirectional; update `papers/index.md`, `topics/index.md`, `concepts/index.md` and the wiki home.
 9. **Non-paper sources** go under `sources/<slug>.md` with `type: Reference`; their links to topics and concepts are one-way. A paper used by a project in the repository gets `# Used In Projects` with a relative link to a Markdown file of that project.
 10. **Finish.** Fetch the viewer libraries if missing (Specifics), then from `<PW>`:
