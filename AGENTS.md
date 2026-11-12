@@ -163,7 +163,10 @@ exception, and never a Python rule or a default taken from the source's shape.
 A package without the document registers nothing. Intake and build still execute
 and register nothing on the factory machine, and classification never registers
 a hook. All five native adapters deliver permanent policy through the host's
-system/developer instruction channel. Claude Code and Codex also register
+system/developer instruction channel. Hermes caps a section at 4,000 characters
+(8,000 in all) and skips what is over: a longer policy is never cut, it goes
+whole through `pre_llm_call` into the turn's user message (read in the Hermes
+source on 2026-11-12, not run live). Claude Code and Codex also register
 declared source command hooks; unsupported wirings are rejected. Installing
 only skill folders does not load native policy. Host trust, safe mode and
 permissions remain authoritative. API requirements and limitations belong in

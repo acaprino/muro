@@ -95,11 +95,15 @@ def test_the_packaged_runtime_applies_the_same_proportional_budget(tmp_path, cap
 
 
 def test_hermes_registers_a_policy_longer_than_one_source_allowance_whole(tmp_path):
-    """The Hermes registration carried a fixed `max_chars=2000`; a two-source policy must not be cut by it."""
+    """The Hermes registration carried a fixed `max_chars=2000`, then `len(policy)`.
+
+    The host accepts at most 4,000 characters in a section and skips what is over, so
+    neither could carry a two-source policy: it goes whole through the turn hook.
+    """
     import importlib.util
     from muro.hermes_adapter import write_hermes_adapter
 
-    policy = "z" * (2 * ALWAYS_ON_PER_SOURCE)
+    policy = "\n\n".join(f"Rule {index}. " + "z" * 990 for index in range(2 * ALWAYS_ON_PER_SOURCE // 1000))[:2 * ALWAYS_ON_PER_SOURCE]
     (tmp_path / "skills").mkdir()
     (tmp_path / "policy.md").write_text(policy, encoding="utf-8")
     write_hermes_adapter(tmp_path, {"slug": "demo", "command": "demo", "name": "Demo", "version": "1.0.0"}, True)
@@ -108,17 +112,23 @@ def test_hermes_registers_a_policy_longer_than_one_source_allowance_whole(tmp_pa
     spec.loader.exec_module(module)
 
     class Context:
-        seen = {}
+        def __init__(self):
+            self.hooks = []
 
         def register_skill(self, name, path):
             pass
 
         def register_system_prompt_section(self, identifier, content, *, position, max_chars):
-            self.seen = {"content": content, "max_chars": max_chars}
+            raise AssertionError("Hermes rejects max_chars over 4000 and skips a longer section")
+
+        def register_hook(self, name, callback):
+            assert name == "pre_llm_call"
+            self.hooks.append(callback)
 
     ctx = Context()
     module.register(ctx)
-    assert ctx.seen["content"] == policy and ctx.seen["max_chars"] >= len(policy)
+    pieces = [hook(conversation_history=[])["context"] for hook in ctx.hooks]
+    assert "\n\n".join(pieces) == policy and all(len(piece) <= 8000 for piece in pieces) and len(pieces) > 1
 
 
 @pytest.mark.parametrize("broken, message", [

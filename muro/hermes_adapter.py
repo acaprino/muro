@@ -17,6 +17,45 @@ def register(ctx):
 '''
 
 
+# Hermes accepts at most 4,000 characters in one system prompt section and 8,000 in all of
+# them, and skips what is over (hermes_cli/plugins_dispatch.py, read at upstream 34ecc0fa,
+# 2026-11-12). A longer policy keeps its words and changes channel: `pre_llm_call`, whose
+# return the host appends to the turn's user message and replays with it.
+_SECTION_LIMIT = 4000
+# The host spills one hook return over `hooks.output_spill.max_chars` (default 10,000) to disk.
+_PIECE_LIMIT = 8000
+
+_TURN_HOOK = '''
+    pieces = []
+    for paragraph in policy.strip().split("\\n\\n"):
+        if pieces and len(pieces[-1]) + 2 + len(paragraph) <= %d:
+            pieces[-1] += "\\n\\n" + paragraph
+        else:
+            pieces.append(paragraph)
+
+    def sent(piece, history):
+        for message in history or ():
+            if not isinstance(message, dict):
+                continue
+            for value in (message.get("api_content"), message.get("content")):
+                parts = value if isinstance(value, list) else [value]
+                for part in parts:
+                    text = part.get("text") if isinstance(part, dict) else part
+                    if isinstance(text, str) and piece in text:
+                        return True
+        return False
+
+    def deliver(piece):
+        # Once per session, and again when compression dropped it; never the same text twice.
+        def policy_context(conversation_history=None, **_):
+            return None if sent(piece, conversation_history) else {"context": piece}
+        return policy_context
+
+    for piece in pieces:
+        ctx.register_hook("pre_llm_call", deliver(piece))
+''' % _PIECE_LIMIT
+
+
 def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:
     """Package existing skills and the declared policy without touching host state."""
     manifest = {
@@ -45,6 +84,8 @@ def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:
         return
     # The build already bounded the policy (one allowance per contributing source); never cut it here.
     policy = (root / "policy.md").read_text(encoding="utf-8")
-    register_section({section_id!r}, policy, position="after_memory", max_chars=len(policy))
-'''
+    if len(policy.strip()) <= {_SECTION_LIMIT}:
+        register_section({section_id!r}, policy, position="after_memory", max_chars={_SECTION_LIMIT})
+        return
+''' + _TURN_HOOK
     (root / "__init__.py").write_text(registration, encoding="utf-8")

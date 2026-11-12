@@ -22,6 +22,7 @@ class Context:
     def __init__(self):
         self.skills = {}
         self.sections = {}
+        self.hooks = {}
 
     def register_skill(self, name, path):
         assert isinstance(path, Path) and path.is_file()
@@ -35,6 +36,17 @@ class Context:
         assert isinstance(content, str)
         assert position == "after_memory" and 0 < len(content) <= max_chars <= 4000
         self.sections[identifier] = content
+
+    def register_hook(self, name, callback):
+        self.hooks.setdefault(name, []).append(callback)
+
+    def turn_context(self, history=()):
+        """Hermes joins every pre_llm_call return with a blank line and spills a piece over 10,000 characters."""
+        pieces = [hook(session_id="s", user_message="hi", conversation_history=list(history),
+                       is_first_turn=not history, model="m", platform="cli") for hook in self.hooks.get("pre_llm_call", [])]
+        pieces = [piece["context"] for piece in pieces if piece]
+        assert all(len(piece) <= 10000 for piece in pieces)
+        return "\n\n".join(pieces)
 
 
 def plugin_root(tmp_path, policy="Use the evidence already supplied."):
@@ -103,6 +115,42 @@ def test_older_hermes_keeps_skills_and_warns_that_policy_is_inactive(tmp_path):
     with pytest.warns(RuntimeWarning, match="always-on policy is not active.*upgrade Hermes"):
         module.register(ctx)
     assert set(ctx.skills) == {"observe", "observe-review"}
+
+
+def long_policy(size):
+    paragraphs, index = [], 0
+    while len("\n\n".join(paragraphs)) < size:
+        index += 1
+        paragraphs.append(f"## Rule {index}\n" + "Keep the source's own words, numbers and exceptions. " * 6)
+    return "\n\n".join(paragraphs)[:size].rstrip()
+
+
+@pytest.mark.parametrize("size", [4001, 9998, 23000])
+def test_a_policy_over_the_section_limit_is_delivered_whole_through_the_turn_hook(tmp_path, size):
+    """Hermes caps a section at 4,000 characters and all sections at 8,000 (hooks.md, plugins_dispatch.py).
+
+    Marionette's policy is 9,998 characters of two sources' own words: it is never cut and
+    never registered as a section the host would reject or skip.
+    """
+    policy = long_policy(size)
+    ctx = Context()
+    load_plugin(plugin_root(tmp_path, policy)).register(ctx)
+    assert ctx.sections == {} and set(ctx.skills) == {"observe", "observe-review"}
+    first = ctx.turn_context()
+    assert first == policy
+    # Hermes replays what a turn sent (the api_content sidecar): the policy is not sent again while it is there.
+    history = [{"role": "user", "content": "hi", "api_content": "hi\n\n" + first}, {"role": "assistant", "content": "ok"}]
+    assert ctx.turn_context(history) == ""
+    multimodal = [{"role": "user", "content": [{"type": "text", "text": "hi"}, {"type": "text", "text": first}]}]
+    assert ctx.turn_context(multimodal) == ""
+    # After compression dropped it, the next turn carries it again, whole.
+    assert ctx.turn_context([{"role": "user", "content": "a summary of earlier turns"}]) == policy
+
+
+def test_a_policy_within_the_section_limit_registers_no_turn_hook(tmp_path):
+    ctx = Context()
+    load_plugin(plugin_root(tmp_path, long_policy(4000))).register(ctx)
+    assert len(ctx.sections) == 1 and ctx.hooks == {}
 
 
 def test_without_a_declared_policy_no_system_section_or_hook_is_registered(tmp_path):

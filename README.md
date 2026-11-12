@@ -59,7 +59,7 @@ Each row corresponds to a native adapter in the generated release. Its `INSTALL.
 | <img src="docs/assets/branding/harnesses/codex.svg" width="24" alt=""> **[Codex](https://developers.openai.com/codex/hooks/)** | `adapters/codex/` | Developer context on session and subagent start | Supported |
 | <img src="docs/assets/branding/harnesses/opencode.svg" width="24" alt=""> **[OpenCode](https://opencode.ai/)** | `adapters/opencode/` | System parts via the V2 package plugin API | — |
 | <img src="docs/assets/branding/harnesses/pi.svg" width="24" alt=""> **[Pi](https://pi.dev/)** | `adapters/pi/` | Named system section via a package extension | — |
-| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | `adapters/hermes/` | Registered system prompt section | — |
+| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | `adapters/hermes/` | Registered system prompt section up to 4,000 characters; a longer policy goes whole through `pre_llm_call` | — |
 
 Installing the **complete adapter** lets the harness load the session instructions and active hooks declared in `delivery.json`, subject to the host's permissions and trust settings. For on-demand capabilities, the standalone `skills/<command>/` directory includes its launcher, catalog, prompts, helpers, notices, and offline guide. Keep the directory intact and install any discovery entries alongside it.
 
