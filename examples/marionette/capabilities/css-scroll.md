@@ -18,7 +18,7 @@ Implements scroll-driven animation in pure CSS with scroll and view timelines, f
 
 ## Behavior
 
-The CSS method below is Muro-authored and has no packaged original. Only the motion limits come from a source: before working, read whole `<package_root>/scripts/motion-design/patterns/ambient-continuous.md` (section `## Parallax`), `<package_root>/scripts/motion-design/director/context-adaptation.md` (sections `## Platform Scaling` and `## Accessibility`) and the section `## Quality Rules` of `<package_root>/scripts/motion-design/SKILL.source.md`. For those limits the originals are the source's own words; where this body and an original differ, the original wins, except for the changes listed in the Sources section below under "Changes for coexistence".
+The CSS method is this package's own and has no packaged original. Only the motion limits in Specifics come from a source, motion-design; for them the packaged original wins where this body differs, except for the changes listed in the Sources section under "Changes for coexistence".
 
 1. **Read the behavior.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `motion-spec` and `reduced-motion`, implement their scroll-linked rows. Otherwise implement the behavior the user stated. Do not invent a choreography the user did not ask for.
 2. **Check support** for `animation-timeline` in the project's target browsers against current MDN or caniuse data; do not rely on remembered version numbers.
@@ -42,7 +42,10 @@ Return every required output key as a JSON string. For a mapped step, submit the
 
 - The host AI selects this variant only for an explicit CSS-only constraint (`stack:css-only`), even when GSAP is installed; Python never substitutes another variant.
 - The result is CSS only: no runtime dependency and no bundle-size change.
-- Limits from motion-design, also without a recorded specification: "**Scroll-driven**: total displacement <100px; avoid on mobile; never parallax text" (`patterns/ambient-continuous.md`); mobile rules "avoid parallax" and, under `prefers-reduced-motion`, "Parallax" becomes "Static positioning" (`director/context-adaptation.md`); "**Never linear for spatial movement** — always use easing curves (linear only for spinners, progress bars)" (`SKILL.source.md`, Quality Rules), applied here as in step 3.
+- Limits from motion-design, also without a recorded specification:
+  - Scroll-driven parallax: total displacement under 100px, avoid it on mobile, never parallax text. Open `<package_root>/scripts/motion-design/patterns/ambient-continuous.md`, `## Parallax`, when the task builds parallax layers, for their speed ratios.
+  - Under `prefers-reduced-motion` parallax becomes static positioning. Open `<package_root>/scripts/motion-design/director/context-adaptation.md`, `### prefers-reduced-motion`, when no `reduced-motion` output is recorded, for the alternative of each other kind of motion.
+  - Never linear for spatial movement, linear only for spinners and progress bars (`## Quality Rules` of `<package_root>/scripts/motion-design/SKILL.source.md`), applied here with the exception of step 3.
 
 ## Checks
 
@@ -55,10 +58,10 @@ Return every required output key as a JSON string. For a mapped step, submit the
 ## Sources
 
 - No selected upstream source covers CSS scroll-driven animation. This variant is Muro-authored, kept from the original architecture (ADR-0002, the CSS-only alternative to GSAP), and its CSS method is general platform knowledge, not extracted from a pinned skill.
-- Source: motion-design (LottieFiles/motion-design-skill@f9a8a041) — only the limits in Specifics: `patterns/ambient-continuous.md` (scroll-driven displacement, mobile, text parallax), `director/context-adaptation.md` (parallax on mobile and under reduced motion) and `SKILL.md` Quality Rules (linear only for spinners and progress bars), packaged under `<package_root>/scripts/motion-design/` and read at run time. It does not describe `animation-timeline` or any CSS method.
+- Source: motion-design (LottieFiles/motion-design-skill@f9a8a041) — only the limits in Specifics: `patterns/ambient-continuous.md` (scroll-driven displacement, mobile, text parallax), `director/context-adaptation.md` (parallax on mobile and under reduced motion) and `SKILL.md` Quality Rules (linear only for spinners and progress bars), packaged under `<package_root>/scripts/motion-design/`. It does not describe `animation-timeline` or any CSS method.
 - Changes for coexistence (ADR-0017):
-  - The source allows linear "only for spinners, progress bars". Step 3 also allows linear timing where the progress must track the scroll position one to one: motion-design does not address timing functions on a scroll timeline, and the source of the other `scroll-code` variant (gsap-scrolltrigger) requires `ease: "none"` on a horizontal-scroll tween because any other ease "breaks the 1:1 scroll-to-position mapping". The two rules contradict each other for that case; this Muro-authored method follows the one-to-one mapping there and the motion-design rule everywhere else.
-  - Only the named sections of motion-design are applied in this step. The rest of that source (personality, durations, choreography, the three motion layers) belongs to `motion-principles`, the one owner of `motion-spec`; a recorded `motion-spec` and `reduced-motion` are implemented as recorded.
+  - The source allows linear "only for spinners, progress bars"; step 3 also allows it where progress must track the scroll position one to one. motion-design does not address timing on a scroll timeline, and the source of the other `scroll-code` variant (gsap-scrolltrigger) requires `ease: "none"` on a horizontal-scroll tween because any other ease "breaks the 1:1 scroll-to-position mapping": this method follows the one-to-one mapping there and the motion-design rule everywhere else.
+  - The rest of motion-design (personality, durations, choreography, the three motion layers) is not applied here: `motion-principles` is the one owner of `motion-spec`, and a recorded `motion-spec` and `reduced-motion` are implemented as recorded.
 - Runtime dependency: none.
 - Hooks: none.
 - Open gap: a maintained upstream source for CSS scroll-driven animation would replace this Muro-authored method; choosing one is the owner's decision.
