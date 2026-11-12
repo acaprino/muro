@@ -103,7 +103,7 @@ def test_procedures_match_the_router_and_keep_source_provenance():
     assert f"<package_root>/scripts/{SOURCE}/{BENCHMARK}" in caps["engineering-guidance"].body
     # ADR-0017: the engineering capabilities read the packaged originals; the rules file is in the policy only.
     for name in (*PROCEDURES, "work-map"):
-        assert f"<package_root>/scripts/{SOURCE}/skills/" in caps[name].body, name
+        assert f"<package_root>/scripts/{SOURCE}/" in caps[name].body, name
     assert all(CORE not in cap.body.split("## Sources", 1)[0] for cap in caps.values())
 
 

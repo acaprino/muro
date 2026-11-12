@@ -62,10 +62,10 @@
     },
     {
       "source": "ai-design-skills",
-      "content": "landing-page-design's visual mandates: fixed font list, one-typeface rule, mandatory hero text gradient, universal Tailwind scale",
+      "content": "landing-page-design's visual system on a built page: Part B sections B1 to B7 and B11 (fixed font list, one-typeface rule, mandatory hero text gradient, universal Tailwind scale and the rest), the tagline line of A2, the B1 note of A5 and the 'Visual' checklist block; B8's invented people, brands and sample numbers and B9's hover and active values",
       "form": "dropped",
       "targets": [],
-      "reason": "Authority and fit: they would be a second visual system beside the palette and type dealt from the pinned taste-skill, which owns the look (visual-direction, Specifics 'One owner of the look'). The source's own rule that the user's explicit prompt wins supports scoping them out."
+      "reason": "Authority and fit: they would be a second visual system beside the palette and type dealt from the pinned taste-skill, which owns the look (visual-direction, Specifics 'One owner of the look'). The source's own rule that the user's explicit prompt wins supports scoping them out. Re-read of 2026-11-12 (ADR-0017): the two sources contradict each other on a built page (a font one names to use the other names never; scroll reveals against 'a fade-in on every section'; invented proof against 'No invented proof'), so taste-skill decides there and each part not applied is listed in visual-direction, Sources. B8 (content realism), B9 (states) and B10 (ship requirements) collide with nothing beyond the parts named here and are carried in the source's words."
     },
     {
       "source": "ai-design-skills",
@@ -108,7 +108,7 @@
       "content": "skill list|install|path, mcp install|uninstall|list and install-cli; search, image and media as standalone uses",
       "form": "dropped",
       "targets": [],
-      "reason": "Installing or registering the source itself is never carried (office-files, Sources 'Not adopted'). The provider-backed commands send queries or files off the machine and give no standalone intent: they remain optional, disclosed steps inside the deck pipeline (office-deck, Sources)."
+      "reason": "Installing or registering the source itself is never carried (office-files, Sources 'Not adopted'). The provider-backed commands send queries or files off the machine and give no standalone intent: they remain optional, disclosed steps inside the deck pipeline (office-deck, Sources). Re-read of 2026-11-12 (ADR-0017): three limits the earlier harmonization had added on those commands (no user files or confidential content to them unless asked) are not in the source and no collision requires them, so they were removed; the source's own disclosure that only these commands send data off the machine is carried. Open for the owner: whether Marionette should have a privacy principle that puts them back."
     },
     {
       "source": "explain-this",

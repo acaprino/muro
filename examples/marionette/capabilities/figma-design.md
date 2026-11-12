@@ -15,17 +15,19 @@ checks: ["foundations_bound", "states_complete", "contrast_checked", "responsive
 
 # Figma Design
 
-Builds or updates a design inside Figma with real variables, text styles, auto layout and components. It starts from what the file already has and applies a recorded visual direction when one exists. Does not assume a Figma integration exists.
+Builds or updates a design inside Figma with real variables, text styles, auto layout and components. It starts from what the file already has and applies a recorded visual direction when one exists. Does not assume a Figma integration exists. `<FD>` below stands for `<package_root>/scripts/ai-design-skills/skills/figma-designer`.
 
 ## Behavior
 
-1. **Check integration first.** Before any `use_figma` call, verify that Figma MCP and `figma-use` are available. If unavailable, report that limitation and **do not simulate** Figma changes, screenshots or completed screens.
-2. **Check the file.** List local variable collections and text styles and search the file's libraries for variables, styles and components. Reuse what exists before creating anything. Do not move or delete existing user layers without approval.
+The packaged original is the method, in the source's own words. Read `<FD>/SKILL.source.md` whole before working, and its "Token reference" "before you create or bind any variable or text style". The steps below are an index into it. Where this body and the original differ, the original wins, except for the changes listed under Sources, "Changes for coexistence (ADR-0017)".
+
+1. **Check integration first.** Before any `use_figma` call, verify that Figma MCP and `figma-use` are available. If unavailable, report that limitation and **do not simulate** Figma changes, screenshots or completed screens. Then, as the source says: "Load `figma-use` before any `use_figma` call." "For full screens and pages, also load `figma-generate-design`. For component libraries and tokens, also load `figma-generate-library`."
+2. **Check the file first** ("Workflow" 1). "List local variable collections and text styles, and search the file's libraries (`search_design_system`) for variables, styles and components. Reuse what exists before creating anything." "Don't delete or move the user's existing layers unless asked."
 3. **Read the direction.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `palette`, `typography`, `layout`, `constraints`, `offer` and `page_outline` from `visual-direction`, apply them; a recorded `aesthetic_direction` (a look committed for a product with no brand) or `design_tokens` (values extracted from the product) supplies the foundation values the same way. A landing page with no recorded or supplied outline should have reached this step after `visual-direction` (declared in `needs`, judged by the classifying AI); if it did not, do not plan its sections: report that the landing strategy is missing.
-4. **Set up foundations if missing** and record them in `foundations`: color variables with light and dark modes (semantic tokens over raw palette values), text styles, spacing and radius variables, and a Foundations frame whose samples are bound to the variables.
-5. **Plan components** in `component_map`: names, variants, component properties, responsive behavior and states (Default, Hover, Pressed, Focus, Disabled; Error and Filled where relevant).
-6. **Build screens section by section** and record them in `screen_plan`: hero first, then one section at a time, every frame in auto layout with bound padding and gaps. Take and inspect a screenshot after each section before the next.
-7. **Evaluate:** body text contrast at least 4.5:1, large text and UI at least 3:1, touch targets at least 44px, a 1440px desktop frame, 768px and 390px frames when the screen needs responsive versions, meaningful layer names and real copy.
+4. **Set up foundations if missing** ("Workflow" 2) and record them in `foundations`. "Create everything below before you build any screen": "the `spacing` and `radius` variables", "the two color layers (`Core Colors`, then `Color System` with Light and Dark modes)", "the text styles". "Light and dark are variable modes, never two sets of hardcoded colors." Place the `Foundations` frame, bind its samples and keep its labels in sync as that step says.
+5. **Plan components** ("Components and states") in `component_map`: names, variants, component properties, responsive behavior and states. "Interactive components get variants for Default, Hover, Pressed, Focus, Disabled. Inputs also get Error and Filled." Buttons are one component set, "every combination present (25 variants per size)". "Data views get Loading (a skeleton shaped like the real layout), Empty (a composed getting-started view) and Error states."
+6. **Build section by section** ("Workflow" 3 to 5) and record the screens in `screen_plan`. "Do the hero first, then one section per step. Never build a whole page in one pass. Screenshot after each section and fix it before moving on." "Every frame with children uses auto layout. Padding and gap are bound to spacing variables, never typed numbers." "Bind designs to `Color System` tokens only, never to `Core Colors` directly."
+7. **Self check before finishing** ("Workflow" 6): "Run the checklist at the end of this file, fix every failure, then report what was built and what was skipped." The checklist is "Checklist (run before reporting)"; its numbers are in "Contrast and accessibility" and "Layout": "Body text: at least 4.5:1 against its background", large text and UI parts "at least 3:1", "Touch targets are at least 44 × 44 on mobile frames", "Desktop frames are 1440 wide, with a centered content container of 1200 to 1280", "Add 768 and 390 frames when the screen needs responsive versions."
 
 ## Output handoff
 
@@ -33,10 +35,9 @@ Return `foundations`, `component_map` and `screen_plan` as JSON strings. For a m
 
 ## Specifics
 
-- **Typography:** use the font the user or brand names, after checking it with `figma.listAvailableFontsAsync()`. One typeface per file unless a pair is asked for; a pairing recorded by `visual-direction` counts as that request and is kept. Sizes follow the source's Tailwind type scale unless a recorded direction sets its own scale.
-- **Color:** token names and structure follow the source's fixed set; hex values follow the brand or the recorded palette. No background gradients. The source's one exception, a gradient on the hero heading text, is not used when a recorded direction rules gradients out.
-- No eyebrow tag above a heading unless the user asks or an uploaded inspiration shows one.
-- Use real SVG icons at one stroke weight and components for repeated elements. Never invent facts, proof, reviews or client branding.
+- **A recorded direction is a committed system.** The source fixes token names, structure, spacing and radius values and says "The hex values follow the user's brand": hex values follow the brand or the recorded `palette`, `aesthetic_direction` or `design_tokens`. Where a recorded direction sets what the source also fixes, the recorded value is kept: a type pairing recorded by `visual-direction` counts as the user asking for a pair ("One typeface per file unless the user asks for a pair"); a type scale recorded with the direction replaces "Sizes come from the Tailwind type scale only"; the hero heading gradient ("the one gradient exception") is not used when the recorded direction rules gradients out. Everything the recorded direction does not set follows the original.
+- **Landing pages.** The source's "Landing pages" section sends the work to the user's `landing-page-design` skill and says "If that skill isn't available, ask the user for it before planning sections." In this package that skill is the landing strategy of `visual-direction`: its recorded `offer` and `page_outline` are the page structure and copy (step 3). Their facts and proof are used as recorded and none is added. The "mandatory large tagline section" is built only when the recorded or supplied outline has one.
+- Everything else (typography, spacing, corner radius, color, contrast, layout, icons, motion, content, file hygiene) is in the original and is not restated here.
 
 ## Checks
 
@@ -48,7 +49,15 @@ Return `foundations`, `component_map` and `screen_plan` as JSON strings. For a m
 ## Sources
 
 - AI intent mapping: figma-designer → ui.figma-design, from its workflow, foundations, typography, color, component, layout and evaluation sections.
-- Source: ai-design-skills (elayadesign/ai-design-skills@456d9e0d) — `skills/figma-designer/SKILL.md`, packaged under `<package_root>/scripts/ai-design-skills/skills/figma-designer/`.
+- Source: ai-design-skills (elayadesign/ai-design-skills@456d9e0d) — `skills/figma-designer/SKILL.md`, packaged as `<package_root>/scripts/ai-design-skills/skills/figma-designer/SKILL.source.md` and read there at run time.
+- Changes for coexistence (ADR-0017):
+  - The source's frontmatter (name, description with "Use this skill whenever" and "Load it before writing any use_figma code") is not carried: the coordinator classifies by meaning and a packaged original is not a registered skill.
+  - Step 1 adds an availability check and "do not simulate": without the host's Figma integration no supported host can run the source's steps, and a step must not report work it did not do.
+  - The source's "Landing pages" section is served by `visual-direction` (the `needs` entry) instead of a separate `landing-page-design` skill, and "ask the user for it" becomes a report that the landing strategy is missing: landing-page-design is absorbed into `visual-direction`, and activation belongs to the coordinator.
+  - The tagline section with a word-by-word reveal is built only when the outline has one: `visual-direction` owns `page_outline` and does not apply landing-page-design B11.
+  - A recorded `typography`, `palette`, `aesthetic_direction` or `design_tokens` keeps its pairing, its scale and its rule on gradients against the source's one typeface, Tailwind scale and hero heading gradient: one owner per output, and later steps do not restyle a committed direction.
+  - Facts and proof of a recorded `offer` and `page_outline` are not extended with the source's "believable names, brands and numbers": `visual-direction` owns them under its check `proof_supported`.
+  - The source's closing report ("report what was built and what was skipped") is returned through the output handoff: the coordinator is the only writer of the map.
 - Runtime dependency: the Figma MCP and figma-use integration of the host (not bundled; it needs the user's account, so it is never installed by this step, ADR-0007).
 - Hooks: the selected file defines none; `assets/**`, `scripts/**`, `tests/**` and `.github/**` are excluded and were not inspected for hooks.
 - Harmonization 2026-11-12 (claude-design-system-prompt intake): `aesthetic_direction` and `design_tokens` are added to `reads`, so a Figma file follows a direction committed outside Figma or the tokens extracted from the product. Data flow only, no prerequisite.

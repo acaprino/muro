@@ -18,7 +18,7 @@ Answers requests about the working method and its published evidence without cha
 ## Behavior
 
 0. **Read the originals first.** Read whole, before answering, the packaged originals of the requested intent. They are the content in the source's own words:
-   - method help: `<package_root>/scripts/ponytail/skills/ponytail-help/SKILL.source.md` and `<package_root>/scripts/ponytail/skills/ponytail/SKILL.source.md`;
+   - method help: `<package_root>/scripts/ponytail/skills/ponytail-help/SKILL.source.md` and `<package_root>/scripts/ponytail/SKILL.source.md`;
    - benchmark evidence: `<package_root>/scripts/ponytail/skills/ponytail-gain/SKILL.source.md` and `<package_root>/scripts/ponytail/benchmarks/results/2026-10-07-agentic.md`.
    Where this body and an original differ, the original wins, except for the changes listed under the Sources section below, "Changes for coexistence".
 1. Method help. Show the help card's `## Levels` and `## Skills` tables in the source's words (the "What change" and "What it does" columns) and its `## More` link. Each "Trigger" cell is replaced by how the method is reached here: the working method through the package's permanent policy and work-map, review and audit through engineering-review, the shortcut ledger through engineering-debt, the scoreboard and this card through this capability. For the method itself, use `## Before you write`, `## The smallest complete change` and the "Never cut:" line of the ponytail skill file. Answer only the requested explanation; point to engineering-review or engineering-debt when the user wants that work done.
