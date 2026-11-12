@@ -455,7 +455,7 @@
       "targets": [
         "engineering-review"
       ],
-      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents retains the diff default, whole-repo mapping, expected-load assumptions, concrete-case gate, full finding explanation and audit's 20-finding display default with an omitted count; all material risks and explicitly requested full findings remain visible through grouping or additional detail. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
+      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents follows both packaged skills in their own words, including audit's 'At most 20 findings; if you left smaller ones out, say how many'. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
     },
     {
       "source": "ponytail",
@@ -477,10 +477,10 @@
     },
     {
       "source": "ponytail",
-      "content": "In the on-demand skills: lazy-senior persona, forced closing lines and English-only templates; for the whole source: original slash-skill routing, plugin self-install/update and persistent mode controls",
+      "content": "For the whole source: original slash-skill routing and trigger phrases, plugin self-install/update, band and persistent mode controls",
       "form": "dropped",
       "targets": [],
-      "reason": "Persona/format claims would override host and user preferences; source activation commands would compete with Marionette classification or promise state the native package does not keep. Preserve concise evidence, disclosures and lite/full/ultra behavioral choices through task-scoped guidance. Source plugin installation is excluded by the factory contract. Changing a released permanent policy is not falsely presented as toggling an upstream mode. The rules file's own persona and closing lines are carried in the policy (always-on decision). The on-demand skill bodies were written before the owner rule of 2026-11-12 on unaltered content and have not been rewritten."
+      "reason": "Source activation commands would compete with Marionette classification or promise state the native package does not keep: the mode hooks are not selected, so no host can run 'Level sticks', Deactivate or Configure Default Mode. The lite/full/ultra meanings are carried in the source's words as task-scoped choices. Re-read of 2026-11-12 (ADR-0017): the persona, the fixed closing lines of review, audit, debt and gain and the fixed English templates had been dropped here as 'would override host and user preferences', which is taste and not a collision; they are carried again, because the capabilities now read the packaged skills. Only the reply-closing lines of skills/ponytail/SKILL.md collide (with i-have-adhd rule 3) and follow the policy wording. Source plugin installation is excluded by the factory contract. Changing a released permanent policy is not falsely presented as toggling an upstream mode. The rules file's own persona and closing lines are carried in the policy (always-on decision). The on-demand skills are packaged and read by work-map, engineering-review, engineering-debt and engineering-guidance, which list their changes for coexistence in Sources."
     },
     {
       "source": "ponytail",

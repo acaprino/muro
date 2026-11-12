@@ -17,11 +17,12 @@ Turns recorded deliberate limits into a requested report; it does not create a n
 
 ## Behavior
 
-1. Use the repository or area the user names. Search real comment markers `shortcut:` and legacy `ponytail:`; if the user names a custom marker, use that marker instead. Respect `.gitignore` files and skip `.git`, dependencies, build outputs and caches.
-2. The source suggests `git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'`; adjust comment syntax for the actual language. A text match is evidence to read, not proof of a deliberate deferral: skip prose and unrelated keyboard-shortcut comments.
-3. Produce one row per actual marker, grouped by file: file and line, what was simplified, the limit stated and the condition or upgrade path stated for revisiting it. Preserve the source meaning; do not invent a missing owner, ceiling or trigger.
-4. Tag a comment with no upgrade trigger `no-trigger`. If the user wants ownership and Git history exists, inspect the specific line with blame and distinguish its author from any explicitly assigned owner.
-5. End with the counted marker total and the number without a trigger. If none were found, state that within the scanned scope. Read/report only by default; persist a file only when the user requested it, reporting its path.
+0. **Read the original first.** Read `<package_root>/scripts/ponytail/skills/ponytail-debt/SKILL.source.md` whole before working. It is the method in the source's own words, and the steps below are an index into its `## Scan`, `## Output` and `## Boundaries`. Where this body and the original differ, the original wins, except for the changes listed under `## Sources`, "Changes for coexistence".
+1. `## Scan`: "Grep the repo for comment markers, skipping `.git` and everything the `.gitignore` files ignore (dependencies, build output, caches, in any stack)". Markers are `shortcut:` and the older `ponytail:`. If the user names their own marker word, "grep for that word instead."
+2. The source's command: `git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'` "(add other comment prefixes if your stack uses them)". "Each hit is one ledger row." "Skip hits that are not a deferral, like a note about a keyboard shortcut."
+3. `## Output`: "One row per marker, grouped by file", in the source's form: `<file>:<line>, <what was simplified>. ceiling: <the limit named>. upgrade: <the trigger to revisit>.` "pull the ceiling and the trigger straight from the comment."
+4. "any marker comment that names no upgrade path or trigger gets a `no-trigger` tag". "Want an owner per row too? add `git blame -L<line>,<line>`."
+5. "End with `<N> markers, <M> with no trigger.` Nothing found: `No shortcut debt. Clean ledger.`" `## Boundaries`: "Reads and reports only, changes nothing. To persist it, ask and it writes the ledger to a file (e.g. `PONYTAIL-DEBT.md`)." Report the path of a file written.
 
 ## Output handoff
 
@@ -30,7 +31,7 @@ Return `shortcut_ledger` as a JSON string containing the ledger, counts, scan co
 ## Specifics
 
 - This is not session-handoff's current task narrative, a duplicated task map or TokenEconomizer's cost ledger. Another capability may consume it only when the user requests that next action.
-- Git is useful for ignore-aware search/blame, not a new fixed stack constraint. The source supplies no Git installation procedure. If history is unavailable, omit ownership inference and disclose the limit.
+- Git is useful for ignore-aware search/blame, not a new fixed stack constraint. The source supplies no Git installation procedure. If history is unavailable, leave the owner out and disclose the limit.
 
 ## Checks
 
@@ -42,9 +43,12 @@ Return `shortcut_ledger` as a JSON string containing the ledger, counts, scan co
 
 ## Sources
 
-- Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) — `skills/ponytail-debt/SKILL.md`, Scan, Output and Boundaries.
+- Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) — `skills/ponytail-debt/SKILL.md`, Scan, Output and Boundaries, packaged as `<package_root>/scripts/ponytail/skills/ponytail-debt/SKILL.source.md` and read whole at run time.
 - AI mapping: ponytail-debt → engineering.shortcut-ledger. The marker search locates evidence; the host AI determines whether a hit records a deferral. This is not a routing keyword rule.
-- Original slash commands, persistent mode flags and upstream plugin UI/telemetry are not adopted. No source hook is selected for this method.
+- Changes for coexistence (ADR-0017):
+  - The frontmatter's trigger phrases and `/ponytail-debt` are not carried, and the marker word is taken from the user's request instead of the slash argument in "`/ponytail-debt TODO`": the coordinator classifies by meaning and the package registers no source command.
+  - The ledger is also handed over as `shortcut_ledger` through the coordinator (factory contract: output handoff). Its rows and closing line stay the source's.
+- Original persistent mode flags and upstream plugin UI/telemetry are not adopted. No source hook is selected for this method.
 
 
-Harmonized by: `prompts/harmonizer.md` (2026-11-12). Original skill files are intake-only; their methods are restated above.
+Harmonized by: `prompts/harmonizer.md` (2026-11-12). Re-read against the pinned original under ADR-0017: the body indexes the packaged original skill file, which is the method.

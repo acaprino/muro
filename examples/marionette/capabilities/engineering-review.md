@@ -13,17 +13,21 @@ conflicts: []
 
 # Engineering Review
 
-Produces a report, never silently applies its fixes. Priority is correctness, safety, expected load, meaningful tests, performance, then unnecessary complexity.
+Produces a report: "Lists findings, changes no code." The source's order of importance: "correct, safe, holds under load, tested, fast, lean."
 
 ## Behavior
 
-1. Establish scope. For a change review use the named uncommitted/staged changes, branch, PR or files; if unnamed, use uncommitted changes, otherwise the last commit. For an audit use the named folder/package/repository, otherwise the whole repository.
-2. Read before judging. A change review follows the diff into every changed function's callers and callees, tests and README; inspect all callers of changed signatures, return values or behavior. An audit maps README, build/deploy config, dependencies, entry points and tests, then traces input, storage and output, especially auth, money, data writes, background jobs and state shared between processes. In a large repository, prioritize costly failures and name unread areas.
-3. Establish the expected load from project evidence and state the assumption. Check wrong results/crashes/edge cases; injection/secrets/missing trust checks/data loss; races, repeated work, unbounded state, per-item queries and unsuitable complexity; meaningful tests for risky logic; real slowdowns; dead or speculative code, duplicate responsibilities, avoidable dependencies and unrelated jobs coupled in one function.
-4. Require a concrete input or situation and its consequence for every finding; re-read to verify it. Before calling code unused, search callers, tests, fixtures, configuration and dynamic/string references. A documented shortcut is a deliberate limit unless actual expected use exceeds it. Do not report taste, vague worries or arbitrary function-length rules.
-5. Propose the smallest readable fix that preserves behavior and safeguards. Prefer existing project code (name its path), native/standard features or deletion when justified. Split by independent responsibility only; do not invent layers or configuration.
-6. Explain what the change/repository does in two or three sentences, then numbered Must fix / Should fix / Nice to have groups, omitting empty groups. Each finding gives location, what the code does, the concrete problem, the fix and the consequence of leaving it. For an audit, default to 20 displayed findings and state the omitted count; group or append details so no material risk disappears, and provide the full findings when requested.
-7. End with a supported verdict, quantified removable lines/dependencies only when measured from actual findings, and coverage/unchecked limits. If nothing was found, state that and what was checked; do not imply proof that no defect exists.
+0. **Read the original first.** Read whole, before working, the packaged original of the requested intent. It is the method in the source's own words:
+   - a change review: `<package_root>/scripts/ponytail/skills/ponytail-review/SKILL.source.md`;
+   - a repository or folder audit: `<package_root>/scripts/ponytail/skills/ponytail-audit/SKILL.source.md`.
+   The steps below are an index into its four sections. Where this body and the original differ, the original wins, except for the changes listed under `## Sources`, "Changes for coexistence".
+1. Establish scope. Change review: "Review what the user names: uncommitted or staged changes, a branch, a PR link, or files. Nothing named: the uncommitted changes, or the last commit if there are none." Audit: "Audit what the user names: a folder, a package, or the whole repo. Nothing named: the whole repo."
+2. Read before judging: `## 1. Understand first` (review) or `## 1. Map first` (audit), every bullet. Both end the same way: find the expected load, "Judge scale against that, and say which load you assumed." Audit of a big repository: "go deep where a mistake costs the most, not file by file. Say which parts you did not read."
+3. Look for the six classes of `## 2. Look for`, in its order and with its lists: Bug, Risk, Scale, Missing test, Speed, Lean.
+4. Apply `## 3. Check before you report` to every finding: "Every finding needs a concrete case: "this input or situation leads to this wrong result". No case, no finding." "A shortcut marked with a `shortcut:` (or older `ponytail:`) comment that names its limit is a decision, not a finding, unless the expected load already crosses it." "No style taste, no "consider", no vague worries."
+5. Fix proposals, same section: "Propose the smallest fix that works. Prefer fixes that delete code. Never add layers, frameworks or config the problem does not need."
+6. Write the report as `## 4. Output` has it: its opening line, the three groups (Must fix, Should fix, Nice to have; "skip empty groups"), findings numbered across all groups, "Every finding has all four parts, each one or two short sentences" (What this is, Problem, Fix, If we skip it). Audit only: "At most 20 findings; if you left smaller ones out, say how many."
+7. End as `## 4. Output` has it: the `Verdict:` line, the `Lean:` line "when lean findings exist", the `Not checked:` line, and its "Nothing found:" form.
 
 ## Output handoff
 
@@ -32,22 +36,26 @@ Return `code_review_findings` (numbered findings and verdict) and `code_review_c
 ## Specifics
 
 - Work-map's per-slice acceptance review remains part of implementation; this report is a separate step only when that report is requested. Design-review retains design-system/accessibility/visual ownership; this capability owns software-behavior findings.
-- Follow the user's language and report format; upstream's fixed English wording is illustrative. Apply fixes only when the user also requests implementation, through the authorized implementation step.
+- Apply fixes only when the user also requests implementation, through the authorized implementation step.
 - Git/search/test tools are assessed case by case. The selected sources prescribe no runtime installation procedure; do not invent an upstream claim about one. There is no adopted hook or background work.
 
 ## Checks
 
 - **target_and_load_stated**: the selected scope and expected-load assumption are explicit.
 - **connected_flows_inspected**: relevant callers and end-to-end flows were read or recorded as gaps.
-- **findings_have_concrete_evidence**: every finding has a reproducible situation, confirmed location, smallest fix and consequence.
-- **limits_respected**: documented shortcuts, requested scope and the audit's 20-finding display default were respected without silently losing material risks or requested full findings; omissions are disclosed.
+- **findings_have_concrete_evidence**: every finding has a concrete case, re-read and confirmed lines, the smallest fix that works and all four parts.
+- **limits_respected**: documented shortcuts and the requested scope were respected; an audit shows at most 20 findings and says how many smaller ones were left out.
 - **report_only**: source code was not changed.
 
 ## Sources
 
-- Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) — `skills/ponytail-review/SKILL.md` and `skills/ponytail-audit/SKILL.md`, especially Understand/Map first, Look for, Check before you report and Output.
+- Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) — `skills/ponytail-review/SKILL.md` and `skills/ponytail-audit/SKILL.md`, packaged as `<package_root>/scripts/ponytail/skills/ponytail-review/SKILL.source.md` and `<package_root>/scripts/ponytail/skills/ponytail-audit/SKILL.source.md` and read whole at run time.
 - AI mapping: ponytail-review → engineering.change-review; ponytail-audit → engineering.codebase-audit. One report responsibility preserves two scopes; source names alone did not decide the merge. Outputs are separate from design-review's findings/fixes and TokenEconomizer's measured reports.
-- Original lifecycle hooks, native UI modules and mode state are outside this curated selection; `hooks: []` does not claim the upstream has no hooks. Persona, slash routing, fixed English wording and plugin installation were not adopted.
+- Changes for coexistence (ADR-0017):
+  - The frontmatter of both files (their trigger phrases, `/ponytail-review`, `/ponytail-audit`) is not carried: the coordinator classifies by meaning.
+  - "so the user can say "fix 2 and 5"": the numbering is kept, but this step fixes nothing (the source says the same: "changes no code"). A fix request is a separate implementation step (factory contract: one capability per step).
+  - The report is also handed over as `code_review_findings` and `code_review_coverage` through the coordinator (factory contract: output handoff). Its wording and format stay the source's.
+- Original lifecycle hooks, native UI modules and mode state are outside this curated selection; `hooks: []` does not claim the upstream has no hooks. Slash routing and plugin installation were not adopted.
 
 
-Harmonized by: `prompts/harmonizer.md` (2026-11-12). Original skill files are intake-only; their methods are restated above.
+Harmonized by: `prompts/harmonizer.md` (2026-11-12). Re-read against the pinned originals under ADR-0017: the body indexes the packaged original skill files, which are the method.

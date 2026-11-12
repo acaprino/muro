@@ -101,7 +101,10 @@ def test_procedures_match_the_router_and_keep_source_provenance():
         assert f"skills/{name}/SKILL.md" in mapped, name
     assert COMMIT in caps["work-map"].body.split("## Sources", 1)[1]
     assert f"<package_root>/scripts/{SOURCE}/{BENCHMARK}" in caps["engineering-guidance"].body
-    assert all(f"<package_root>/scripts/{SOURCE}/skills/" not in cap.body for cap in caps.values())
+    # ADR-0017: the engineering capabilities read the packaged originals; the rules file is in the policy only.
+    for name in (*PROCEDURES, "work-map"):
+        assert f"<package_root>/scripts/{SOURCE}/skills/" in caps[name].body, name
+    assert all(CORE not in cap.body.split("## Sources", 1)[0] for cap in caps.values())
 
 
 def test_new_outputs_have_one_owner_without_taking_design_or_cost_outputs():
