@@ -105,11 +105,14 @@ checks and 1 installed-Pi check. Linux, Python 3.13.
 
 ## Open points for the owner
 
-1. **GenOffice provider commands.** The limits "no user files or confidential
-   content to `search`, `image`, `media` unless asked" were Muro's, with no
-   source and no collision, so they were removed. The source's disclosure that
-   these commands send data off the machine stays. Put them back only as a
-   stated package principle.
+1. **GenOffice provider commands — decided.** The limits "no user files or
+   confidential content to `search`, `image`, `media` unless asked" were
+   Muro's, with no source and no collision, so they were removed. Owner, same
+   day: "io eliminerei in generale questo limite per tutto muro". It is now a
+   factory rule (AGENTS.md, `prompts/intake.md`, `prompts/harmonizer.md`,
+   ADR-0017 amendment). A search of the factory and of the 29 capabilities
+   found no other limit of this kind: what remains are statements of what
+   leaves the machine, in the source's words or in a tool's purpose.
 2. **The design system prompt travels again as a file**, read by chapter. It
    reverses "non ha senso" of the ADR-0016 amendment, because seven
    capabilities now read it. The alternative is to quote the chapters inside

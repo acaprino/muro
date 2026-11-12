@@ -185,7 +185,9 @@ coexistence under the package's principles (Delivery protocol, "The content
 stays the source's"), never for size, style or taste, and record each change
 with the collision that required it in `## Sources`. A short body that sends
 the host to the packaged original for the full method changes the place of the
-content, not the content.
+content, not the content. Add no limit of your own on what a source's tool or
+command may send off the machine: carry the source's own statement of what
+leaves it, and leave permission to the host and the user.
 
 Preserve actionable knowledge and source-specific limits. Strip upstream public
 commands, installation of the skill or plugin itself and competing routing

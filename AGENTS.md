@@ -34,6 +34,15 @@ where it states a rule and lists every difference with its collision in
 the release lays them out (the factory drops `skills/<source-id>/`) and never
 write the heading literal of the Sources section inside a step.
 
+Owner decision of 2026-11-12 ("io eliminerei in generale questo limite per tutto muro"): Muro adds no limit of
+its own on what an absorbed tool or command may send off the machine (a file,
+a query, content to a provider), in any package. An earlier harmonization had
+written "not unless the user asks" on three GenOffice commands with no source
+behind it. The source's own statement of what leaves the machine is carried as
+content, a tool's purpose may say that data leaves, and the host's permissions
+and the user's instructions stay authoritative; intake, harmonization and
+capability bodies never add a restriction the source does not state.
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin

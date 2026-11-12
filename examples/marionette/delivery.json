@@ -108,7 +108,7 @@
       "content": "skill list|install|path, mcp install|uninstall|list and install-cli; search, image and media as standalone uses",
       "form": "dropped",
       "targets": [],
-      "reason": "Installing or registering the source itself is never carried (office-files, Sources 'Not adopted'). The provider-backed commands send queries or files off the machine and give no standalone intent: they remain optional, disclosed steps inside the deck pipeline (office-deck, Sources). Re-read of 2026-11-12 (ADR-0017): three limits the earlier harmonization had added on those commands (no user files or confidential content to them unless asked) are not in the source and no collision requires them, so they were removed; the source's own disclosure that only these commands send data off the machine is carried. Open for the owner: whether Marionette should have a privacy principle that puts them back."
+      "reason": "Installing or registering the source itself is never carried (office-files, Sources 'Not adopted'). The provider-backed commands send queries or files off the machine and give no standalone intent: they remain optional, disclosed steps inside the deck pipeline (office-deck, Sources). Re-read of 2026-11-12 (ADR-0017): three limits the earlier harmonization had added on those commands (no user files or confidential content to them unless asked) are not in the source and no collision requires them, so they were removed; the source's own disclosure that only these commands send data off the machine is carried. Owner decision of the same day: the limit is removed for the whole factory, not only here (AGENTS.md)."
     },
     {
       "source": "explain-this",

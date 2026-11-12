@@ -16,7 +16,9 @@ responsibilities, real prerequisites and useful alternatives; source repositorie
 are provenance, not branches. Preserve methods and limits in the source's own words.
 Rewrite only where harmonization and coexistence require it (two owners of one
 output, contradictory rules, competing routing), never for size, style or taste,
-and record each rewrite with the collision that required it.
+and record each rewrite with the collision that required it. Never add a
+restriction on data leaving the machine that the source does not state; say
+what leaves, in the source's words, and nothing more.
 
 For each changed relationship, record a short decision with supporting source
 paths/sections: what overlaps, why the result is a merge, an alternative, a required

@@ -144,6 +144,20 @@ What follows is how it was done; the wording is not separately approved.
   routing eval was not rerun (no intent, role or output changed). Open points
   for the owner are in `docs/verification/2026-11-12-capabilities-reread.md`.
 
+## Amendment of 2026-11-12: no added limit on data leaving the machine
+
+The re-read removed three limits the earlier harmonization had put on
+GenOffice's provider commands and asked the owner whether to restore them as a
+package principle. Owner: "io eliminerei in generale questo limite per tutto muro".
+
+Decision (the removal for the whole factory is the owner's; the wording is
+not separately approved): Muro adds no restriction of its own on what an
+absorbed tool or command may send off the machine. The source's statement of
+what leaves is content and is carried; a tool's purpose may say that data
+leaves; the host's permissions and the user's instructions decide. Consequence:
+a host that allows it may pass a user's file to a provider-backed command
+without a question from the package.
+
 ## Rejected alternatives
 
 - **RA-001: keep a synthesis and raise the limit.** The limit was one cause, the
