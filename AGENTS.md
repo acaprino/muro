@@ -27,8 +27,12 @@ owners of one output, contradictory rules of two sources, routing or activation
 that competes with the coordinator, a step no host can run. Size, style and
 taste are never reasons; when content does not fit a limit, its form changes,
 not its words. Every change is recorded with the collision that required it
-(ADR-0017). Capabilities written before this rule restate their sources and
-have not all been re-read against it.
+(ADR-0017). A capability body is an index into the packaged originals: it
+names the files the host reads whole, says the original wins, quotes the source
+where it states a rule and lists every difference with its collision in
+`## Sources` under "Changes for coexistence (ADR-0017)". Name packaged paths as
+the release lays them out (the factory drops `skills/<source-id>/`) and never
+write the heading literal of the Sources section inside a step.
 
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`

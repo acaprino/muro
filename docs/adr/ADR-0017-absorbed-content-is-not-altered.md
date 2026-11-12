@@ -103,7 +103,8 @@ carried. The skill's frontmatter is not: it registers the original as a skill.
   estimate). That is what the two originals cost when installed separately.
 - `tests/test_policy_original_wording.py` reads both pinned originals from
   their repositories and checks the policy line by line.
-- **Not yet applied to the rest of the catalog.** Capability bodies written
+- **Not yet applied to the rest of the catalog** (state on the day of the
+  decision; see the amendment below, which applied it). Capability bodies written
   before this rule restate their sources (the design capabilities were checked
   on purpose for low verbatim overlap). They have not been re-read against it.
   Where a body's packaged original is read at run time the content is intact;
@@ -111,6 +112,37 @@ carried. The skill's frontmatter is not: it registers the original as a skill.
   travels.
 - A source's own persona or identity statement is content. It is scoped, not
   removed, unless it collides with something that cannot be scoped.
+
+## Amendment of 2026-11-12: applied to the 29 capabilities
+
+Owner, after the report that the catalog had not been re-read: "falle tutte".
+What follows is how it was done; the wording is not separately approved.
+
+- Every capability was re-read by a host LLM against its originals at the
+  pinned commits. Each body now names the packaged files (and, for the design
+  system prompt, the chapters by number and title) that the host reads whole
+  before working, says that the original wins, quotes the source where it
+  states a rule, and lists every difference with its collision under
+  "Changes for coexistence (ADR-0017)" in `## Sources`.
+- An original a capability must read has to travel. `claude/system-prompt.md`
+  and the six Ponytail `skills/*/SKILL.md` left `intake_only_paths`; the
+  Ponytail rules file stays intake-only because the policy carries it whole.
+  This reverses, for the prompt, the ADR-0016 amendment "a transformed original
+  is not shipped": that amendment's own rule is that a release carries a file
+  when a capability reads it at run time, and now seven do. It is still never
+  session text.
+- Drops that had a reason of taste were undone: the persona, the fixed closing
+  lines and the English templates of the on-demand Ponytail skills; three
+  limits on GenOffice's provider commands that no source states; rules the
+  earlier bodies had added to open-paper-skills, explain-this and
+  ui-ux-pro-max (one of them a `--rtl` flag that does not exist).
+- Cost: the 29 bodies went from 239,833 to about 376,000 characters, and a
+  step now reads its originals as well (a design step up to 13 chapters, about
+  25,000 characters, an estimate). The classifier's brief index is unchanged.
+- Limits: fidelity was judged by the re-reading AI, with quoted sentences
+  checked by script against the pinned files; no host session was run, and the
+  routing eval was not rerun (no intent, role or output changed). Open points
+  for the owner are in `docs/verification/2026-11-12-capabilities-reread.md`.
 
 ## Rejected alternatives
 
