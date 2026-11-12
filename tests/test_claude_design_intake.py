@@ -70,8 +70,8 @@ def test_manifest_pins_head_and_selects_the_prompt_and_its_skills_only():
     assert src["commit"] == COMMIT and src["pin"] == "head" and "release" not in src
     assert src["license"] == "MIT" and src["copyright"] == "Copyright (c) 2026 Trystan Sarrade"
     assert src["selected_paths"] == ["claude/system-prompt.md", "claude/skills/**"]
-    # The prompt was read and restated; no step reads the original, so it does not travel in the release.
-    assert src["intake_only_paths"] == ["claude/system-prompt.md"]
+    # Absorbed content is not altered (ADR-0017): the capabilities read the prompt's chapters in its own words.
+    assert "intake_only_paths" not in src
     assert "codex/**" in src["excluded_paths"] and "README.md" in src["excluded_paths"]
     assert src["runtime_deps"] == [] and "not injected into every session" in src["intake"]["goal"]
     for name in SKILLS:                                   # an installed original would compete for the same requests
@@ -143,7 +143,7 @@ def test_delivery_carries_the_source_on_demand_only():
     by_content = {d["content"]: d for d in mine}
     whole = next(d for c, d in by_content.items() if c.startswith("claude/system-prompt.md as a whole"))
     assert whole["form"] == "dropped" and "2026-11-12" in whole["reason"] and "35,565 characters" in whole["reason"]
-    assert "intake_only_paths" in whole["reason"] and "not shipped" in whole["reason"]
+    assert "ADR-0017" in whole["reason"] and "source's own words" in whole["reason"]
     routing = next(d for c, d in by_content.items() if c.startswith("Chapter 20"))
     assert routing["form"] == "dropped" and "routing" in routing["reason"]
     covered = set()                                       # every chapter of the prompt has a decision
@@ -242,9 +242,9 @@ def release(tmp_path_factory):
 
 def test_release_packages_the_source_as_reference_and_registers_nothing(release):
     helper = release / "scripts" / SOURCE / "claude"
-    # A transformed original is not shipped: the prompt lives in the capability bodies, the skills are read at run time.
-    assert not (helper / "system-prompt.md").exists()
-    assert not list(release.rglob("system-prompt.md"))
+    # The prompt travels once, as a reference the design capabilities read by chapter; it is never session text.
+    assert (helper / "system-prompt.md").is_file()
+    assert {p.relative_to(release).parts[0] for p in release.rglob("system-prompt.md")} <= {"scripts", "adapters"}
     assert sorted(p.stem for p in (helper / "skills").glob("*.md")) == sorted(SKILLS)
     assert not (release / "scripts" / SOURCE / "codex").exists()
     # Every packaged reference a capability names exists in the release.

@@ -67,9 +67,9 @@ def test_manifest_pins_the_release_and_selects_only_the_curated_methods():
     assert (src["pin"], src["release"], src["commit"]) == ("release", "v5.3.3", COMMIT)
     assert src["license"] == "MIT" and src["copyright"] == "Copyright (c) 2026 DietrichGebert"
     assert set(src["selected_paths"]) == {CORE, BENCHMARK, *(f"skills/{name}/SKILL.md" for name in SKILLS)}
-    # Canonical instructions are synthesized at intake. Only the published
-    # benchmark is a reference the requested runtime procedure still reads.
-    assert set(src["intake_only_paths"]) == set(src["selected_paths"]) - {BENCHMARK}
+    # The rules file is carried whole in the permanent policy; the six skills and the
+    # benchmark are packaged and read by the engineering capabilities (ADR-0017).
+    assert src["intake_only_paths"] == [CORE]
     assert {"hooks/**", ".claude-plugin/**", ".codex-plugin/**", ".opencode/**", "pi-extension/**"} <= set(src["excluded_paths"])
     assert src["runtime_deps"] == [] and src["intake"]["goal"].strip()
     assert set(SKILLS) <= set(manifest["plugin"]["replaces"])

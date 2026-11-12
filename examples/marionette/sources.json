@@ -477,12 +477,9 @@
         "codex/**",
         "README.md"
       ],
-      "intake_only_paths": [
-        "claude/system-prompt.md"
-      ],
       "runtime_deps": [],
       "intake": {
-        "goal": "Read the system prompt chapter by chapter and the fourteen procedural skills, and decide the delivery form of each part with the delivery protocol. Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the system prompt is not injected into every session; its content becomes capabilities found from context, harmonized and coordinated with the others. Compare its design rules, review passes and production procedures with the existing design, motion, deck and explainer capabilities and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Leave out the Codex variant and the source's own list of when to invoke which skill. Record that the upstream describes itself as a reverse-engineered rendition of Anthropic's Claude Design system prompt, and adapt its methods in your own words rather than copying."
+        "goal": "Read the system prompt chapter by chapter and the fourteen procedural skills, and decide the delivery form of each part with the delivery protocol. Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the system prompt is not injected into every session; its content becomes capabilities found from context, harmonized and coordinated with the others. Compare its design rules, review passes and production procedures with the existing design, motion, deck and explainer capabilities and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Leave out the Codex variant and the source's own list of when to invoke which skill. Record that the upstream describes itself as a reverse-engineered rendition of Anthropic's Claude Design system prompt, and carry its methods in the source's own words (owner rule of 2026-11-12, ADR-0017, which replaces the earlier instruction to restate them): the capabilities read the packaged skills and the chapters of the prompt they apply, and change wording only for a recorded collision."
       }
     },
     {
@@ -529,13 +526,7 @@
         "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. Owner rule of 2026-11-12: the source's own rules file is carried in its own words as permanent policy, active by default and scoped to code work; its wording changes only where coexistence with another source or the catalog requires it, each change recorded in delivery.json. The intake also enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. In the on-demand skills original persona and compulsory wording, and for the whole source slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
       },
       "intake_only_paths": [
-        ".agents/rules/ponytail.md",
-        "skills/ponytail/SKILL.md",
-        "skills/ponytail-review/SKILL.md",
-        "skills/ponytail-audit/SKILL.md",
-        "skills/ponytail-debt/SKILL.md",
-        "skills/ponytail-gain/SKILL.md",
-        "skills/ponytail-help/SKILL.md"
+        ".agents/rules/ponytail.md"
       ]
     },
     {
