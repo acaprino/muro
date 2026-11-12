@@ -180,6 +180,13 @@ the release").
 
 ## Extraction rules
 
+Carry the source's content in its own words. Rewrite only for harmonization and
+coexistence under the package's principles (Delivery protocol, "The content
+stays the source's"), never for size, style or taste, and record each change
+with the collision that required it in `## Sources`. A short body that sends
+the host to the packaged original for the full method changes the place of the
+content, not the content.
+
 Preserve actionable knowledge and source-specific limits. Strip upstream public
 commands, installation of the skill or plugin itself and competing routing
 policies; keep how its runtime dependencies are checked and installed. Do not execute

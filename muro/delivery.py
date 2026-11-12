@@ -8,12 +8,23 @@ from typing import Any
 
 DELIVERY_FILE = "delivery.json"
 FORMS = ("capability", "always-on", "hook", "dropped")
-# Text every receiving prompt pays for. Exact token cost depends on the model.
-MAX_ALWAYS_ON = 2000
+# Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
+# permanent place: one allowance for each source with an always-on decision (owner, 2026-11-12).
+# The allowance is sized so a real always-on source fits in its own words: content is never shortened to fit
+# (the larger of Marionette's two, i-have-adhd, is about 7000 characters). Exact token cost depends on the model.
+ALWAYS_ON_PER_SOURCE = 6000
 # Arbitrary source command hooks; native prompt registration is supported on every host.
 HOOK_HOSTS = ("claude-code", "codex")
 KNOWN_HOSTS = ("claude-code", "codex", "pi", "opencode", "hermes")
 SESSION_MATCHER = "startup|resume|clear|compact|fork"
+
+
+def always_on_limit(document: Any) -> int:
+    """Characters `always_on` may hold: one allowance per source with an always-on decision. Counts, never judges."""
+    decisions = document.get("decisions") if isinstance(document, dict) else None
+    sources = {item["source"] for item in decisions if isinstance(item, dict) and item.get("form") == "always-on"
+               and isinstance(item.get("source"), str)} if isinstance(decisions, list) else set()
+    return ALWAYS_ON_PER_SOURCE * len(sources)
 _DECISION_KEYS = {"source", "content", "form", "targets", "reason"}
 _WIRING_KEYS = {"host", "capability", "event", "matcher", "run"}
 
@@ -82,8 +93,11 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
             errors.append("always_on text is present but no decision has form always-on")
         if not _text(text):
             errors.append("always_on must be nonempty text")
-        elif len(text) > MAX_ALWAYS_ON:
-            errors.append(f"always_on exceeds {MAX_ALWAYS_ON} characters: every session pays for it")
+        else:
+            limit = always_on_limit(document)
+            if limit and len(text) > limit:
+                errors.append(f"always_on exceeds {limit} characters ({ALWAYS_ON_PER_SOURCE} for each source with "
+                              f"an always-on decision, {limit // ALWAYS_ON_PER_SOURCE} here): every session pays for it")
 
     wirings = document.get("hooks", [])
     if not isinstance(wirings, list):

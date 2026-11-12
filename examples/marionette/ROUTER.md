@@ -95,13 +95,13 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   A motion-spec overrides the transition band; design-guidance stays lookup/report. Eval:
   32 of 33 historically; db-migration was later corrected as in scope.
 
-- ponytail v5.3.3 and i-have-adhd v0.4.1 (2026-11-12): one permanent policy for
-  complete work and clear conversation; preserves domain engines, formats and checks.
+- ponytail v5.3.3 and i-have-adhd v0.4.1 (2026-11-12): one permanent policy that
+  carries both in their own words; three marked lines let them coexist with the catalog.
   Ponytail enriches work-map; review/audit share engineering-review; shortcut ledgers
   use engineering-debt; method/benchmark explanations use engineering-guidance.
   No forced prerequisite or duplicate output owner. i-have-adhd adds no procedure.
-  delivery.json explains exclusions of source mode controls, persona, UI and telemetry.
-  Restated originals are intake-only; the benchmark travels. Native policy needs the
+  delivery.json explains exclusions of source mode controls, UI and telemetry.
+  Originals carried as text are intake-only; the benchmark travels. Native policy needs the
   complete adapter, acts before classification and creates no step for style alone.
 <!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run
 files not selected; no maintained source for CSS scroll-driven animation; the

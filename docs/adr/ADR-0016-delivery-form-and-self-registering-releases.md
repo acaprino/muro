@@ -110,7 +110,7 @@ approved.
    AI from the catalog, never pasted from a source.
 4. **Python validates and emits, nothing more** (`muro/delivery.py`): exact
    keys, known sources and capabilities, a decision for every source, a text of
-   at most 2000 characters, and a form with something behind it (text for
+   at most 6000 characters per contributing source (amendment below), and a form with something behind it (text for
    always-on; for a hook, a catalog hook with the new policy `active` and a
    wiring). It never picks a form. An invalid document stops the build.
 5. **A release registers what its document declares.** Every adapter emits its
@@ -187,7 +187,8 @@ amendment of 2026-11-11 are superseded by this record.
 - **INV-001**: no adapter contains a `hooks/` folder unless the package's
   `delivery.json` declares session text or a wiring for that host.
 - **INV-002**: `always_on` is present exactly when a decision has form
-  `always-on`, and never exceeds 2000 characters.
+  `always-on`, and never exceeds 6000 characters for each source with an
+  `always-on` decision.
 - **INV-003**: a capability hook has policy `active` exactly when a `hook`
   decision targets the capability and a wiring exists.
 - **INV-004**: when `delivery.json` exists, every source has a decision.
@@ -201,7 +202,7 @@ amendment of 2026-11-11 are superseded by this record.
 
 ## Consequences
 
-- Cost: at most 2000 characters of policy in the prompts receiving it; exact
+- Cost: at most 6000 characters of policy per contributing source in the prompts receiving it; exact
   tokens and caching depend on the host/model. Native registrations make no
   additional model call. Codex policy delivery starts a trampoline and launcher
   process per matched session/subagent event. Each source command hook starts
@@ -297,6 +298,37 @@ literal, so a body that reaches the file through an abbreviation it defines is
 not caught; `--validate` checks plain paths only, the build checks every match.
 Evidence: `tests/test_intake_only_paths.py` and
 `docs/verification/2026-11-12-claude-design-intake.md`.
+
+## Amendment of 2026-11-12: the always-on budget is proportional
+
+The first implementation capped `always_on` at 2000 characters in total. With
+two sources in it (Ponytail and i-have-adhd) Marionette's policy came out at
+1,999 characters against roughly 10,000 of source text, and rules were softened
+or left out. Told that the fixed limit was one cause, the owner answered: "mhh
+no, deve essere proporzionale al numero di intake che ci vanno dentro".
+
+Decision (the proportionality is the owner's; the unit is an implementation
+choice): the limit is `ALWAYS_ON_PER_SOURCE` for each distinct
+source that has a decision of form `always-on`, as one shared budget
+(`always_on_limit` in `muro/delivery.py`). Python counts sources; it does not
+judge which source deserves a place. The same function bounds the text the
+packaged `session-context` command prints, and the Hermes registration no longer
+carries a fixed `max_chars=2000`.
+
+The unit was first kept at 2000. The same day the owner ruled that absorbed
+content is never altered except for harmonization and coexistence (ADR-0017),
+so a limit may not force a source to be shortened: the unit became 6000, sized
+on Marionette's two always-on sources (i-have-adhd, about 7000 characters, and
+Ponytail, about 2800, sharing one budget).
+
+Cost: up to 6000 more characters in every receiving prompt for each further
+source the AI gives a permanent place (about 1,500 tokens at four characters per
+token, an estimate). Host ceilings are not enforced by the factory and were not
+verified: Codex's documentation gives hook context a default limit of 2,500
+tokens, and the Hermes contract test assumes a section of at most 4,000
+characters, so a long policy may exceed either. Evidence: `tests/test_delivery.py`
+(`test_the_always_on_budget_is_proportional_to_the_sources_that_contribute` and
+the two tests after it).
 
 ## Amendment of 2026-11-12: an adapter installs with the host's own command
 

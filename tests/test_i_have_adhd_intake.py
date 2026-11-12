@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from muro import parse_capabilities
-from muro.delivery import MAX_ALWAYS_ON, validate_delivery
+from muro.delivery import ALWAYS_ON_PER_SOURCE, always_on_limit, validate_delivery
 from muro.runtime import Coordinator
 from routing_helpers import decision
 
@@ -60,7 +60,10 @@ def test_delivery_uses_policy_without_a_parallel_capability_or_source_hook():
     assert any(CANONICAL in item["content"] and item["form"] == "always-on" for item in mine)
     # Pure policy validates with no capabilities at all: it needs no placeholder
     # output producer, discovery entry or dependency to get into the native prompt.
-    assert validate_delivery({"decisions": mine, "always_on": document["always_on"]}, [], {SOURCE}) == []
+    # The text and its budget are shared with the other contributing sources, so their decisions count too.
+    shared = [item for item in document["decisions"] if item["form"] == "always-on" and item["source"] != SOURCE]
+    assert validate_delivery({"decisions": mine + shared, "always_on": document["always_on"]}, [],
+                             {SOURCE, *(item["source"] for item in shared)}) == []
     assert SOURCE not in {cap.id for cap in parse_capabilities(PACKAGE / "capabilities")}
     entries = read_json("entries.json")["entries"]
     assert not any(SOURCE in entry["capabilities"] for entry in entries)
@@ -71,7 +74,9 @@ def test_combined_policy_has_a_bounded_cost_and_reasoned_source_contributions():
     manifest = read_json("sources.json")
     document = read_json("delivery.json")
     policy = document.get("always_on")
-    assert isinstance(policy, str) and policy.strip() and len(policy) <= MAX_ALWAYS_ON == 2000
+    # The budget is one allowance per source with an always-on decision (owner, 2026-11-12), two here.
+    assert always_on_limit(document) == 2 * ALWAYS_ON_PER_SOURCE
+    assert isinstance(policy, str) and policy.strip() and len(policy) <= always_on_limit(document)
     contributions = {item["source"] for item in document["decisions"] if item["form"] == "always-on"}
     assert {SOURCE, "ponytail"} <= contributions
     assert validate_delivery(document, parse_capabilities(PACKAGE / "capabilities"),

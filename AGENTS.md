@@ -19,6 +19,17 @@ whether a package "should" cover a domain its sources cover, never hide an
 absorbed capability from discovery, and never treat a domain as a pending
 decision: to change the scope, add or remove a source (ADR-0015).
 
+Owner rule of 2026-11-12: Muro never alters absorbed content. The AI chooses
+the form and the place of each part (capability, permanent policy, hook,
+command) and carries it in the source's own words. It may rewrite content only
+to guarantee harmonization and coexistence under the package's principles: two
+owners of one output, contradictory rules of two sources, routing or activation
+that competes with the coordinator, a step no host can run. Size, style and
+taste are never reasons; when content does not fit a limit, its form changes,
+not its words. Every change is recorded with the collision that required it
+(ADR-0017). Capabilities written before this rule restate their sources and
+have not all been re-read against it.
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin
@@ -112,7 +123,10 @@ installation, publication or replacement of existing dist output without request
   source becomes in this package, decided by the host AI at intake and reviewed
   at harmonization: `decisions` of `{source, content, form, targets, reason}`
   with form `capability`, `always-on`, `hook` or `dropped`, the `always_on`
-  session text (AI-written from the catalog, 2000 characters at most) and `hooks`
+  session text (the contributing sources' own words plus marked coexistence
+  lines; at most 6000 characters for each source with an `always-on` decision,
+  owner rule of 2026-11-12: the limit is proportional to the intakes that go
+  into it) and `hooks`
   wirings `{host, capability, event, matcher, run}`. Both preparations append the
   prompt. `muro/delivery.py` checks shape, references, a decision for every
   source and that each form has something behind it, then emits only what the

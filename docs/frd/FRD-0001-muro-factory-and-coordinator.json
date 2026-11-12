@@ -266,7 +266,7 @@
           "excerpt": "It never picks a form. An invalid document stops the build."
         }
       ],
-      "text": "Every intake records in delivery.json what each part of a source becomes (on-demand capability, permanent session policy, active hook or dropped) with a source-grounded reason; the host AI makes that judgment with prompts/delivery.md at intake and reviews it at harmonization. Python validates shape, references, a decision for every source, the 2000-character policy cap and declared active hook ownership, and never chooses a form. Loading the complete generated native plugin/package registers only its declared delivery, subject to the host's own trust, feature and permission controls; intake, build and classification never install, activate or modify host configuration. All five adapters provide a native policy channel; arbitrary source command-hook wirings are currently accepted only for Claude Code and Codex, with unsupported wirings rejected and host requirements stated in INSTALL.md. Packages without delivery.json retain no automatic policy or hook registration."
+      "text": "Every intake records in delivery.json what each part of a source becomes (on-demand capability, permanent session policy, active hook or dropped) with a source-grounded reason; the host AI makes that judgment with prompts/delivery.md at intake and reviews it at harmonization. Python validates shape, references, a decision for every source, the policy cap of 6000 characters for each source with an always-on decision (one shared budget, proportional to the contributing intakes) and declared active hook ownership, and never chooses a form. Loading the complete generated native plugin/package registers only its declared delivery, subject to the host's own trust, feature and permission controls; intake, build and classification never install, activate or modify host configuration. All five adapters provide a native policy channel; arbitrary source command-hook wirings are currently accepted only for Claude Code and Codex, with unsupported wirings rejected and host requirements stated in INSTALL.md. Packages without delivery.json retain no automatic policy or hook registration."
     },
     {
       "id": "REQ-016",
@@ -354,6 +354,17 @@
         }
       ],
       "text": "Each generated adapter can be installed with its host's own command: the Claude Code and Codex adapter folders carry a single-plugin marketplace manifest (.claude-plugin/marketplace.json, .agents/plugins/marketplace.json) whose plugin source is the folder itself, and INSTALL.md of Claude Code, Codex, Pi and OpenCode ends with an Install section giving the command and what is active after it. A command appears there only after it ran on the real host. The Codex section states that declared hooks, and the policy they deliver, are not active until the user trusts them in /hooks."
+    },
+    {
+      "id": "REQ-021",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0017-absorbed-content-is-not-altered.md",
+          "excerpt": "content is carried in the source's own words, whole"
+        }
+      ],
+      "text": "Absorbed content is carried in the source's own words in whatever form the AI chose for it (capability, permanent policy, hook). Its wording changes only to guarantee harmonization and coexistence under the package's principles, never for size, style or taste; each change is the smallest that removes the collision and is recorded with that collision in delivery.json or in the capability's Sources. When content exceeds a limit its form changes, not its words. In permanent policy every line that is not a source's is marked with the package name in square brackets."
     }
   ],
   "schema_version": 1,

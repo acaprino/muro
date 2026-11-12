@@ -112,12 +112,91 @@ established.
 
 ## What "active" means here
 
+(History: superseded the same day, see "the policy carries the originals".)
+
 The policy is the host AI's merge of both sources under the 2,000-character
 limit: 1,999 characters. The originals load 7,201 bytes (i-have-adhd
 `SKILL.md`) and 2,623 to 3,496 bytes (Ponytail rules file or central skill).
 Fixed rules of i-have-adhd, such as the five-item cap and a next action at the
 end of every reply, are recorded as dropped in `delivery.json`. This run checks
 that the policy is delivered, not that it equals the originals.
+
+## Correction, same day: the limit is proportional
+
+Told that the fixed 2,000-character limit was one cause of the shortened policy,
+the owner answered: "mhh no, deve essere proporzionale al numero di intake che
+ci vanno dentro". Changed in the factory, tests first (ADR-0016 amendment "the
+always-on budget is proportional"): 2,000 characters for each source with an
+`always-on` decision, one shared budget. Marionette has two such sources, so its
+limit is now 4,000. **Its policy text was not changed by this correction**: it
+is still the 1,999-character merge described above.
+
+| Command | Result |
+|---|---|
+| `python -m pytest -q tests/test_delivery.py`, before the code | collection error: `cannot import name 'ALWAYS_ON_PER_SOURCE'` |
+| delivery, Hermes, Codex, policy-only, i-have-adhd, native and Claude policy tests, after | `1 failed, 74 passed, 3 skipped` (the failure was a wrong source list in my new test), then `49 passed, 2 skipped in 11.00s` on the three files touched |
+| `--validate` on Marionette | `OK: capabilities and ROUTER.md valid` |
+| fresh `--build --out <scratch>` | built; the Hermes registration reads `max_chars=len(policy)` instead of a fixed 2000; `muro.py session-context` from the Codex adapter prints the policy |
+
+Not executed for this correction: a live session with a policy longer than
+2,000 characters on any host. Codex's hook-context limit and Hermes's section
+limit are host ceilings the factory does not check.
+
+## Correction, same day: the policy carries the originals
+
+Owner rule, confirmed with "confermo": "non deve mai alterare il contenuto Muro",
+"se non per garantire armonizzazione e coesistenza in base ai suoi principi",
+"solo in quel caso può riscriverne il contenuto delle skills ecc" (ADR-0017).
+Everything above this section describes the 1,999-character synthesis; the
+section "What 'active' means here" is now history.
+
+- Policy: 9,998 characters. The i-have-adhd `SKILL.md` body (blob `6c42757f`,
+  commit `1ecea199`, v0.4.1) and Ponytail's `.agents/rules/ponytail.md` (blob
+  `b314fa6e`, commit `7801d061`, v5.3.3), unchanged, plus a two-line header and
+  three lines marked `[Marionette]` (reply versus artifact, code scope, the end
+  of the reply). Composed by a script that refuses any input that is not the
+  pinned blob; the previous text is kept in the session scratch folder.
+- `delivery.json`: 58 decisions. The two `always-on` decisions name each change
+  and its collision; the i-have-adhd decision that had dropped the opening, the
+  every-turn rules and the numeric limits is gone.
+- Per-source allowance raised from 2,000 to 6,000 so the originals fit unchanged.
+- Rule written into `AGENTS.md`, the three factory prompts, ADR-0017 and FRD
+  REQ-021; both sources' `intake.goal` and the router record follow it.
+
+| Command | Result |
+|---|---|
+| `python -m pytest -q tests/test_policy_original_wording.py`, before | `7 failed` |
+| wording, delivery, both source intakes, Hermes and policy-binding tests, after | `73 passed, 2 skipped in 22.88s` |
+| `--validate` on Marionette | `OK: capabilities and ROUTER.md valid` |
+| fresh `--build --out <scratch>` | built; `policy.md` is 9,998 bytes in all five adapters |
+| `python -m pytest -q` (before this correction, with the proportional limit) | `436 passed, 8 skipped in 341.27s` |
+| `python -m pytest -q` (after it) | `1 failed, 439 passed, 8 skipped, 3 errors in 421.55s` |
+| `python -m pytest -q tests/test_live_host_fixes.py` (the file with those four) | `7 passed in 74.49s` |
+
+The four non-passing tests of the last full run failed with `OSError: [WinError
+112] Spazio su disco insufficiente` and `fatal: write error: No space left on
+device`: drive D: ran out of space during the run. Free space on C: and D: moved
+between a few hundred megabytes and several gigabytes during the day for reasons
+outside this work, and that is the likely cause of the unexplained failures in
+the earlier full runs, whose tracebacks were not kept. A full run that is green
+on the final tree has not been obtained.
+
+Real sessions with the 9,998-character policy, one each, release built after the
+correction. Probe for the first three: quote the `[Marionette]` sentence about
+closing a code-change reply (middle of the text) and the sentence starting
+"Never cut:" (its last line), and say where they sit.
+
+| Host | Result |
+|---|---|
+| Claude Code 2.1.322, `claude-sonnet-5-5`, `--plugin-dir` | both quoted in full; "in the system prompt, under Marionette session policy". 1 turn, 0 denials, 0.253874 USD. The owner's installed i-have-adhd was loaded too and the model reported its hook message separately |
+| Pi 1.4.0, `tri-llm-gateway/claude-sonnet-5-5` | both quoted in full; "inside the `<muro_policy_marionette>` block" |
+| OpenCode 2.2.5, `tri-llm-gateway/claude-sonnet-5-5` | both quoted in full; "System prompt, in the Marionette session policy section" |
+| Codex 0.167.2, session hook passed as a one-run override | asked for the shortcut comment format and for what follows the skipped-or-unchecked lines: `// shortcut: cache has no eviction, add eviction before caching an unbounded set of keys.` and `3`. Control without the hook: `// Intentional shortcut: [...]` and `NONE` |
+
+So the middle and the end of the longer text reach the model on all four; on
+Codex the hook context was not cut at this size. Still not executed: a session
+on an installed plugin, Codex's `/hooks` review, Hermes (its section-size limit
+is unknown), whether a model follows the rules over a real task, a second sample.
 
 ## Leftovers
 

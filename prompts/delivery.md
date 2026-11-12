@@ -13,6 +13,19 @@ itself whatever it needs: session text, hooks, tools, skills. That it may does n
 mean it should. Each thing that activates by itself is paid for in every session
 by a user who may be doing something unrelated, so each one needs its own reason.
 
+## The content stays the source's
+
+You choose the form and the place of each part. You do not rewrite it. Carry a
+source's content in its own words, whole, in whatever form you chose. Change the
+wording only for harmonization and coexistence under this package's principles:
+two owners of one output, rules of two sources that contradict each other, a
+routing or activation that competes with the coordinator, a step no supported
+host can run, a rule that would bend the work of another capability. Change it
+never for size, style, tone or taste. Make the smallest change that removes the
+collision and record in the decision's reason what was changed and which
+collision required it. When content does not fit a limit, change its form (move
+a part to a capability that reads the original), not its words.
+
 ## Forms
 
 - `capability`: knowledge or a procedure loaded on demand, when a task needs it.
@@ -64,8 +77,8 @@ package stops being true for every session once the package broadens.
 
 `selected_paths` are what you read. A release carries an original file only when
 a capability reads it at run time: a full method behind a short body, a script,
-data. When you restated a file's content in capability bodies or in the always-on
-text, or dropped it, and no step reads the original, the original does not
+data. When a file's content is carried inside capability bodies or inside the
+always-on text, or dropped, and no step reads the original file, the file does not
 travel: list it in the source's `intake_only_paths` in `sources.json`. It stays in
 the intake snapshot for the next pass and is left out of the package. Decide per
 file, not per source, and say in the decision's reason that the original is not
@@ -74,10 +87,18 @@ license notice either way: its text shaped what the package says.
 
 ## Always-on text
 
-Write it yourself from the selected source evidence and catalog; never paste a
-source's prompt. Give concise working guidance with explicit applicability,
-preserving the host's instructions, user requirements, permissions and the
-responsibilities of other capabilities. Keep it short (at most 2000 characters).
+Carry each contributing source's always-on text in its own words ("The content
+stays the source's"); do not condense or paraphrase it into guidance of your
+own. Add only the lines coexistence needs (the scope of a single-domain source,
+a collision between two sources, the boundary with what capabilities produce)
+and mark each of them with the package name in square brackets, so a reader can
+tell the source's words from yours. Preserve the host's instructions, user
+requirements, permissions and the responsibilities of other capabilities. The
+limit is 6000 characters for each source that has an `always-on` decision,
+shared by all of them (two contributing sources share 12000). That is a ceiling
+for the cost every session pays, not a length to reach and never a reason to
+shorten a source: if the text does not fit, move a part to an on-demand
+capability and say so in the reason.
 Scope domain-specific clauses to the work they govern; do not make a broad
 package act as a single-domain assistant. The adapters add the text through
 their native system/developer instruction channels, never as a user request.

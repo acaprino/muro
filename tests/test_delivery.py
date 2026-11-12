@@ -59,20 +59,66 @@ def test_the_always_on_budget_is_proportional_to_the_sources_that_contribute():
         decisions += [decision("always-on", [], source=name) for name in sources]
         return {"decisions": decisions, "always_on": "x" * size}
 
-    known = ("quiet", "a", "b", "c")
     unit = ALWAYS_ON_PER_SOURCE
     for sources in (["a"], ["a", "b"], ["a", "b", "c"]):
         limit = unit * len(sources)
         document = policy_of(sources, limit)
         assert always_on_limit(document) == limit
+        known = ("quiet", *sources)
         assert errors_for(document, sources=known) == []
         over = errors_for(policy_of(sources, limit + 1), sources=known)
-        assert over == [f"always_on exceeds {limit} characters ({unit} for each of the {len(sources)} sources "
-                        "with an always-on decision): every session pays for it"]
+        assert over == [f"always_on exceeds {limit} characters ({unit} for each source with an always-on decision, "
+                        f"{len(sources)} here): every session pays for it"]
     # Two parts of one source are one intake; a source that only gives capabilities adds nothing.
     assert always_on_limit(policy_of(["a", "a"], 1)) == unit
-    assert errors_for(policy_of(["a", "a"], unit + 1), sources=known)
+    assert errors_for(policy_of(["a", "a"], unit + 1), sources=("quiet", "a"))
     assert always_on_limit(doc()) == 0
+
+
+def _two_source_policy(size):
+    return {"decisions": [decision("always-on", [], source="a"), decision("always-on", [], source="b")],
+            "always_on": "y" * size}
+
+
+def test_the_packaged_runtime_applies_the_same_proportional_budget(tmp_path, capsys):
+    """The session command re-checks the text it prints; it must not keep the old fixed limit."""
+    from muro.runtime import runtime_main
+
+    (tmp_path / "delivery.json").write_text(json.dumps(_two_source_policy(2 * ALWAYS_ON_PER_SOURCE)), encoding="utf-8")
+    assert runtime_main(["--package", str(tmp_path), "session-context"]) == 0
+    assert capsys.readouterr().out.strip() == "y" * (2 * ALWAYS_ON_PER_SOURCE)
+    (tmp_path / "delivery.json").write_text(json.dumps(_two_source_policy(2 * ALWAYS_ON_PER_SOURCE + 1)),
+                                            encoding="utf-8")
+    assert runtime_main(["--package", str(tmp_path), "session-context"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == "" and f"at most {2 * ALWAYS_ON_PER_SOURCE} characters" in captured.err
+
+
+def test_hermes_registers_a_policy_longer_than_one_source_allowance_whole(tmp_path):
+    """The Hermes registration carried a fixed `max_chars=2000`; a two-source policy must not be cut by it."""
+    import importlib.util
+    from muro.hermes_adapter import write_hermes_adapter
+
+    policy = "z" * (2 * ALWAYS_ON_PER_SOURCE)
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "policy.md").write_text(policy, encoding="utf-8")
+    write_hermes_adapter(tmp_path, {"slug": "demo", "command": "demo", "name": "Demo", "version": "1.0.0"}, True)
+    spec = importlib.util.spec_from_file_location("generated_hermes_budget", tmp_path / "__init__.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    class Context:
+        seen = {}
+
+        def register_skill(self, name, path):
+            pass
+
+        def register_system_prompt_section(self, identifier, content, *, position, max_chars):
+            self.seen = {"content": content, "max_chars": max_chars}
+
+    ctx = Context()
+    module.register(ctx)
+    assert ctx.seen["content"] == policy and ctx.seen["max_chars"] >= len(policy)
 
 
 @pytest.mark.parametrize("broken, message", [

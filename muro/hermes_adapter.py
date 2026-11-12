@@ -43,10 +43,8 @@ def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:
             RuntimeWarning, stacklevel=2,
         )
         return
-    register_section(
-        {section_id!r},
-        (root / "policy.md").read_text(encoding="utf-8"),
-        position="after_memory", max_chars=2000,
-    )
+    # The build already bounded the policy (one allowance per contributing source); never cut it here.
+    policy = (root / "policy.md").read_text(encoding="utf-8")
+    register_section({section_id!r}, policy, position="after_memory", max_chars=len(policy))
 '''
     (root / "__init__.py").write_text(registration, encoding="utf-8")

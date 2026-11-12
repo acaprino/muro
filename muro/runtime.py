@@ -916,13 +916,15 @@ def runtime_main(argv: list[str] | None = None) -> int:
         # Invalid declared text must be visible
         # as a hook failure instead of a successful session silently missing its policy.
         try:
-            from .delivery import MAX_ALWAYS_ON
+            from .delivery import always_on_limit
             document = load_delivery(args.package)
             if document is not None and not isinstance(document, dict):
                 raise ValueError("delivery.json must be an object")
             text = (document or {}).get("always_on", "")
-            if not isinstance(text, str) or len(text) > MAX_ALWAYS_ON:
-                raise ValueError(f"always_on must be text of at most {MAX_ALWAYS_ON} characters")
+            limit = always_on_limit(document)
+            if not isinstance(text, str) or len(text) > limit:
+                raise ValueError(f"always_on must be text of at most {limit} characters "
+                                 "(one allowance for each source with an always-on decision)")
         except (OSError, ValueError) as exc:
             print(f"Invalid delivery session policy: {exc}", file=sys.stderr)
             return 1
