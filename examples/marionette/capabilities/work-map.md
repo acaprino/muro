@@ -23,7 +23,7 @@ Coordinates an engineering change with the wayfinder method: agree the destinati
    - for a spec: `<package_root>/scripts/wayfinder/skills/engineering/to-spec/SKILL.source.md`;
    - for slices: `<package_root>/scripts/wayfinder/skills/engineering/to-tickets/SKILL.source.md`;
    - for any step that writes or changes code: `<package_root>/scripts/ponytail/skills/ponytail/SKILL.source.md`.
-   The steps below are an index into those files. Where this body and an original differ, the original wins, except for the changes listed under `## Sources`, "Changes for coexistence".
+   The steps below are an index into those files. Where this body and an original differ, the original wins, except for the changes listed under the Sources section below, "Changes for coexistence".
 1. **Size the route first**, with the guide's `## When to reach for it`: "The effort must be larger than one agent session can hold, and the route to the destination must be unclear." The split is "Session count, not project size."
    - "A well-scoped feature you can settle in one sitting": no map. Reuse the user's authorization and build directly (step 6) with check evidence; ask how to proceed only if the requested action is still unresolved.
    - "A thread where the deciding is already done": "skip straight past the map" and go to the spec (step 4).
@@ -57,7 +57,7 @@ Return `task_map` (the route chosen and, for a charted map, its index), `spec` (
 ## Specifics
 
 - Muro's plan confirmation authorizes running this step; it does not replace meaningful user decisions inside it (destination, test seams, slice breakdown, HITL decisions). Reuse decisions and authorization already given; ask only for an unresolved choice, not a repeated confirmation.
-- The parts of the originals that are not applied here (tracker, labels, assignment, pushed branches, calls to unselected skills, slash commands, session mode) are listed under `## Sources`, "Changes for coexistence". Do the work of the unselected grilling, domain-modeling, research, prototype and implement skills inline.
+- The parts of the originals that are not applied here (tracker, labels, assignment, pushed branches, calls to unselected skills, slash commands, session mode) are listed under the Sources section below, "Changes for coexistence". Do the work of the unselected grilling, domain-modeling, research, prototype and implement skills inline.
 - The guide warns that local markdown "puts the artifacts in your repo, which is not recommended, because material stored in the repo tends to persist by accident": tell the user which `.scratch/` files were written.
 - The guide's most-reported failure is production code written in the middle of a map. Its advice applies: "read the Notes on any map you did not chart yourself, keep implementation in separate sessions, and treat any `wayfinder:task` that looks like a slice of the build as mis-typed."
 - The method has no fixed runtime dependency; assess and install dependencies needed by the authorized implementation under the package's runtime rule, preserving any required engine.

@@ -27,7 +27,7 @@ Keep each fact in its authoritative layer:
 
 ## Behavior
 
-0. **Read the original first.** Read `<SH>/SKILL.source.md` whole before working. It is the method in the source's own words. If `HANDOFF.md` is missing or needs structural repair, read `<SH>/references/format.md` before recording; that file says: "Read this reference only when creating `HANDOFF.md` or repairing its structure." Where this body and an original differ, the original wins, except for the changes listed under `## Sources` → "Changes for coexistence".
+0. **Read the original first.** Read `<SH>/SKILL.source.md` whole before working. It is the method in the source's own words. If `HANDOFF.md` is missing or needs structural repair, read `<SH>/references/format.md` before recording; that file says: "Read this reference only when creating `HANDOFF.md` or repairing its structure." Where this body and an original differ, the original wins, except for the changes listed in the Sources section below under "Changes for coexistence".
 
 **Resume** (an existing file):
 

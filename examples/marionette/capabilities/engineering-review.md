@@ -20,7 +20,7 @@ Produces a report: "Lists findings, changes no code." The source's order of impo
 0. **Read the original first.** Read whole, before working, the packaged original of the requested intent. It is the method in the source's own words:
    - a change review: `<package_root>/scripts/ponytail/skills/ponytail-review/SKILL.source.md`;
    - a repository or folder audit: `<package_root>/scripts/ponytail/skills/ponytail-audit/SKILL.source.md`.
-   The steps below are an index into its four sections. Where this body and the original differ, the original wins, except for the changes listed under `## Sources`, "Changes for coexistence".
+   The steps below are an index into its four sections. Where this body and the original differ, the original wins, except for the changes listed under the Sources section below, "Changes for coexistence".
 1. Establish scope. Change review: "Review what the user names: uncommitted or staged changes, a branch, a PR link, or files. Nothing named: the uncommitted changes, or the last commit if there are none." Audit: "Audit what the user names: a folder, a package, or the whole repo. Nothing named: the whole repo."
 2. Read before judging: `## 1. Understand first` (review) or `## 1. Map first` (audit), every bullet. Both end the same way: find the expected load, "Judge scale against that, and say which load you assumed." Audit of a big repository: "go deep where a mistake costs the most, not file by file. Say which parts you did not read."
 3. Look for the six classes of `## 2. Look for`, in its order and with its lists: Bug, Risk, Scale, Missing test, Speed, Lean.

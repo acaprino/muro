@@ -17,7 +17,7 @@ Turns recorded deliberate limits into a requested report; it does not create a n
 
 ## Behavior
 
-0. **Read the original first.** Read `<package_root>/scripts/ponytail/skills/ponytail-debt/SKILL.source.md` whole before working. It is the method in the source's own words, and the steps below are an index into its `## Scan`, `## Output` and `## Boundaries`. Where this body and the original differ, the original wins, except for the changes listed under `## Sources`, "Changes for coexistence".
+0. **Read the original first.** Read `<package_root>/scripts/ponytail/skills/ponytail-debt/SKILL.source.md` whole before working. It is the method in the source's own words, and the steps below are an index into its `## Scan`, `## Output` and `## Boundaries`. Where this body and the original differ, the original wins, except for the changes listed under the Sources section below, "Changes for coexistence".
 1. `## Scan`: "Grep the repo for comment markers, skipping `.git` and everything the `.gitignore` files ignore (dependencies, build output, caches, in any stack)". Markers are `shortcut:` and the older `ponytail:`. If the user names their own marker word, "grep for that word instead."
 2. The source's command: `git grep --no-index --exclude-standard -nE '(#|//|/[*]) ?(shortcut|ponytail):'` "(add other comment prefixes if your stack uses them)". "Each hit is one ledger row." "Skip hits that are not a deferral, like a note about a keyboard shortcut."
 3. `## Output`: "One row per marker, grouped by file", in the source's form: `<file>:<line>, <what was simplified>. ceiling: <the limit named>. upgrade: <the trigger to revisit>.` "pull the ceiling and the trigger straight from the comment."

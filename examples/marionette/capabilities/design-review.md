@@ -18,7 +18,7 @@ Reviews a design the host can read and edit (HTML, CSS, script or component mark
 
 ## Behavior
 
-0. **Scope by the selected intent, then read its originals whole before working.** They are the method in the source's own words, and the steps below are an index into them. Where this body and an original differ, the original wins, except for the changes listed under `## Sources` → "Changes for coexistence". A skill file is the review procedure; the chapters of the prompt state the same rules as write-time defaults, and where a chapter and a skill file give different numbers the skill file is the review method. Of the prompt only the chapters named here are read for this capability:
+0. **Scope by the selected intent, then read its originals whole before working.** They are the method in the source's own words, and the steps below are an index into them. Where this body and an original differ, the original wins, except for the changes listed in the Sources section below under "Changes for coexistence". A skill file is the review procedure; the chapters of the prompt state the same rules as write-time defaults, and where a chapter and a skill file give different numbers the skill file is the review method. Of the prompt only the chapters named here are read for this capability:
    - `ui.accessibility-audit`: `<CD>/accessibility-audit.md`; chapters `# 9. Color system` and `# 10. Accessibility and inclusivity`.
    - `ui.generic-look-check`: `<CD>/ai-slop-check.md`; chapter `# 6. Aesthetic principles — purposeful visuals`.
    - `ui.hierarchy-rhythm-review`: `<CD>/hierarchy-rhythm-review.md`; chapters `# 7. Visual hierarchy and rhythm`, `# 8. Typography system` and `# 12. Simplicity and one clear CTA`.

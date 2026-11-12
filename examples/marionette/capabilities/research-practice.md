@@ -17,7 +17,7 @@ Turns the principles of the essay "How to be good at research" into concrete res
 
 ## Behavior
 
-0. **Read the original first.** Read `<package_root>/scripts/open-paper-skills/skills/research-bible/SKILL.source.md` whole before working. It is the method in the source's own words. Where this body and that file differ, the file wins, except for the changes listed under `## Sources` → "Changes for coexistence". The source's first step is: "Read `references/how_to_be_good_at_research.md` first when the user asks for research advice, a research workflow, or a plan inspired by this skill." That essay is not packaged (see `## Specifics`): read it first at its public address in those same cases. When it cannot be opened, say that the essay was not read and work from `SKILL.source.md`.
+0. **Read the original first.** Read `<package_root>/scripts/open-paper-skills/skills/research-bible/SKILL.source.md` whole before working. It is the method in the source's own words. Where this body and that file differ, the file wins, except for the changes listed in the Sources section below under "Changes for coexistence". The source's first step is: "Read `references/how_to_be_good_at_research.md` first when the user asks for research advice, a research workflow, or a plan inspired by this skill." That essay is not packaged (see `## Specifics`): read it first at its public address in those same cases. When it cannot be opened, say that the essay was not read and work from `SKILL.source.md`.
 
 When helping with a research task, shape the answer around the smallest useful subset of these moves:
 
