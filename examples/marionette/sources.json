@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.1.0",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, creating or updating Figma designs, specifying UI motion or implementing GSAP ScrollTrigger and CSS scroll animations, creating, editing or converting Word, Excel, PowerPoint and PDF Office files with GenOffice, coordinating multi-slice software specs, or authoring and fact-checking interactive HTML explainers.",
+    "description": "Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, creating or updating Figma designs, specifying UI motion or implementing GSAP ScrollTrigger and CSS scroll animations, creating, editing or converting Word, Excel, PowerPoint and PDF Office files with GenOffice, coordinating multi-slice software specs or handing work over between sessions, authoring and fact-checking interactive HTML explainers, or doing research work; finding and reading papers, keeping a paper wiki, making paper diagrams and plots, planning experiments and pitching results without overclaiming, or reviewing and steering what TokenEconomizer learns and saves in agent sessions.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -17,7 +17,15 @@
       "genoffice",
       "creating-explainers",
       "explaining-codebases",
-      "fact-checking-explainers"
+      "fact-checking-explainers",
+      "paper-search",
+      "paper-wiki-manager",
+      "drawio-paper",
+      "codex-paper-figure-skill",
+      "research-bible",
+      "sell-research-honestly",
+      "session-handoff",
+      "tokeneconomizer"
     ]
   },
   "stack": {
@@ -284,6 +292,153 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Classify every outcome of the three skills: an interactive single-file HTML explainer built from documents, from topic research or from a codebase, and the claim-by-claim fact-check of an explainer. Keep the article template and the references as packaged helpers, keep the zero-dependency rule and the blocking fact-check gate, and drop the plugin manifests, host agent files, evals and upstream planning documents."
+      }
+    },
+    {
+      "id": "open-paper-skills",
+      "repo_url": "https://github.com/pengqianhan/open-paper-skills",
+      "commit": "f85fd3dc80720dfa42fb5ab069f232f28c831109",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 pengqianhan",
+      "selected_paths": [
+        "skills/paper-search/SKILL.md",
+        "skills/paper-search/scripts/paper_search.py",
+        "skills/paper-wiki-manager/SKILL.md",
+        "skills/paper-wiki-manager/assets/**",
+        "skills/paper-wiki-manager/references/**",
+        "skills/paper-wiki-manager/scripts/create_paper_body_profile.py",
+        "skills/paper-wiki-manager/scripts/generate_viz.py",
+        "skills/paper-wiki-manager/scripts/set_status.py",
+        "skills/paper-wiki-manager/scripts/validate_paper_wiki.py",
+        "skills/paper-wiki-manager/scripts/static/**",
+        "skills/paper-wiki-manager/scripts/templates/**",
+        "skills/paper-wiki-manager/scripts/vendor/README.md",
+        "skills/drawio-paper/SKILL.md",
+        "skills/drawio-paper/neurips2025_diagram_style_guide.md",
+        "skills/drawio-paper/neurips2025_plot_style_guide.md",
+        "skills/drawio-paper/scripts/extract_bench.py",
+        "skills/codex-paper-figure-skill/SKILL.md",
+        "skills/research-bible/SKILL.md",
+        "skills/sell-research-honestly/SKILL.md",
+        "skills/sell-research-honestly/references/**",
+        "skills/session-handoff/SKILL.md",
+        "skills/session-handoff/references/**"
+      ],
+      "excluded_paths": [
+        "collected-skills/**",
+        "skills/research-bible/references/**",
+        "skills/paper-wiki-manager/scripts/vendor/cytoscape.min.js",
+        "skills/paper-wiki-manager/scripts/vendor/layout-base.js",
+        "skills/paper-wiki-manager/scripts/vendor/cose-base.js",
+        "skills/paper-wiki-manager/scripts/vendor/cytoscape-fcose.js",
+        "skills/paper-wiki-manager/scripts/vendor/marked.min.js",
+        "skills/paper-wiki-manager/scripts/test_set_status.py",
+        "skills/paper-wiki-manager/scripts/test_validate_paper_wiki.py",
+        "skills/paper-search/scripts/test_paper_search.py",
+        "skills/drawio-paper/evals/**",
+        "skills/paper-wiki-manager/agents/**",
+        "skills/codex-paper-figure-skill/agents/**",
+        "skills/research-bible/agents/**",
+        "skills/sell-research-honestly/agents/**",
+        "skills/discover-academic-skills/**",
+        "skills/explain-anything-html/**",
+        "skills/explain-paper-html/**",
+        "skills/filetree-simple/**",
+        "skills/human-cognition-cache/**",
+        "skills/karpathy-coding-rules/**",
+        "skills/map-then-territory/**",
+        "skills/okf-repo-organizer/**",
+        "skills/project-dispatch/**",
+        "skills/research-project-manager/**",
+        "skills/skill-organizer/**",
+        "skills/task-file-builder/**",
+        "skills/uv-env/**",
+        "skills/writing-great-prompt/**",
+        "scripts/**",
+        "assets/**"
+      ],
+      "runtime_deps": [
+        {
+          "name": "uv, or Python 3.11+ (standard library; optional truststore)",
+          "license": "External runtime, not bundled by Muro; installed at runtime from astral.sh when missing and wanted",
+          "bundled": false
+        },
+        {
+          "name": "cytoscape 3.28.1, layout-base 2.0.1, cose-base 2.2.0, cytoscape-fcose 2.2.0, marked 12.0.0",
+          "license": "MIT (third-party viewer libraries, not bundled by Muro; fetched at runtime from the jsDelivr npm mirror)",
+          "bundled": false
+        },
+        {
+          "name": "PaperBananaBench reference dataset",
+          "license": "Apache-2.0 (about 266 MB, not bundled by Muro; downloaded at runtime from Hugging Face)",
+          "bundled": false
+        },
+        {
+          "name": "matplotlib, numpy, pillow",
+          "license": "Their own open-source licences (target environment packages, not bundled by Muro)",
+          "bundled": false
+        },
+        {
+          "name": "draw.io desktop command line",
+          "license": "Apache-2.0 (external application, not bundled by Muro)",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Classify every outcome of the author's own research skills that stand on their own: literature search and paper reading with per-source switches, the OKF paper wiki with its viewer and validator, publication diagrams and plots (the two figure skills as one method), research-practice guidance, honest research communication, and the cross-session HANDOFF.md. Keep the scripts, references and style guides as packaged helpers. Leave out collected-skills (other authors' work), the third-party essays under research-bible/references, the vendored viewer libraries (fetched at runtime), and the skills that operate the author's own Research OS or repeat a need another source already serves."
+      }
+    },
+    {
+      "id": "tokeneconomizer",
+      "repo_url": "https://github.com/microsoft/TokenEconomizer",
+      "commit": "ec8ff5ec7ed5924520ee71b705a920ee64fe2918",
+      "pin": "release",
+      "release": "v0.1.0",
+      "license": "Apache-2.0",
+      "copyright": "TokenEconomizer authors (the upstream LICENSE carries no copyright line)",
+      "selected_paths": [
+        "tokeneconomizer/**",
+        "plugin/scripts/te_bootstrap.py",
+        "plugin/hooks/hooks.json",
+        "plugin/hooks/codex-hooks.json",
+        "plugin/hooks/copilot-hooks.json",
+        "plugin/README.md",
+        "docs/PLUGIN.md"
+      ],
+      "excluded_paths": [
+        "plugin/.claude-plugin/**",
+        "plugin/.codex-plugin/**",
+        "plugin/.github/**",
+        ".claude-plugin/**",
+        "plugin/slash-commands/**",
+        "plugin/codex-skills/**",
+        "plugin/pi/**",
+        "plugin/lib/tokeneconomizer",
+        "plugin/scripts/te",
+        "plugin/scripts/te-hook",
+        "plugin/package.json",
+        "experiments/**",
+        "tests/**",
+        "scripts/**",
+        "docs/assets/**",
+        "docs/ARCHITECTURE.md",
+        "CLAUDE.md"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Python 3.10+ (standard library)",
+          "license": "PSF runtime prerequisite, not bundled by Muro",
+          "bundled": false
+        },
+        {
+          "name": "The user's own agent command line (claude, codex, copilot or pi) for the loop guard's judge and the fact proposer",
+          "license": "External host application, not bundled by Muro; called only by hooks the user registered",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Absorb TokenEconomizer's control surface and engine: the status, micro-skills, tool-pruning, settings and repository-state commands as one capability, with the engine packaged unchanged so those commands run from this plugin. Catalog its six default hooks as passive, host-approved entries and make registering or removing them an explicit user-requested action that first discloses their effects. Leave out the upstream plugin manifests, slash commands and skills as files, the Pi extension, experiments and tests."
       }
     }
   ]

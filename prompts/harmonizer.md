@@ -158,7 +158,7 @@ still require your analysis and the host's checks.
 ## Output
 
 Return changed capability files, reviewed `guide-examples.json`, `entries.json`
-and `eval-cases.json`, and one `ROUTER.md` of at most 80 lines. Write them in the package
+and `eval-cases.json`, and one `ROUTER.md` whose text stays within 80 lines (the catalog table's rows are not counted). Write them in the package
 directory, beside `sources.json`: capabilities under `capabilities/`. Each capability must have exactly one row with
 these six columns in this order:
 

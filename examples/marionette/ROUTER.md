@@ -1,18 +1,12 @@
 # Marionette AI routing catalog
 
-The intake AI derives intents from source skills; the harmonizer AI normalizes
-them. The host AI interprets the task using the descriptions and exclusions in
-capability frontmatter. IDs below are catalog data, not a closed Python taxonomy.
-`when` expresses stack constraints only; `—` does not mean automatic activation.
-Tools and adopted hooks are catalog metadata in capability frontmatter. The host
-AI checks tool availability and hook permissions; Python never auto-runs hooks.
-The LLM unifies by purpose and functional responsibility, not names or source
-order. Merges, alternatives and prerequisite edges require source-grounded reasons;
-the table records those decisions and cannot replace semantic analysis.
-Each release's offline `GUIDE.html` presents a compact navigable graph, brief
-intents and authored example paths from `guide-examples.json`; full details and
-commands open on demand. Declared relationships and validated example decisions
-are illustrations: selecting a node or example never classifies or activates work.
+Intake AI derives intents from source skills; the harmonizer AI normalizes them.
+The host AI interprets the task with the descriptions and exclusions in capability
+frontmatter. IDs are catalog data, not a closed Python taxonomy. `when` holds stack
+constraints only; `—` is not automatic activation. Tools and hooks are metadata:
+the host AI checks availability and permissions; Python never auto-runs hooks.
+Merges, alternatives and prerequisites need source-grounded reasons, recorded below.
+`GUIDE.html` illustrates the graph and example paths; it never classifies work.
 
 | id | role | when | after | outputs | intents |
 |---|---|---|---|---|---|
@@ -28,6 +22,13 @@ are illustrations: selecting a node or example never classifies or activates wor
 | office-files | office-file-operations | — | — | file_reading, file_result | office.file-editing, office.format-conversion, office.content-extraction, office.editor-handoff |
 | interactive-explainer | explainer-authoring | — | — | explainer_outline, explainer_file, explainer_claims | explainer.source-walkthrough, explainer.topic-research, explainer.codebase-walkthrough |
 | explainer-fact-check | claim-verification | — | — | verification_report, verification_verdict | explainer.fact-check |
+| paper-search | literature-search | — | — | literature_findings | research.literature-search, research.paper-reading |
+| paper-wiki | paper-knowledge-base | — | — | wiki_changes, wiki_validation | research.paper-notes, research.wiki-upkeep |
+| paper-figure | academic-figure | — | — | figure_plan, figure_file, figure_review | research.paper-diagram, research.paper-plot |
+| research-practice | research-guidance | — | — | research_guidance | research.planning, research.experiment-debugging |
+| research-pitch | research-communication | — | — | value_verdict, value_deliverable, claim_ledger | research.value-communication |
+| session-handoff | session-handoff | — | — | handoff_state | engineering.session-handoff, engineering.session-resume |
+| token-economy | session-cost-control | — | — | economy_report, economy_changes | cost.economy-report, cost.tool-pruning, cost.economy-settings |
 
 ## Runtime contract
 
@@ -70,8 +71,15 @@ are illustrations: selecting a node or example never classifies or activates wor
   even as the only step (2026-11-11, ADR-0015).
 - Office and explainer roles are unchanged and separate from UI. A PDF of an
   existing file is office-files' conversion, not office-authoring's.
+- open-paper-skills (2026-11-11): six roles, none merged with an earlier one.
+  The two figure skills are one method (paper-figure). paper-wiki runs the
+  paper-search script inside its step and only `reads` its findings. Its
+  explainer skills and map-then-territory are not absorbed: explain-this and
+  wayfinder serve those needs. session-handoff links work maps, never copies.
 
-<!-- Dependencies are judged at runtime, case by case (ADR-0007); GSAP is
-installed when a task needs it. Open gaps: taste-skill
-run files not selected (dealers, kit, checkers, gate, Stop hook); no maintained
-source for CSS scroll-driven animation. -->
+- tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six
+  default hooks are passive `host-approved` entries; registering them is an
+  explicit user-requested step of the capability, never done at build or install.
+
+<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run
+files not selected; no maintained source for CSS scroll-driven animation. -->

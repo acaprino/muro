@@ -174,7 +174,9 @@ Host references: [Claude Code](https://code.claude.com/docs/en/plugins/manifest-
    such as `office-files#1` when repeating a capability).
 2. Repeat `plan` with the same task, project and stack options plus
    `--classification <file>`, a JSON file the host writes in the state folder
-   (`plan --compact` returns its path and a compact catalog; the rules travel in
+   (`plan --compact` returns its path and a compact catalog; `--focus <ids>` returns
+   those capabilities in full and the others as a brief index, `--brief` returns the
+   index alone, so the output stays small as sources are added; the rules travel in
    `SKILL.md`). Keep each call on one line so host permission rules match. A `direct`
    result returns the one step when no active map exists. A `confirm` result
    returns the ordered plan before repeating with `--confirm`. `no_match` and

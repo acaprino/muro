@@ -195,3 +195,22 @@ def test_eval_cases_are_checked_for_shape(tmp_path):
     case["expect"] = {"status": "no_match", "capabilities": ["office-files"]}
     assert any("no_match" in e for e in validate_cases({"cases": [case]}, caps))
     assert validate_cases({"cases": []}, caps)
+
+
+def test_router_line_cap_counts_prose_not_catalog_rows(tmp_path):
+    """Second-source lesson: at 18 capabilities the flat 80-line cap blocked the next intake."""
+    from muro import parse_router
+    text = (MARIONETTE / "ROUTER.md").read_text(encoding="utf-8")
+    rows = [line for line in text.splitlines() if line.startswith("| ") and not line.startswith("| id ")]
+    assert len(rows) == 19
+    many = tmp_path / "ROUTER.md"
+    extra = "".join(f"| extra-{n} | role-{n} | — | — | out_{n} | area.intent-{n} |\n" for n in range(40))
+    anchor = rows[-1] + "\n"
+    many.write_text(text.replace(anchor, anchor + extra), encoding="utf-8")
+    assert len(many.read_text(encoding="utf-8").splitlines()) > 80
+    assert len(parse_router(many)) == 59                      # rows never hit the cap
+    prose = tmp_path / "prose" / "ROUTER.md"
+    prose.parent.mkdir()
+    prose.write_text(text + "\n".join(f"- note {n}" for n in range(80)) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="80 lines of text"):
+        parse_router(prose)

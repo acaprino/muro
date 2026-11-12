@@ -82,6 +82,8 @@ def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_p
         launcher = f"<skill-directory>/../{slug}/muro.py" if entry else "<skill-directory>/muro.py"
         allowed = ""
     desc = entry["description"] if entry else _skill_description(plugin, capabilities)
+    # An entry asks for its own area in full and an index of the rest; the umbrella starts from the index.
+    view = "--focus " + ",".join(entry["capabilities"]) if entry else "--brief"
     scope = ""
     if entry:
         titles = {cap.id: next((ln[2:].strip() for ln in cap.body.splitlines() if ln.startswith("# ")), cap.id)
@@ -123,9 +125,12 @@ host's permission rules match every call. `{state}` is this coordinator's folder
 the current project; the runtime keeps it out of Git with its own `.gitignore`.
 
 1. Read the user's task and relevant project context. Run:
-   `python {launcher} plan --compact --task "<user task>" --project "<current project>"`.
+   `python {launcher} plan --compact {view} --task "<user task>" --project "<current project>"`.
 2. The result is `classification-required` with `context` and a compact `catalog`
-   (empty fields are omitted). YOU are the AI classifier: apply the Classification
+   (empty fields are omitted). Entries marked `brief` show only role and intents:
+   before selecting one, or when the task may need one, rerun the same command with
+   `--focus <ids>` (comma-separated, keeping the ids already in focus) to read its
+   exclusions, tools and constraints. YOU are the AI classifier: apply the Classification
    rules at the end of this file to the task and the project. Interpret outcomes,
    negations and constraints; never use keyword matching or ask the user to classify skills.
    Check required tools and hook policies for selected capabilities and prerequisites

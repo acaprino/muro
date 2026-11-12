@@ -81,6 +81,26 @@ def compact_catalog(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for entry in catalog]
 
 
+def focused_catalog(catalog: list[dict[str, Any]], focus: set[str]) -> list[dict[str, Any]]:
+    """Compact catalog with full detail for `focus` and an index line for every other capability.
+
+    Nothing is hidden: a brief entry keeps its role and intent descriptions so the classifier can
+    see that it exists and ask for it. Its exclusions, tools and constraints come with --focus.
+    """
+    known = {entry["id"] for entry in catalog}
+    unknown = sorted(focus - known)
+    if unknown:
+        raise ValueError("--focus names unknown capability: " + ", ".join(unknown))
+    result = []
+    for entry in compact_catalog(catalog):
+        if entry["id"] in focus:
+            result.append(entry)
+        else:
+            result.append({"id": entry["id"], "role": entry["role"], "brief": True,
+                           "intents": [{"id": i["id"], "description": i["description"]} for i in entry["intents"]]})
+    return result
+
+
 class Coordinator:
     def __init__(self, package_root: Path, project_root: Path):
         self.package_root = package_root.resolve()
@@ -438,6 +458,7 @@ class Coordinator:
         classification: dict | None = None,
         compact: bool = False,
         amend: bool = False,
+        focus: set[str] | None = None,
     ) -> dict[str, Any]:
         # amend: the same conversation refined its request; plan against the new decision, keep valid work.
         self._new_map = new or amend
@@ -456,9 +477,13 @@ class Coordinator:
                     "context": context,
                     "instructions": ("Classify with the rules under 'Classification rules' in this skill's SKILL.md "
                                      "(prompts/classify.md). Write the decision JSON with your file tool to "
-                                     "classification_path, then rerun plan on one line with --classification <that file>."),
+                                     "classification_path, then rerun plan on one line with --classification <that file>."
+                                     + ("" if focus is None else
+                                        " Entries marked brief show role and intents only: before selecting one, or when "
+                                        "the task may need one, rerun plan --compact with --focus <ids> (comma-separated, "
+                                        "together with the ones already in focus) to read its exclusions, tools and constraints.")),
                     "classification_path": str(self.classification_path),
-                    "catalog": compact_catalog(self.catalog),
+                    "catalog": compact_catalog(self.catalog) if focus is None else focused_catalog(self.catalog, focus),
                 }
             return {
                 "mode": "classification-required",
@@ -838,6 +863,10 @@ def runtime_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--confirm", action="store_true")
     parser.add_argument("--compact", action="store_true",
                         help="plan without a decision: return context and a compact catalog only (rules live in SKILL.md)")
+    parser.add_argument("--focus", metavar="IDS",
+                        help="with --compact: comma-separated capabilities returned in full; the others as a brief index")
+    parser.add_argument("--brief", action="store_true",
+                        help="with --compact: return every capability as a brief index (role and intents)")
     parser.add_argument("--new", action="store_true", help="Start a fresh map, archiving any previous map")
     parser.add_argument("--amend", action="store_true",
                         help="The request was refined in the same conversation: replan and keep outputs that are still valid")
@@ -877,8 +906,14 @@ def runtime_main(argv: list[str] | None = None) -> int:
             if args.classification not in (None, "-") and Path(args.classification).resolve().parent == coordinator.state_dir:
                 coordinator.ensure_gitignore()
             preserved = [s.strip() for s in args.preserve_completed.split(",") if s.strip()] or None
+            focus = None
+            if args.focus is not None or args.brief:
+                if not args.compact:
+                    raise ValueError("--focus and --brief need --compact")
+                focus = {s.strip() for s in (args.focus or "").split(",") if s.strip()}
             result = coordinator.propose(args.task, stack, new=args.new or bool(preserved),
-                                         classification=classification, compact=args.compact, amend=args.amend)
+                                         classification=classification, compact=args.compact, amend=args.amend,
+                                         focus=focus)
             if args.confirm:
                 if result["mode"] == "classification-required":
                     raise ValueError("AI classification is required before confirmation; run plan without --confirm first")

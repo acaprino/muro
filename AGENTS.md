@@ -59,8 +59,12 @@ installation, publication or replacement of existing dist output without request
   for each and holds the plan to it. AI-written graph labels are 5 words at most
   (ADR-0012). `when` is only `—` or comma-separated stack constraints. Router rows must
   match the capability exactly, including ordered intent IDs in column six.
+- `ROUTER.md`: one table row per capability plus a short harmonization record;
+  the 80-line cap counts text only, never table rows (ADR-0015 amendment).
 - `prompts/classify.md`: the host AI interprets the runtime task and actual project
-  context. `muro/routing.py` validates its structured decision and expands only
+  context. `plan --compact --focus <ids>` gives those capabilities in full and
+  the rest as a brief index; `--brief` gives the index alone. Entry skills focus
+  on their own capabilities, the umbrella starts from the index. `muro/routing.py` validates its structured decision and expands only
   explicit prerequisites. `muro/runtime.py` handles confirmation, state and evidence.
 - `muro/adapters.py` and `muro/release.py`: every host's standalone skill folder
   includes runtime, router, capabilities, prompts and license notices. Test the
@@ -103,6 +107,12 @@ hooks in source provenance; do not assume omitted upstream files contain none.
 The host AI must map requirements to real tools and check availability/authorization.
 Catalog metadata is not executable native hook wiring and grants no permissions.
 Never install or automatically activate upstream hooks as part of intake/build.
+A source whose function is its hooks (tokeneconomizer, 2026-11-11) keeps that rule:
+its hooks are `host-approved` catalog entries, the release ships nothing a host
+would auto-register (no `hooks/` at a plugin or skill root, no manifest key), and
+registering or removing them is a step of the capability that runs only on the
+user's explicit request, after it has said what the hooks do, what they write and
+which model calls they make (ADR-0007 amendment).
 
 Owner decision of 2026-11-09 ("il plugin/skill dovrebbero installarli se
 necessario"): a capability installs a runtime dependency it needs and finds

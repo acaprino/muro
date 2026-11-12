@@ -83,6 +83,26 @@
       ],
       "reason": "Un'unica capability gestisce lettura, spiegazione, figure e verifica delle affermazioni nel proprio flusso. Non aggiunge una landing o uno strumento di animazione esterno.",
       "questions": []
+    },
+    {
+      "title": "Dai paper al wiki",
+      "task": "Cerca i lavori recenti su un metodo e aggiungi al paper wiki i tre più rilevanti, con topic e concetti collegati.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "paper-search",
+          "intent": "research.literature-search",
+          "reason": "Prima serve trovare i paper nelle fonti che l'utente ha attivato."
+        },
+        {
+          "capability": "paper-wiki",
+          "intent": "research.paper-notes",
+          "reason": "Poi le note, i topic e i concetti vanno scritti nel wiki e validati; legge i risultati della ricerca."
+        }
+      ],
+      "reason": "Due passi in ordine: la ricerca produce l'elenco, il wiki lo usa. Nessuna spiegazione HTML e nessuna figura sono richieste.",
+      "questions": []
     }
   ]
 }

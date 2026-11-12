@@ -340,8 +340,10 @@ def parse_capability(path: Path) -> Capability:
 # ----------------------------------------------------------------------
 def parse_router(path: Path) -> list[RouterRow]:
     raw_lines = path.read_text(encoding="utf-8").splitlines()
-    if len(raw_lines) > 80:
-        raise ValueError(f"{path}: router exceeds 80 lines")
+    # The cap keeps the router's text short. Catalog rows are one per capability and grow with
+    # every absorbed source, so they do not count (ADR-0015).
+    if sum(1 for line in raw_lines if not line.lstrip().startswith("|")) > 80:
+        raise ValueError(f"{path}: router exceeds 80 lines of text (catalog rows are not counted)")
     # Harmonizer merge audits are documentation, never router rows.
     lines = []
     in_comment = False

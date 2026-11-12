@@ -37,9 +37,34 @@
     },
     {
       "name": "marionette-engineering",
-      "description": "Use when a software change is larger than one sitting or still has open decisions: agreeing the destination, resolving decisions with the user, writing a spec, slicing it into vertical tickets, then building and reviewing slice by slice with test evidence. Not for a small, already clear change such as a rename or a one-file fix.",
+      "description": "Use when a software change is larger than one sitting or still has open decisions: agreeing the destination, resolving decisions with the user, writing a spec, slicing it into vertical tickets, then building and reviewing slice by slice with test evidence; or when recording, preparing or resuming a HANDOFF.md that carries a task across sessions. Not for a small, already clear change such as a rename or a one-file fix.",
       "capabilities": [
-        "work-map"
+        "work-map",
+        "session-handoff"
+      ]
+    },
+    {
+      "name": "marionette-papers",
+      "description": "Use when finding research papers, related work or prior art, reading a paper from its arXiv id, DOI or PubMed id, adding papers to a paper wiki with topic and concept pages and validating it, or making a publication-quality paper figure: an editable draw.io method or architecture diagram, or a matplotlib plot from results data. Not for a web search on a non-academic subject or a chart for a dashboard.",
+      "capabilities": [
+        "paper-search",
+        "paper-wiki",
+        "paper-figure"
+      ]
+    },
+    {
+      "name": "marionette-research",
+      "description": "Use when planning ML or AI research (choosing a problem, a research plan, an experiment loop, a reading plan, a research log), debugging a training run or an evaluation that misbehaves, or pitching and positioning research for an advisor, reviewer, collaborator or talk audience without overclaiming, including checking a pitch for claims the evidence does not support.",
+      "capabilities": [
+        "research-practice",
+        "research-pitch"
+      ]
+    },
+    {
+      "name": "marionette-token-economy",
+      "description": "Use when the user asks what TokenEconomizer learned or saved in this repository or what their agent sessions cost, wants to see or change its repository facts (micro-skills), its tool pruning deny list or its loop guard, to give pruned tools back, to change its settings, or to turn its automatic mode on or off for a project. Not for questions about model pricing or for shrinking a prompt by hand.",
+      "capabilities": [
+        "token-economy"
       ]
     }
   ]

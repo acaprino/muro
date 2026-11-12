@@ -18,7 +18,8 @@ ROOT = Path(__file__).resolve().parent.parent
 MARIONETTE = ROOT / "examples" / "marionette"
 # Claude Code 2.1.322 persisted p4's 29.4 KB plan output to a file instead of showing it inline.
 # The exact host threshold is not documented; this bound keeps a wide margin under it, and the
-# live rerun recorded in docs/verification/2026-11-11-claude-code-host-test.md is the real check.
+# live reruns recorded in docs/verification/ are the real check. It applies to the focused view:
+# the full catalog grows with every absorbed source (26 KB at 18 capabilities).
 INLINE_LIMIT = 20000
 
 
@@ -49,16 +50,36 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     consumer = tmp_path / "consumer"
     consumer.mkdir()
     task = "Disegna in Figma la landing page di Lumo. Non abbiamo ancora una struttura dei contenuti."
-    out = run(pkg, consumer, "plan", "--compact", "--task", task)
-    assert len(out.encode("utf-8")) < INLINE_LIMIT, len(out.encode("utf-8"))
+    full = run(pkg, consumer, "plan", "--compact", "--task", task)
+    # The full catalog grows with every source; the focused view is what a host skill asks for.
+    out = run(pkg, consumer, "plan", "--compact", "--focus", "visual-direction,design-guidance,figma-design", "--task", task)
+    assert len(out.encode("utf-8")) < INLINE_LIMIT < 30000, len(out.encode("utf-8"))
+    brief_all = run(pkg, consumer, "plan", "--compact", "--brief", "--task", task)
+    assert len(brief_all.encode("utf-8")) < len(out.encode("utf-8")) < len(full.encode("utf-8"))
     data = json.loads(out)
+    assert json.loads(full)["context"] == data["context"] == json.loads(brief_all)["context"]
     assert data["mode"] == "classification-required"
     assert data["context"]["task"] == task
     assert len(data["context"]["catalog_digest"]) == 64
-    assert len(data["instructions"]) < 400 and "SKILL.md" in data["instructions"]
+    assert len(data["instructions"]) < 600 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
     assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
-    entries = {e["id"]: e for e in data["catalog"]}
-    assert len(entries) == 12
+    entries = {e["id"]: e for e in json.loads(full)["catalog"]}
+    assert len(entries) == 19
+    focused = {e["id"]: e for e in data["catalog"]}
+    assert set(focused) == set(entries)                      # nothing is hidden from the classifier
+    for name in ("visual-direction", "design-guidance", "figma-design"):
+        assert focused[name] == entries[name]                # focused entries are complete
+    for name, entry in focused.items():
+        if name in ("visual-direction", "design-guidance", "figma-design"):
+            continue
+        assert entry["brief"] is True and set(entry) == {"id", "role", "brief", "intents"}
+        assert [set(i) for i in entry["intents"]] == [{"id", "description"}] * len(entry["intents"])
+        assert [i["description"] for i in entry["intents"]] == [i["description"] for i in entries[name]["intents"]]
+    assert all(e["brief"] is True for e in json.loads(brief_all)["catalog"])
+    assert "--focus" in data["instructions"] and "brief" in data["instructions"]
+    bad = subprocess.run([sys.executable, str(pkg / "muro.py"), "plan", "--compact", "--focus", "ghost", "--task", task,
+                          "--project", str(consumer)], capture_output=True, text=True, encoding="utf-8")
+    assert bad.returncode == 1 and "ghost" in bad.stderr
     for entry in entries.values():
         assert entry["intents"] and entry["role"] and "outputs" in entry
         for key in ("after", "conflicts", "hooks", "reads", "needs"):
@@ -106,7 +127,8 @@ def test_skill_embeds_rules_uses_one_line_calls_and_preapproves_them_on_claude_c
         front, body = text.split("---", 2)[1], text.split("---", 2)[2]
         assert "## Classification rules" in body
         assert "semantic decision" in body and "catalog_digest" in body
-        assert "plan --compact" in body
+        assert "plan --compact --brief" in body          # the umbrella starts from the index
+        assert "--focus <ids>" in body and "marked `brief`" in body
         assert ".muro/classification.json" in body
         assert "heredoc" in body  # tells the host not to use one
         for discouraged in ("--classification -", "--classification-json", "--step-json"):

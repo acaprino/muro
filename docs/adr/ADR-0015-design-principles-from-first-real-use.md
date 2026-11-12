@@ -124,6 +124,27 @@ What the evidence showed, in one line each:
    not confirm that more protocol means more assurance. A safeguard is added with
    its per-task cost stated, and removed when nothing verifies what it records.
 
+## Amendment after the second-source intake (same day)
+
+Adding one source of six capabilities to Marionette (12 to 18) tripped two limits
+that held only at the first size. Both are instances of principle 1 and of rule 0:
+a limit that stops the next intake is a second lever on scope.
+
+- **Router cap.** `parse_router` rejected any `ROUTER.md` over 80 lines, table
+  rows included (ADR-0002 INV-001, written when the router was the model's
+  reading). The table grows by one row per capability, so the cap now counts
+  only lines outside the table. The harmonization record still has to stay short.
+- **Compact catalog.** The full compact catalog grew from 16.2 KB to 25.6 KB,
+  close to the size the host stopped showing inline (29.4 KB). `plan --compact
+  --focus <ids>` returns the named capabilities in full and every other one as a
+  brief index (id, role, intent ids and descriptions, `brief: true`);
+  `--brief` returns the index alone. Nothing is hidden from the classifier, and
+  it is told to refocus before selecting a brief entry. An entry skill asks for
+  its own capabilities in focus; the umbrella skill starts from the index.
+  Measured on Marionette: index 9.4 KB, focused views 10.7 to 12.9 KB. Cost: one
+  more `plan --compact` call when the task needs a capability outside the focus.
+  Classification is still validated against the whole catalog and its digest.
+
 ## Enforceable Invariants
 
 - **INV-000**: every capability in a package's catalog is reachable through a
@@ -139,6 +160,9 @@ What the evidence showed, in one line each:
 - **INV-005**: `plugin.replaces`, when declared, appears in every host's `INSTALL.md`.
 - **INV-006**: every generated `SKILL.md` description is a valid YAML scalar that
   round-trips to the authored text.
+- **INV-007**: a focused or brief catalog lists every capability of the package;
+  a focused entry equals its full compact entry; an unknown focus id fails.
+- **INV-008**: the router cap counts text lines only, never catalog rows.
 
 ## Open questions for the owner
 
