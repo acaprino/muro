@@ -103,7 +103,71 @@ checks and 1 installed-Pi check. Linux, Python 3.13.
   read one skill file.
 - Release size grows by the prompt (35,565 bytes) and six skill files.
 
-## Open points for the owner
+## Second pass, same day: the first one was too literal
+
+Owner, after reading the cost above: "hai preso troppo alla lettera. Il
+contenuto si altera o addirittura si rigenera tramite llm per creare l'hook,
+il prompt di ingresso o la descrizione di selezione [...] ma poi se attivata va
+a fare riferimento alla sua versione integrale, ed è integrale solo in relazione
+a ciò che serve", and files "che non servono al nostro plugin generato [...] si
+possono anche eliminare sia come file sia come riferimenti". Rule: ADR-0017,
+amendment "the rule had been taken too literally".
+
+What changed, by the same nine delegated agents with a second brief:
+
+- All 29 bodies are entry prompts in the LLM's words. The step "read the
+  originals whole before working" is gone from every body; quotations of
+  ordinary prose are gone; literals stay for commands, flags, fixed output
+  strings, file names and numbers.
+- Each body points to the packaged original by file and section, at the step
+  that needs it, with the condition for opening it. `wireframe`,
+  `design-options`, `design-review` and `design-system-extract` no longer open
+  the design system prompt at all; `aesthetic-direction`, `ui-prototype` and
+  `html-deck` open single chapters or sections of it.
+- The corrections of substance from the first pass are kept (stated compactly
+  or behind a pointer).
+- Nine selected files nothing needs at run time became `intake_only_paths`:
+  `explaining-codebases/SKILL.md`, motion-design's
+  `reference/troubleshooting.md`, five developer READMEs inside the
+  TokenEconomizer engine, ui-ux-pro-max's `catalog-summary.json` and
+  `phosphor-icons-upstream.json` (824 KB). Kept although unread by scripts: the
+  licence and provenance records `google-font-licenses.json` and
+  `data-provenance.json`. The motion-design skill file still links to the
+  removed troubleshooting file.
+- Factory: AGENTS.md, the three prompts, the coordinator's step rule
+  (`muro/adapters.py`), REQ-021, README.
+
+Sizes, all 29 files, characters:
+
+| | Morning (`e8d757d`) | Literal pass | Now |
+|---|---:|---:|---:|
+| Whole files | 239,833 | 376,057 | 342,860 |
+| Operative body (no frontmatter, no Sources section) | 146,635 | 224,909 | 210,125 |
+
+The bodies did **not** return to the morning's size: they are 43% larger. The
+agents kept every restored rule in the body where a pointer would have hidden
+it, and each Sources section gained a list of changes (1 to 2.8 KB). What
+fell is the reading of originals: no step loads them whole any more. Per-step
+cost after this pass was not measured on a host.
+
+| Command | Result |
+|---|---|
+| `--validate` | `OK: capabilities and ROUTER.md valid` |
+| `--check-sources` | `OK: all sources and plugin identity valid` |
+| `--build --out <scratch>` | built; the nine files are absent, the two licence records present |
+| `python -m pytest -q`, final tree | `471 passed, 15 skipped in 255.33s` |
+
+Not executed: any host session; the routing eval. Still open: whether the
+runtime should stop sending the provenance lines of the Sources section with
+each step's instructions (`instructions` is the whole body today), and whether
+the always-on policy should be regenerated too (it keeps the sources' words).
+Rules now reachable only through a pointer are listed per capability in the
+agents' reports, the main ones: design-review no longer reaches the prompt's
+write-time rules of chapters 8, 11 and 12; paper-wiki's topic conditions and
+mirror rules; paper-figure's layout numbers beyond the two gaps; the research
+checklist of research-practice.
+
+## Open points for the owner (first pass)
 
 1. **GenOffice provider commands — decided.** The limits "no user files or
    confidential content to `search`, `image`, `media` unless asked" were

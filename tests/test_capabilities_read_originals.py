@@ -1,10 +1,11 @@
-"""Every capability carries its sources in their own words (owner, 2026-11-12, ADR-0017).
+"""Every capability keeps the substance of its sources and points to their originals (ADR-0017).
 
-The 29 Marionette capabilities were re-read against their pinned originals. A body is
-an index into packaged files it tells the host to read whole, and lists each difference
-with its collision. These tests check the two mechanical halves of that: the record is
-there, and every packaged original a body names really travels in a release. They do
-not prove that a body is faithful (that was the AI re-read) or that a host reads the files.
+Owner, 2026-11-12: a body is an entry prompt in the LLM's words; once activated it refers
+to the packaged original, by file and section, for what the task needs. These tests check
+the mechanical halves of that: each body records its changes and names a packaged
+original, none orders a whole read of everything first, and every original a body names
+really travels in a release. They do not prove that a body is faithful (that was the AI
+re-read) or that a host opens the files.
 """
 import re
 from pathlib import Path
