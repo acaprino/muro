@@ -14,23 +14,29 @@ reads: ["offer", "page_outline"]
 
 # Wireframe (low-fidelity exploration)
 
-Sketches several structures of the same screen or flow quickly, so the user compares arrangements before any look is chosen. The value is the breadth of options; no single wireframe is worth polishing. `<CD>` below stands for `<package_root>/scripts/claude-design-system-prompt/claude`.
+Sketches several structures of the same screen or flow quickly, so the user compares arrangements before any look is chosen. In the skill's words: "**Wireframes are disposable** — their value is breadth of options, not the fidelity of any one." `<CD>` below stands for `<package_root>/scripts/claude-design-system-prompt/claude`.
 
 ## Behavior
 
-1. **Fix the goal.** What is explored (a screen, a flow, navigation, hierarchy, an interaction model), what the user of that screen wants to do, the constraints (mobile or desktop, existing product or new, elements that must stay), how many variations (three at least, five or six at most per round) and the axis they vary on. When the request names no axis, propose two or three (for a sign-up: one page, a multi-step wizard, progressive disclosure) and ask which, once. A recorded `page_outline` and `offer` give the content to arrange.
-2. **Keep the wireframe language**, so nobody reads the sheet as unfinished hi-fi:
-   - black, white and two or three greys, no brand colour;
-   - a system sans-serif, no type personality;
-   - labelled boxes for content areas ("headline", "image", "feature card");
-   - striped placeholders with a monospace label and size for imagery, never real images;
-   - skeleton copy, no final wording;
-   - numbered callouts on the decisions that matter.
-3. **Write each variation's structure before drawing it.** One sentence per variation saying what distinguishes it (layout, density, flow structure, placement of the main action, navigation). Left unstated, variations converge. Order them from the conventional to the novel and make one clearly unusual.
-4. **Draw them in one file.** Single screens side by side in a grid; a flow as a storyboard of three to five screens per variation.
-5. **Annotate beside each variation**, two to four points: what it is good at and what it costs.
-6. **Capture the decision.** After the user picks: the chosen variation or hybrid, what attracted them, what they rejected, constraints that surfaced. This is the brief for the hi-fi step. If the user has not chosen yet, record the decision as pending with your recommendation.
-7. **Record** `wireframe_file` (path, variations, axis) and `wireframe_decision`.
+0. **Read the originals whole before working.** They are the method, in the source's own words:
+   - `<CD>/skills/wireframe.md`, all five phases;
+   - `<CD>/skills/discovery-questions.md`, for the question round of step 1;
+   - in `<CD>/system-prompt.md`, these chapters only, each from its heading to the next `# ` heading: `# 2. Workflow`, `# 3. Asking questions first`, `# 5. Content principles — no filler`, `# 15. Understanding users`, `# 16. Quality over quantity`, `# 19. IP and content boundaries`. No other part of the prompt is read for this capability.
+
+   The steps below are an index into those files. Where this body and an original differ, the original wins, except for the changes listed in the Sources section under "Changes for coexistence".
+1. **Understand the goal** (skill Phase 1, discovery-questions, chapters 3 and 15). "Confirm: **what's being explored** (a screen, a flow, a navigation pattern, an information hierarchy, an interaction model); **the user goal** on this screen or flow; **constraints** (mobile or desktop, existing context or greenfield, non-negotiable elements); **number of variations** (3 minimum, 5–6 ceiling per round); **axis of variation** (layout? density? step count? CTA placement?)." "If the user just says "wireframe a sign-up flow," propose 2–3 axes (e.g., "single-page form vs multi-step wizard vs progressive disclosure") and ask which to explore." One consolidated round. A recorded `page_outline` and `offer` give the content to arrange.
+2. **Establish wireframe conventions** (skill Phase 2). "Stick to the wireframe visual language so the user reads them as wireframes, not broken hi-fi:"
+   - "**Greyscale only** — black, white, 2–3 grays; no brand color"
+   - "**System sans-serif** — no type personality; the user shouldn't form font opinions yet"
+   - "**Boxes for content areas**, labeled ("headline", "image", "feature card")"
+   - "**Striped placeholders for imagery** with monospace labels (`product shot 1200×800`) — never real images; they pull focus"
+   - "**Ipsum or skeleton copy** — no final copy at this stage"
+   - "**Annotations welcome** — numbered callouts on key decisions"
+3. **Sketch variations** (skill Phase 3). "Produce **at least 3** variations differing on the established axis." "Write down each variation's distinguishing structure before sketching it. Left unspecified, variations converge on near-identical layouts — make the differences deliberate, and make at least one genuinely off-distribution." "Order from most by-the-book to most novel". The dimensions to vary across are the skill's list in Phase 3.
+4. **Draw them in one file.** Single-screen variations side by side; "build flow variations as small storyboards (3–5 screens each)".
+5. **Annotate** (skill Phase 4). "Add 2–4 annotation points per variation, placed next to it (not in a separate doc), so the user reads the variation and its rationale together".
+6. **Capture decisions and hand off** (skill Phase 5). "After the user picks a direction, capture: the chosen variation (or hybrid), what attracted them to it, what they explicitly rejected, and any new constraints surfaced. This becomes the brief for the hi-fi follow-up." If the user has not chosen yet, record the decision as pending.
+7. **Record** `wireframe_file` (path, variations, axis) and `wireframe_decision`, and summarize as the skill ends: "variations produced, axis of variation, recommended next step, open questions surfaced."
 
 ## Output handoff
 
@@ -38,27 +44,37 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 
 ## Specifics
 
-- Simple line shapes and rough icons are acceptable here and only here: everything sits at the same low fidelity.
-- When the user holds a hypothesis about their audience, a wireframe round and a hi-fi round on different bets tell more than several hi-fi takes on one bet.
-- One file with every variation; never `v1.html`, `v2.html`, `v3.html`.
-- Sections, pages or content beyond the brief are proposed to the user, not added.
+- Skill Phase 2: "This is the one context where hand-drawn-feeling SVG (rectangles, lines, simple icons) is acceptable — everything is at the same low fidelity."
+- Skill Phase 5: "Don't invest hi-fi polish in the wireframes themselves — they've served their purpose."
+- Chapter 15: "When the user has hypotheses about what their audience wants, gently surface options that test those assumptions. A wireframe round and a hi-fi round on different bets is more useful than four hi-fi takes on the same bet."
+- One file holds every variation: the skill lays them side by side on one canvas, and this step hands over one `wireframe_file`.
+- Chapter 19: "If you think additional sections, pages, copy, or content would improve the design, **ask the user first.**"
 - The source lays variations out with a canvas starter of its own host (`design_canvas.jsx`), which is not packaged: use a plain CSS grid.
-- After the decision, the usual next step is a prototype, an HTML deck when the wireframe was for a presentation, or another low-fidelity round. Suggest it; do not start it.
-- Full method: `<CD>/skills/wireframe.md`. Nothing is installed.
+- After the decision the skill suggests the next step: a hi-fi interactive prototype (`ui-prototype`), an HTML deck "if the wireframe was for a presentation" (`html-deck`), "or another low-fi round". Suggest it; do not start it.
+- Nothing is installed.
 
 ## Checks
 
 - **axis_stated_before_sketching**: the axis of variation and each variation's distinguishing structure were written before drawing.
-- **variations_structurally_distinct**: at least three variations differ in structure, not in decoration, and one is outside the conventional range.
-- **lofi_conventions_kept**: the sheet is greyscale, in a system sans-serif, with labelled boxes, placeholder imagery and skeleton copy.
-- **annotations_beside_variations**: every variation carries two to four annotations next to it.
-- **decision_captured_or_pending**: the user's pick, attractions, rejections and new constraints are recorded, or the decision is recorded as pending with a recommendation.
+- **variations_structurally_distinct**: at least three variations differ on the established axis in structure, not in decoration, and at least one is genuinely off-distribution.
+- **lofi_conventions_kept**: the sheet is greyscale only, in a system sans-serif, with labelled boxes, striped placeholders with monospace labels for imagery and ipsum or skeleton copy.
+- **annotations_beside_variations**: every variation carries two to four annotation points next to it.
+- **decision_captured_or_pending**: the user's pick, what attracted them, what they rejected and new constraints are recorded, or the decision is recorded as pending with the recommended next step and the open questions.
 
 ## Sources
 
-- AI intent mapping: wireframe → ui.wireframe-exploration, from its five phases; discovery-questions supplies the single question round of step 1; system prompt chapter 15 ("Test assumptions") and chapter 19 (no added scope) supply two Specifics.
-- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, head; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `head`) — `claude/skills/wireframe.md`, `claude/skills/discovery-questions.md`, packaged under `<package_root>/scripts/claude-design-system-prompt/`; `claude/system-prompt.md` chapters 15 and 19, read at intake only and not packaged (`intake_only_paths`: its rules are restated in this body).
-- Provenance: the upstream README describes the repository as a "Reverse-engineered system prompt of Claude Design from Anthropic" (README.md is excluded from the selection and was not read at intake; the fact comes from the intake brief). The method is restated here, not copied.
-- Not adopted: the host starter `design_canvas.jsx` and the `questions_v2` tool, which the selected snapshot names but does not contain; the source's "then suggest `make-a-prototype`" routing, kept only as a suggestion to the user.
+- AI intent mapping: wireframe → ui.wireframe-exploration, from its five phases; discovery-questions supplies the single question round of step 1; system prompt chapters 2 (order of work), 3 (questions), 5 (ask before adding), 15 ("Test assumptions"), 16 and 19 (no added scope) are applied as the delivery decisions assign them.
+- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, head; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `head`) — `claude/skills/wireframe.md`, `claude/skills/discovery-questions.md` and `claude/system-prompt.md` (chapters 2, 3, 5, 15, 16 and 19), all packaged under `<package_root>/scripts/claude-design-system-prompt/` and read at run time (step 0).
+- Provenance: the upstream README describes the repository as a "Reverse-engineered system prompt of Claude Design from Anthropic" (README.md is excluded from the selection and was not read at intake; the fact comes from the intake brief).
+- Changes for coexistence (ADR-0017):
+  - The skill's opening trigger phrases ("explore options," "sketch something out," "see a few directions") are not activation rules here: the coordinator classifies by meaning.
+  - "Lay single-screen variations side-by-side with the `design_canvas.jsx` starter": the starter belongs to the source's host and is not in the selected snapshot, so no supported host can copy it. The sheet is a plain CSS grid in one HTML file.
+  - The form tool `questions_v2` of discovery-questions Phases 4 and 5 belongs to the source's host: the round uses the optional logical `question-form` tool when the host has one, otherwise one plain-text message, and the step waits for the answers either way.
+  - Skill names in the originals are not invoked from this step (one capability per step, run by the coordinator). "Then suggest `make-a-prototype` ..., `make-a-deck` ..." is a suggestion to the user that names `ui-prototype` and `html-deck`; discovery-questions Phase 5 "Proceed to the appropriate building skill" means continuing with the steps of this body.
+  - Added by the package: the pending value of `wireframe_decision` when the user has not picked yet (the coordinator closes a step only with both output keys); the recorded `offer` and `page_outline` as content to arrange (handoff from the landing capabilities).
+  - Chapters 2, 5 and 16 are written for hi-fi work. Where they meet this skill, the skill's own words govern a wireframe: chapter 2's "(See chapter 4.)" is covered by the skill's constraint "existing context or greenfield" and its "no brand color"; chapter 5's "Lorem ipsum where real copy belongs" and chapter 16's "Copy proofread, no Lorem" by "**Ipsum or skeleton copy** — no final copy at this stage"; chapter 16's "Show fewer ideas, but show them polished" by "their value is breadth of options" and "Don't invest hi-fi polish in the wireframes themselves". This is the source's own exception ("This is the one context where ..."), recorded so the host does not apply both.
+  - Chapter 2, closing paragraphs ("You are encouraged to call file-exploration tools concurrently", "Default to silence between tool calls ...") are not applied: conduct for the whole conversation belongs to the host and would change how other capabilities report. The "verifier subagent" of its step 5 is a tool of the source's host: the sheet is looked at with the optional `browser` tool, and what was not looked at is said.
+  - Chapter 19's test "unless the user's email domain indicates they work at that company" cannot be run by any supported host: it is replaced by the user's own statement that the product is theirs.
+  - Not read and not applied (dropped in `delivery.json`): the prompt's opening lines, chapter 1 (persona, "the user is your manager", the rule not to divulge the environment), chapter 20 (the source's own routing and trigger phrases) and the "Final principle".
 - Runtime dependency: none. Hooks: the selected files define none; `codex/**` and `README.md` are excluded and were not inspected.
 - Harmonized by: prompts/harmonizer.md (2026-11-12) — a new role. No earlier capability explores structure at low fidelity: `visual-direction` plans one page by screens and builds it, `design-options` varies a design that already has a look. It reads a recorded landing outline but needs none.
