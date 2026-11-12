@@ -54,4 +54,5 @@ Return `deck_outline` (outline path and page count), `deck_file` (the .pptx path
 - Runtime dependency: the GenOffice app and its `genoffice` command line (Apache-2.0), not bundled by Muro; the capability installs it from the official releases when it is missing.
 - Not adopted: `search`, `image` and `media` give no standalone intent; they are optional, data-leaving steps of this pipeline. The skill, MCP and CLI installation or registration commands are dropped.
 - Hooks: the selected SKILL.md defines none. The rest of the repository (app, packaging, CLAUDE.md, .github) was not inspected for hooks.
+- Harmonization 2026-11-12 (claude-design-system-prompt intake): `html-deck` builds a presentation as a web page. The two are alternatives by wanted format with different outputs; a request that names no format stays here, and this intent already excludes an HTML slideshow.
 - Harmonized by: prompts/harmonizer.md — pipeline kept as written; the upstream "use them when configured" rule for cloud commands is narrowed to public content unless the user asks otherwise.

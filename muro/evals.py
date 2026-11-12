@@ -13,6 +13,7 @@ import re
 from typing import Any
 
 from .core import parse_router
+from .delivery import load_delivery, session_text, unregistered_active_hooks, validate_delivery
 from .factory import _fresh_workbench, prompts_dir
 from .routing import catalog_digest, catalog_entries, resolve_selection, validate_classification, validate_stack
 from .runtime import compact_catalog
@@ -58,12 +59,18 @@ def _package(project_root: Path):
     catalog = catalog_entries(rows, by_id)
     prompt = (prompts_dir(project_root) / "classify.md").read_text(encoding="utf-8")
     manifest = json.loads((project_root / "sources.json").read_text(encoding="utf-8"))
+    delivery = load_delivery(project_root)
+    errors = (unregistered_active_hooks(capabilities) if delivery is None else
+              validate_delivery(delivery, capabilities, {source.get("id") for source in manifest.get("sources", [])}))
+    if errors:
+        raise ValueError("Invalid delivery: " + "; ".join(errors))
     stack = manifest.get("stack") if isinstance(manifest.get("stack"), dict) else {}
     document = json.loads((project_root / CASES_FILE).read_text(encoding="utf-8"))
     errors = validate_cases(document, capabilities)
     if errors:
         raise ValueError("Invalid eval cases: " + "; ".join(errors))
-    return by_id, rows, catalog, prompt, catalog_digest(catalog, by_id, prompt), stack.get("conflicts"), document["cases"]
+    return (by_id, rows, catalog, prompt, catalog_digest(catalog, by_id, prompt, delivery),
+            stack.get("conflicts"), document["cases"], delivery)
 
 
 def _contexts(cases: list[dict], digest: str, conflicts) -> dict[str, dict]:
@@ -76,7 +83,7 @@ def _contexts(cases: list[dict], digest: str, conflicts) -> dict[str, dict]:
 
 def prepare_eval(project_root: Path, output_dir: Path) -> Path:
     """Write the classifier's material: rules, compact catalog and one context per case, without expectations."""
-    _, _, catalog, prompt, digest, conflicts, cases = _package(project_root)
+    _, _, catalog, prompt, digest, conflicts, cases, delivery = _package(project_root)
     contexts = _contexts(cases, digest, conflicts)
     _fresh_workbench(output_dir, {"PROMPT.md", "contexts.json"})
     text = (
@@ -84,7 +91,8 @@ def prepare_eval(project_root: Path, output_dir: Path) -> Path:
         "catalog that follow. There is no project to inspect: decide from the request and its stack tokens.\n"
         "Write one JSON file `decisions.json` of the form `{\"decisions\": {\"<case id>\": <classification>}}`, where each\n"
         "classification copies that case's context (task, stack_tokens, catalog_digest) exactly.\n\n"
-        "## Cases (context per case id)\n\n```json\n" + json.dumps(contexts, ensure_ascii=False, indent=1) + "\n```\n\n"
+        + ("## Permanent session policy\n\n" + session_text(delivery) + "\n\n" if session_text(delivery) else "")
+        + "## Cases (context per case id)\n\n```json\n" + json.dumps(contexts, ensure_ascii=False, indent=1) + "\n```\n\n"
         "## Catalog\n\n```json\n" + json.dumps(compact_catalog(catalog), ensure_ascii=False, separators=(",", ":")) + "\n```\n\n"
         "## Rules\n\n" + prompt
     )
@@ -95,7 +103,7 @@ def prepare_eval(project_root: Path, output_dir: Path) -> Path:
 
 def score_eval(project_root: Path, decisions_path: Path) -> dict[str, Any]:
     """Validate each decision with the runtime's rules and compare status and ordered capabilities."""
-    by_id, rows, _, _, digest, conflicts, cases = _package(project_root)
+    by_id, rows, _, _, digest, conflicts, cases, _ = _package(project_root)
     contexts = _contexts(cases, digest, conflicts)
     document = json.loads(decisions_path.read_text(encoding="utf-8"))
     decisions = document.get("decisions") if isinstance(document, dict) else None

@@ -1,0 +1,8 @@
+{
+  "command": "muro.sources.check_sources(local_manifest, scratch_root)",
+  "source_count": 11,
+  "errors": [],
+  "elapsed_seconds": 3.72,
+  "remote_git_fetch": "unavailable; GitHub API original objects and live pin refs independently verified",
+  "notes": "Partial mirrors include original commits, complete tree objects, original annotated tags, selected blobs and license/NOTICE blobs. Unselected blobs and parent history are intentionally absent. No production manifest changes."
+}

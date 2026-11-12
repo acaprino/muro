@@ -16,6 +16,7 @@ from typing import Any
 import uuid
 
 from .core import parse_capability, parse_router, validate_capabilities_and_router
+from .delivery import allows_empty_catalog, load_delivery, validate_delivery, unregistered_active_hooks
 from .routing import (
     catalog_entries,
     catalog_digest,
@@ -119,10 +120,18 @@ class Coordinator:
         stack_cfg = manifest.get("stack") if isinstance(manifest.get("stack"), dict) else None
         self.stack_rules: list[dict[str, Any]] | None = stack_cfg.get("detectors") if stack_cfg is not None else None
         self.stack_conflicts: list[list[str]] | None = stack_cfg.get("conflicts") if stack_cfg is not None else None
+        capabilities = list(self.capabilities.values())
+        delivery = load_delivery(self.package_root)
+        source_ids = {source.get("id") for source in manifest.get("sources", [])}
+        delivery_errors = (unregistered_active_hooks(capabilities) if delivery is None
+                           else validate_delivery(delivery, capabilities, source_ids))
+        if delivery_errors:
+            raise ValueError("Invalid delivery: " + "; ".join(delivery_errors))
         errors = validate_capabilities_and_router(
             list(self.capabilities.values()),
             self.rows,
             plugin_slug=slug if plugin_meta else None,
+            allow_empty=allows_empty_catalog(delivery, capabilities, source_ids),
         )
         if errors:
             raise ValueError("Invalid AI catalog: " + "; ".join(errors))
@@ -131,7 +140,7 @@ class Coordinator:
             raise ValueError("Missing AI classification prompt")
         self.catalog = catalog_entries(self.rows, self.capabilities)
         self.conflicts = {key: cap.conflicts for key, cap in self.capabilities.items()}
-        self.digest = catalog_digest(self.catalog, self.capabilities, self.routing_prompt)
+        self.digest = catalog_digest(self.catalog, self.capabilities, self.routing_prompt, delivery)
         self.state_dir = self.project_root / f".{slug}"
         self._last_stack: set[str] | None = None
         self._last_classification: dict | None = None
@@ -867,7 +876,8 @@ def runtime_main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
-    parser.add_argument("action", choices=("plan", "resume", "record", "check", "complete", "step", "unlock"))
+    parser.add_argument("action", choices=("plan", "resume", "record", "check", "complete", "step", "unlock",
+                                           "session-context"))
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--task", default="")
@@ -896,7 +906,34 @@ def runtime_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--classification", help="JSON classification file or '-' for stdin")
     parser.add_argument("--classification-json", help="Inline JSON classification string")
     parser.add_argument("--token", help="Lock recovery token for unlock")
+    parser.add_argument("--hook-event", choices=("SessionStart", "SubagentStart"),
+                        help="session-context: emit Codex's JSON context envelope for this hook event")
     args = parser.parse_args(argv)
+    if args.hook_event and args.action != "session-context":
+        parser.error("--hook-event requires session-context")
+    if args.action == "session-context":
+        # Explicit JSON keeps policy starting with { or [ from becoming hook controls.
+        # Invalid declared text must be visible
+        # as a hook failure instead of a successful session silently missing its policy.
+        try:
+            from .delivery import MAX_ALWAYS_ON
+            document = load_delivery(args.package)
+            if document is not None and not isinstance(document, dict):
+                raise ValueError("delivery.json must be an object")
+            text = (document or {}).get("always_on", "")
+            if not isinstance(text, str) or len(text) > MAX_ALWAYS_ON:
+                raise ValueError(f"always_on must be text of at most {MAX_ALWAYS_ON} characters")
+        except (OSError, ValueError) as exc:
+            print(f"Invalid delivery session policy: {exc}", file=sys.stderr)
+            return 1
+        if text.strip():
+            if args.hook_event:
+                print(json.dumps({"hookSpecificOutput": {
+                    "hookEventName": args.hook_event, "additionalContext": text,
+                }}, ensure_ascii=False))
+            else:
+                print(text)
+        return 0
     try:
         stdin_consumers = sum(
             1 for val in (args.classification, args.outputs, args.result, args.step_data) if val == "-"

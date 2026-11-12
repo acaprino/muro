@@ -51,9 +51,13 @@ def catalog_entries(rows: list[RouterRow], capabilities: dict[str, Capability]) 
              "resumable": capabilities[row.id].resumable} for row in rows]
 
 
-def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str) -> str:
+def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], prompt: str,
+                   delivery: dict | None = None) -> str:
     payload = {"catalog": catalog, "bodies": {key: cap.body for key, cap in sorted(capabilities.items())},
                "checks": {key: cap.checks for key, cap in sorted(capabilities.items())}, "prompt": prompt}
+    # Absent delivery preserves existing catalog bindings; declared policy and hooks belong to the release contract.
+    if delivery is not None:
+        payload["delivery"] = delivery
     return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
 
 

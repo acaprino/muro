@@ -37,7 +37,13 @@ installation, publication or replacement of existing dist output without request
 ## Architecture and ownership
 
 - `sources.json`: source identity, pinned revision, license gate, selected paths,
-  exclusions, runtime dependencies and source-specific intake goal. Every source
+  exclusions, runtime dependencies and source-specific intake goal. Optional
+  `intake_only_paths`: selected files the intake AI read and then restated in
+  capability bodies or in the policy, or dropped, and that no step reads at run
+  time. They stay in the intake snapshot and are not packaged; a capability that
+  points at one is rejected. The AI decides per file; Python only removes and
+  checks (owner, 2026-11-12: a system prompt turned into capabilities does not
+  also travel as a raw file; ADR-0016 amendment). Every source
   declares `pin`: `release` (with `release`, the published tag its commit must
   be), `head` or `static`. Owner rule of 2026-11-10: pin published releases, not
   an arbitrary commit; an upstream without releases follows `head`, and `static`
@@ -48,7 +54,8 @@ installation, publication or replacement of existing dist output without request
 - `prompts/intake.md`: AI reads selected source skills, classifies all their
   supported outcomes and extracts capabilities with source-to-intent provenance.
   `prompts/harmonizer.md`: AI normalizes intent meanings, merges overlapping roles
-  and defines alternatives/dependencies. Preparation commands do not call an LLM.
+  and defines alternatives/dependencies. `prompts/delivery.md`: AI decides the
+  form each part takes (below). Preparation commands do not call an LLM.
 - `capabilities/*.md`: ten frontmatter fields: id, role, when, after, outputs,
   checks, intents, tools, hooks, conflicts. `intents` is nonempty `{id, description, excludes}`
   data. Optional eleventh field `reads`: output keys of other capabilities used
@@ -69,6 +76,14 @@ installation, publication or replacement of existing dist output without request
 - `muro/adapters.py` and `muro/release.py`: every host's standalone skill folder
   includes runtime, router, capabilities, prompts and license notices. Test the
   packaged launcher outside the source checkout, not only Python imports.
+  An adapter is installable with its host's own command: the Claude Code and
+  Codex adapter folders are their own single-plugin marketplace
+  (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`), and
+  each `INSTALL.md` ends with `## Install`: the command and what is active after
+  it. Write a command there only after running it on the real host (owner,
+  2026-11-12: what a package declares always-on is active by default once
+  installed). Codex reviews a plugin's hooks in `/hooks` before running them;
+  say so, never claim it away.
 - `muro/guide.py` and `muro/guide.html`: every release generates an offline,
   self-contained `GUIDE.html` at its root and in every standalone host skill.
   Initially show only the responsive navigable graph and a few controls for
@@ -93,6 +108,18 @@ installation, publication or replacement of existing dist output without request
   whole catalog, hidden from the slash menu on Claude Code. Python checks names,
   references, length and that every capability has an entry; it never groups
   capabilities or writes descriptions (ADR-0014).
+- `delivery.json` (optional) and `prompts/delivery.md`: what each part of each
+  source becomes in this package, decided by the host AI at intake and reviewed
+  at harmonization: `decisions` of `{source, content, form, targets, reason}`
+  with form `capability`, `always-on`, `hook` or `dropped`, the `always_on`
+  session text (AI-written from the catalog, 2000 characters at most) and `hooks`
+  wirings `{host, capability, event, matcher, run}`. Both preparations append the
+  prompt. `muro/delivery.py` checks shape, references, a decision for every
+  source and that each form has something behind it, then emits only what the
+  document declares; it never chooses a form (ADR-0016). A validated always-on
+  package can have no capabilities: header-only router, authored no_match guide
+  examples, no entries and no discoverable SKILL.md. The policy and delivery
+  declarations participate in catalog_digest and are supplied to routing evals.
 - `eval-cases.json` (optional): AI-authored requests with expected status and
   ordered capabilities. `--prepare-eval` gives the host AI rules, catalog and
   contexts without the expectations; `--score-eval <decisions.json>` validates
@@ -101,18 +128,43 @@ installation, publication or replacement of existing dist output without request
 ## Tools, hooks and execution
 
 Catalog logical tool requirements with purpose and required/optional status.
-Catalog adopted hooks with event, action, declared tools and manual/host-approved
-policy. Record original defaults, effects, portability and omitted/uninspected
-hooks in source provenance; do not assume omitted upstream files contain none.
-The host AI must map requirements to real tools and check availability/authorization.
-Catalog metadata is not executable native hook wiring and grants no permissions.
-Never install or automatically activate upstream hooks as part of intake/build.
-A source whose function is its hooks (tokeneconomizer, 2026-11-11) keeps that rule:
-its hooks are `host-approved` catalog entries, the release ships nothing a host
-would auto-register (no `hooks/` at a plugin or skill root, no manifest key), and
-registering or removing them is a step of the capability that runs only on the
-user's explicit request, after it has said what the hooks do, what they write and
-which model calls they make (ADR-0007 amendment).
+Catalog adopted hooks with event, action, declared tools and policy `manual`,
+`host-approved` or `active`. Record original defaults, effects, portability and
+omitted/uninspected hooks in source provenance; do not assume omitted upstream
+files contain none. The host AI must map requirements to real tools and check
+availability/authorization. Capability frontmatter describes a hook; it is not
+the wiring and grants no permissions.
+
+Owner correction of 2026-11-12 ("se installo il plugin generato da muro, allora
+può attivare da solo prompt, hook, tools, skills", "tutto ciò che serve"):
+installing a generated plugin is the consent, so a release may register by
+itself what its package declares in `delivery.json`: text for every session and
+hooks with policy `active`. May is not should. Same day, on a design system
+prompt offered to Marionette: it "non deve fagocitare tutto" in a package that
+is "multi theme, context e intent"; it becomes capabilities found from context,
+harmonized with the others, and "questo è anche il tipo di sensibilità che mi
+aspetto da Muro" for every new intake. So the form of each absorbed part is an AI
+judgment with a recorded reason (`prompts/delivery.md`), always-on is the
+exception, and never a Python rule or a default taken from the source's shape.
+A package without the document registers nothing. Intake and build still execute
+and register nothing on the factory machine, and classification never registers
+a hook. All five native adapters deliver permanent policy through the host's
+system/developer instruction channel. Claude Code and Codex also register
+declared source command hooks; unsupported wirings are rejected. Installing
+only skill folders does not load native policy. Host trust, safe mode and
+permissions remain authoritative. API requirements and limitations belong in
+`INSTALL.md` (ADR-0016, which
+supersedes the passive-hook rule of ADR-0007 and its 2026-11-11 amendment).
+Hook `run` is literal argv, never shell syntax; generated commands resolve the
+plugin root inside a stdlib Python trampoline. Windows batch targets are
+rejected; declare the executable and script directly. Codex policy hooks emit
+event-specific JSON additionalContext; raw `session-context` is inspection only.
+Test native delivery separately from model behavior and record both limits.
+After a policy upgrade, Hermes needs a new session because resumed sessions may
+retain their persisted prompt. Do not claim refresh from registration alone.
+TokenEconomizer's hooks are still `host-approved` and registered on the user's
+request by its capability: activating them by default is an open delivery
+decision, not yet run live.
 
 Owner decision of 2026-11-09 ("il plugin/skill dovrebbero installarli se
 necessario"): a capability installs a runtime dependency it needs and finds
@@ -123,8 +175,8 @@ substitutes another engine. A failed install, or the user's objection, blocks
 only the delivery that depends on it. The classifier does not treat such a
 dependency as a reason to stop. Intake records how each dependency is checked
 and installed; when the source gives no method, it says so. Intake and build
-still install nothing, the skill or plugin itself is never installed by a
-capability, and hooks stay passive (ADR-0007).
+still install nothing, and the skill or plugin itself is never installed by a
+capability (ADR-0007). What a release registers by itself is ADR-0016's subject.
 
 Owner correction of 2026-11-10 ("sono da valutare runtime caso per caso"): there
 is no closed dependency manifest and no build gate on dependencies. The host AI
@@ -164,7 +216,8 @@ For routing changes, cover the full chain: source prompt → capability schema �
 router/catalog → AI-response boundary → plan/state → portable host adapters.
 Test malformed/unknown/stale decisions, new non-UI intents, negation-sensitive
 examples supplied as AI fixtures, variant constraints, dependencies, state
-preservation, missing tools and passive hook metadata. A fixture does not prove
+preservation, missing tools, hook metadata and delivery declarations (a release
+registers exactly what `delivery.json` declares, and nothing without it). A fixture does not prove
 AI reasoning quality. Report real and simulated integrations separately.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
@@ -208,7 +261,8 @@ with `pin: release`; only an upstream with no release or tag gets `pin: head`.
 Before moving a pin, diff the selected paths, `LICENSE` and `NOTICE` between the
 old and new commit and check that no capability relies on what changed or
 disappeared. Write the pin and its release into each capability's `## Sources`
-line and into `tests/test_<source>_intake.py`. Record the release, the diff
+line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
+each part of the source became and why, and review the earlier decisions. Record the release, the diff
 summary, the commands and their results in `docs/verification/`. A release
 proves packaging; say what was not executed.
 

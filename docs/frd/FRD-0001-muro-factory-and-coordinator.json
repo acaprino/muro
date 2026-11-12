@@ -72,7 +72,7 @@
       ],
       "id": "REQ-001",
       "status": "extracted",
-      "text": "The user never has to remember an absorbed skill name or manually pair skills; the generated umbrella skill exposes at most one configurable user-facing command (/<command>) and a bounded domain-rich 'Use when...' SKILL.md description for natural-language host discovery."
+      "text": "The user never has to remember an absorbed skill name or manually pair skills; a package with procedural capabilities generates an umbrella skill exposing at most one configurable user-facing command (/<command>) and a bounded domain-rich 'Use when...' SKILL.md description for natural-language host discovery. A package containing only permanent policy emits no discoverable SKILL.md."
     },
     {
       "evidence": [
@@ -87,7 +87,7 @@
       ],
       "id": "REQ-002",
       "status": "extracted",
-      "text": "Muro is a standard-library-only Python 3.10+ factory separate from the packages it builds (such as examples/marionette/), emitting standalone multi-host coordinators across Claude Code, Codex, Pi, OpenCode and Hermes with no package-specific rules leaked into muro/ or prompts/."
+      "text": "Muro is a standard-library-only Python 3.10+ factory separate from the packages it builds (such as examples/marionette/), emitting standalone packages with shared coordination mechanics and each host's native policy channel across Claude Code, Codex, Pi, OpenCode and Hermes, with no package-specific rules leaked into muro/ or prompts/."
     },
     {
       "evidence": [
@@ -173,11 +173,19 @@
         {
           "path": "docs/adr/ADR-0013-runtime-lifecycle-discovery-and-factory-isolation.md",
           "excerpt": "Repeated capabilities in one plan use explicit step_id: <cap>#<n> with namespaced output keys."
+        },
+        {
+          "path": "muro/routing.py",
+          "excerpt": "Absent delivery preserves existing catalog bindings; declared policy and hooks belong to the release contract."
+        },
+        {
+          "path": "tests/test_policy_binding.py",
+          "excerpt": "test_changed_policy_rejects_old_decision_and_evidence_without_writes"
         }
       ],
       "id": "REQ-008",
       "status": "extracted",
-      "text": "Python validates the host AI's explicit selections against task, stack constraints, catalog digest, conditional needs judgments, role variants, declared conflicts and single-owner outputs (supporting explicit step_id instances with namespaced outputs), failing closed without automatic substitution."
+      "text": "Python validates the host AI's explicit selections against task, stack constraints, catalog digest, conditional needs judgments, role variants, declared conflicts and single-owner outputs (supporting explicit step_id instances with namespaced outputs), failing closed without automatic substitution. When delivery.json exists its full validated declaration participates in the digest, so changed permanent policy or hook delivery invalidates previous classifications and saved-map resumes without rewriting their evidence; absent delivery preserves the previous digest format."
     },
     {
       "evidence": [
@@ -188,7 +196,7 @@
       ],
       "id": "REQ-009",
       "status": "extracted",
-      "text": "Every release generates an offline, self-contained GUIDE.html (defaulting to English, or Italian via plugin.language) embedding the verified Cytoscape.js bundle, declared after/needs/reads relationships and validated guide-examples.json scenarios without browser-side task classification."
+      "text": "Every release generates an offline, self-contained GUIDE.html (defaulting to English, or Italian via plugin.language) at its root and in every adapter's runtime resource directory, embedding the verified Cytoscape.js bundle, declared after/needs/reads relationships and validated nonempty guide-examples.json scenarios without browser-side task classification. The guide preserves declared delivery decisions, reasons, policy text and hook wirings and uses the runtime's delivery-bound catalog digest, including for packages with no procedural capabilities."
     },
     {
       "evidence": [
@@ -241,14 +249,116 @@
         {
           "path": "docs/adr/ADR-0015-design-principles-from-first-real-use.md",
           "excerpt": "`--prepare-eval` writes the rules, compact catalog and case contexts for the host AI, never the expectations"
+        },
+        {
+          "path": "tests/test_policy_binding.py",
+          "excerpt": "test_eval_receives_exact_policy_and_matches_runtime_and_guide_binding"
         }
       ],
-      "text": "Routing quality is evaluated from outside: eval-cases.json holds requests with expected decisions, the host AI classifies them without seeing the expectations, Python validates and compares, and host-protocol changes are run in a real host with calls, denials, cost and sample size recorded."
+      "text": "Routing quality is evaluated from outside: eval-cases.json holds requests with expected decisions, the host AI classifies them without seeing the expectations, and Python validates and compares. Eval preparation validates delivery.json and supplies its exact always_on policy alongside the catalog, rules and case contexts; preparation, scoring, runtime and guide share the delivery-bound digest, so old eval decisions cannot be scored as current after a policy change. Host-protocol changes are run in a real host with calls, denials, cost and sample size recorded; deterministic adapter simulations and unavailable live checks are reported separately."
+    },
+    {
+      "id": "REQ-015",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0016-delivery-form-and-self-registering-releases.md",
+          "excerpt": "It never picks a form. An invalid document stops the build."
+        }
+      ],
+      "text": "Every intake records in delivery.json what each part of a source becomes (on-demand capability, permanent session policy, active hook or dropped) with a source-grounded reason; the host AI makes that judgment with prompts/delivery.md at intake and reviews it at harmonization. Python validates shape, references, a decision for every source, the 2000-character policy cap and declared active hook ownership, and never chooses a form. Loading the complete generated native plugin/package registers only its declared delivery, subject to the host's own trust, feature and permission controls; intake, build and classification never install, activate or modify host configuration. All five adapters provide a native policy channel; arbitrary source command-hook wirings are currently accepted only for Claude Code and Codex, with unsupported wirings rejected and host requirements stated in INSTALL.md. Packages without delivery.json retain no automatic policy or hook registration."
+    },
+    {
+      "id": "REQ-016",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "muro/delivery.py",
+          "excerpt": "An explicit, valid permanent policy is a useful package without procedural skills."
+        },
+        {
+          "path": "tests/test_policy_only.py",
+          "excerpt": "test_policy_only_release_has_no_fabricated_capability"
+        },
+        {
+          "path": "tests/test_policy_only.py",
+          "excerpt": "test_policy_only_runtime_requires_ai_and_accepts_no_match_without_state"
+        }
+      ],
+      "text": "A valid explicit always-on delivery may form a package with zero procedural capabilities: capabilities/ may be absent or empty, ROUTER.md retains its valid six-column header with no capability rows, and guide-examples.json remains nonempty with authored no_match or needs_clarification decisions. Build preserves runtime resources, provenance, notices and GUIDE.html in every adapter but emits no fabricated capability, discovery entry or SKILL.md. If its runtime is called, plan still requires an explicit AI classification and never invents a coordinator fallback. Empty packages without a valid nonempty declared policy, including dropped-only delivery, remain invalid."
+    },
+    {
+      "id": "REQ-017",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "muro/claude_adapter.py",
+          "excerpt": "Emit Claude Code's native additive system-prompt module."
+        },
+        {
+          "path": "muro/delivery.py",
+          "excerpt": "Codex's native developer-instruction channel, plus explicitly declared source hooks."
+        },
+        {
+          "path": "muro/native_policy.py",
+          "excerpt": "Expose the skills and, when declared, one structured Pi system-prompt section."
+        },
+        {
+          "path": "muro/native_policy.py",
+          "excerpt": "A dependency-free OpenCode V2 plugin: skills and optional outgoing system text."
+        },
+        {
+          "path": "muro/hermes_adapter.py",
+          "excerpt": "Emit a native Hermes plugin; the host owns prompt assembly and permissions."
+        }
+      ],
+      "text": "Declared policy is delivered through additive host-native channels without replacing existing core instructions: Claude Code uses a prompt.compose module adding a named system-prompt section; Codex uses SessionStart and SubagentStart hooks adding developer instructions, with startup, resume, clear, compact and fork session matching; Pi uses before_agent_start with systemPromptOptions.sections; OpenCode V2 uses context, compaction, generate and title session hooks that append a policy text part only when absent; Hermes uses register_system_prompt_section after memory. The full native adapter, not merely its skill files, must be loaded. INSTALL.md declares the required APIs and host controls; Hermes reports an explicit warning when its prompt-section API is unavailable instead of claiming policy activation. Claude Code, Pi and OpenCode composition preserves other host sections and does not accumulate duplicate policy sections."
+    },
+    {
+      "id": "REQ-018",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "muro/delivery.py",
+          "excerpt": "Keep declared argv and installed paths out of the host's shell syntax."
+        },
+        {
+          "path": "tests/test_hook_command_argv.py",
+          "excerpt": "test_host_shell_preserves_argv_stdin_and_exit_without_expanding_data"
+        },
+        {
+          "path": "muro/runtime.py",
+          "excerpt": "Explicit JSON keeps policy starting with { or [ from becoming hook controls."
+        }
+      ],
+      "text": "Generated command-hook dispatch preserves literal declared argv, installed paths, stdin, stdout, stderr and process exit status across supported host shells. A standard-library Python trampoline decodes command data, resolves the host's plugin-root variable and <package_root> after shell dispatch, then runs the declared argv with shell=False; shell metacharacters in arguments or installed paths are not reinterpreted by the host shell. Codex session-context --hook-event emits the policy as hookSpecificOutput.additionalContext with the matching hookEventName, so policy text beginning with JSON syntax cannot become hook-control fields. Unreadable or invalid declared session policy returns a visible failure; absent delivery emits no policy."
+    },
+    {
+      "id": "REQ-019",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0016-delivery-form-and-self-registering-releases.md",
+          "excerpt": "A release carries an original"
+        }
+      ],
+      "text": "A release carries an original source file only when a capability reads it at run time. A source may declare intake_only_paths: selected files the intake AI read and restated or dropped; they remain in the intake workbench, are absent from scripts/<source-id>/ in the release and in every adapter, each pattern must match a selected file, and a capability body that names the packaged path of such a file is rejected. The AI decides per file; Python removes and checks."
+    },
+    {
+      "id": "REQ-020",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0016-delivery-form-and-self-registering-releases.md",
+          "excerpt": "installed with exactly the commands written there"
+        }
+      ],
+      "text": "Each generated adapter can be installed with its host's own command: the Claude Code and Codex adapter folders carry a single-plugin marketplace manifest (.claude-plugin/marketplace.json, .agents/plugins/marketplace.json) whose plugin source is the folder itself, and INSTALL.md of Claude Code, Codex, Pi and OpenCode ends with an Install section giving the command and what is active after it. A command appears there only after it ran on the real host. The Codex section states that declared hooks, and the policy they deliver, are not active until the user trusts them in /hooks."
     }
   ],
   "schema_version": 1,
   "status": "Proposed",
   "superseded_by": null,
   "title": "Muro AI-Classified Skill Package Factory, Multi-Host Coordinator, and Transactional Step Runtime",
-  "version": 3
+  "version": 4
 }

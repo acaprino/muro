@@ -1,0 +1,28 @@
+{
+  "cwd": "D:\\workspace\\muro-ponytail-probe\\host-project",
+  "args": [
+    "claude",
+    "-p",
+    "In this verification session, list all available skills from the Ponytail Probe package, including hidden entries. Then describe the package working policy already supplied at startup: its preference order, completeness guarantees, and whether it forces a review for every task. Do not invoke skills, read files or run tools to obtain the policy. If no such policy was supplied, say so. Answer concisely in Italian.",
+    "--plugin-dir",
+    "D:\\workspace\\muro-ponytail-probe\\release\\ponytail-probe\\adapters\\claude-code",
+    "--setting-sources",
+    "",
+    "--strict-mcp-config",
+    "--mcp-config",
+    "{\"mcpServers\":{}}",
+    "--permission-mode",
+    "dontAsk",
+    "--allowedTools",
+    "Skill",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--include-hook-events",
+    "--debug-file",
+    "D:\\workspace\\muro-ponytail-probe\\host-debug.log",
+    "--max-budget-usd",
+    "1",
+    "--no-session-persistence"
+  ]
+}

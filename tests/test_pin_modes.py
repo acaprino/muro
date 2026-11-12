@@ -129,9 +129,12 @@ def test_manifest_declares_a_mode_for_every_source():
         "wayfinder": ("release", "v1.3.2"),
         "ui-ux-pro-max": ("release", "v2.15.0"),
         "genoffice": ("release", "v0.12.852"),
+        "ponytail": ("release", "v5.3.3"),
+        "i-have-adhd": ("release", "v0.4.1"),
         # These upstreams publish no release or tag: the owner follows their HEAD.
         "motion-design": ("head", None),
         "gsap-scrolltrigger": ("head", None),
         "ai-design-skills": ("head", None),
         "explain-this": ("head", None),
+        "claude-design-system-prompt": ("head", None),
     }

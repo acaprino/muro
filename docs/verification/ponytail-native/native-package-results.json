@@ -1,0 +1,19 @@
+{
+  "source_preserved": "D:\\workspace\\muro-ponytail-probe\\package",
+  "new_inputs": "D:\\workspace\\muro-ponytail-probe\\native-package",
+  "excluded_generated_state": ".muro",
+  "copied_root_inputs": [
+    "sources.json",
+    "delivery.json",
+    "entries.json",
+    "eval-cases.json",
+    "guide-examples.json",
+    "ROUTER.md"
+  ],
+  "copied_directories": [
+    "capabilities"
+  ],
+  "policy_characters": 1800,
+  "policy_sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+  "only_authored_change": "delivery.json decisions[0].reason"
+}

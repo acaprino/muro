@@ -1,8 +1,9 @@
 """Integration contract for the tokeneconomizer intake (session cost control).
 
 Pinned at release v0.1.0 (ec8ff5ec). The source is a hook-driven plugin: its six
-default hooks are passive catalog entries here, and the capability registers them
-only on the user's explicit request. Runtime decisions below are explicit host-AI
+default hooks are `host-approved` catalog entries here, and the capability registers
+them only on the user's explicit request. Since ADR-0016 a release may register hooks
+by itself when the package's delivery.json declares them; Marionette's does not. Runtime decisions below are explicit host-AI
 response fixtures, not evidence of AI classification quality.
 """
 import json
@@ -99,11 +100,16 @@ def test_release_packages_the_engine_and_keeps_the_hooks_passive(release):
     assert sorted(upstream["hooks"]) == sorted(EVENTS)            # the catalog lists exactly what upstream wires
     for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
         root = release / "adapters" / host
-        # Nothing a host would auto-register: no hooks folder at a plugin or skill root, no manifest that names hooks.
-        assert not (root / "hooks").exists() and not (root / "skills" / "marionette" / "hooks").exists()
-        manifest = root / ".claude-plugin" / "plugin.json"
-        if manifest.is_file():
-            assert "hooks" not in json.loads(manifest.read_text(encoding="utf-8"))
+        # Other sources may register native policy. TokenEconomizer itself stays
+        # passive: its reference hooks live under scripts, with no active wiring.
+        delivery = json.loads((root / "skills" / "marionette" / "delivery.json").read_text(encoding="utf-8"))
+        assert not any(wiring["capability"] == "token-economy" for wiring in delivery.get("hooks", []))
+        assert not any(item["source"] == "tokeneconomizer" and item["form"] == "hook"
+                       for item in delivery["decisions"])
+        for registered in (root / "hooks" / "hooks.json", root / "skills" / "marionette" / "hooks" / "hooks.json"):
+            if registered.is_file():
+                wiring = registered.read_text(encoding="utf-8")
+                assert "te_bootstrap.py" not in wiring and "scripts/tokeneconomizer" not in wiring
         assert (root / "skills" / "marionette" / "scripts" / "tokeneconomizer" / "plugin" / "scripts" / "te_bootstrap.py").is_file()
         install = (root / "INSTALL.md").read_text(encoding="utf-8")
         assert "`tokeneconomizer`" in install and "marionette-token-economy" in install

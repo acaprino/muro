@@ -1,0 +1,92 @@
+{
+  "url": "https://api.github.com/repos/pengqianhan/open-paper-skills/commits/HEAD",
+  "response": {
+    "sha": "f85fd3dc80720dfa42fb5ab069f232f28c831109",
+    "node_id": "C_kwDORd9eJtoAKGY4NWZkM2RjODA3MjBkZmE0MmZiNWFiMDY5ZjIzMmYyOGM4MzExMDk",
+    "commit": {
+      "author": {
+        "name": "github-actions[bot]",
+        "email": "41898282+github-actions[bot]@users.noreply.github.com",
+        "date": "2026-10-12T11:03:53Z"
+      },
+      "committer": {
+        "name": "github-actions[bot]",
+        "email": "41898282+github-actions[bot]@users.noreply.github.com",
+        "date": "2026-10-12T11:03:53Z"
+      },
+      "message": "chore: sync skills from AI-Human Research OS (c60a416083d7)",
+      "tree": {
+        "sha": "478cf353acad6378d4ae24c11e88e4d01c0dcb83",
+        "url": "https://api.github.com/repos/pengqianhan/open-paper-skills/git/trees/478cf353acad6378d4ae24c11e88e4d01c0dcb83"
+      },
+      "url": "https://api.github.com/repos/pengqianhan/open-paper-skills/git/commits/f85fd3dc80720dfa42fb5ab069f232f28c831109",
+      "comment_count": 0,
+      "verification": {
+        "verified": false,
+        "reason": "unsigned",
+        "signature": null,
+        "payload": null,
+        "verified_at": null
+      }
+    },
+    "url": "https://api.github.com/repos/pengqianhan/open-paper-skills/commits/f85fd3dc80720dfa42fb5ab069f232f28c831109",
+    "html_url": "https://github.com/pengqianhan/open-paper-skills/commit/f85fd3dc80720dfa42fb5ab069f232f28c831109",
+    "comments_url": "https://api.github.com/repos/pengqianhan/open-paper-skills/commits/f85fd3dc80720dfa42fb5ab069f232f28c831109/comments",
+    "author": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "github-actions[bot]",
+      "id": 41898282,
+      "node_id": "MDM6Qm90NDE4OTgyODI=",
+      "avatar_url": "https://avatars.githubusercontent.com/in/15368?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/github-actions%5Bbot%5D",
+      "html_url": "https://github.com/apps/github-actions",
+      "followers_url": "https://api.github.com/users/github-actions%5Bbot%5D/followers",
+      "following_url": "https://api.github.com/users/github-actions%5Bbot%5D/following{/other_user}",
+      "gists_url": "https://api.github.com/users/github-actions%5Bbot%5D/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/github-actions%5Bbot%5D/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/github-actions%5Bbot%5D/subscriptions",
+      "organizations_url": "https://api.github.com/users/github-actions%5Bbot%5D/orgs",
+      "repos_url": "https://api.github.com/users/github-actions%5Bbot%5D/repos",
+      "events_url": "https://api.github.com/users/github-actions%5Bbot%5D/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/github-actions%5Bbot%5D/received_events",
+      "type": "Bot",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "ac82a8add87bd2cda14e4c7936ca80faaa9391d7",
+        "url": "https://api.github.com/repos/pengqianhan/open-paper-skills/commits/ac82a8add87bd2cda14e4c7936ca80faaa9391d7",
+        "html_url": "https://github.com/pengqianhan/open-paper-skills/commit/ac82a8add87bd2cda14e4c7936ca80faaa9391d7"
+      }
+    ],
+    "stats": {
+      "total": 13,
+      "additions": 7,
+      "deletions": 6
+    }
+  },
+  "omitted_commit_file_patch_count": 2,
+  "archive_note": "Commit file patch payloads omitted; release/ref/commit verification metadata retained."
+}

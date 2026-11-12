@@ -1,0 +1,37 @@
+{
+  "url": "https://api.github.com/repos/mattpocock/skills/git/ref/tags/v1.3.2",
+  "response": {
+    "ref": "refs/tags/v1.3.2",
+    "node_id": "REF_kwDORHkddrByZWZzL3RhZ3MvdjEuMy4y",
+    "url": "https://api.github.com/repos/mattpocock/skills/git/refs/tags/v1.3.2",
+    "object": {
+      "sha": "85cbec972d7a79c278c793d272f7fc715850fad4",
+      "type": "tag",
+      "url": "https://api.github.com/repos/mattpocock/skills/git/tags/85cbec972d7a79c278c793d272f7fc715850fad4"
+    }
+  },
+  "tag": {
+    "node_id": "TA_kwDORHkddtoAKDg1Y2JlYzk3MmQ3YTc5YzI3OGM3OTNkMjcyZjdmYzcxNTg1MGZhZDQ",
+    "sha": "85cbec972d7a79c278c793d272f7fc715850fad4",
+    "url": "https://api.github.com/repos/mattpocock/skills/git/tags/85cbec972d7a79c278c793d272f7fc715850fad4",
+    "tagger": {
+      "name": "github-actions[bot]",
+      "email": "41898282+github-actions[bot]@users.noreply.github.com",
+      "date": "2026-10-29T10:27:39Z"
+    },
+    "object": {
+      "sha": "d1478fcb140db0b93c0c8df17bcfd311844749d0",
+      "type": "commit",
+      "url": "https://api.github.com/repos/mattpocock/skills/git/commits/d1478fcb140db0b93c0c8df17bcfd311844749d0"
+    },
+    "tag": "v1.3.2",
+    "message": "v1.3.2\n",
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  }
+}

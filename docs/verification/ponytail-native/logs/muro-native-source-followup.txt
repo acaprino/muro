@@ -1,0 +1,164 @@
+.F.F.F.F.........F.F.......F.......F............                         [100%]
+================================== FAILURES ===================================
+_ test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.0-True] _
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_release_pin_accepts_the_t1/source'), '707350e2e779adf9695c45ecbeadc0b977481357', '212c61735ddec0350b2f78c8128df41c31d3565a')
+remote = True, tag = 'v1.0.0'
+
+    @pytest.mark.parametrize("remote", [False, True])
+    @pytest.mark.parametrize("tag", ["v1.0.0", "v1.0.1"])
+    def test_release_pin_accepts_the_tagged_commit_although_head_moved(repo, remote, tag):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="release", release=tag) == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:57: AssertionError
+_ test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.1-True] _
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_release_pin_accepts_the_t3/source'), 'd19940f3c7c3f7daacbf1123a2f44d13a67c52ae', 'fc9234f845e67fcc265747946b6cd71a679a1643')
+remote = True, tag = 'v1.0.1'
+
+    @pytest.mark.parametrize("remote", [False, True])
+    @pytest.mark.parametrize("tag", ["v1.0.0", "v1.0.1"])
+    def test_release_pin_accepts_the_tagged_commit_although_head_moved(repo, remote, tag):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="release", release=tag) == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:57: AssertionError
+_________ test_release_pin_rejects_a_commit_that_is_not_the_tag[True] _________
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_release_pin_rejects_a_com1/source'), '7bf6d0aa5a5fa732a8369f0f426bc6a199f5e443', '175306ca3647fc2454cdec30c0b3e59218eb745f')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_release_pin_rejects_a_commit_that_is_not_the_tag(repo, remote):
+        root, released, head = repo
+        found = errors(root, head, remote, pin="release", release="v1.0.0")
+>       assert found and f"is not release v1.0.0 ({released})" in found[0]
+E       AssertionError: assert (['[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'] and 'is not release v1.0.0 (7bf6d0aa5a5fa732a8369f0f426bc6a199f5e443)' in '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.')
+
+tests\test_pin_modes.py:64: AssertionError
+________________ test_release_pin_rejects_an_unknown_tag[True] ________________
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_release_pin_rejects_an_un1/source'), 'c4b77bc25175e23bf95a9e036e1c3279338dba65', '9f4b68acdb5af1736aedc1fa9f403c72299e1e07')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_release_pin_rejects_an_unknown_tag(repo, remote):
+        root, released, _ = repo
+        found = errors(root, released, remote, pin="release", release="v9.9.9")
+>       assert found and "release v9.9.9 not found" in found[0]
+E       AssertionError: assert (['[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'] and 'release v9.9.9 not found' in '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.')
+
+tests\test_pin_modes.py:71: AssertionError
+__________ test_head_pin_follows_head_and_fails_when_it_moved[True] ___________
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_head_pin_follows_head_and1/source'), '15002035605adefc642afac7e3d94d3b3ef2114c', '417bd8a7a324ae4e45077250c006e5e7998863eb')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_head_pin_follows_head_and_fails_when_it_moved(repo, remote):
+        root, released, head = repo
+>       assert errors(root, head, remote, pin="head") == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:98: AssertionError
+_________ test_static_pin_accepts_a_reviewed_commit_behind_head[True] _________
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_static_pin_accepts_a_revi1/source'), 'a4e108a2e2c7f592eb8ea8ddaa832c403dc89d46', 'c0114538ef79a68357180e27d82787f4218c5da7')
+remote = True
+
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_static_pin_accepts_a_reviewed_commit_behind_head(repo, remote):
+        root, released, _ = repo
+>       assert errors(root, released, remote, pin="static") == []
+E       AssertionError: assert ['[demo] fata...tory exists.'] == []
+E         
+E         Left contains one more item: '[demo] fatal: Could not read from remote repository.\n\nPlease make sure you have the correct access rights\nand the repository exists.'
+E         Use -v to get more diff
+
+tests\test_pin_modes.py:106: AssertionError
+______________ test_remote_commit_fetch_and_glob_validate_files _______________
+
+repo = (WindowsPath('D:/workspace/muro-source-temp-followup/test_remote_commit_fetch_and_g0/source'), '776721f3c15fc4db1ba9398931adac3522ddeb61')
+tmp_path = WindowsPath('D:/workspace/muro-source-temp-followup/test_remote_commit_fetch_and_g0')
+
+    def test_remote_commit_fetch_and_glob_validate_files(repo, tmp_path):
+        root, commit = repo
+        entry = source(root, commit, selected_paths=["references/**"])["sources"][0]
+        del entry["repo_path"]
+        entry["repo_url"] = root.as_uri()
+        errors = check_sources({"sources": [entry]}, tmp_path)
+>       assert any("photo.png" in error for error in errors)
+E       assert False
+E        +  where False = any(<generator object test_remote_commit_fetch_and_glob_validate_files.<locals>.<genexpr> at 0x000001F53FC85FF0>)
+
+tests\test_regressions.py:79: AssertionError
+_________________ test_release_copies_verified_remote_license _________________
+
+build_project = WindowsPath('D:/workspace/muro-source-temp-followup/test_release_copies_verified_r0/project')
+tmp_path = WindowsPath('D:/workspace/muro-source-temp-followup/test_release_copies_verified_r0')
+
+    def test_release_copies_verified_remote_license(build_project, tmp_path):
+        manifest_path = build_project / "sources.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        source_path = Path(manifest["sources"][0].pop("repo_path"))
+        manifest["sources"][0]["repo_url"] = source_path.as_uri()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+>       result = build_release(manifest_path, build_project, tmp_path / "output")
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_regressions.py:159: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+muro\release.py:64: in build_release
+    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+muro\sources.py:215: in inspect_source
+    with source_repository(src, base_dir) as repo:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Users\alfio\AppData\Local\Programs\Python\Python313\Lib\contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+muro\sources.py:100: in source_repository
+    _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('D:/workspace/muro-python-safe-temp/muro-source-qezbj3s5')
+args = ('fetch', '--no-tags', '--depth=1', '--', 'file:///D:/workspace/muro-source-temp-followup/test_release_copies_verified_r0/source', '32d57e3bb506d6b9a7f168045fb9ec57d70fdb62')
+
+    def _git(path: Path, *args: str) -> bytes:
+        env = os.environ.copy()
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        try:
+            result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
+                                    env=env, timeout=45, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ValueError(f"Git unavailable or timed out: {exc}") from exc
+        if result.returncode:
+>           raise ValueError(result.stderr.decode("utf-8", "replace").strip() or "Git command failed")
+E           ValueError: fatal: Could not read from remote repository.
+E           
+E           Please make sure you have the correct access rights
+E           and the repository exists.
+
+muro\sources.py:29: ValueError
+=========================== short test summary info ===========================
+FAILED tests/test_pin_modes.py::test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.0-True]
+FAILED tests/test_pin_modes.py::test_release_pin_accepts_the_tagged_commit_although_head_moved[v1.0.1-True]
+FAILED tests/test_pin_modes.py::test_release_pin_rejects_a_commit_that_is_not_the_tag[True]
+FAILED tests/test_pin_modes.py::test_release_pin_rejects_an_unknown_tag[True]
+FAILED tests/test_pin_modes.py::test_head_pin_follows_head_and_fails_when_it_moved[True]
+FAILED tests/test_pin_modes.py::test_static_pin_accepts_a_reviewed_commit_behind_head[True]
+FAILED tests/test_regressions.py::test_remote_commit_fetch_and_glob_validate_files
+FAILED tests/test_regressions.py::test_release_copies_verified_remote_license
+8 failed, 40 passed in 44.10s

@@ -1,0 +1,529 @@
+{
+  "decisions": [
+    {
+      "source": "taste-skill",
+      "content": "skills/taste-skill/SKILL.md (house rules, sections 1 to 6), references/{system,sections,layout-v4,motion,copy}.md, library/{type,palettes}.json, scripts/start.mjs and scripts/shoot.mjs",
+      "form": "capability",
+      "targets": [
+        "visual-direction"
+      ],
+      "reason": "Breadth: rules for building a company website or landing page, one domain of a package that also does Office files, research and engineering. Timing: nothing acts before a task is classified. Fit: merged with landing-page-design into the one step that plans, deals and builds the page (visual-direction, Sources; ROUTER.md harmonization record of 2026-11-10)."
+    },
+    {
+      "source": "taste-skill",
+      "content": "The Stop command hook declared in SKILL.md, which runs gate.mjs (the finish gate) when the agent stops",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Function: the hook only runs gate.mjs, which is not among the selected paths, so it would have nothing to run. Cost: it would fire at every stop of every session, including Office and research work. Recorded as not adopted in visual-direction, Sources ('Hooks'); the capability discloses that the automated gate was not run (check automated_gate_disclosed)."
+    },
+    {
+      "source": "motion-design",
+      "content": "skills/motion-design/SKILL.md, director/**, patterns/** and reference/** (personality, duration and easing tables, choreography, reduced motion)",
+      "form": "capability",
+      "targets": [
+        "motion-principles",
+        "css-scroll"
+      ],
+      "reason": "Breadth: applies only when a task decides how an interface moves. Timing: on demand; the source itself starts from purpose, audience and context of one animation (SKILL.md 'When to Apply'). Fit: one specification role (motion-principles); css-scroll takes only the scroll-linked limits of patterns/ambient-continuous.md and director/context-adaptation.md. The selected files define no hook."
+    },
+    {
+      "source": "gsap-scrolltrigger",
+      "content": "skills/gsap-scrolltrigger/SKILL.md (configuration, pinning, scrub, batch, horizontal scroll, refresh and cleanup)",
+      "form": "capability",
+      "targets": [
+        "gsap-scrolltrigger"
+      ],
+      "reason": "Breadth: scroll animation code in a project that uses GSAP, a stack-constrained variant (`stack:gsap`). Timing: on demand from a stated behaviour or a recorded motion specification. Fit: one of two variants of the scroll-code role (gsap-scrolltrigger, Sources). No hook in the selected file."
+    },
+    {
+      "source": "wayfinder",
+      "content": "skills/engineering/wayfinder/SKILL.md, docs/engineering/wayfinder.md, skills/engineering/to-spec/SKILL.md and skills/engineering/to-tickets/SKILL.md (map, decisions, spec, vertical slices)",
+      "form": "capability",
+      "targets": [
+        "work-map"
+      ],
+      "reason": "Breadth: software changes larger than one session. Timing: the method starts when such a change is requested, and the source sizes the route per task. Authority: as session text it would add planning ceremony to unrelated work, which work-map's own exclusions forbid ('never a fallback'). Fit: the three skills are one coordinator role (work-map, Sources)."
+    },
+    {
+      "source": "wayfinder",
+      "content": "The issue tracker as map store, assigning and labels, research branches pushed to the remote, publishing spec and tickets with the ready-for-agent label",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The intake goal keeps the work local ('without remote trackers'); these parts write to a remote on the user's behalf and are recorded as not adopted in work-map, Specifics. Calls to the unselected grilling, research, prototype and implement skills are routing between the source's own skills and are done inline."
+    },
+    {
+      "source": "ai-design-skills",
+      "content": "skills/landing-page-design/SKILL.md: intake, conversion structure, proof, FAQ and output format",
+      "form": "capability",
+      "targets": [
+        "visual-direction"
+      ],
+      "reason": "Breadth: landing pages only. Fit: its offer, proof and outline are the brief and copy stage of the website step, so it is merged into visual-direction as the ui.landing-strategy intent rather than kept as a parallel page builder (visual-direction, Sources; ROUTER.md record)."
+    },
+    {
+      "source": "ai-design-skills",
+      "content": "landing-page-design's visual mandates: fixed font list, one-typeface rule, mandatory hero text gradient, universal Tailwind scale",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Authority and fit: they would be a second visual system beside the palette and type dealt from the pinned taste-skill, which owns the look (visual-direction, Specifics 'One owner of the look'). The source's own rule that the user's explicit prompt wins supports scoping them out."
+    },
+    {
+      "source": "ai-design-skills",
+      "content": "skills/figma-designer/SKILL.md: workflow, foundations, typography, colour, components, layout and evaluation",
+      "form": "capability",
+      "targets": [
+        "figma-design"
+      ],
+      "reason": "Breadth: only tasks that edit a Figma file through the host's Figma integration. Timing: on demand; it starts from the file's own system. Fit: its own role, with visual-direction as a conditional prerequisite for a new landing page (figma-design, `needs` and Sources)."
+    },
+    {
+      "source": "ui-ux-pro-max",
+      "content": ".claude/skills/ui-ux-pro-max/SKILL.md, references/pro-rules.md and quick-reference.md, src/ui-ux-pro-max/scripts/*.py and data/** (offline design-system and UX search)",
+      "form": "capability",
+      "targets": [
+        "design-guidance"
+      ],
+      "reason": "Breadth: guidance for an interface task. Timing: a lookup made when a task needs it; the source's own query contract asks for the smallest search. Cost of the alternative: the earlier catalog ran a full design-system search on every page, which the 2026-11-10 re-harmonization removed (design-guidance, Sources). Fit: its own lookup-and-report role."
+    },
+    {
+      "source": "ui-ux-pro-max",
+      "content": "The source's 'REQUIRED for new pages' design-system search as a mandatory first step, the --motion GSAP snippets as instructions, premium assets, templates and the CLI installer",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The mandatory search is the source's own routing and contradicts the pinned taste-skill, which deals palette and type itself; the GSAP snippets would be a second implementation authority beside the scroll-code step; assets, templates and the installer install or decorate the source itself (design-guidance, Sources 'Not adopted' and 'Harmonized by')."
+    },
+    {
+      "source": "genoffice",
+      "content": "skills/genoffice/SKILL.md: deck pipeline, create, read, convert, apply, check, render and audit commands",
+      "form": "capability",
+      "targets": [
+        "office-deck",
+        "office-authoring",
+        "office-files"
+      ],
+      "reason": "Breadth: Office and PDF files. Timing: each command is run inside a task that asks for a file. Function: the engine is the user's installed application; nothing in the skill acts when no file is requested. Fit: three roles by pipeline (new deck, new document or workbook, existing file), as the capabilities' Sources record."
+    },
+    {
+      "source": "genoffice",
+      "content": "skill list|install|path, mcp install|uninstall|list and install-cli; search, image and media as standalone uses",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Installing or registering the source itself is never carried (office-files, Sources 'Not adopted'). The provider-backed commands send queries or files off the machine and give no standalone intent: they remain optional, disclosed steps inside the deck pipeline (office-deck, Sources)."
+    },
+    {
+      "source": "explain-this",
+      "content": "skills/creating-explainers, skills/explaining-codebases and skills/fact-checking-explainers with their references and the article template",
+      "form": "capability",
+      "targets": [
+        "interactive-explainer",
+        "explainer-fact-check"
+      ],
+      "reason": "Breadth: only requests for an interactive HTML explainer or an audit of one. Timing: a staged pipeline with an approval pause, started by such a request. Fit: the two authoring skills share one output format and are one role with three intents; the fact-check gate is both steps 2 and 7 of authoring and a standalone role (interactive-explainer and explainer-fact-check, Sources)."
+    },
+    {
+      "source": "explain-this",
+      "content": "Plugin manifests, agents/openai.yaml, evals, upstream plans and the skills' trigger phrases",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Host registration files and trigger phrases are the source's own discovery and routing; the coordinator classifies by meaning from intents (interactive-explainer, Sources 'Not adopted')."
+    },
+    {
+      "source": "open-paper-skills",
+      "content": "paper-search, paper-wiki-manager, drawio-paper and codex-paper-figure-skill with their scripts, references and style guides",
+      "form": "capability",
+      "targets": [
+        "paper-search",
+        "paper-wiki",
+        "paper-figure"
+      ],
+      "reason": "Breadth: literature and paper work. Timing: each runs a script or writes files for one request; paper-search contacts external literature services and must not run unasked. Fit: three roles; the two figure skills are one method (ROUTER.md record of 2026-11-11; capabilities' Sources)."
+    },
+    {
+      "source": "open-paper-skills",
+      "content": "research-bible and sell-research-honestly (workflow, checklist, audience playbooks)",
+      "form": "capability",
+      "targets": [
+        "research-practice",
+        "research-pitch"
+      ],
+      "reason": "Breadth: research planning, debugging and communication. Authority: research principles as session text would bend unrelated work. Fit: two separate roles, distinct from work-map and from explainer-fact-check (their Sources)."
+    },
+    {
+      "source": "open-paper-skills",
+      "content": "session-handoff (record, prepare and resume a HANDOFF.md)",
+      "form": "capability",
+      "targets": [
+        "session-handoff"
+      ],
+      "reason": "Timing was the open question: a handoff could be read at every session start. The source itself says it does not run at session start by itself, and no hook is registered for it (session-handoff, Sources 'Hooks'), so it stays on demand. Cost of the alternative: a file read and its text in every session of every project, most of which have no HANDOFF.md."
+    },
+    {
+      "source": "open-paper-skills",
+      "content": "explain-paper-html, map-then-territory and the other excluded skills; os-ui panel references, Status-row buttons, test scripts, agents/openai.yaml, trigger keywords and the vendored viewer libraries",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Fit: explain-this and wayfinder already serve the explainer and mapping needs (ROUTER.md record of 2026-11-11). The os-ui parts need the author's own server; the vendored libraries carry other copyrights and are fetched at runtime instead (paper-wiki, Sources 'Not packaged')."
+    },
+    {
+      "source": "tokeneconomizer",
+      "content": "The command surface (status, microskills, repos, doctor, config, toolprune) and the engine package under tokeneconomizer/**, plugin/scripts/te_bootstrap.py, plugin/README.md and docs/PLUGIN.md",
+      "form": "capability",
+      "targets": [
+        "token-economy"
+      ],
+      "reason": "Breadth: session cost control, asked for explicitly. Timing: the commands report or change state only when the user asks (token-economy, checks output_shown_verbatim and no_change_without_explicit_request). Fit: one role; no other capability controls session cost."
+    },
+    {
+      "source": "tokeneconomizer",
+      "content": "The six default hooks of plugin/hooks/*.json: SessionStart, UserPromptSubmit, PostToolUse, PostToolUseFailure, Stop, SessionEnd",
+      "form": "capability",
+      "targets": [
+        "token-economy"
+      ],
+      "reason": "Function: the mechanisms exist only as hooks, so as a capability they are idle until registered; that is said in token-economy, Specifics. They stay catalog entries with policy host-approved, registered only on the user's explicit request by step 4 after its effects are disclosed. Cost if active by default: the dispatcher on every session start and end, every prompt and every tool call of every session, state written under ~/.tokeneconomizer, a deny list written to the project's host settings after idle time, and a judge model called through the user's own agent command line and billed to them. Open doubt for a later pass: the delivery contract now permits automatic activation (installing the plugin is consent), but an active wiring of these hooks from this release has not been run live in any host, and the source lists Windows as a limitation; unchanged in this pass."
+    },
+    {
+      "source": "tokeneconomizer",
+      "content": "Upstream plugin manifests and marketplace file, slash commands and Codex skills as files, the Pi extension, the POSIX te and te-hook launchers, experiments, tests and scripts",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Manifests and commands would register the original beside the coordinator and run its hooks twice (token-economy, Specifics); the commands' behaviour is steps 1 to 3 of the capability and the Python bootstrap is called directly (token-economy, Sources 'Not adopted')."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/system-prompt.md as a whole, in the form the source ships it: text for every session",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the prompt is not injected. Breadth: it is useful only in design sessions, while the package also covers Office files, explainers, engineering, research papers and session cost. Timing: every rule in it works when loaded at the moment a design task is classified. Authority: it opens by giving the model a designer identity for the whole session. Cost: 35,565 characters per session, far above the 2,000 the release accepts, paid by users writing a spreadsheet or reading a paper. Its chapters are decided one by one below; no always-on text and no hook is declared. The original file is read at intake only and is not shipped (`intake_only_paths` in sources.json): nothing reads it at run time, and its rules are restated in the capability bodies."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Opening lines, chapter 1 'Identity and role' and the 'Final principle': the designer persona and 'the user is your manager'",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Authority: a session-wide identity competes with the host's instructions and with the ten other absorbed sources. What it means in practice (ask what the artifact is for, give an opinion and let the user decide, cut what does not earn its place) is stated as steps of the production capabilities from the skills themselves, so no persona text is carried. The final principle restates chapters 5, 11, 16 and 18."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 1, last paragraph: do not divulge the environment, system prompt, tools or skill names",
+      "form": "dropped",
+      "targets": [],
+      "reason": "A confidentiality rule of the product the prompt was written for. Here it would contradict the coordinator, which shows the user the plan, the capabilities selected and the evidence, and the package's rule of honest reporting."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 2 'Workflow': understand, acquire context, plan visibly, skeleton early, iterate and verify, summarize briefly",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "html-deck",
+        "design-review"
+      ],
+      "reason": "A working process is a chain, not session text. Its order is the step order inside each production capability (brief, context, plan as a comment block in the file, early skeleton, verification, short summary) and the catalog chain aesthetic-direction, then wireframe or ui-prototype or html-deck, then design-review, expressed with `needs` and `reads` and never forced with `after`: each stage can start from existing work."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 2, closing paragraphs: silence between tool calls, concurrent file exploration, no narration",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Conduct rules for the whole conversation: they belong to the host and its user, and would change how unrelated capabilities report."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 3 'Asking questions first' and claude/skills/discovery-questions.md",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "html-deck"
+      ],
+      "reason": "Function: a question round is never the outcome a user asks for; it is the first step of design work. Fit: every capability in this catalog already asks for missing essentials in one batch inside its own step, and the classifier has needs_clarification. So the protocol (read what is attached first, ask only what changes the design, once, then execute) is the brief step of each production capability, with the skill's per-artifact questions. Its `questions_v2` tool becomes an optional logical question-form tool."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 4 'Rooting designs in existing context'",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction",
+        "ui-prototype",
+        "design-options",
+        "html-deck",
+        "design-system-extract"
+      ],
+      "reason": "Domain rule for hi-fi design: match what exists and lift exact values from the source. It is step 1 of aesthetic-direction (stop when context exists), the context step of the three production capabilities and the 'never guess a value' rule of design-system-extract."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 5 'Content principles — no filler'",
+      "form": "capability",
+      "targets": [
+        "wireframe",
+        "ui-prototype",
+        "html-deck"
+      ],
+      "reason": "Write-time rules for a design artifact; the review skills leave content out of scope (polish-pass, Phase 5), so they live in the production bodies' Specifics and checks (no_filler_or_invented_content, no_filler_slides). They overlap with visual-direction's 'never invent proof', which stays the rule for websites."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapters 6 to 9: aesthetic defaults, hierarchy and rhythm, typography system, colour system",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction",
+        "design-review",
+        "html-deck"
+      ],
+      "reason": "Domain rules. As write-time defaults they are the commit rules of aesthetic-direction; as detection patterns they are the generic-look and hierarchy passes of design-review; the per-medium type sizes are also in html-deck. Fit: for a website the dealt palette of visual-direction stays the authority, and design-review treats a recorded system as deliberate."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapters 10 to 12: accessibility, interaction and feedback, simplicity and one clear call to action",
+      "form": "capability",
+      "targets": [
+        "design-review",
+        "ui-prototype"
+      ],
+      "reason": "Domain rules that are checked on a file: the accessibility and interaction-states passes of design-review, and the wiring rules of ui-prototype. The chapter's 0.2 to 0.3 second transitions contradict motion-design's shorter feedback durations; a recorded motion-spec wins (design-review, Specifics)."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 13 'System thinking': components, design tokens, documented patterns",
+      "form": "capability",
+      "targets": [
+        "design-system-extract"
+      ],
+      "reason": "It is the rationale and the documentation format of the two extract skills, merged into one role."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 14 'Respecting the medium': CSS strengths, real interactions, fixed-size content that scales, persisted state, canonical HTML",
+      "form": "capability",
+      "targets": [
+        "ui-prototype",
+        "html-deck",
+        "design-options"
+      ],
+      "reason": "Rules for HTML design artifacts only; they would mislead an Office or Figma task. Carried where they act: real interactions and persistence in ui-prototype, scaling and persistence in html-deck, persisted tweak values in design-options."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapters 15 and 16: understanding users, quality over quantity",
+      "form": "capability",
+      "targets": [
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "design-review"
+      ],
+      "reason": "Audience and persona questions are part of the brief steps; 'a wireframe round and a hi-fi round on different bets' is in wireframe; depth over breadth and the polish list are design-review's polish pass and design-options' rule against near-duplicates."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 17 'Output principles': pick the format, give variations, one file with many variants, right scale",
+      "form": "capability",
+      "targets": [
+        "design-options",
+        "ui-prototype",
+        "html-deck"
+      ],
+      "reason": "The variation and single-file rules are design-options. Its format table (canvas, prototype, deck, animation engine) chooses between artifacts, which here is the classifier's job through the intents, so the table itself is not carried; the timeline engine with a scrubber for animation has no procedure in the selected snapshot and motion stays with motion-principles. Adding tweak controls nobody asked for is left to a request for design-options, because chapter 19 of the same prompt forbids unrequested scope."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 18 'Collaboration and delivery': show early, brief summaries, delegate verification, honest progress reports",
+      "form": "capability",
+      "targets": [
+        "ui-prototype",
+        "html-deck",
+        "design-review"
+      ],
+      "reason": "Process rules of a design step: the early skeleton, the closing summary and the checks that name what was not verified (unverified_behavior_disclosed, deck_walked_or_disclosed, unverified_items_disclosed). The verifier subagent is an optional logical tool; one capability still runs per step."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 19 'IP and content boundaries'",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "html-deck"
+      ],
+      "reason": "A limit that matters only when a design is produced, so it is a scoped line in each production capability: a company's distinctive interface or branded elements are not recreated unless the product is the user's own, and scope is not added without asking. The source's test, the user's email domain, cannot be verified by any host here and is replaced by the user's own statement. Open doubt: whether the owner wants a stricter rule than the user's statement."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Chapter 20 'Available skills': the list of its skills, 'When to invoke which' and the typical chains",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Competing routing: it tells the model which skill to invoke from trigger phrases and to run a review whenever in doubt. The coordinator classifies by meaning from the intents. The chains were read as evidence for `needs` and `reads` only."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/frontend-aesthetic-direction.md",
+      "form": "capability",
+      "targets": [
+        "aesthetic-direction"
+      ],
+      "reason": "A procedure loaded when a design with no brand needs a look. Fit: not merged into visual-direction (which deals palette and type for a website from the pinned taste-skill) nor into design-guidance (which recommends from packaged data): it proposes and commits with the user, for any artifact. Two owners of palette and type cannot share a plan, so the two are declared conflicting."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/wireframe.md",
+      "form": "capability",
+      "targets": [
+        "wireframe"
+      ],
+      "reason": "A distinct outcome no earlier capability had: low-fidelity structural exploration before a look exists. Its greyscale conventions contradict the hi-fi rules, so it is its own role."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/make-a-prototype.md",
+      "form": "capability",
+      "targets": [
+        "ui-prototype"
+      ],
+      "reason": "A procedure for one request. Fit: building an app screen as a working design artifact was owned by nobody (visual-direction excludes app screens, design-guidance only recommends, work-map ships production code)."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/generate-variations.md and claude/skills/make-tweakable.md",
+      "form": "capability",
+      "targets": [
+        "design-options"
+      ],
+      "reason": "Merged into one role with two intents: both deliver alternatives of a hi-fi design inside one file, and each skill presents its result through the other's mechanism. The tweak panel's host protocol (window messages to a toolbar, a defaults block rewritten on disk) works only in the source's own host: the panel here opens by itself and persists in the browser, and the two phases are kept as a packaged reference."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/make-a-deck.md",
+      "form": "capability",
+      "targets": [
+        "html-deck"
+      ],
+      "reason": "Fit: office-deck builds a .pptx through GenOffice's checked pipeline and excludes an HTML slideshow; this builds a web page. Alternatives by wanted format with separate outputs, not a merge and not a conflict. A request that names no format stays with office-deck: open doubt for the owner whether the classifier should ask instead."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/design-system-extract.md and claude/skills/component-extract.md",
+      "form": "capability",
+      "targets": [
+        "design-system-extract"
+      ],
+      "reason": "One role with two intents: the component inventory's first category is the tokens of the other skill, and chapter 13 treats both as one system. Distinct from design-guidance's persisted recommendation and from figma-design's foundations, which now reads the extracted tokens."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "claude/skills/accessibility-audit.md, ai-slop-check.md, hierarchy-rhythm-review.md, interaction-states-pass.md and polish-pass.md",
+      "form": "capability",
+      "targets": [
+        "design-review"
+      ],
+      "reason": "Timing: a review runs on a named file when asked, or as a requested last gate; chapter 20's 'when in doubt, invoke it' would make it run on every design task and is not carried. Fit: five skills, one role with five intents, because polish-pass runs the other four on one file with one aggregate-and-fix method; as separate capabilities they would be four writers of the same file."
+    },
+    {
+      "source": "claude-design-system-prompt",
+      "content": "Host tools and starters the skills call: questions_v2, copy_starter_component with deck_stage.js, the device frames and design_canvas.jsx, ${AGENT_TOOL_NAME} and the verifier subagent",
+      "form": "dropped",
+      "targets": [],
+      "reason": "They belong to the host the prompt was written for and are not in the selected snapshot. Asking, parallel review and verification become optional logical tools (question-form, subagents, browser) that the host AI maps to what it has; the deck shell, frames and grid are written by the capability. Open gap: whether upstream publishes the starters was not inspected (README.md and codex/** are excluded)."
+    },
+    {
+      "source": "ponytail",
+      "content": ".agents/rules/ponytail.md and skills/ponytail/SKILL.md: duplicated scope-before-minimization, reuse ladder, completeness and non-negotiable safeguards",
+      "form": "always-on",
+      "targets": [],
+      "reason": "The owner requested permanent working guidance. The rule file and central skill express the same working method and merge into one neutral policy, not two copies or another capability. Complete scope, understandable reuse and truthful limits apply across Marionette outcomes; code clauses are explicitly scoped and required engines/design authority are preserved. The host AI authored the synthesis. Its per-session character cost is the final combined policy length, not separate per-source charges; native system channels on Claude Code/Pi/OpenCode/Hermes and developer additionalContext on Codex are described by the current factory. No extra model call or source hook is declared. Combined cost: 1999 characters of policy, shared once rather than charged per source. Native system sections on Claude Code, Pi, OpenCode and Hermes add no per-event subprocess or model call; Codex session/subagent hooks use two local Python processes per event to supply developer context. No source hook, telemetry or user-file write is declared. Host trust and permissions remain authoritative. The selected source originals are intake-only: their methods are restated in this policy or capability bodies; only the Ponytail benchmark reference is carried for an explicit runtime read."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail/SKILL.md: concrete code-change procedure, caller tracing, root-cause fix, scoped reuse, tests and shortcut comments",
+      "form": "capability",
+      "targets": [
+        "work-map"
+      ],
+      "reason": "The existing work-map already owns direct engineering implementation and per-slice build/review. These methods improve its build step without creating a parallel code writer or making planning mandatory. Existing approved scope, test seams, slices and named dependencies remain authoritative; the source's detailed code method is loaded where it is used."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-review/SKILL.md and skills/ponytail-audit/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-review"
+      ],
+      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents retains the diff default, whole-repo mapping, expected-load assumptions, concrete-case gate, full finding explanation and audit's 20-finding display default with an omitted count; all material risks and explicitly requested full findings remain visible through grouping or additional detail. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-debt/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-debt"
+      ],
+      "reason": "A requested ledger of deliberate shortcut comments is a separate read-only artifact, not the session-handoff's task arc or TokenEconomizer's costs. Preserve custom/legacy markers, ignore rules, ceilings and upgrade triggers, no-trigger tags and optional blame. Persist a ledger only when requested."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-help/SKILL.md, skills/ponytail-gain/SKILL.md and benchmarks/results/2026-10-07-agentic.md",
+      "form": "capability",
+      "targets": [
+        "engineering-guidance"
+      ],
+      "reason": "A method reference and a published benchmark explanation answer genuine user requests without changing code or mode. Preserve level meanings as task-scoped preferences, transparent mapping to Marionette's procedures and the measured scoreboard with its date/model/sample/limits. Never claim these are Marionette measurements or current-repository savings. Help explicitly says the original plugin's runtime mode toggles and optional UI infrastructure are not included."
+    },
+    {
+      "source": "ponytail",
+      "content": "Selected skills' lazy-senior persona, forced closing lines, English-only templates, original slash-skill routing, plugin self-install/update and persistent mode controls",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Persona/format claims would override host and user preferences; source activation commands would compete with Marionette classification or promise state the native package does not keep. Preserve concise evidence, disclosures and lite/full/ultra behavioral choices through task-scoped guidance. Source plugin installation is excluded by the factory contract. Changing a released permanent policy is not falsely presented as toggling an upstream mode."
+    },
+    {
+      "source": "ponytail",
+      "content": "Inspected but unselected original plugin infrastructure: lifecycle mode hooks, startup code map, status badge, native Claude band, board/import/export/webhook and other host registrations",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The curated goal is working and communication methods, not installation of Ponytail's original UI/telemetry product. These paths are explicitly outside selected_paths after inspection of their outcomes and costs: defaults write mode flags/statusline artifacts and task CSV/HTML records; optional webhooks can transmit task names; the native TSX band needs Claude-only APIs. They are not needed to deliver any selected review/audit/debt/benchmark method. No source command hook, background process, host config mutation or telemetry is emitted. Full effect inventory is preserved in intake provenance."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "skills/i-have-adhd/SKILL.md: rules 1-10, When to break the rules 1/3/4/5/6, Pre-send check; README.md: what it does and no-diagnosis framing",
+      "form": "always-on",
+      "targets": [],
+      "reason": "Breadth: clear, complete and actionable communication is useful across Marionette's design, Office, engineering and research sessions, including ordinary answers before a capability is selected. Timing: response framing applies from the first reply. Fit: it governs conversational presentation, not a new output producer or routing authority. Adapt the source's own task/harness exceptions into flexible guidance that honors user expertise, requested depth, uncertainty and authorized autonomy. Merge with Ponytail's complementary collaboration policy; no parallel skill. Combined cost: 1999 characters of policy, shared once rather than charged per source. Native system sections on Claude Code, Pi, OpenCode and Hermes add no per-event subprocess or model call; Codex session/subagent hooks use two local Python processes per event to supply developer context. No source hook, telemetry or user-file write is declared. Host trust and permissions remain authoritative. The selected source originals are intake-only: their methods are restated in this policy or capability bodies; only the Ponytail benchmark reference is carried for an explicit runtime read."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "SKILL.md diagnostic opening and What ADHD changes about reading; absolute every-turn action/progress/numbering, five-item/two-minute limits, compelled estimates and exact stop phrases",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Authority: the requested adaptation must respect the person and current context, not diagnose the user or impose a rigid form. The source itself says completeness, explanation requests, the task and the harness win (When to break the rules; rule 9; Pre-send check). Keep useful communication goals, omit unsupported identity/cognitive claims and fixed numeric constraints. Honor ordinary user style changes semantically; do not add a Python phrase detector. Do not invent a cause or a time estimate merely to fill a template."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "hooks/hooks.json; hooks/always-on.{mjs,sh,ps1}; .opencode/plugins/i-have-adhd.{mjs,js}; extensions/{i-have-adhd,context-compat}.ts; source mode flags, persisted state and status",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Function: these mechanisms inject the same policy or toggle its source-specific mode; none performs separate user work. Original defaults are manual/flag-gated, with saved Pi session state and opt-in CLI/config. The inspected Claude hook reads a flag and prints policy at startup/resume/clear/compact; OpenCode adds config/skill/command registrations and per-turn system text; Pi/OMP registers commands/input/session handlers, stores mode entries and displays status. They would duplicate native delivery and introduce Node/Pi dependencies and competing activation/state. The factory native policy channel supplies the synthesized guidance, so no source executable/hook is copied, registered or run."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "skills/i-have-adhd/agents/*; .cursor canonical skill duplicate; .agents/.claude-plugin/.codex-plugin manifests; .opencode/command; package/plugin/Gemini/Qwen/Kimi manifests; GEMINI.md; INSTALL.md",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The manifests, slash commands, global-instruction edits and install/uninstall recipes package or activate the original source itself. They do not add a communication outcome beyond the canonical skill. Dropping competing routing and source installation follows the intake contract. Add i-have-adhd to plugin.replaces; Marionette's generated adapters own discovery and native policy. Cursor's SKILL.md has the exact canonical blob SHA. No separate review-response capability is inferred from the Codex default prompt."
+    },
+    {
+      "source": "i-have-adhd",
+      "content": "scripts/*; evals/*; tests/*; .github/workflows/*; AGENTS.md/CONTRIBUTING.md; translated docs and branding",
+      "form": "dropped",
+      "targets": [],
+      "reason": "These are source development, QA, CI, installation translations and branding, not end-user skill procedures. Static audit inspected all runtime/developer helper files and eval protocol/rubric/results/cases, with uninspected test bodies and translations explicitly recorded. Eval runners call paid host CLIs and write JSONL; Pi smoke script installs the source into a temporary configuration; CI may install tools/run models. None is executed or adopted. The reported upstream candidate gate failure is a caution to preserve uncertainty, not evidence this adaptation passed behavioral testing."
+    }
+  ],
+  "always_on": "Complete requested work, including affected scope and required deliverables. Use settled context; ask only for information blocking a sound result. Continue independent authorized work. Perform authorized actions with your tools instead of merely explaining how.\n\nKeep conversation direct and easy to scan. Lead with the result or useful action; use short paragraphs or numbered steps when helpful. Group long lists without dropping items. Match the user's language, style, expertise and requested depth. Explain complex steps with a concrete example or diagram when useful. Avoid filler, repetition, tangents and imposed status templates. Track the goal, decisions, progress and open work; give one small next action only when work remains for the user. Describe observed errors neutrally with a recovery step; do not invent causes. After repeated failures, reassess assumptions before retrying. Estimate effort only when useful, with concrete units and stated assumptions. Do not infer a diagnosis or personal traits.\n\nBrevity never reduces scope, artifact completeness, design fidelity, required engines, evidence, accessibility, security, hardware calibration, validation, checks or honest disclosures. Preserve each task's required format and approval gates; reuse approval already given. Preserve uncertainty; distinguish verified results from assumptions and untested work.\n\nFor code changes, inspect the affected path: callers, tests, fixtures, configuration and exports. Fix the shared cause with the smallest readable change; retain existing conventions and safeguards. Prefer suitable project components, then platform features, then installed dependencies; preserve required engines and behavior. Avoid speculative features and unnecessary wrappers or abstractions. Test meaningful changed behavior and report what was checked. Mark a deliberate shortcut as `shortcut: <limit>, <upgrade trigger>` when relevant; do not invent debt. Never claim unmeasured savings or fabricate benchmarks."
+}

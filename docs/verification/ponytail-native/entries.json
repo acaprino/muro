@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "name": "ponytail-probe-review",
+      "description": "Use when reviewing a software change, diff or pull request for correctness, safety, expected load, testing and unnecessary complexity. Produces a report; does not implement fixes.",
+      "capabilities": [
+        "change-review"
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ tools: [{"name":"shell","purpose":"Run the packaged offline search script with P
 hooks: []
 conflicts: []
 when: —
-intents: [{"id":"ui.design-guidance","description":"Recommend a design system, or look up UI, UX, accessibility and stack-specific implementation guidance, from the packaged local data, for a web, mobile or desktop interface including app screens and dashboards; review an existing interface against its pre-delivery checklist.","excludes":["Search recommendations do not override approved design decisions, the user or repository rules.","Do not fabricate database matches or infer an implementation stack.","Building a company website or landing page is visual direction; its palette and type are dealt there, not taken from search results."]}]
+intents: [{"id":"ui.design-guidance","description":"Recommend a design system, or look up UI, UX, accessibility and stack-specific implementation guidance, from the packaged local data, for a web, mobile or desktop interface including app screens and dashboards; review an existing interface against its pre-delivery checklist.","excludes":["Search recommendations do not override approved design decisions, the user or repository rules.","Do not fabricate database matches or infer an implementation stack.","Building a company website or landing page is visual direction; its palette and type are dealt there, not taken from search results.","Committing a product with no brand to one look is aesthetic direction, and auditing and fixing an HTML design is the design review; this step recommends and reports."]}]
 after: []
 outputs: ["design_candidates", "stack_guidance"]
 checks: ["search_domain_fit", "search_stack_fit", "search_empty_disclosed", "master_not_overwritten"]
@@ -40,6 +40,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 - Leave the `--motion` dial unset: motion is specified by `motion-principles`, and the GSAP snippets it attaches are not implementation instructions for the scroll-code step.
 - In a plan that also builds a website with `visual-direction`, these results are candidates: the dealt palette and pairing decide, and accessibility, touch and stack rules still apply.
 - This capability writes no project file except a requested Master or page override.
+- `aesthetic-direction` reads `design_candidates` when it proposes directions. `design-review` audits and fixes a web design in place; a review here stays a report against the packaged checklist, for any stack.
 
 ## Checks
 
@@ -55,4 +56,5 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 - Runtime dependency: Python 3.10+, standard library only. If no `python`, `python3` or `py -3` answers, install it from https://www.python.org/downloads/ for the current user, in one stated line, then check the version. The source points to its unselected README for this; Muro's coordinator already needs Python.
 - Not adopted: premium assets, templates, the CLI installer and the `--motion` GSAP snippets as instructions.
 - Hooks: the selected files define none; `cli/**`, `docs/**`, `templates/**` and `.github/**` are excluded and were not inspected for hooks.
+- Harmonization 2026-11-12 (claude-design-system-prompt intake): not merged with `aesthetic-direction` or `design-review`. This source looks rules and candidates up in packaged data and reports; that one commits a look with the user and fixes files. The boundary is in the intent exclusions.
 - Harmonized by: prompts/harmonizer.md (2026-11-10 re-harmonization) — split from `visual-direction`. The source is guidance for any interface, including app screens, and its own query contract asks for the smallest search; inside the website step it ran a full design-system search on every page and forced guidance-only requests to fill palette, layout and offer outputs. The source's "REQUIRED for new pages" design-system search is not made a prerequisite of the website step, because the pinned taste-skill deals palette and type itself ("Deal, never choose by taste").

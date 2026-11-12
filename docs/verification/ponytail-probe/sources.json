@@ -1,0 +1,30 @@
+{
+  "plugin": {
+    "slug": "ponytail-probe",
+    "name": "Ponytail Probe",
+    "command": "ponytail-probe",
+    "version": "0.1.0",
+    "language": "it",
+    "description": "Use when reviewing a software change for correctness, safety, expected load, testing and unnecessary complexity.",
+    "replaces": []
+  },
+  "sources": [
+    {
+      "id": "ponytail",
+      "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "pin": "release",
+      "release": "v5.3.3",
+      "license": "MIT",
+      "selected_paths": [
+        ".agents/rules/ponytail.md",
+        "skills/ponytail-review/SKILL.md"
+      ],
+      "excluded_paths": [],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Bounded experiment requested by the owner on 2026-11-12: assess the core working policy as always-on session guidance and preserve the selected review procedure on demand. Read both selected files by meaning and record the split. This is a two-file transport/behavior probe, not full Ponytail integration or a change to Marionette. No source hook, mode state, map, band, installer, audit, debt or gain feature is selected. Use the published release and verify the selected source files."
+      },
+      "repo_url": "https://github.com/dietrichgebert/ponytail.git"
+    }
+  ]
+}

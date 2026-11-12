@@ -202,10 +202,10 @@ def validate_operations(tools: Any, hooks: Any) -> list[str]:
     for hook in hooks:
         if (not isinstance(hook, dict) or set(hook) != {"event", "action", "tools", "policy"}
                 or any(not isinstance(hook[k], str) or not hook[k].strip() for k in ("event", "action", "policy"))
-                or hook["policy"] not in {"manual", "host-approved"}
+                or hook["policy"] not in {"manual", "host-approved", "active"}
                 or not isinstance(hook["tools"], list)
                 or any(not isinstance(name, str) or name not in names for name in hook["tools"])):
-            errors.append("each hook requires event, action, declared tools and policy manual|host-approved")
+            errors.append("each hook requires event, action, declared tools and policy manual|host-approved|active")
     return errors
 
 
@@ -386,8 +386,10 @@ def validate_capabilities_and_router(
     router_rows: list[RouterRow],
     registered_sources: set[str] | None = None,
     plugin_slug: str | None = None,
+    *,
+    allow_empty: bool = False,
 ) -> list[str]:
-    """Validate capabilities and router rows; return list of errors."""
+    """Validate capabilities and router rows; allow empty only after validating declared session delivery."""
     errors: list[str] = []
     if isinstance(capabilities, Path) and isinstance(router_rows, Path):
         try:
@@ -396,9 +398,9 @@ def validate_capabilities_and_router(
         except (OSError, ValueError) as exc:
             return [str(exc)]
 
-    if not capabilities:
+    if not capabilities and not allow_empty:
         errors.append("no capabilities provided")
-    if not router_rows:
+    if not router_rows and not allow_empty:
         errors.append("no router rows provided")
 
     # 1-to-1 correspondence

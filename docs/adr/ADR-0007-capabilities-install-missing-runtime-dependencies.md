@@ -146,3 +146,14 @@ packaged but idle. The rule is kept and made precise:
   writes project-scope settings, merges, refuses a file that does not parse, and
   removes exactly what it added.
 - Classification never registers a hook (unchanged, `prompts/classify.md`).
+
+## Superseded in part (2026-11-12)
+
+Owner statement of 2026-11-12: "quest adr è obsoleta, se installo il plugin
+generato da muro, allora può attivare da solo prompt, hook, tools, skills ecc".
+[ADR-0016](ADR-0016-delivery-form-and-self-registering-releases.md) replaces the
+sentence "Hooks remain passive metadata and are never installed or activated",
+the hook half of INV-003 and the amendment of 2026-11-11 above: a release now
+registers what its package's `delivery.json` declares. The decision on runtime
+dependencies, and "intake and build install nothing", stand unchanged. The text
+above is kept as the historical record.

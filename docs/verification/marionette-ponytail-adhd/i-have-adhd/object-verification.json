@@ -1,0 +1,10 @@
+{
+  "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+  "tree": "d4775095f471d938babccea77838d43b7fd39bc3",
+  "tag": "refs/tags/v0.4.1",
+  "verified_trees": 25,
+  "verified_blobs": 42,
+  "mirror": "D:\\workspace\\muro-integration-20261112\\i-have-adhd\\verified-mirror.git",
+  "partial": true,
+  "omitted": "Unfetched blobs and parent history; all tree objects and inspected UTF-8 blobs retained."
+}

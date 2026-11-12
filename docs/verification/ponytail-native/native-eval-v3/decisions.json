@@ -1,0 +1,52 @@
+{
+  "decisions": {
+    "review-report": {
+      "task": "Controlla se questa PR introduce regressioni e dammi un elenco motivato, senza toccare il codice.",
+      "stack_tokens": [],
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "change-review",
+          "intent": "code.change-review",
+          "reason": "A motivated report on regressions in a software PR, with no code edits, is the report-only review outcome."
+        }
+      ],
+      "reason": "The requested artifact is a software-change review. Required file-access maps to the available file-reading tools; optional Git inspection maps to the shell. No additional capability, prerequisite or hook is required. Permanent policy guides how the review is performed.",
+      "questions": []
+    },
+    "implement-no-review": {
+      "task": "Non voglio una revisione: correggi direttamente il parser e aggiorna i test.",
+      "stack_tokens": [],
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4",
+      "status": "no_match",
+      "selections": [],
+      "reason": "The user explicitly rejects review and asks for parser and test implementation. The sole catalog capability excludes implementing fixes. Ambient implementation principles do not provide a missing execution capability or justify substituting a report.",
+      "questions": []
+    },
+    "review-lean": {
+      "task": "Leggi le modifiche attuali e dimmi dove abbiamo aggiunto astrazioni inutili; proponi interventi concreti senza applicarli.",
+      "stack_tokens": [],
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "change-review",
+          "intent": "code.change-review",
+          "reason": "The user wants an evidence-based assessment of unnecessary abstractions in current software changes and concrete proposed interventions without applying them."
+        }
+      ],
+      "reason": "One report-only change review covers the requested complexity analysis while respecting the prohibition on edits. Required file access and optional shell inspection are available. The session policy does not add an implementation stage or select another capability.",
+      "questions": []
+    },
+    "non-code": {
+      "task": "Rivedi questo invito di compleanno per renderlo più affettuoso.",
+      "stack_tokens": [],
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4",
+      "status": "no_match",
+      "selections": [],
+      "reason": "A warmer rewrite of a personal invitation is an editorial outcome, which the software-change review intent explicitly excludes. The ambient policy cannot create an absent writing capability; this bounded catalog does not determine the breadth of any larger package.",
+      "questions": []
+    }
+  }
+}

@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 
 from .core import parse_router, validate_capabilities_and_router
+from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
 from .routing import catalog_digest, catalog_entries, resolve_selection, validate_classification, validate_stack
 from .sources import parse_capabilities
 
@@ -75,7 +76,15 @@ _I18N: dict[str, dict[str, str]] = {
         "action_word": "Action:",
         "policy_word": "Policy:",
         "no_hook_tools": "No tool declared for this hook.",
-        "hooks_note": "Hooks are passive metadata. The host checks tools, permissions and conditions; the guide neither installs nor runs them.",
+        "hooks_note": "A hook with policy active is registered by the release on the hosts listed under Release sources. Any other hook is passive metadata: the host checks tools, permissions and conditions. The guide neither installs nor runs anything.",
+        "delivery_h4": "Delivered as",
+        "form_capability": "on-demand capability",
+        "form_always-on": "text in every session",
+        "form_hook": "active hook",
+        "form_dropped": "not carried",
+        "always_on_h3": "Text added to every session",
+        "always_on_note": "characters, paid by every session on hosts that register it.",
+        "wirings_h3": "Hooks registered by the release",
         "checks_h3": "Verification checks",
         "no_checks": "No check declared.",
         "checks_note": "Listing checks is not proof of passing results.",
@@ -173,7 +182,15 @@ _I18N: dict[str, dict[str, str]] = {
         "action_word": "Azione:",
         "policy_word": "Politica:",
         "no_hook_tools": "Nessuno strumento dichiarato per questo hook.",
-        "hooks_note": "Gli hook sono descrizioni passive. L’host verifica strumenti, permessi e condizioni; la guida non li installa né li esegue.",
+        "hooks_note": "Un hook con politica active è registrato dalla release sugli host elencati in Fonti della release. Ogni altro hook è una descrizione passiva: l’host verifica strumenti, permessi e condizioni. La guida non installa né esegue nulla.",
+        "delivery_h4": "Consegnato come",
+        "form_capability": "capability a richiesta",
+        "form_always-on": "testo in ogni sessione",
+        "form_hook": "hook attivo",
+        "form_dropped": "non incluso",
+        "always_on_h3": "Testo aggiunto a ogni sessione",
+        "always_on_note": "caratteri, pagati da ogni sessione sugli host che lo registrano.",
+        "wirings_h3": "Hook registrati dalla release",
         "checks_h3": "Verifiche da eseguire",
         "no_checks": "Nessuna verifica dichiarata.",
         "checks_note": "L’elenco delle verifiche non equivale a risultati superati.",
@@ -274,7 +291,7 @@ def _workflow_html(lang: str, command_escaped: str) -> str:
         '<p>To replace an active map: supply a fresh classification with <code>plan --new</code>. The browser executes no commands.</p></details>'
         '<details><summary>Tools, hooks and precedence</summary>'
         '<p><code>stack:*</code> tokens express technical compatibility, not keyword triggers. The host checks tool availability and permissions. '
-        'Hooks remain passive metadata and are never auto-registered or executed by the guide.</p></details>'
+        'A hook is registered by the release only when delivery.json declares it active; every other hook is passive metadata. The guide executes nothing.</p></details>'
     )
 
 
@@ -383,7 +400,9 @@ def _capability_html(cap: dict, catalog: list[dict], tr: dict[str, str]) -> str:
     return '\n'.join(parts)
 
 
-def _sources_html(sources: list[dict]) -> str:
+def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | None = None) -> str:
+    """Pins and, when the package records them, the AI-authored delivery decisions. Nothing is derived here."""
+    delivery, tr = delivery or {}, tr or _I18N['en']
     parts = ['<div class="source-list">']
     for source in sources:
         pin = source['pin']
@@ -393,8 +412,30 @@ def _sources_html(sources: list[dict]) -> str:
             f'<h3>{_text(source["id"])}</h3>',
             f'<p>{_text(source["license"])} · {_text(revision)}</p>',
             f'<p><code>{_text(source["commit"])}</code></p>',
-            '</article>',
         ])
+        decisions = [d for d in delivery.get('decisions', []) if d['source'] == source['id']]
+        if decisions:
+            parts.append(f'<details><summary>{_text(tr["delivery_h4"])}</summary>')
+            for item in decisions:
+                targets = ' → ' + ', '.join(item['targets']) if item['targets'] else ''
+                parts.append(f'<p><strong>{_text(tr["form_" + item["form"]])}{_text(targets)}</strong><br>'
+                             f'{_text(item["content"])}<br>{_text(item["reason"])}</p>')
+            parts.append('</details>')
+        parts.append('</article>')
+    if delivery.get('always_on'):
+        text = delivery['always_on']
+        parts.extend([
+            '<article class="source-entry">', f'<h3>{_text(tr["always_on_h3"])}</h3>',
+            f'<pre class="source-body">{_text(text)}</pre>',
+            f'<p>{len(text)} {_text(tr["always_on_note"])}</p>', '</article>',
+        ])
+    if delivery.get('hooks'):
+        parts.extend(['<article class="source-entry">', f'<h3>{_text(tr["wirings_h3"])}</h3>'])
+        for wiring in delivery['hooks']:
+            matcher = f' ({wiring["matcher"]})' if wiring['matcher'] else ''
+            parts.append(f'<p><strong>{_text(wiring["host"])} · {_text(wiring["event"] + matcher)}</strong> → '
+                         f'{_text(wiring["capability"])}<br><code>{_text(" ".join(wiring["run"]))}</code></p>')
+        parts.append('</article>')
     parts.append('</div>')
     return '\n'.join(parts)
 
@@ -452,15 +493,22 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
     graph_library, graph_script = _graph_library()
     capabilities = parse_capabilities(dist / 'capabilities')
     rows = parse_router(dist / 'ROUTER.md')
+    source_ids = {source['id'] for source in sources}
+    delivery = load_delivery(dist)
+    errors = (unregistered_active_hooks(capabilities) if delivery is None
+              else validate_delivery(delivery, capabilities, source_ids))
+    if errors:
+        raise ValueError('Invalid guide delivery: ' + '; '.join(errors))
     errors = validate_capabilities_and_router(
-        capabilities, rows, {source['id'] for source in sources}, plugin_slug=plugin.get('slug')
+        capabilities, rows, source_ids, plugin_slug=plugin.get('slug'),
+        allow_empty=allows_empty_catalog(delivery, capabilities, source_ids),
     )
     if errors:
         raise ValueError('Invalid guide catalog: ' + '; '.join(errors))
     by_id = {cap.id: cap for cap in capabilities}
     catalog = catalog_entries(rows, by_id)
     prompt = (dist / 'prompts' / 'classify.md').read_text(encoding='utf-8')
-    digest = catalog_digest(catalog, by_id, prompt)
+    digest = catalog_digest(catalog, by_id, prompt, delivery)
     manifest_file = dist / 'sources.json'
     stack_conflicts = None
     if manifest_file.is_file():
@@ -516,7 +564,7 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         '__MURO_VERSION__': _text(plugin['version']),
         '__MURO_DATA__': serialized,
         '__MURO_CONTENT__': '\n'.join(_capability_html(cap, catalog, tr) for cap in catalog) + '\n' + _examples_html(examples, tr) + '\n' + catalog_notes,
-        '__MURO_SOURCES__': _sources_html(public_sources),
+        '__MURO_SOURCES__': _sources_html(public_sources, delivery, tr),
         '__MURO_GRAPH_LIBRARY__': graph_script,
     }
     template = GUIDE_TEMPLATE.read_text(encoding='utf-8')

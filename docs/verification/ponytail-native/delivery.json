@@ -1,0 +1,28 @@
+{
+  "decisions": [
+    {
+      "source": "ponytail",
+      "content": ".agents/rules/ponytail.md: scope before minimization, reuse ladder, completeness and non-negotiable safeguards.",
+      "form": "always-on",
+      "targets": [],
+      "reason": "The source governs how work is performed before an individual capability is chosen, rather than producing a separate artifact. The owner explicitly expects system-style delivery in this bounded experiment. This host-LLM-authored synthesis is permanent execution guidance, with code-specific clauses applying to code and without narrowing package domains or replacing required engines. Personality and forced response endings are omitted. The current factory places the declared text in native system-prompt sections for Claude Code, Pi, OpenCode and Hermes. Codex receives structured lifecycle-hook additionalContext carried at developer level; it is not described as literal system-role delivery. Cost: the unchanged 1800-character policy is included in the applicable native prompt context; the four native in-process integrations add no subprocess or model call, and Codex starts two Python processes per SessionStart or SubagentStart event with no model call. No upstream hooks, mode state or host configuration writes are adopted."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-review/SKILL.md: connected-code review, concrete evidence and severity-ranked report.",
+      "form": "capability",
+      "targets": [
+        "change-review"
+      ],
+      "reason": "The source explicitly describes a user-requested bounded report and changes no code. It belongs on demand, separately discoverable. It complements ambient implementation guidance without imposing a review step on every task or claiming authority over unrelated domains."
+    },
+    {
+      "source": "ponytail",
+      "content": ".agents/rules/ponytail.md: lazy senior developer identity and compulsory ending; review's fixed English-only wording.",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The behavioral method is preserved without changing the host's identity or overriding user language and format. Selected source outcomes are retained. Other upstream hooks and skills are outside the selected scope of this explicitly bounded probe, not silently discarded from a full intake."
+    }
+  ],
+  "always_on": "Ponytail-derived working policy: smallest complete change.\n\nThe package favors the smallest understandable solution that fully satisfies the requested outcome. Scope is established before minimizing: affected material, callers, tests, fixtures, configuration and public interfaces all count. Data loss, exposure and compatibility remain part of the assessment.\n\nFor implementation work the preference order is existing project patterns and components, then standard-library or platform features, then installed dependencies, then minimal new code. Existing architecture and conventions take precedence. Speculative features, wrappers, abstractions and configuration are unnecessary; deletion is useful only when the required behavior survives. A shorter result must remain readable.\n\nCompleteness includes every consequential change. Requested functionality, validation at trust boundaries, security, accessibility, required hardware calibration and error handling that prevents data loss are preserved. Moving or merging code retains its safeguards. Defect fixes inspect callers and address the shared cause. Equally small alternatives favor correctness on edge cases.\n\nNon-trivial logic receives a focused test or executable self-check that can detect failure; trivial edits need no ceremonial tests. Comments explain hidden reasons. A deliberate shortcut records its limit and when to replace it. Reports distinguish verified outcomes, unchecked work and remaining material risks.\n\nThese are execution principles, not routing rules or permissions. They do not select capabilities, override required tools or approved designs, authorize hooks or narrow the package's domains. Code-specific clauses apply when working on code; requested reviews keep their substantive evidence and report-only scope."
+}

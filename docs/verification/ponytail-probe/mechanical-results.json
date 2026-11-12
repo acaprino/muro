@@ -1,0 +1,48 @@
+{
+  "always_on_characters": 1800,
+  "hosts": [
+    {
+      "host": "claude-code",
+      "two_standalone_runs_match": true,
+      "automatic_hook_registered": true
+    },
+    {
+      "host": "codex",
+      "two_standalone_runs_match": true,
+      "automatic_hook_registered": false
+    },
+    {
+      "host": "pi",
+      "two_standalone_runs_match": true,
+      "automatic_hook_registered": false
+    },
+    {
+      "host": "opencode",
+      "two_standalone_runs_match": true,
+      "automatic_hook_registered": false
+    },
+    {
+      "host": "hermes",
+      "two_standalone_runs_match": true,
+      "automatic_hook_registered": false
+    }
+  ],
+  "source_skill_renamed": true,
+  "guide_and_license_present": true,
+  "live_model_verified": false,
+  "runtime_sha256": {
+    "adapters.py": "a5ae6cfe2a92f2faa353e89bb67576cb3578f9deae16076770aabdf18d4ba41e",
+    "cli.py": "0625eecd8b1900c06c5ea6cd38b6437c03643d317e84e3ba5b6eb72f58f1ca8d",
+    "core.py": "6da3a6bcd61be751979d5219ec4bc555ffc73d8ac07dc48d3e19ce9bf83bf67d",
+    "delivery.py": "a0aa3fe7608dbdf315381fe1b620bb47865ba5ee75240b2ae1e17bc75f434924",
+    "entries.py": "752bd1fc7ca389de19b09cd201eef4ede7dcf22e06cd47f902050220567f4ade",
+    "evals.py": "15be19716229a5f185a38c23f70a3e21657b3a4f12cce98a65936688f93b0146",
+    "factory.py": "6d7541244abeb2cba5d3b5515ad2552aab0c3d55b42286d2f0ecaf708c6b3695",
+    "guide.py": "45a60f17cf0a3d8709d9dbf0911dd1d1452926c1a21a616ab6a69ad716f02990",
+    "release.py": "ab6cd9e3dbd5d724492d5fd150d31270c7ed164d43d3967583476c20e178a820",
+    "routing.py": "095853b538d06773aa2e1bd25b48c56fd8be4922b3309d67e87729ccf730a35a",
+    "runtime.py": "f74d3d65f217ab3397ccb9d52c6e04fceeeb60c0c71a27f94a180b539e2c4798",
+    "sources.py": "742c19a27c0755d9696b5596b2b32bbd14d70e9c0c57355618ef37fd8b8b2c92",
+    "__init__.py": "49eddbcb57a12f755e49f9cf7c031b960dfec5fd32efcf2e0d958b08fac9b74f"
+  }
+}

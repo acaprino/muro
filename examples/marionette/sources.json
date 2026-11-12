@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.1.0",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, searching UI/UX and accessibility guidance, creating or updating Figma designs, specifying UI motion or implementing GSAP ScrollTrigger and CSS scroll animations, creating, editing or converting Word, Excel, PowerPoint and PDF Office files with GenOffice, coordinating multi-slice software specs or handing work over between sessions, authoring and fact-checking interactive HTML explainers, or doing research work; finding and reading papers, keeping a paper wiki, making paper diagrams and plots, planning experiments and pitching results without overclaiming, or reviewing and steering what TokenEconomizer learns and saves in agent sessions.",
+    "description": "Use when designing or building websites and landing pages, looking up UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, making design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, specifying motion or implementing GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF Office files; implementing software changes, coordinating specs and handoffs, reviewing changes or auditing a repository, reporting deliberate shortcut debt or explaining the Ponytail method and published benchmark; authoring and fact-checking interactive HTML explainers; finding and reading papers, keeping a paper wiki, making paper figures, planning experiments and pitching research; or steering what TokenEconomizer learns and saves.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -25,7 +25,28 @@
       "research-bible",
       "sell-research-honestly",
       "session-handoff",
-      "tokeneconomizer"
+      "tokeneconomizer",
+      "discovery-questions",
+      "frontend-aesthetic-direction",
+      "wireframe",
+      "make-a-deck",
+      "make-a-prototype",
+      "make-tweakable",
+      "generate-variations",
+      "design-system-extract",
+      "component-extract",
+      "accessibility-audit",
+      "ai-slop-check",
+      "hierarchy-rhythm-review",
+      "interaction-states-pass",
+      "polish-pass",
+      "ponytail",
+      "ponytail-review",
+      "ponytail-audit",
+      "ponytail-debt",
+      "ponytail-gain",
+      "ponytail-help",
+      "i-have-adhd"
     ]
   },
   "stack": {
@@ -440,6 +461,128 @@
       "intake": {
         "goal": "Absorb TokenEconomizer's control surface and engine: the status, micro-skills, tool-pruning, settings and repository-state commands as one capability, with the engine packaged unchanged so those commands run from this plugin. Catalog its six default hooks as passive, host-approved entries and make registering or removing them an explicit user-requested action that first discloses their effects. Leave out the upstream plugin manifests, slash commands and skills as files, the Pi extension, experiments and tests."
       }
+    },
+    {
+      "id": "claude-design-system-prompt",
+      "repo_url": "https://github.com/Trystan-SA/claude-design-system-prompt",
+      "commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Trystan Sarrade",
+      "selected_paths": [
+        "claude/system-prompt.md",
+        "claude/skills/**"
+      ],
+      "excluded_paths": [
+        "codex/**",
+        "README.md"
+      ],
+      "intake_only_paths": [
+        "claude/system-prompt.md"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Read the system prompt chapter by chapter and the fourteen procedural skills, and decide the delivery form of each part with the delivery protocol. Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the system prompt is not injected into every session; its content becomes capabilities found from context, harmonized and coordinated with the others. Compare its design rules, review passes and production procedures with the existing design, motion, deck and explainer capabilities and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Leave out the Codex variant and the source's own list of when to invoke which skill. Record that the upstream describes itself as a reverse-engineered rendition of Anthropic's Claude Design system prompt, and adapt its methods in your own words rather than copying."
+      }
+    },
+    {
+      "id": "ponytail",
+      "repo_url": "https://github.com/DietrichGebert/ponytail.git",
+      "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+      "pin": "release",
+      "release": "v5.3.3",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 DietrichGebert",
+      "selected_paths": [
+        ".agents/rules/ponytail.md",
+        "skills/ponytail/SKILL.md",
+        "skills/ponytail-review/SKILL.md",
+        "skills/ponytail-audit/SKILL.md",
+        "skills/ponytail-debt/SKILL.md",
+        "skills/ponytail-gain/SKILL.md",
+        "skills/ponytail-help/SKILL.md",
+        "benchmarks/results/2026-10-07-agentic.md"
+      ],
+      "excluded_paths": [
+        "hooks/**",
+        ".claude-plugin/**",
+        ".codex-plugin/**",
+        ".opencode/**",
+        "pi-extension/**",
+        "__init__.py",
+        "plugin.yaml",
+        "plugin.json",
+        "package.json",
+        "scripts/**",
+        ".cursor/**",
+        ".github/**",
+        ".openclaw/**",
+        "assets/**",
+        "i18n/**",
+        "tests/**",
+        "benchmarks/agentic/**",
+        "benchmarks/arms/**",
+        ".agents/plugins/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. The host AI synthesizes neutral permanent working guidance, retains full scope and safety before minimization, enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. Original persona, compulsory wording, slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
+      },
+      "intake_only_paths": [
+        ".agents/rules/ponytail.md",
+        "skills/ponytail/SKILL.md",
+        "skills/ponytail-review/SKILL.md",
+        "skills/ponytail-audit/SKILL.md",
+        "skills/ponytail-debt/SKILL.md",
+        "skills/ponytail-gain/SKILL.md",
+        "skills/ponytail-help/SKILL.md"
+      ]
+    },
+    {
+      "id": "i-have-adhd",
+      "repo_url": "https://github.com/ayghri/i-have-adhd.git",
+      "commit": "1ecea1993b7fce257ffbd686c070948b5e07eda6",
+      "pin": "release",
+      "release": "v0.4.1",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Ayoub Ghriss",
+      "selected_paths": [
+        "skills/i-have-adhd/SKILL.md",
+        "README.md"
+      ],
+      "excluded_paths": [
+        "skills/i-have-adhd/agents/**",
+        ".agents/**",
+        ".claude-plugin/**",
+        ".codex-plugin/**",
+        ".cursor/**",
+        ".github/**",
+        ".opencode/**",
+        "hooks/**",
+        "extensions/**",
+        "scripts/**",
+        "tests/**",
+        "evals/**",
+        "INSTALL.md",
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        "GEMINI.md",
+        "package.json",
+        "plugin.json",
+        "gemini-extension.json",
+        "qwen-extension.json",
+        "kimi.plugin.json",
+        "logo.png",
+        ".gitignore"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Absorb the source's communication policy as flexible permanent guidance: clear useful answers, bounded steps where helpful, concrete progress, complete explanations and uncertainty preserved, and no delegation of authorized agent-owned work. Respect the user's demonstrated knowledge and current constraints, including requests for realistic examples or diagrams when they help understanding. Drop diagnostic assumptions, mandatory response templates, redundant source activation/routing and source plugin installation. Preserve all supported communication outcomes without inventing an on-demand capability. Source-native hooks, transport, developer QA and installation instructions were statically inspected and are accounted for in delivery and verification evidence; none are executed or registered."
+      },
+      "intake_only_paths": [
+        "skills/i-have-adhd/SKILL.md",
+        "README.md"
+      ]
     }
   ]
 }

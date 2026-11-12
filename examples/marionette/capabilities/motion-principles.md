@@ -4,7 +4,7 @@ role: motion-spec
 tools: [{"name":"file-access","purpose":"Read existing UI context and record the motion specification.","required":true},{"name":"browser","purpose":"Measure timing and reduced-motion behavior when implemented UI is available.","required":false}]
 hooks: []
 conflicts: []
-reads: ["palette", "typography", "layout", "constraints"]
+reads: ["palette", "typography", "layout", "constraints", "aesthetic_direction"]
 when: —
 intents: [{"id":"ui.motion-design","description":"Decide what moves in a UI and how: motion personality, durations, directional easing, choreography and reduced-motion alternatives, as a specification for later implementation or on its own. Needed before scroll or transition code when the request leaves the motion open.","excludes":["A static hero or page does not imply animation.","A motion specification or hover request does not imply scroll implementation.","A request that already states the exact behavior (for example pin this section and scrub this image) needs no separate specification step.","Animation inside an interactive explainer is part of its own canvas figures."]}]
 after: []
@@ -18,7 +18,7 @@ Defines the motion specification for UI elements: why each element moves, how lo
 
 ## Behavior
 
-1. **Read the context.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `palette`, `typography`, `layout` and `constraints` from a `visual-direction` step, use them; otherwise read the existing UI and brand. Answer purpose, audience and context first: busy layout → simpler motion; other animations active → coordinate or stagger; seen 100 times a day → fast and subtle (`<MD>/director/decision-framework.md`).
+1. **Read the context.** If `recorded_outputs` (or `<state_dir>/map.md ## Outputs`) holds `palette`, `typography`, `layout` and `constraints` from a `visual-direction` step, use them; a recorded `aesthetic_direction` carries a motion mode (quiet, expressive or playful) that the personality of step 2 must fit; otherwise read the existing UI and brand. Answer purpose, audience and context first: busy layout → simpler motion; other animations active → coordinate or stagger; seen 100 times a day → fast and subtle (`<MD>/director/decision-framework.md`).
 2. **Choose one motion personality** for the project: Playful, Premium, Corporate or Energetic, with their duration, easing and overshoot. Default: Corporate for UI. Fix the brand motion identity: one signature easing for about 80% of animations, three durations (quick, standard, slow) and one entrance pattern (`<MD>/SKILL.source.md` Motion Personality; `<MD>/director/motion-personality.md`).
 3. **Map each animated element.** Give its category (revealing, concealing, transitioning, emphasizing, responding, ambient), the minimum properties (one is direct, two is the usual best, three or more risks overwhelming), the trigger (load, hover, press, state change, or a scroll range) and its direction.
 4. **Time it** from the duration table: micro-feedback 80–120ms, button press 120–180ms, icon 150–250ms, card 200–350ms, modal 300–400ms, page transition 400–600ms, dramatic reveal 600–1200ms. Hover under 100ms, press under 150ms, settle 200–300ms. Distance scales duration (200px = 1.3×, 400px = 1.6×); entrances run 30–50% longer than exits; mobile 0.8×.
@@ -55,4 +55,5 @@ Return every required output key as a JSON string. For a mapped step, submit the
 - Source: motion-design (LottieFiles/motion-design-skill@f9a8a041) — `skills/motion-design/SKILL.md`, `director/**`, `patterns/**`, `reference/**`, packaged under `<package_root>/scripts/motion-design/`.
 - Runtime dependency: none.
 - Hooks: the selected files define none; `assets/**`, `examples/**` and `scripts/**` are excluded and were not inspected for hooks.
+- Harmonization 2026-11-12 (claude-design-system-prompt intake): that source gives 0.2 to 0.3 seconds for every state transition and calls anything under 0.15 jarring, against this source's 80 to 180ms feedback durations. This step stays the owner of timing: `design-review` and `ui-prototype` use the other band only when no `motion-spec` is recorded. `aesthetic_direction` is read for its motion mode.
 - Harmonized by: prompts/harmonizer.md (2026-11-10 re-harmonization) — no prerequisite: the source starts from purpose, audience and context and defaults to the Corporate personality (`SKILL.md` Motion Personality, `director/decision-framework.md`), and never asks for a palette, layout or offer. The earlier easing names, duration bands, "never mix ease-out and spring" and 150ms hover rule were not in the source and are replaced by its tables. The three-layer rule is scoped by an approved visual direction (see Specifics).

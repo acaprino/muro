@@ -1,0 +1,13 @@
+{
+  "url": "https://api.github.com/repos/genspark-ai/genoffice/git/ref/tags/v0.12.852",
+  "response": {
+    "ref": "refs/tags/v0.12.852",
+    "node_id": "REF_kwDOTpHwCLNyZWZzL3RhZ3MvdjAuMTIuODUy",
+    "url": "https://api.github.com/repos/genspark-ai/genoffice/git/refs/tags/v0.12.852",
+    "object": {
+      "sha": "4b55db9ed1994575a695160ffc6cfd0bfc866211",
+      "type": "commit",
+      "url": "https://api.github.com/repos/genspark-ai/genoffice/git/commits/4b55db9ed1994575a695160ffc6cfd0bfc866211"
+    }
+  }
+}

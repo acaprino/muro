@@ -5,6 +5,11 @@ import json
 from pathlib import Path
 import shutil
 
+from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
+from .claude_adapter import write_claude_policy
+from .hermes_adapter import write_hermes_adapter
+from .native_policy import write_opencode_adapter, write_pi_adapter
+
 
 _LAUNCHER = '''from pathlib import Path
 import sys
@@ -185,8 +190,37 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
 {_embedded_rules(classify_prompt)}'''
 
 
+def _install_steps(host: str, plugin: dict, reviews_hooks: bool) -> str:
+    """The host's own install command for this adapter folder, and what is active after it.
+
+    Each command was run on the real host before it was written here; Hermes was not, so it gets none.
+    """
+    slug, here = plugin["slug"], "<path of this folder>"
+    active = "Everything this release declares is active"
+    if host == "claude-code":
+        steps = (f"```sh\nclaude plugin marketplace add {here}\nclaude plugin install {slug}@{slug}\n```\n\n"
+                 f"For one session only: `claude --plugin-dir {here}`. {active} as soon as the plugin is enabled: "
+                 "there is no further step.")
+    elif host == "codex":
+        steps = f"```sh\ncodex plugin marketplace add {here}\ncodex plugin add {slug}@{slug}\n```\n\n"
+        steps += ("Then open `/hooks` in Codex, trust this plugin's hooks and start a new thread. Codex skips every "
+                  "plugin's hooks until its user reviews them, and asks again when a release changes them, so what "
+                  "this release declares is not active on Codex until that review. No package can skip it."
+                  if reviews_hooks else "The skills are available from the next thread.")
+    elif host == "pi":
+        steps = (f"```sh\npi install {here}\n```\n\nAdd `-l` to install for the current project only. "
+                 f"{active} from the next run: there is no further step.")
+    elif host == "opencode":
+        steps = ("Add this folder to `plugins` in `opencode.json` (`~/.config/opencode/opencode.json`, or the "
+                 f"project's own), as a `file:///` URL:\n\n```json\n{{\"plugins\": [\"file:///{here}\"]}}\n```\n\n"
+                 f"{active} from the next session: there is no further step.")
+    else:
+        return ""
+    return f"\n\n## Install\n\n{steps}"
+
+
 def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities: list | None = None,
-                   entries: list[dict] | None = None) -> None:
+                   entries: list[dict] | None = None, delivery: dict | None = None) -> None:
     """Write documented skill layouts and independently runnable host launchers."""
     shutil.copytree(package_source, dist / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (dist / "muro.py").write_text(_LAUNCHER, encoding="utf-8")
@@ -207,8 +241,12 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         root = dist / "adapters" / host
         skill_dir = root / "skills" / plugin["command"]
         skill_dir.mkdir(parents=True)
-        (skill_dir / "SKILL.md").write_text(
-            _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt), encoding="utf-8")
+        policy = session_text(delivery)
+        if policy:
+            (root / "policy.md").write_text(policy, encoding="utf-8", newline="")
+        if capabilities:
+            (skill_dir / "SKILL.md").write_text(
+                _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt), encoding="utf-8")
         (skill_dir / "muro.py").write_text(_LAUNCHER, encoding="utf-8")
         # A skill directory is independently installable; omit build-only graph bundle inside runtime muro/.
         shutil.copytree(
@@ -224,6 +262,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         shutil.copy2(dist / "sources.json", skill_dir / "sources.json")
         shutil.copy2(dist / "GUIDE.html", skill_dir / "GUIDE.html")
         shutil.copy2(dist / "guide-examples.json", skill_dir / "guide-examples.json")
+        if (dist / DELIVERY_FILE).is_file():
+            shutil.copy2(dist / DELIVERY_FILE, skill_dir / DELIVERY_FILE)
         if (dist / "scripts").is_dir():
             shutil.copytree(dist / "scripts", skill_dir / "scripts")
         entry_names = []
@@ -247,13 +287,58 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
                             f"only a SKILL.md that runs the runtime of `skills/{plugin['command']}`. ")
         (root / "INSTALL.md").write_text(
             f"# {plugin['name']} on {host}\n\n"
-            f"Install the complete folder `skills/{plugin['command']}` as one skill; do not copy only SKILL.md. "
-            "It includes its runtime, capabilities, license notices and offline `GUIDE.html`. "
+            "Install this complete adapter directory as the host's native plugin/package, including its manifest and entrypoint. "
+            f"`skills/{plugin['command']}` holds the standalone runtime, catalog, license notices and offline `GUIDE.html`. "
             f"{entries_note}"
             f"Open `skills/{plugin['command']}/GUIDE.html` for this release's illustrated decision graph and commands. "
             "The universal fallback is `python muro.py` inside that folder. "
-            f"See README.md in the source project for current verification limits.{replaces_note}\n",
+            f"See README.md in the source project for current verification limits.{replaces_note}"
+            f"{install_note(delivery, host, plugin['command'])}"
+            f"{_install_steps(host, plugin, host == 'codex' and bool(codex_hooks(delivery, plugin['command'], plugin['name'])))}\n",
             encoding="utf-8")
         if host == "claude-code":
             (root / ".claude-plugin").mkdir()
             (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin_doc, indent=2), encoding="utf-8")
+            # The adapter folder is its own marketplace, so the host's install command accepts it as it is.
+            marketplace = {"name": plugin["slug"], "owner": plugin_doc["author"],
+                           "metadata": {"description": f"{plugin['name']}, installed from this folder"},
+                           "plugins": [{"name": plugin["slug"], "source": "./",
+                                        "description": plugin_doc["description"], "version": plugin["version"]}]}
+            (root / ".claude-plugin" / "marketplace.json").write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+            # Installing the plugin is the consent: what delivery.json declares is registered when it is enabled.
+            registered = claude_code_hooks(delivery, plugin["command"], plugin["name"])
+            module = write_claude_policy(root, plugin)
+            if module:
+                registered = registered or {}
+                registered["modules"] = [module]
+            if registered:
+                (root / "hooks").mkdir(exist_ok=True)
+                (root / "hooks" / "hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+        elif host == "codex":
+            # Both modern and compatibility entrypoints refer to the same packaged resources.
+            portable = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+                        "name": plugin["slug"], "version": plugin["version"],
+                        "description": plugin_doc["description"]}
+            (root / "plugin.json").write_text(json.dumps(portable, indent=2), encoding="utf-8")
+            (root / ".codex-plugin").mkdir()
+            compatibility = {"name": plugin["slug"], "version": plugin["version"],
+                             "description": plugin_doc["description"], "skills": "./skills/"}
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compatibility, indent=2), encoding="utf-8")
+            # The adapter folder is its own marketplace, so `codex plugin marketplace add` accepts it as it is.
+            marketplace = {"name": plugin["slug"], "interface": {"displayName": plugin["name"]},
+                           "plugins": [{"name": plugin["slug"], "source": {"source": "local", "path": "./"},
+                                        "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+                                        "category": "Productivity"}]}
+            (root / ".agents" / "plugins").mkdir(parents=True)
+            (root / ".agents" / "plugins" / "marketplace.json").write_text(json.dumps(marketplace, indent=2),
+                                                                         encoding="utf-8")
+            registered = codex_hooks(delivery, plugin["command"], plugin["name"])
+            if registered:
+                (root / "hooks").mkdir()
+                (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+        elif host == "pi":
+            write_pi_adapter(root, plugin, bool(policy))
+        elif host == "opencode":
+            write_opencode_adapter(root, plugin, bool(policy))
+        elif host == "hermes":
+            write_hermes_adapter(root, plugin, bool(policy))

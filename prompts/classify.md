@@ -22,8 +22,11 @@ required tool cannot be obtained that way (a host integration that needs the
 user's account or approval, a permission the host withholds), choose a genuinely
 equivalent permitted variant or return needs_clarification/no_match with the
 limitation. Do not simulate tool calls.
-Hook metadata is passive: execute a manual action only within the authorized
-task; a host-approved hook also requires actual host support and existing approval.
+A hook with policy `active` was registered by the release when the plugin was
+installed: on hosts that support it, it already runs and is never registered
+again from a task. Any other hook is passive metadata: execute a manual action
+only within the authorized task; a host-approved hook also requires actual host
+support and existing approval.
 Never install/register a hook, or run source commands, merely because metadata
 describes a default. Python does not verify tool availability or execute hooks.
 

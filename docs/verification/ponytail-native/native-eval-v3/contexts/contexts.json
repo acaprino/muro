@@ -1,0 +1,22 @@
+{
+ "review-report": {
+  "task": "Controlla se questa PR introduce regressioni e dammi un elenco motivato, senza toccare il codice.",
+  "stack_tokens": [],
+  "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+ },
+ "implement-no-review": {
+  "task": "Non voglio una revisione: correggi direttamente il parser e aggiorna i test.",
+  "stack_tokens": [],
+  "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+ },
+ "review-lean": {
+  "task": "Leggi le modifiche attuali e dimmi dove abbiamo aggiunto astrazioni inutili; proponi interventi concreti senza applicarli.",
+  "stack_tokens": [],
+  "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+ },
+ "non-code": {
+  "task": "Rivedi questo invito di compleanno per renderlo più affettuoso.",
+  "stack_tokens": [],
+  "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+ }
+}

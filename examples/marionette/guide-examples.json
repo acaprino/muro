@@ -103,6 +103,164 @@
       ],
       "reason": "Due passi in ordine: la ricerca produce l'elenco, il wiki lo usa. Nessuna spiegazione HTML e nessuna figura sono richieste.",
       "questions": []
+    },
+    {
+      "title": "Prototipo di un'app senza brand",
+      "task": "Fammi un prototipo cliccabile dell'onboarding della nostra nuova app: non abbiamo ancora né brand né design system. Prima di consegnarlo controlla accessibilità e stati dei bottoni.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "aesthetic-direction",
+          "intent": "ui.aesthetic-direction",
+          "reason": "Non esiste nulla a cui adeguarsi: prima si sceglie e si scrive una direzione visiva insieme all'utente."
+        },
+        {
+          "capability": "ui-prototype",
+          "intent": "ui.interactive-prototype",
+          "reason": "Il risultato richiesto è un flusso cliccabile con stato, validazione e feedback reali, costruito sulla direzione registrata.",
+          "needs": [
+            {
+              "requires": "aesthetic-direction",
+              "applies": true,
+              "reason": "Il prototipo è hi-fi e né il progetto né l'utente forniscono brand, design system o direzione."
+            }
+          ]
+        },
+        {
+          "capability": "design-review",
+          "intent": "ui.polish-pass",
+          "reason": "L'utente chiede un controllo prima della consegna: accessibilità e stati rientrano nel passaggio completo, che corregge ciò che trova."
+        }
+      ],
+      "reason": "Tre passi in ordine: la direzione, il prototipo che la legge, la revisione che la rispetta come sistema dichiarato. Con un brand o un design system esistente l'IA avrebbe risposto che il prerequisito non si applica.",
+      "questions": []
+    },
+    {
+      "title": "Esplorare prima di disegnare",
+      "task": "Fammi tre o quattro wireframe diversi per la schermata di checkout su mobile, così scegliamo la struttura prima di disegnarla davvero.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "wireframe",
+          "intent": "ui.wireframe-exploration",
+          "reason": "Serve confrontare strutture a bassa fedeltà, in scala di grigi e annotate: nessuna direzione visiva e nessun prototipo sono ancora richiesti."
+        }
+      ],
+      "reason": "Un solo passo. La scelta dell'utente viene registrata e diventa il brief del prototipo, che è un'altra richiesta.",
+      "questions": []
+    },
+    {
+      "title": "Token dal codice a Figma",
+      "task": "Estrai i design token dal tema del nostro frontend e usali per impostare le variabili nel file Figma. L'integrazione Figma è collegata.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-system-extract",
+          "intent": "ui.token-extraction",
+          "reason": "I valori reali vanno letti dal codice e scritti in un file di token, segnalando lacune e incoerenze."
+        },
+        {
+          "capability": "figma-design",
+          "intent": "ui.figma-design",
+          "reason": "Le fondamenta nel file Figma si costruiscono con i token registrati dal passo precedente.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": false,
+              "reason": "Non è una landing nuova: si impostano variabili e fondamenta, non sezioni di pagina."
+            }
+          ]
+        }
+      ],
+      "reason": "L'estrazione produce i token, Figma li legge come flusso di dati. Nessun prerequisito viene forzato.",
+      "questions": []
+    },
+    {
+      "title": "Review delle modifiche",
+      "task": "Rivedi solo le modifiche non committate: controlla la logica e i chiamanti, segnala problemi concreti senza modificare file.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-review",
+          "intent": "engineering.change-review",
+          "reason": "La richiesta riguarda il diff e i percorsi collegati; non un audit globale o una revisione visiva."
+        }
+      ],
+      "reason": "La richiesta riguarda il diff e i percorsi collegati; non un audit globale o una revisione visiva.",
+      "questions": []
+    },
+    {
+      "title": "Audit del repository",
+      "task": "Controlla la correttezza di tutto il repository, anche dei file non modificati; consegna le evidenze senza applicare fix.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-review",
+          "intent": "engineering.codebase-audit",
+          "reason": "Lo stesso responsabile delle review legge ora tutto il repository: cambia il perimetro, non il proprietario dei risultati."
+        }
+      ],
+      "reason": "Lo stesso responsabile delle review legge ora tutto il repository: cambia il perimetro, non il proprietario dei risultati.",
+      "questions": []
+    },
+    {
+      "title": "Registro delle scorciatoie",
+      "task": "Elenca i commenti shortcut e ponytail con limiti e condizioni di upgrade. Non salvare un file.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-debt",
+          "intent": "engineering.shortcut-ledger",
+          "reason": "Serve un inventario delle rinunce dichiarate, con trigger mancanti segnalati; non un handoff o un audit generale."
+        }
+      ],
+      "reason": "Serve un inventario delle rinunce dichiarate, con trigger mancanti segnalati; non un handoff o un audit generale.",
+      "questions": []
+    },
+    {
+      "title": "Capire il metodo",
+      "task": "Spiegami come Marionette integra Ponytail e cosa significano lite, full e ultra, senza cambiare impostazioni.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-guidance",
+          "intent": "engineering.working-guidance",
+          "reason": "Spiegazione del metodo e delle preferenze di lavoro, senza inventare un selettore persistente del plugin originale."
+        }
+      ],
+      "reason": "Spiegazione del metodo e delle preferenze di lavoro, senza inventare un selettore persistente del plugin originale.",
+      "questions": []
+    },
+    {
+      "title": "Leggere il benchmark",
+      "task": "Spiegami il benchmark pubblicato di Ponytail, con campione e limiti; non stimare quanto risparmia questo repository.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-guidance",
+          "intent": "engineering.benchmark-evidence",
+          "reason": "Legge la fonte confezionata e distingue misure upstream da risultati di Marionette o costi reali delle sessioni."
+        }
+      ],
+      "reason": "Legge la fonte confezionata e distingue misure upstream da risultati di Marionette o costi reali delle sessioni.",
+      "questions": []
+    },
+    {
+      "title": "Solo stile della risposta",
+      "task": "Rispondi in modo più chiaro e con meno ripetizioni; non creare file o rivedere codice.",
+      "stack_tokens": [],
+      "status": "no_match",
+      "selections": [],
+      "reason": "La policy permanente guida la comunicazione senza attivare una procedura o creare un piano. no_match riguarda il catalogo, non impedisce la risposta ordinaria dell’host.",
+      "questions": []
     }
   ]
 }

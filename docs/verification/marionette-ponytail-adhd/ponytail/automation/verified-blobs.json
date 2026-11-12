@@ -1,0 +1,247 @@
+{
+  "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+  "files": [
+    {
+      "path": "README.md",
+      "expected_blob": "79529b3c536ff31540714deb0ebcd32f24ae6ef9",
+      "actual_blob": "79529b3c536ff31540714deb0ebcd32f24ae6ef9",
+      "verified": true,
+      "bytes": 14578,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/README.md"
+    },
+    {
+      "path": "INSTALL.md",
+      "expected_blob": "efb0deba75dbe947ebeab1a7bf480772e1c997bd",
+      "actual_blob": "efb0deba75dbe947ebeab1a7bf480772e1c997bd",
+      "verified": true,
+      "bytes": 15774,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/INSTALL.md"
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "expected_blob": "4ad141962ec1448b6f63954f091c0d6004bd78cb",
+      "actual_blob": "4ad141962ec1448b6f63954f091c0d6004bd78cb",
+      "verified": true,
+      "bytes": 1508,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/.claude-plugin/plugin.json"
+    },
+    {
+      "path": "hooks/claude-band.json",
+      "expected_blob": "1231467764480e9a2c67f7b190a1a95e35bf9462",
+      "actual_blob": "1231467764480e9a2c67f7b190a1a95e35bf9462",
+      "verified": true,
+      "bytes": 64,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/claude-band.json"
+    },
+    {
+      "path": "hooks/band/register.tsx",
+      "expected_blob": "b57bf830abee12acf0786f7e9e5c6d5400b6d6e3",
+      "actual_blob": "b57bf830abee12acf0786f7e9e5c6d5400b6d6e3",
+      "verified": true,
+      "bytes": 21980,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/band/register.tsx"
+    },
+    {
+      "path": "hooks/band/metrics.ts",
+      "expected_blob": "f88eefff4c529a462feacdcdb1ac82242ffa5ece",
+      "actual_blob": "f88eefff4c529a462feacdcdb1ac82242ffa5ece",
+      "verified": true,
+      "bytes": 14738,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/band/metrics.ts"
+    },
+    {
+      "path": "hooks/band/board.ts",
+      "expected_blob": "737c0965662be55c992aab50b1b9085c1630dc62",
+      "actual_blob": "737c0965662be55c992aab50b1b9085c1630dc62",
+      "verified": true,
+      "bytes": 45260,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/band/board.ts"
+    },
+    {
+      "path": "hooks/ponytail-band-import.js",
+      "expected_blob": "6879144bfd42e72a0ecbdab920cb5836beb73e9e",
+      "actual_blob": "6879144bfd42e72a0ecbdab920cb5836beb73e9e",
+      "verified": true,
+      "bytes": 14078,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-band-import.js"
+    },
+    {
+      "path": ".opencode/plugins/ponytail.mjs",
+      "expected_blob": "110f743a74b53f1ecc2fea032dee93a1339b2afc",
+      "actual_blob": "110f743a74b53f1ecc2fea032dee93a1339b2afc",
+      "verified": true,
+      "bytes": 7653,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/.opencode/plugins/ponytail.mjs"
+    },
+    {
+      "path": "pi-extension/index.js",
+      "expected_blob": "50d5d31abba7d17d1e97c80da0cf8abd28baafbe",
+      "actual_blob": "50d5d31abba7d17d1e97c80da0cf8abd28baafbe",
+      "verified": true,
+      "bytes": 9486,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/pi-extension/index.js"
+    },
+    {
+      "path": "__init__.py",
+      "expected_blob": "68055deb0493cdf1d3cbcff23bfdff03c9abcbd2",
+      "actual_blob": "68055deb0493cdf1d3cbcff23bfdff03c9abcbd2",
+      "verified": true,
+      "bytes": 8936,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/__init__.py"
+    },
+    {
+      "path": "package.json",
+      "expected_blob": "5988fcafab928f81d1ac973c24c33d05f248b0a2",
+      "actual_blob": "5988fcafab928f81d1ac973c24c33d05f248b0a2",
+      "verified": true,
+      "bytes": 1260,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/package.json"
+    },
+    {
+      "path": "docs/agent-portability.md",
+      "expected_blob": "8437f1cc4d7fecba8d0de7bde73f55906b4b591b",
+      "actual_blob": "8437f1cc4d7fecba8d0de7bde73f55906b4b591b",
+      "verified": true,
+      "bytes": 12826,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/docs/agent-portability.md"
+    },
+    {
+      "path": "hooks/claude-codex-hooks.json",
+      "expected_blob": "4acacf0b01fb899f3130a55e87bc73ad8b03d52c",
+      "actual_blob": "4acacf0b01fb899f3130a55e87bc73ad8b03d52c",
+      "verified": true,
+      "bytes": 1230,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/claude-codex-hooks.json"
+    },
+    {
+      "path": "hooks/copilot-hooks.json",
+      "expected_blob": "6e09e4182abb1b701642b65b46eb1625f239aaa4",
+      "actual_blob": "6e09e4182abb1b701642b65b46eb1625f239aaa4",
+      "verified": true,
+      "bytes": 1017,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/copilot-hooks.json"
+    },
+    {
+      "path": "hooks/cursor-hooks.json",
+      "expected_blob": "0d89c4affc49428c099f3b22d6111f373e09e52f",
+      "actual_blob": "0d89c4affc49428c099f3b22d6111f373e09e52f",
+      "verified": true,
+      "bytes": 322,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/cursor-hooks.json"
+    },
+    {
+      "path": "hooks/ponytail-activate.js",
+      "expected_blob": "ebfa077c9476d3e1dfeae855d107e94a684ae49d",
+      "actual_blob": "ebfa077c9476d3e1dfeae855d107e94a684ae49d",
+      "verified": true,
+      "bytes": 9347,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-activate.js"
+    },
+    {
+      "path": "hooks/ponytail-config.js",
+      "expected_blob": "c2864e500e5aaf7ab522e1e37897a9f736efa754",
+      "actual_blob": "c2864e500e5aaf7ab522e1e37897a9f736efa754",
+      "verified": true,
+      "bytes": 5911,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-config.js"
+    },
+    {
+      "path": "hooks/ponytail-instructions.js",
+      "expected_blob": "1ac2f8ee7c5f5082847c8cc13616f7ae8577a372",
+      "actual_blob": "1ac2f8ee7c5f5082847c8cc13616f7ae8577a372",
+      "verified": true,
+      "bytes": 5565,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-instructions.js"
+    },
+    {
+      "path": "hooks/ponytail-map.js",
+      "expected_blob": "03ec4a87e0e3a0a11fdcd22430edac3fd78f9788",
+      "actual_blob": "03ec4a87e0e3a0a11fdcd22430edac3fd78f9788",
+      "verified": true,
+      "bytes": 5439,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-map.js"
+    },
+    {
+      "path": "hooks/ponytail-mode-tracker.js",
+      "expected_blob": "1f1f129c8dae4aa88cb51bd1f28f2bbc2224226a",
+      "actual_blob": "1f1f129c8dae4aa88cb51bd1f28f2bbc2224226a",
+      "verified": true,
+      "bytes": 9912,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-mode-tracker.js"
+    },
+    {
+      "path": "hooks/ponytail-runtime.js",
+      "expected_blob": "27e9ceee8e77a59dbd89a37efa64d73d546a9e25",
+      "actual_blob": "27e9ceee8e77a59dbd89a37efa64d73d546a9e25",
+      "verified": true,
+      "bytes": 7751,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-runtime.js"
+    },
+    {
+      "path": "hooks/ponytail-statusline.ps1",
+      "expected_blob": "b75b142143b9a2df4180962b7e48c6ad5e855226",
+      "actual_blob": "b75b142143b9a2df4180962b7e48c6ad5e855226",
+      "verified": true,
+      "bytes": 885,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-statusline.ps1"
+    },
+    {
+      "path": "hooks/ponytail-statusline.sh",
+      "expected_blob": "7d0616051b5a44de4710eeb13f1e8c5a5584fb3f",
+      "actual_blob": "7d0616051b5a44de4710eeb13f1e8c5a5584fb3f",
+      "verified": true,
+      "bytes": 696,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-statusline.sh"
+    },
+    {
+      "path": "hooks/ponytail-subagent.js",
+      "expected_blob": "f2d9fe259aea580345c025b12c781278f9a5c881",
+      "actual_blob": "f2d9fe259aea580345c025b12c781278f9a5c881",
+      "verified": true,
+      "bytes": 3462,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/ponytail-subagent.js"
+    },
+    {
+      "path": "hooks/qoder-hooks.json",
+      "expected_blob": "874d565145f4c0a11638744761a3d45ec89c84b8",
+      "actual_blob": "874d565145f4c0a11638744761a3d45ec89c84b8",
+      "verified": true,
+      "bytes": 718,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/qoder-hooks.json"
+    },
+    {
+      "path": "scripts/cursor-hooks.js",
+      "expected_blob": "0fc026e3beebb96eb082ce742fdfd86ec243f686",
+      "actual_blob": "0fc026e3beebb96eb082ce742fdfd86ec243f686",
+      "verified": true,
+      "bytes": 5511,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/scripts/cursor-hooks.js"
+    },
+    {
+      "path": "scripts/uninstall.js",
+      "expected_blob": "8bb93d6986a6dee06ee24c7f6ee32aa71213a442",
+      "actual_blob": "8bb93d6986a6dee06ee24c7f6ee32aa71213a442",
+      "verified": true,
+      "bytes": 4400,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/scripts/uninstall.js"
+    },
+    {
+      "path": "hooks/band/types.d.ts",
+      "expected_blob": "8583c48fd6a91b29f4882407424668432b963f3e",
+      "actual_blob": "8583c48fd6a91b29f4882407424668432b963f3e",
+      "verified": true,
+      "bytes": 640,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/band/types.d.ts"
+    },
+    {
+      "path": "hooks/band/logo.ts",
+      "expected_blob": "1250faa90d92762c96d7e73b23d8060bee9ca3b1",
+      "actual_blob": "1250faa90d92762c96d7e73b23d8060bee9ca3b1",
+      "verified": true,
+      "bytes": 49871,
+      "url": "https://github.com/DietrichGebert/ponytail/blob/7801d061243d7b753bad0e0b3c057cd250b11755/hooks/band/logo.ts"
+    }
+  ],
+  "all_verified": true,
+  "executed_upstream_code": false
+}

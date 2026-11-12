@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "id": "review-report",
+      "task": "Controlla se questa PR introduce regressioni e dammi un elenco motivato, senza toccare il codice.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "change-review"
+        ]
+      }
+    },
+    {
+      "id": "implement-no-review",
+      "task": "Non voglio una revisione: correggi direttamente il parser e aggiorna i test.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "no_match",
+        "capabilities": []
+      }
+    },
+    {
+      "id": "review-lean",
+      "task": "Leggi le modifiche attuali e dimmi dove abbiamo aggiunto astrazioni inutili; proponi interventi concreti senza applicarli.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "change-review"
+        ]
+      }
+    },
+    {
+      "id": "non-code",
+      "task": "Rivedi questo invito di compleanno per renderlo più affettuoso.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "no_match",
+        "capabilities": []
+      }
+    }
+  ]
+}

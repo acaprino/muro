@@ -1,0 +1,684 @@
+{
+  "scope": "Fresh bounded Ponytail native-policy release with corrected transport rationale; generated-artifact checks, not live hosts.",
+  "stage": "D:\\workspace\\muro-ponytail-probe\\release-native-v3",
+  "commands": [
+    {
+      "timestamp_utc": "2026-11-12T11:32:50.067861+00:00",
+      "cwd": "D:\\Projects\\Muro",
+      "command": [
+        "python",
+        "muro_build.py",
+        "--manifest",
+        "D:\\workspace\\muro-ponytail-probe\\native-package\\sources.json",
+        "--build",
+        "--out",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3"
+      ],
+      "exit_code": 0,
+      "stdout": "Built D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\n",
+      "stderr": ""
+    },
+    {
+      "label": "claude-code: launcher pass 1",
+      "timestamp_utc": "2026-11-12T11:35:37.779129+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\claude-code\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "claude-code: launcher pass 2",
+      "timestamp_utc": "2026-11-12T11:35:38.258450+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\claude-code\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "codex: launcher pass 1",
+      "timestamp_utc": "2026-11-12T11:35:38.741287+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "codex: launcher pass 2",
+      "timestamp_utc": "2026-11-12T11:35:39.270701+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "opencode: launcher pass 1",
+      "timestamp_utc": "2026-11-12T11:35:39.801253+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\opencode\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "opencode: launcher pass 2",
+      "timestamp_utc": "2026-11-12T11:35:40.252262+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\opencode\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "pi: launcher pass 1",
+      "timestamp_utc": "2026-11-12T11:35:40.728637+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\pi\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "pi: launcher pass 2",
+      "timestamp_utc": "2026-11-12T11:35:41.201249+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\pi\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "hermes: launcher pass 1",
+      "timestamp_utc": "2026-11-12T11:35:41.711118+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\hermes\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "hermes: launcher pass 2",
+      "timestamp_utc": "2026-11-12T11:35:42.195341+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "python",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\hermes\\skills\\ponytail-probe\\muro.py",
+        "session-context"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1801,
+        "utf8_bytes": 1801,
+        "sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+      }
+    },
+    {
+      "label": "Codex SessionStart pass 1",
+      "timestamp_utc": "2026-11-12T11:35:42.999491+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": "python -c \"import base64,json,os,shutil,string,subprocess,sys;p=json.loads(base64.b64decode('eyJydW4iOiBbInB5dGhvbiIsICI8cGFja2FnZV9yb290Pi9tdXJvLnB5IiwgInNlc3Npb24tY29udGV4dCIsICItLWhvb2stZXZlbnQiLCAiU2Vzc2lvblN0YXJ0Il0sICJyb290IjogIiR7UExVR0lOX1JPT1R9L3NraWxscy9wb255dGFpbC1wcm9iZSJ9'));root=string.Template(p['root']).substitute(os.environ);argv=[part.replace('<package_root>',root) for part in p['run']];program=shutil.which(argv[0]) or argv[0];sys.exit('Windows batch hooks require an explicit executable and script') if os.name=='nt' and os.path.splitext(program)[1].lower() in ('.bat','.cmd') else None;argv[0]=program;sys.exit(subprocess.run(argv,shell=False).returncode)\"",
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PLUGIN_ROOT": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1893,
+        "utf8_bytes": 1893,
+        "sha256": "d4d38810a7810a1309b117b76dc4cc27d719c7df4883949ca9ac53d98929ecf0"
+      }
+    },
+    {
+      "label": "Codex SessionStart pass 2",
+      "timestamp_utc": "2026-11-12T11:35:43.788021+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": "python -c \"import base64,json,os,shutil,string,subprocess,sys;p=json.loads(base64.b64decode('eyJydW4iOiBbInB5dGhvbiIsICI8cGFja2FnZV9yb290Pi9tdXJvLnB5IiwgInNlc3Npb24tY29udGV4dCIsICItLWhvb2stZXZlbnQiLCAiU2Vzc2lvblN0YXJ0Il0sICJyb290IjogIiR7UExVR0lOX1JPT1R9L3NraWxscy9wb255dGFpbC1wcm9iZSJ9'));root=string.Template(p['root']).substitute(os.environ);argv=[part.replace('<package_root>',root) for part in p['run']];program=shutil.which(argv[0]) or argv[0];sys.exit('Windows batch hooks require an explicit executable and script') if os.name=='nt' and os.path.splitext(program)[1].lower() in ('.bat','.cmd') else None;argv[0]=program;sys.exit(subprocess.run(argv,shell=False).returncode)\"",
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PLUGIN_ROOT": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1893,
+        "utf8_bytes": 1893,
+        "sha256": "d4d38810a7810a1309b117b76dc4cc27d719c7df4883949ca9ac53d98929ecf0"
+      }
+    },
+    {
+      "label": "Codex SubagentStart pass 1",
+      "timestamp_utc": "2026-11-12T11:35:44.617848+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": "python -c \"import base64,json,os,shutil,string,subprocess,sys;p=json.loads(base64.b64decode('eyJydW4iOiBbInB5dGhvbiIsICI8cGFja2FnZV9yb290Pi9tdXJvLnB5IiwgInNlc3Npb24tY29udGV4dCIsICItLWhvb2stZXZlbnQiLCAiU3ViYWdlbnRTdGFydCJdLCAicm9vdCI6ICIke1BMVUdJTl9ST09UfS9za2lsbHMvcG9ueXRhaWwtcHJvYmUifQ=='));root=string.Template(p['root']).substitute(os.environ);argv=[part.replace('<package_root>',root) for part in p['run']];program=shutil.which(argv[0]) or argv[0];sys.exit('Windows batch hooks require an explicit executable and script') if os.name=='nt' and os.path.splitext(program)[1].lower() in ('.bat','.cmd') else None;argv[0]=program;sys.exit(subprocess.run(argv,shell=False).returncode)\"",
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PLUGIN_ROOT": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1894,
+        "utf8_bytes": 1894,
+        "sha256": "2c498038d6356bfb9ea6435dd27b9f9a69f0f9eed97053c2e0648de33ef273ed"
+      }
+    },
+    {
+      "label": "Codex SubagentStart pass 2",
+      "timestamp_utc": "2026-11-12T11:35:45.355151+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": "python -c \"import base64,json,os,shutil,string,subprocess,sys;p=json.loads(base64.b64decode('eyJydW4iOiBbInB5dGhvbiIsICI8cGFja2FnZV9yb290Pi9tdXJvLnB5IiwgInNlc3Npb24tY29udGV4dCIsICItLWhvb2stZXZlbnQiLCAiU3ViYWdlbnRTdGFydCJdLCAicm9vdCI6ICIke1BMVUdJTl9ST09UfS9za2lsbHMvcG9ueXRhaWwtcHJvYmUifQ=='));root=string.Template(p['root']).substitute(os.environ);argv=[part.replace('<package_root>',root) for part in p['run']];program=shutil.which(argv[0]) or argv[0];sys.exit('Windows batch hooks require an explicit executable and script') if os.name=='nt' and os.path.splitext(program)[1].lower() in ('.bat','.cmd') else None;argv[0]=program;sys.exit(subprocess.run(argv,shell=False).returncode)\"",
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PLUGIN_ROOT": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\codex"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1894,
+        "utf8_bytes": 1894,
+        "sha256": "2c498038d6356bfb9ea6435dd27b9f9a69f0f9eed97053c2e0648de33ef273ed"
+      }
+    },
+    {
+      "label": "Generated native JavaScript entrypoints; simulated APIs",
+      "timestamp_utc": "2026-11-12T11:35:45.480276+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "node",
+        "--input-type=module",
+        "-e",
+        "\nimport assert from 'node:assert/strict';import{readFileSync}from'node:fs';import{pathToFileURL}from'node:url';\nconst root=process.argv[1],read=p=>JSON.parse(readFileSync(root+'/'+p,'utf8')),policy=read('delivery.json').always_on,load=p=>import(pathToFileURL(root+'/'+p).href),checks=[];\nassert.deepEqual(read('adapters/claude-code/hooks/hooks.json'),{modules:['./policy.mjs']});let compose;(await load('adapters/claude-code/hooks/policy.mjs')).register((name,fn)=>{assert.equal(name,'prompt.compose');compose=fn;});let prompt={sections:[{id:'host',text:'host policy'},{id:'ponytail-probe:policy',text:'stale'}]};for(let i=0;i<2;i++){prompt=await compose({}, {}, async()=>prompt);assert.deepEqual(prompt.sections,[{id:'host',text:'host policy'},{id:'ponytail-probe:policy',text:policy,scope:'session'}]);}checks.push('Claude: exact named session section, twice, host section preserved');\nassert.equal(read('adapters/opencode/package.json').exports['.'],'./index.js');const handlers=new Map(),skills=[];await(await load('adapters/opencode/index.js')).default.setup({skill:{transform:async fn=>fn({add:item=>skills.push(item)})},session:{hook:async(name,fn)=>handlers.set(name,fn)}});assert.deepEqual([...handlers.keys()],['context','compaction','generate','title']);assert.equal(skills.length,2);for(const fn of handlers.values()){const event={system:[{type:'text',text:'host policy'}]};fn(event);fn(event);assert.deepEqual(event.system,[{type:'text',text:'host policy'},{type:'text',text:policy}]);}checks.push('OpenCode: 2 skills; 4 events; exact system text once after repeat');\nassert.deepEqual(read('adapters/pi/package.json').pi.extensions,['./extensions/policy.js']);let before;(await load('adapters/pi/extensions/policy.js')).default({on:(name,fn)=>{assert.equal(name,'before_agent_start');before=fn;}});const event={systemPromptOptions:{sections:{host:'host policy'}}};before(event);before(event);assert.deepEqual(event.systemPromptOptions.sections,{host:'host policy','muro_policy_ponytail-probe':policy});checks.push('Pi: exact named system section once after repeat');console.log(JSON.stringify({kind:'simulated host callbacks',checks}));\n",
+        "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stdout": "{\"kind\":\"simulated host callbacks\",\"checks\":[\"Claude: exact named session section, twice, host section preserved\",\"OpenCode: 2 skills; 4 events; exact system text once after repeat\",\"Pi: exact named system section once after repeat\"]}\n",
+      "stderr": ""
+    },
+    {
+      "label": "Read pinned LICENSE",
+      "timestamp_utc": "2026-11-12T11:35:45.561242+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "git",
+        "--git-dir",
+        "D:\\workspace\\muro-ponytail-probe\\upstream.git",
+        "show",
+        "7801d061243d7b753bad0e0b3c057cd250b11755:LICENSE"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 1071,
+        "utf8_bytes": 1071,
+        "sha256": "fb1bc6909ac3ef82d5c22106e32ef682b0cff66788fa915fb9b53b15c9d2f3ab"
+      }
+    },
+    {
+      "label": "Read pinned selected review skill",
+      "timestamp_utc": "2026-11-12T11:35:45.635384+00:00",
+      "cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+      "command": [
+        "git",
+        "--git-dir",
+        "D:\\workspace\\muro-ponytail-probe\\upstream.git",
+        "show",
+        "7801d061243d7b753bad0e0b3c057cd250b11755:skills/ponytail-review/SKILL.md"
+      ],
+      "environment_overrides": {
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_summary": {
+        "omitted": true,
+        "characters": 5143,
+        "utf8_bytes": 5143,
+        "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "check": "claude-code: exact policy bytes",
+      "passed": true,
+      "sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+      "bytes": 1800
+    },
+    {
+      "check": "claude-code: exact launcher pass 1",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "claude-code: exact launcher pass 2",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "codex: exact policy bytes",
+      "passed": true,
+      "sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+      "bytes": 1800
+    },
+    {
+      "check": "codex: exact launcher pass 1",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "codex: exact launcher pass 2",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "opencode: exact policy bytes",
+      "passed": true,
+      "sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+      "bytes": 1800
+    },
+    {
+      "check": "opencode: exact launcher pass 1",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "opencode: exact launcher pass 2",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "pi: exact policy bytes",
+      "passed": true,
+      "sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+      "bytes": 1800
+    },
+    {
+      "check": "pi: exact launcher pass 1",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "pi: exact launcher pass 2",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "hermes: exact policy bytes",
+      "passed": true,
+      "sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+      "bytes": 1800
+    },
+    {
+      "check": "hermes: exact launcher pass 1",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "hermes: exact launcher pass 2",
+      "passed": true,
+      "output_sha256": "aa3506e8d441cbb8eb7cb8abebd28a56c50f71187392812cffc3d4e115e135a9"
+    },
+    {
+      "check": "Codex events and matcher",
+      "passed": true
+    },
+    {
+      "check": "Codex exact JSON SessionStart pass 1",
+      "passed": true
+    },
+    {
+      "check": "Codex exact JSON SessionStart pass 2",
+      "passed": true
+    },
+    {
+      "check": "Codex exact JSON SubagentStart pass 1",
+      "passed": true
+    },
+    {
+      "check": "Codex exact JSON SubagentStart pass 2",
+      "passed": true
+    },
+    {
+      "check": "Claude/OpenCode/Pi native callback contracts",
+      "passed": true
+    },
+    {
+      "check": "Hermes native registration repeated; simulated API",
+      "passed": true,
+      "skills": {
+        "ponytail-probe": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\hermes\\skills\\ponytail-probe\\SKILL.md",
+        "ponytail-probe-review": "D:\\workspace\\muro-ponytail-probe\\release-native-v3\\ponytail-probe\\adapters\\hermes\\skills\\ponytail-probe-review\\SKILL.md"
+      }
+    },
+    {
+      "check": "Root Cytoscape recorded hashes",
+      "passed": true
+    },
+    {
+      "check": "release root: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "release root: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "release root: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "release root: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "claude-code: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "claude-code: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "claude-code: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "claude-code: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "codex: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "codex: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "codex: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "codex: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "opencode: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "opencode: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "opencode: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "opencode: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "pi: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "pi: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "pi: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "pi: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "hermes: exact source license and attribution",
+      "passed": true
+    },
+    {
+      "check": "hermes: renamed absorbed source with exact bytes",
+      "passed": true,
+      "sha256": "33fe4ebe22a460924e5d4a261e223df22e409cc94ab76182bee9fb91a3ef022e"
+    },
+    {
+      "check": "hermes: offline guide metadata, policy, current rationale and embedded graph",
+      "passed": true,
+      "guide_sha256": "b17304317ef6622389fe3561fec4894bc80dfed8c03edfcbeb9f70ed85fa880e",
+      "catalog_digest": "36bf03d2d99ea009584529b06ba5d4ed5cc019f9445bd6108a6b466c327509c4"
+    },
+    {
+      "check": "hermes: preserved graph MIT license",
+      "passed": true
+    },
+    {
+      "check": "release root: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "claude-code: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "codex: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "opencode: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "pi: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "hermes: current factory Python and prompt bytes",
+      "passed": true
+    },
+    {
+      "check": "Unrelated cwd has no runtime state",
+      "passed": true
+    }
+  ],
+  "verification_harness_note": "Initial verifier stopped on a wrong assumption that standalone skill folders copy cytoscape.min.js. They instead embed the verified root bundle in GUIDE.html. The corrected checks compare each guide to the root bundle, and separately verify copied MIT licenses. No product failure was observed; command checks are rerun below with incremental evidence saving.",
+  "unrelated_cwd": "D:\\workspace\\muro-ponytail-probe\\native-release-work-v3",
+  "limitations": [
+    "Native registration callbacks are tested with host-shaped doubles, not live hosts.",
+    "Codex generated event commands execute directly with PLUGIN_ROOT and no host config writes.",
+    "Source checks use the exact-object local mirror; no fresh remote fetch."
+  ],
+  "factory_sha256": {
+    "muro/__init__.py": "49eddbcb57a12f755e49f9cf7c031b960dfec5fd32efcf2e0d958b08fac9b74f",
+    "muro/adapters.py": "aa03c91d4754eec6399226fe49885cbd7329fa3e60536333b3903dada3026a6d",
+    "muro/claude_adapter.py": "a25c15ac8431a6a1ae2b79d3c700d64d53603d7d8c2d49cc2b5b9b94793686c2",
+    "muro/cli.py": "29938925e08c89028ba53a54b27b1eae5f2c8723856de9033c63865b31043d9a",
+    "muro/core.py": "75df007544c86de9eda5288f5f0604183de71d3f9e414e9f75d6482efc66d03d",
+    "muro/delivery.py": "8aa388ea8bd95a000c702d236e76b31f571e382bcb709dea38c7a92e98e57e4f",
+    "muro/entries.py": "752bd1fc7ca389de19b09cd201eef4ede7dcf22e06cd47f902050220567f4ade",
+    "muro/evals.py": "a0a76a14cc40d5c0bcc4b015facc85497fd5ff796a0b717942fd4d177b08e45f",
+    "muro/factory.py": "4334cf72856402e2959d92aaac6e6a64513d90c15657c2e1d08ae46aeeb12406",
+    "muro/guide.py": "4f8913882bfbcecdabeea6dcc08a1307eb74a90cdafae3cac0001374e27ddc45",
+    "muro/hermes_adapter.py": "66067b5f06c0067eb9ac6acf20b2583488f330c389fe9e97bfff45689037e4bf",
+    "muro/native_policy.py": "d801d0bb2ee48e38b903e0f813b4fafca716e70e11e1eba24e95d8cfc6548006",
+    "muro/release.py": "028a769a0820bfd1c3f13dc969c1d8b4541c1d1a6d3165c8946670d3490243ba",
+    "muro/routing.py": "91d584c088503d2c9bb0b751bc930258033e299e0b4b64eb646636b47024ae60",
+    "muro/runtime.py": "e1323eff68fcfb2a31fde541d428509555ddd855494d28fa6973296d40707a49",
+    "muro/sources.py": "742c19a27c0755d9696b5596b2b32bbd14d70e9c0c57355618ef37fd8b8b2c92",
+    "muro/guide.html": "e646afa79bd9658b601d66a6995f44bf5d1c7e4b108d24894665aef7c964ab2f",
+    "muro_build.py": "b3aa57b96e7ced7d9d952c5061547c14481d0572344e40c411b1f1d67eac33fd"
+  },
+  "prompt_sha256": {
+    "prompts/classify.md": "eb7edf24ded7b0383fbcaaef50d921fa69ab09240f8af15e284b792082455442",
+    "prompts/delivery.md": "362a8cc1ea93597cfb8d06774d9f4528248a9af71318d9e54d9ae1f8bafd34d9",
+    "prompts/harmonizer.md": "7f94187b7722382c162423c54f5145004218dd8d1611f1af5ee55b87b216b6f9",
+    "prompts/intake.md": "065cd7033cf9af641d2b5d19a7002c84629894951cf98f28ea4bd49c81c93b3f"
+  },
+  "policy_sha256": "b8b24533b3abdccef51f817d3720823f14ee3579e461e208921ede7419b0294f",
+  "policy_characters": 1800,
+  "policy_bytes": 1800,
+  "native_entrypoint_sha256": {
+    "adapters/claude-code/hooks/policy.mjs": "676303b4e1ccf1ce85595ec730eff6435c1464a2a86e3da4d800986166ca920d",
+    "adapters/codex/hooks/hooks.json": "f44785668889b5a0f5d3b4cae84fcc336aede79a724a1a9faf7d8e71b3ab8435",
+    "adapters/opencode/index.js": "bd84a8f9aa86331efe05028e6443c04e4ba083b5d890bb3649b6525cf2b1ec6b",
+    "adapters/pi/extensions/policy.js": "6f9dfa95c8c3e0e297a40dc2262720bad4d2d2a49181787c8559148864dc306f",
+    "adapters/hermes/__init__.py": "b8bc9c9e9ef1db369f6ee2c5dd883a2b0491831598c4bda82d85a472c1c325db"
+  },
+  "summary": {
+    "checks": 54,
+    "passed": 54,
+    "failed": [],
+    "commands": 18
+  },
+  "evidence_compaction": {
+    "source_file": "D:\\workspace\\muro-ponytail-probe\\native-release-v3-results.json",
+    "source_bytes": 59674,
+    "source_sha256": "da4c3a4651afd4fa71daa1c8fa41d70bfbe9cb5d3f3179dbbadf4332f371729b",
+    "rule": "stdout longer than 1000 characters is replaced by its character count, UTF-8 byte count and SHA-256; all command metadata, stderr, checks and recorded artifact hashes are preserved.",
+    "stdout_fields_summarized": 16
+  }
+}

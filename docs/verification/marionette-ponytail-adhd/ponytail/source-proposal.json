@@ -1,0 +1,44 @@
+{
+  "id": "ponytail",
+  "repo_url": "https://github.com/DietrichGebert/ponytail.git",
+  "commit": "7801d061243d7b753bad0e0b3c057cd250b11755",
+  "pin": "release",
+  "release": "v5.3.3",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 DietrichGebert",
+  "selected_paths": [
+    ".agents/rules/ponytail.md",
+    "skills/ponytail/SKILL.md",
+    "skills/ponytail-review/SKILL.md",
+    "skills/ponytail-audit/SKILL.md",
+    "skills/ponytail-debt/SKILL.md",
+    "skills/ponytail-gain/SKILL.md",
+    "skills/ponytail-help/SKILL.md",
+    "benchmarks/results/2026-10-07-agentic.md"
+  ],
+  "excluded_paths": [
+    "hooks/**",
+    ".claude-plugin/**",
+    ".codex-plugin/**",
+    ".opencode/**",
+    "pi-extension/**",
+    "__init__.py",
+    "plugin.yaml",
+    "plugin.json",
+    "package.json",
+    "scripts/**",
+    ".cursor/**",
+    ".github/**",
+    ".openclaw/**",
+    "assets/**",
+    "i18n/**",
+    "tests/**",
+    "benchmarks/agentic/**",
+    "benchmarks/arms/**",
+    ".agents/plugins/**"
+  ],
+  "runtime_deps": [],
+  "intake": {
+    "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. The host AI synthesizes neutral permanent working guidance, retains full scope and safety before minimization, enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. Original persona, compulsory wording, slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
+  }
+}

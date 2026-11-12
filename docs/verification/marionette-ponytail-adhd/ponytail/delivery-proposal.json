@@ -1,0 +1,66 @@
+{
+  "decisions": [
+    {
+      "source": "ponytail",
+      "content": ".agents/rules/ponytail.md and skills/ponytail/SKILL.md: duplicated scope-before-minimization, reuse ladder, completeness and non-negotiable safeguards",
+      "form": "always-on",
+      "targets": [],
+      "reason": "The owner requested permanent working guidance. The rule file and central skill express the same working method and merge into one neutral policy, not two copies or another capability. Complete scope, understandable reuse and truthful limits apply across Marionette outcomes; code clauses are explicitly scoped and required engines/design authority are preserved. The host AI authored the synthesis. Its per-session character cost is the final combined policy length, not separate per-source charges; native system channels on Claude Code/Pi/OpenCode/Hermes and developer additionalContext on Codex are described by the current factory. No extra model call or source hook is declared."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail/SKILL.md: concrete code-change procedure, caller tracing, root-cause fix, scoped reuse, tests and shortcut comments",
+      "form": "capability",
+      "targets": [
+        "work-map"
+      ],
+      "reason": "The existing work-map already owns direct engineering implementation and per-slice build/review. These methods improve its build step without creating a parallel code writer or making planning mandatory. Existing approved scope, test seams, slices and named dependencies remain authoritative; the source's detailed code method is loaded where it is used."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-review/SKILL.md and skills/ponytail-audit/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-review"
+      ],
+      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents retains the diff default, whole-repo mapping, expected-load assumptions, concrete-case gate, full finding explanation and audit's 20-finding display default with an omitted count; all material risks and explicitly requested full findings remain visible through grouping or additional detail. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-debt/SKILL.md",
+      "form": "capability",
+      "targets": [
+        "engineering-debt"
+      ],
+      "reason": "A requested ledger of deliberate shortcut comments is a separate read-only artifact, not the session-handoff's task arc or TokenEconomizer's costs. Preserve custom/legacy markers, ignore rules, ceilings and upgrade triggers, no-trigger tags and optional blame. Persist a ledger only when requested."
+    },
+    {
+      "source": "ponytail",
+      "content": "skills/ponytail-help/SKILL.md, skills/ponytail-gain/SKILL.md and benchmarks/results/2026-10-07-agentic.md",
+      "form": "capability",
+      "targets": [
+        "engineering-guidance"
+      ],
+      "reason": "A method reference and a published benchmark explanation answer genuine user requests without changing code or mode. Preserve level meanings as task-scoped preferences, transparent mapping to Marionette's procedures and the measured scoreboard with its date/model/sample/limits. Never claim these are Marionette measurements or current-repository savings. Help explicitly says the original plugin's runtime mode toggles and optional UI infrastructure are not included."
+    },
+    {
+      "source": "ponytail",
+      "content": "Selected skills' lazy-senior persona, forced closing lines, English-only templates, original slash-skill routing, plugin self-install/update and persistent mode controls",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Persona/format claims would override host and user preferences; source activation commands would compete with Marionette classification or promise state the native package does not keep. Preserve concise evidence, disclosures and lite/full/ultra behavioral choices through task-scoped guidance. Source plugin installation is excluded by the factory contract. Changing a released permanent policy is not falsely presented as toggling an upstream mode."
+    },
+    {
+      "source": "ponytail",
+      "content": "Inspected but unselected original plugin infrastructure: lifecycle mode hooks, startup code map, status badge, native Claude band, board/import/export/webhook and other host registrations",
+      "form": "dropped",
+      "targets": [],
+      "reason": "The curated goal is working and communication methods, not installation of Ponytail's original UI/telemetry product. These paths are explicitly outside selected_paths after inspection of their outcomes and costs: defaults write mode flags/statusline artifacts and task CSV/HTML records; optional webhooks can transmit task names; the native TSX band needs Claude-only APIs. They are not needed to deliver any selected review/audit/debt/benchmark method. No source command hook, background process, host config mutation or telemetry is emitted. Full effect inventory is preserved in intake provenance."
+    }
+  ],
+  "always_on_contribution": "Complete the requested outcome with the smallest understandable solution that fully works. Establish the affected scope before minimizing; preserve requested functionality, compatibility, security, accessibility, validation and protection against data loss. Reuse the project's established patterns and components before standard-library/platform features, installed dependencies or new code. Preserve approved design systems, named engines and required pipelines; simplicity never authorizes replacing them or reducing artifact quality. Avoid speculative features and abstractions. For code changes, inspect affected callers, tests, fixtures, configuration and interfaces; fix shared causes, retain safeguards when moving code, and check non-trivial logic with a focused test or executable self-check. Keep code readable, explain hidden reasons, and record a deliberate shortcut's limit and upgrade trigger. Report material unchecked work and remaining risks accurately; give requested reports and deliverables their full substance.",
+  "notes": [
+    "Merge the contribution with i-have-adhd and existing package constraints; final always_on must remain <=2000 characters.",
+    "Proposed target IDs are to be harmonized by root; source order is not precedence."
+  ]
+}

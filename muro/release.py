@@ -7,8 +7,9 @@ import shutil
 
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
+from .delivery import DELIVERY_FILE, allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
 from .entries import ENTRIES_FILE, load_entries, validate_entries
-from .factory import copy_source_helpers, prompts_dir, runtime_source
+from .factory import copy_source_helpers, prompts_dir, runtime_source, unpackaged_reference_errors
 from .guide import write_release_guide
 from .sources import copyright_notices, inspect_source, parse_capabilities
 
@@ -27,15 +28,22 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     sources = manifest.get("sources", [])
     if not isinstance(sources, list) or not sources:
         raise ValueError("sources.json must contain at least one source")
+    source_ids = {s.get("id") for s in sources}
+    delivery_doc = load_delivery(project_root)
+    errors = (unregistered_active_hooks(capabilities) if delivery_doc is None
+              else validate_delivery(delivery_doc, capabilities, source_ids))
+    if errors:
+        raise ValueError("Invalid delivery: " + "; ".join(errors))
     errors = validate_capabilities_and_router(
         capabilities,
         router_rows,
-        {s.get("id") for s in sources},
+        source_ids,
         plugin_slug=plugin.get("slug"),
+        allow_empty=allows_empty_catalog(delivery_doc, capabilities, source_ids),
     )
     if errors:
         raise ValueError("Invalid router: " + "; ".join(errors))
-    for prompt in ("intake.md", "harmonizer.md", "classify.md"):
+    for prompt in ("intake.md", "delivery.md", "harmonizer.md", "classify.md"):
         path = prompts_dir(project_root) / prompt
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
             raise ValueError(f"Required AI prompt missing or empty: {path}")
@@ -61,14 +69,23 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     completed = False
     try:
         shutil.copy2(project_root / "ROUTER.md", dist / "ROUTER.md")
-        shutil.copytree(project_root / "capabilities", dist / "capabilities")
+        if (project_root / "capabilities").is_dir():
+            shutil.copytree(project_root / "capabilities", dist / "capabilities")
+        else:
+            (dist / "capabilities").mkdir()
         shutil.copytree(prompts_dir(project_root), dist / "prompts")
         (dist / "sources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         shutil.copy2(project_root / "guide-examples.json", dist / "guide-examples.json")
         if entries_doc is not None:
             shutil.copy2(project_root / ENTRIES_FILE, dist / ENTRIES_FILE)
+        if delivery_doc is not None:
+            shutil.copy2(project_root / DELIVERY_FILE, dist / DELIVERY_FILE)
         for src in sources:
-            copy_source_helpers(src, project_root, dist)
+            # A file the intake AI declared as evidence only is not shipped, and no step may point at it.
+            unpackaged = copy_source_helpers(src, project_root, dist)
+            errors = unpackaged_reference_errors(capabilities, src["id"], unpackaged)
+            if errors:
+                raise ValueError("Invalid helper reference: " + "; ".join(errors))
 
         licenses = dist / "LICENSES"
         licenses.mkdir()
@@ -98,7 +115,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
         (dist / "NOTICE.md").write_text("\n".join(lines), encoding="utf-8")
         write_release_guide(dist, plugin, sources)
         write_adapters(dist, plugin, runtime_source(project_root), capabilities=capabilities,
-                       entries=entries_doc["entries"] if entries_doc else None)
+                       entries=entries_doc["entries"] if entries_doc else None, delivery=delivery_doc)
         dist.replace(target)
         completed = True
         return target
