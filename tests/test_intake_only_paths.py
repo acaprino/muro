@@ -144,4 +144,4 @@ def test_reference_check_names_the_capability_and_ignores_packaged_files():
 def test_the_delivery_prompt_tells_the_ai_when_an_original_travels():
     from pathlib import Path
     rules = (Path(__file__).resolve().parent.parent / "prompts" / "delivery.md").read_text(encoding="utf-8")
-    assert "intake_only_paths" in rules and "reads it at run time" in rules
+    assert "intake_only_paths" in rules and "needs it at run time" in rules

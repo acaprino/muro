@@ -86,10 +86,10 @@ package stops being true for every session once the package broadens.
 ## Originals in the release
 
 `selected_paths` are what you read. A release carries an original file only when
-a capability reads it at run time: a full method behind a short body, a script,
-data. When a file's content is carried inside capability bodies or inside the
-always-on text, or dropped, and no step reads the original file, the file does not
-travel: list it in the source's `intake_only_paths` in `sources.json`. It stays in
+a capability needs it at run time: the full version of a method behind a compact
+body, opened for the part a task needs, a script, data. When nothing the plugin
+does needs a file (its content is in the always-on text, a body says all of it,
+or it was dropped), the file does not travel and no body refers to it: list it in the source's `intake_only_paths` in `sources.json`. It stays in
 the intake snapshot for the next pass and is left out of the package. Decide per
 file, not per source, and say in the decision's reason that the original is not
 carried. A capability body must not point at such a file. The source keeps its

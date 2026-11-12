@@ -120,7 +120,7 @@ Start with Marionette's layout and give the new package its own identity and sou
 
 | File | What it holds |
 | --- | --- |
-| `sources.json` | Package identity, source pins, licenses, selected paths, exclusions, runtime dependency notes, and intake goals. Optional `intake_only_paths` name selected files that were read and restated or dropped: they are not shipped in the release |
+| `sources.json` | Package identity, source pins, licenses, selected paths, exclusions, runtime dependency notes, and intake goals. Optional `intake_only_paths` name selected files the generated plugin does not need at run time: they are read at intake and not shipped in the release |
 | `capabilities/*.md` | Intents and exclusions, procedures, outputs, checks, tools, hooks, and relationships |
 | `ROUTER.md` | Catalog index with one row per capability and the harmonization record |
 | `guide-examples.json` | Reviewed requests with explicit decisions that the guide validates and illustrates |

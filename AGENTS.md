@@ -19,15 +19,16 @@ whether a package "should" cover a domain its sources cover, never hide an
 absorbed capability from discovery, and never treat a domain as a pending
 decision: to change the scope, add or remove a source (ADR-0015).
 
-Owner rule of 2026-11-12: Muro never alters absorbed content. The AI chooses
-the form and the place of each part (capability, permanent policy, hook,
-command) and carries it in the source's own words. It may rewrite content only
-to guarantee harmonization and coexistence under the package's principles: two
-owners of one output, contradictory rules of two sources, routing or activation
-that competes with the coordinator, a step no host can run. Size, style and
-taste are never reasons; when content does not fit a limit, its form changes,
-not its words. Every change is recorded with the collision that required it
-(ADR-0017).
+Owner rule of 2026-11-12: Muro never alters absorbed content, meaning what a
+source prescribes: its rules, numbers, conditions, exceptions and limits. The AI
+chooses the form and the place of each part (capability, permanent policy,
+hook, command). It may change what a source prescribes only to guarantee
+harmonization and coexistence under the package's principles: two owners of one
+output, contradictory rules of two sources, routing or activation that competes
+with the coordinator, a step no host can run. Size, style and taste are never
+reasons. Every such change is recorded with the collision that required it
+(ADR-0017). Text that acts in every session (always-on) keeps the source's own
+words, because nothing opens the original later.
 
 Owner correction of the same day, after that rule was applied word for word
 ("hai preso troppo alla lettera"): "il contenuto si altera o addirittura si
@@ -41,7 +42,9 @@ substance: a generated text never drops, weakens, strengthens or invents a
 rule, number, condition or exception of the source. Once activated, the body
 sends the host to the packaged original, which stays whole and untouched, for
 the parts the task at hand needs, named by file and section; it does not
-require reading everything first and does not need to quote. The original wins
+require reading everything first and does not need to quote. Same message: a
+selected file (a skill, a reference, knowledge, a script) the generated plugin
+does not need is removed as a file and as a reference (`intake_only_paths`). The original wins
 where the two differ, except for the differences listed with their collision
 in `## Sources` under "Changes for coexistence (ADR-0017)". Name packaged paths
 as the release lays them out (the factory drops `skills/<source-id>/`) and
@@ -75,9 +78,9 @@ installation, publication or replacement of existing dist output without request
 
 - `sources.json`: source identity, pinned revision, license gate, selected paths,
   exclusions, runtime dependencies and source-specific intake goal. Optional
-  `intake_only_paths`: selected files the intake AI read and then restated in
-  capability bodies or in the policy, or dropped, and that no step reads at run
-  time. They stay in the intake snapshot and are not packaged; a capability that
+  `intake_only_paths`: selected files the intake AI read and that the generated
+  plugin does not need at run time (their content is carried in the policy or in
+  a body, or was dropped). They stay in the intake snapshot and are not packaged; a capability that
   points at one is rejected. The AI decides per file; Python only removes and
   checks (owner, 2026-11-12: a system prompt turned into capabilities does not
   also travel as a raw file; ADR-0016 amendment). Every source

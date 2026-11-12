@@ -162,7 +162,8 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
 4. Perform the returned step using the host's tools. Do not load other capabilities.
    Replace `<package_root>` and `<state_dir>` in its instructions with the returned
    `package_root` and `state_dir`, and read prior outputs from `recorded_outputs`;
-   helper paths never resolve against the user's project. Give the step what is
+   helper paths never resolve against the user's project. Where the instructions point
+   to a packaged original, open the named part when the task needs it, not everything first. Give the step what is
    already in the conversation (a brief, answers, approvals): do not ask for it again.
 {install_block}
    Run a step in an isolated agent (Claude Code Agent, Codex `spawn_agent` with

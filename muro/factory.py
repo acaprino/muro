@@ -152,8 +152,8 @@ def unpackaged_reference_errors(capabilities: list, source_id: str, unpackaged: 
 def copy_source_helpers(src: dict[str, Any], project_root: Path, dist: Path) -> list[str]:
     """Preserve helper imports and resource layout under the source namespace.
 
-    Files matched by the source's `intake_only_paths` are evidence the intake AI read and restated or
-    dropped: they stay out of the package. Returns their packaged-style names.
+    Files matched by the source's `intake_only_paths` are evidence the intake AI read and that the
+    generated plugin does not need at run time: they stay out of the package. Returns their packaged-style names.
     """
     import posixpath
     import re
