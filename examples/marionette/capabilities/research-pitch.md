@@ -13,24 +13,27 @@ conflicts: []
 
 # Research Pitch
 
-Turns one research object into the strongest defensible case for one audience and one desired action. Facts stay fixed; emphasis changes. The audience playbooks are in `<package_root>/scripts/open-paper-skills/skills/sell-research-honestly/references/audience-playbooks.md`.
+Turn one research object into the strongest defensible case for one audience and one desired action. Keep facts invariant while changing emphasis.
+
+`<SR>` is `<package_root>/scripts/open-paper-skills/skills/sell-research-honestly`.
 
 ## Behavior
 
-Establish three inputs: the **research object**, the **audience** (one), the **desired action**. Inspect the supplied materials and the repository before asking for facts; when an input is still missing, ask one blocking question per turn while doing the audit work already possible.
+0. **Read the originals first.** Read `<SR>/SKILL.source.md` whole before working. In `<SR>/references/audience-playbooks.md` read the section for the current audience ("Load only the section for the current audience"), and its `## Feedback loop` section "only when the user brings back real reactions or outcomes". These files are the method in the source's own words. The steps below are an index into them with the source's section titles; each section ends with a "Complete when" condition that must hold before the next step. Where this body and an original differ, the original wins, except for the changes listed under `## Sources` → "Changes for coexistence".
 
-1. **Frame the case.** Classify the object as `idea`, `preliminary` or `evidenced`. Read the matching audience section of the playbooks and write the audience model: the outcome they value, the cost or decision risk they bear, the objection they will most likely raise, the evidence that would make the action reasonable. Read the playbooks' feedback section only when the user brings back real reactions.
-2. **Build the value case.** Six fields, each marked `supported`, `plausible`, `missing` or `contradicted`: problem, audience stake, gap, insight or solution, evidence, boundary and cost. Beside it keep a **claim ledger**: every material claim gets one state (`observed`, `inferred`, `hypothesized`, `unsupported`, `contradicted`) and an exact evidence pointer. Prefer raw results, data, code output, figures and verified citations; then locatable project or manuscript material; label user-provided unverified information and your own inference as such. Novelty, priority, state-of-the-art and comparisons with current work are external facts: verify them against the literature, or keep them `unsupported` with `verification: unverified` and out of public copy.
-3. **Match burden to claim.** Strong words (*first*, *general*, *robust*, *low-cost*, *state of the art*) need evidence or a weaker word. Look at critical subgroups and failures, not the average alone. Account for added compute, data, labor, latency, memory and deployment cost. Causal language needs a design that excludes the main alternatives. Scope matches the tested models, datasets and conditions. Comparisons need fair baselines. When the evidence is narrower, narrow the claim.
-4. **Apply the value gate.** Exactly one verdict:
-   - `ready-to-sell`: the value proposition and material claims are supported.
-   - `narrow-and-sell`: a useful case survives after narrowing or qualification.
-   - `validate-first`: a load-bearing claim lacks evidence. Deliver a minimum validation plan (claim, cheapest informative test, success and failure criteria, how each outcome changes the message) as an internal brief, not public copy.
-   - `do-not-claim`: the core claim is unsupported, contradicted or rests on an integrity breach. Run one salvage pass for a narrower phenomenon, negative result, failure mode, engineering benefit, cost advantage or research question; use it only if its own ledger passes. Otherwise deliver a short no-case finding that names the evidence needed to reopen the claim.
-   The verdict measures readiness for honest communication, not the odds of acceptance or attention.
-5. **Compose.** For the first two verdicts follow: audience-relevant problem → concrete gap → insight or solution → value → strongest evidence → boundary and cost → explicit next action. `observed` claims are written as facts, `inferred` with calibrated language, `hypothesized` only as questions or future tests; `unsupported` and `contradicted` are replaced by the narrowest supported alternative. Name the concrete contribution before any larger vision. One primary deliverable unless the user asks for more formats.
-6. **Integrity pass.** Re-run step 2 and 3 against every sentence of the draft; repair each mismatch by adding evidence, qualifying or narrowing.
-7. **Deliver four sections:** Verdict (status and decisive reason), Value Case (six fields and audience model), Primary Deliverable, Integrity Notes (claim ledger, required qualifiers, evidence gaps, next action). Answer in the conversation by default and in the user's language unless the target artifact sets another.
+**Inputs.** Establish three inputs: the **research object** ("an idea, experiment, paper, codebase, talk, demo, or the files that contain it"), the **audience** ("one advisor, collaborator, reviewer, talk audience, or research community") and the **desired action** ("what that audience should understand, approve, discuss, accept, use, cite, or do next"). "Inspect supplied materials and repository evidence before requesting facts. If an input remains missing, ask one blocking question per turn while completing the audit work that is already possible."
+
+1. **Frame the case.** "Classify the research object as `idea`, `preliminary`, or `evidenced`." Read the matching audience section of the playbooks, then write the four-part **audience model**: outcome the audience values; cost or decision risk they bear; objection they are most likely to raise; evidence that would make the desired action reasonable.
+2. **Build the value case.** "Create a six-field **value case**. Mark every field `supported`, `plausible`, `missing`, or `contradicted`." The fields are Problem, Audience stake, Gap, Insight / solution, Evidence, Boundary / cost; the question for each is in the original's table. "Build a **claim ledger** beside the value case. Give every material claim one state and an exact evidence pointer": `observed`, `inferred`, `hypothesized`, `unsupported`, `contradicted`, as the original defines them. "Prefer evidence in this order: raw results, data, code output, figures, and verified citations; locatable project or manuscript material; user-provided but unverified information; agent inference. Label the last two categories. Treat novelty, priority, state-of-the-art, and comparisons with current work as external facts: verify them against external literature. Until verified, keep their claim state `unsupported`, add `verification: unverified`, and exclude them from public copy." Then: "Make the evidence burden proportional to the claim" with the original's six rules (strong terms, subgroup and failure behavior, added cost, causal language, scope, fair baselines). "When evidence is narrower, narrow the claim."
+3. **Apply the value gate.** "Choose exactly one verdict":
+   - "`ready-to-sell` — the value proposition and material claims are supported;"
+   - "`narrow-and-sell` — a useful case survives after narrowing or qualification;"
+   - "`validate-first` — the value is plausible but a load-bearing claim lacks evidence;"
+   - "`do-not-claim` — the core claim is unsupported, contradicted, or relies on a research-integrity breach."
+
+   "For `validate-first`, produce a minimum discriminating validation plan: claim, cheapest informative test, success and failure criteria, and how each outcome changes the message. Treat the result as an internal validation brief rather than public-ready copy." "For `do-not-claim`, run one **salvage pass** for a narrower phenomenon, negative result, failure mode, engineering benefit, cost advantage, or worthwhile research question. Use the recovered case only if its own claim ledger passes the gate. If nothing survives, make the Primary Deliverable a concise no-case finding that names the evidence required to reopen the claim." "The verdict measures readiness for honest communication, not the probability of acceptance, collaboration, publication, or attention."
+4. **Compose the strongest defensible message.** "For `ready-to-sell` or `narrow-and-sell`, use this narrative spine: audience-relevant problem → concrete gap → insight or solution → value → strongest evidence → boundary and cost → explicit next action". "Write `observed` claims as facts. Mark `inferred` claims with calibrated language. Present `hypothesized` claims only as research questions or future tests. Replace `unsupported` and `contradicted` claims with the narrowest supported alternative." "Vary emphasis, length, and vocabulary for the audience; keep evidence, costs, and scope unchanged. Produce one primary deliverable unless the user requests additional formats. Name the concrete contribution before any larger vision."
+5. **Run the integrity pass and deliver.** "Re-run the Step 2 evidence rules against every sentence in the draft. Repair each mismatch by adding evidence, qualifying the sentence, or replacing it with the narrowest supported claim." Return four sections: **Verdict** ("status and decisive reason"), **Value Case** ("the six audited fields and audience model"), **Primary Deliverable** ("one ready-to-use artifact allowed by the gate"), **Integrity Notes** ("claim ledger, required qualifiers, evidence gaps, and next action").
 
 ## Output handoff
 
@@ -38,8 +41,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 
 ## Specifics
 
-- Draft outreach, posts and PR plans locally. Publish, send or contact anyone only after the user authorizes that external action.
-- Edit only files the user explicitly names.
+- "Default to chat output. Edit only files the user explicitly names. Draft PR plans, outreach, and posts locally; publish, send, or contact people only after the user authorizes that external action. Match the user's language unless the target artifact establishes another language."
 - No runtime dependency is installed by this capability.
 
 ## Checks
@@ -53,7 +55,10 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 ## Sources
 
 - AI intent mapping: sell-research-honestly → research.value-communication.
-- Source: open-paper-skills (pengqianhan/open-paper-skills@f85fd3dc, head) — `skills/sell-research-honestly/SKILL.md` and `references/audience-playbooks.md`, packaged unchanged.
+- Source: open-paper-skills (pengqianhan/open-paper-skills@f85fd3dc, head) — `skills/sell-research-honestly/SKILL.md` (packaged as `SKILL.source.md`) and `references/audience-playbooks.md`, packaged unchanged.
+- Changes for coexistence (ADR-0017):
+  - The source's frontmatter (`name`, `description` with its "Use when" and "Do not use for" triggers) and `agents/openai.yaml` are not applied: they register and trigger the original as a skill, and the coordinator classifies by meaning.
+  - "Default to chat output" stays for the user. In addition the verdict, the deliverable and the claim ledger are returned as outputs through the coordinator (`## Output handoff`): the factory contract hands outputs over through the coordinator.
 - Runtime dependency: none.
 - Not adopted: `agents/openai.yaml`.
 - Hooks: the selected files define none.
