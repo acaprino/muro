@@ -450,6 +450,11 @@ class Coordinator:
             result["check_conditions"] = conditions
         if map_id is not None:
             result["map_id"] = map_id
+        if mode == "direct":
+            # One-line handoff for an unmapped step; without it a live host left
+            # required_outputs unrecorded (live run, 2026-11-14).
+            result["submit"] = (f'record --project "{self.project_root}" --direct --capability {cap_id} '
+                                f'--outputs "{self.state_dir / "outputs.json"}"')
         return result
 
     def _effective_checks(self, state: dict[str, Any]) -> dict[str, dict[str, str]]:

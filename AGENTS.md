@@ -256,7 +256,10 @@ reference helpers as `<package_root>/scripts/<source-id>/...`. A packaged source
 original as a skill; validation rejects a body that names the old file. A mapped
 step's result carries `scope`, `remaining_steps` and the exact `submit`
 arguments; `checks` carries `submit_check` and `submit_complete` (live runs,
-2026-11-12).
+2026-11-12). A direct result carries the exact `record --direct` line as
+`submit`, and the skill says to run it even after another shell command was
+denied: without both, live hosts left `required_outputs` unrecorded (live
+runs, 2026-11-14).
 
 Without an AI decision, `plan` returns classification-required and executes nothing.
 The host creates the JSON and submits --classification; users need not know skill

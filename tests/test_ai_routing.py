@@ -47,6 +47,9 @@ def test_motion_spec_does_not_imply_scroll_implementation(coordinator):
     # Neither scroll code nor a website direction is added to a motion-only request.
     assert result["mode"] == "direct"
     assert result["capability"] == "motion-principles"
+    # A direct result hands the output handoff over as one line, like a mapped step's submit.
+    assert result["submit"].startswith("record ")
+    assert "--direct --capability motion-principles --outputs" in result["submit"]
 
 
 def test_shipped_catalog_declares_no_forced_prerequisites(coordinator):
