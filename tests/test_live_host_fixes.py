@@ -91,7 +91,12 @@ def test_a_mapped_step_names_its_scope_the_remaining_steps_and_how_to_submit(coo
 
 def test_direct_steps_carry_no_map_submission(coordinator):
     result = proposed(coordinator, "Converti a.docx in PDF", ["office-files"])
-    assert result["mode"] == "direct" and "submit" not in result and "remaining_steps" not in result
+    # No map: nothing of the mapped flow travels with a direct step. The output
+    # handoff still gets its one-line command (record --direct), because a live
+    # host left required_outputs unrecorded without it (2026-11-14).
+    assert result["mode"] == "direct" and "map_id" not in result and "remaining_steps" not in result
+    assert "scope" not in result and "--map-id" not in result["submit"]
+    assert result["submit"].startswith("record ") and "--direct --capability office-files" in result["submit"]
 
 
 def test_a_bare_stack_word_gets_an_error_that_shows_the_accepted_form():
