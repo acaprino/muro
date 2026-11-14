@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 
 from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
-from .entries import entry_description
+from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
 from .hermes_adapter import write_hermes_adapter
 from .native_policy import write_opencode_adapter, write_pi_adapter
@@ -84,7 +84,13 @@ def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_p
         launcher = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{slug}/muro.py"
         # Pre-approve the runtime's one-line calls and the host's own JSON files in the state folder,
         # for the turn that invokes the skill (Claude Code `allowed-tools`; `Edit` rules cover Write).
-        allowed = f"allowed-tools: Bash(python {launcher} *) Edit(./{state}/**)\n"
+        # A host may quote the launcher path; a rule matches the command text, so both forms are approved.
+        # Reads of the plugin's own folder are approved too, so a step opens its packaged originals
+        # without a prompt. A read rule takes an absolute path as a native path or with a second
+        # leading slash, and the host fills in the root differently per system: both are written.
+        root = "${CLAUDE_PLUGIN_ROOT}"
+        allowed = (f'allowed-tools: Bash(python {launcher} *) Bash(python "{launcher}" *) '
+                   f'Read({root}/**) Read(/{root}/**) Edit(./{state}/**)\n')
         if entry:
             # Discovery only: the model can invoke the entry; the one user-facing command stays /<command>.
             allowed = "user-invocable: false\n" + allowed
@@ -138,10 +144,13 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
 1. Read the user's task and relevant project context. Run:
    `python {launcher} plan --compact {view} --task "<user task>" --project "<current project>"`.
 2. The result is `classification-required` with `context` and a compact `catalog`
-   (empty fields are omitted). Entries marked `brief` show only role and intents:
-   before selecting one, or when the task may need one, rerun the same command with
-   `--focus <ids>` (comma-separated, keeping the ids already in focus) to read its
-   exclusions, tools and constraints. YOU are the AI classifier: apply the Classification
+   (empty fields are omitted). Entries marked `brief` index the capabilities
+   outside the focus: a group of capability ids with what the group is for, or one
+   capability with its role and intents. They belong to this same catalog. When any
+   part of the task needs one, rerun the same command with `--focus <ids>`
+   (comma-separated, keeping the ids already in focus) to read its intents,
+   exclusions, tools and constraints, then select it: the plan covers the whole
+   request, not only the capabilities in focus. YOU are the AI classifier: apply the Classification
    rules at the end of this file to the task and the project. Interpret outcomes,
    negations and constraints; never use keyword matching or ask the user to classify skills.
    Check required tools and hook policies for selected capabilities and prerequisites
@@ -277,6 +286,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         shutil.copy2(dist / "guide-examples.json", skill_dir / "guide-examples.json")
         if (dist / DELIVERY_FILE).is_file():
             shutil.copy2(dist / DELIVERY_FILE, skill_dir / DELIVERY_FILE)
+        if (dist / ENTRIES_FILE).is_file():        # the runtime indexes a focused view by entry
+            shutil.copy2(dist / ENTRIES_FILE, skill_dir / ENTRIES_FILE)
         if (dist / "scripts").is_dir():
             shutil.copytree(dist / "scripts", skill_dir / "scripts")
         entry_names = []

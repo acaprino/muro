@@ -148,6 +148,9 @@ Staged release (`egm-build-5/marionette` in the session scratch folder, outside 
 
 ## Open finding: the focused plan no longer fits the inline bound
 
+Closed the same day by indexing the focused view by discovery entry; see
+`2026-11-14-focused-index-by-entry.md`. The text below is the finding as recorded.
+
 `tests/test_audit_host.py::test_compact_plan_fits_inline_and_keeps_what_the_ai_needs` fails: the
 focused plan for three web-design capabilities is 22,199 bytes against `INLINE_LIMIT = 20000`.
 

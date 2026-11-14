@@ -39,7 +39,7 @@ def declare_prerequisite(package, capability, prerequisite):
 
 def response(request, ids, status="selected"):
     assert request["mode"] == "classification-required"
-    catalog = {item["id"]: item for item in request["catalog"]}
+    catalog = {item["id"]: item for item in request["catalog"] if "id" in item}   # index groups carry no id
     def judged(name):
         # Fixture judgment of conditional prerequisites: it applies exactly when the
         # test also selected the required capability. Real judgments come from the AI.
