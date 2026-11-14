@@ -188,6 +188,21 @@ def test_selected_file_with_disallowed_spdx_header_is_rejected(repo, tmp_path):
     assert check_sources(source(root, git(root, "rev-parse", "HEAD")), tmp_path)
 
 
+@pytest.mark.parametrize("header", [
+    "<!-- Copyright 2026 Example LLC. SPDX-License-Identifier: MIT -->",
+    "/* SPDX-License-Identifier: MIT */",
+    "# SPDX-License-Identifier: MIT",
+])
+def test_selected_file_with_matching_spdx_header_in_a_comment_is_accepted(repo, tmp_path, header):
+    # EGM intake, 2026-11-14: google/elephant-goldfish-model closes its header
+    # with "-->"; the closer was read as part of the identifier and refused.
+    root, _ = repo
+    (root / "SKILL.md").write_text(header + "\n# Skill\n", encoding="utf-8")
+    git(root, "add", "SKILL.md")
+    git(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "same license")
+    assert check_sources(source(root, git(root, "rev-parse", "HEAD")), tmp_path) == []
+
+
 def test_reserved_slug_and_invalid_plugin_types_are_reported():
     from muro import validate_plugin_identity
     assert validate_plugin_identity({"slug": "help", "name": "Muro", "command": "muro", "version": "1"})

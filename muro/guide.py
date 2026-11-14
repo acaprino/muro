@@ -408,6 +408,15 @@ def _capability_html(cap: dict, catalog: list[dict], tr: dict[str, str]) -> str:
     return '\n'.join(parts)
 
 
+def _public_source(source: dict) -> dict:
+    """What the guide shows of a source: its name, pin, licence, copyright and public web address."""
+    public = {key: source[key] for key in ('id', 'pin', 'release', 'commit', 'license', 'copyright') if key in source}
+    url = str(source.get('repo_url') or '')
+    if url.startswith('https://'):  # a local checkout path never reaches the page
+        public['repo_url'] = url
+    return public
+
+
 def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | None = None) -> str:
     """Pins and, when the package records them, the AI-authored delivery decisions. Nothing is derived here."""
     delivery, tr = delivery or {}, tr or _I18N['en']
@@ -421,6 +430,11 @@ def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | 
             f'<p>{_text(source["license"])} · {_text(revision)}</p>',
             f'<p><code>{_text(source["commit"])}</code></p>',
         ])
+        if source.get('repo_url'):
+            link = _text(source['repo_url'])
+            parts.append(f'<p><a href="{link}" rel="noopener noreferrer">{link}</a></p>')
+        if source.get('copyright'):
+            parts.append(f'<p>{_text(source["copyright"])}</p>')
         decisions = [d for d in delivery.get('decisions', []) if d['source'] == source['id']]
         if decisions:
             parts.append(f'<details><summary>{_text(tr["delivery_h4"])}</summary>')
@@ -537,8 +551,7 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         entry['checks'] = list(cap.checks)
         entry['intent_checks'] = {key: list(names) for key, names in cap.intent_checks.items()}
         entry['check_conditions'] = dict(cap.check_conditions)
-    public_sources = [{key: source[key] for key in ('id', 'pin', 'release', 'commit', 'license') if key in source}
-                      for source in sources]
+    public_sources = [_public_source(source) for source in sources]
     data = {
         'plugin': {key: plugin[key] for key in ('name', 'slug', 'command', 'version')},
         'capabilities': catalog,
