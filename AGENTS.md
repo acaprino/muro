@@ -295,6 +295,17 @@ the decisions re-examination (prompts/review.md; it rewrites nothing itself)
 and `muro baseline` (`muro/baseline.py`) reports pins against upstreams
 read-only, by mechanical version order; re-pinning stays the procedure below.
 
+ADR-0022 adds the agentic surfaces: `muro mcp` (`muro/mcp.py`) serves the
+operations to an MCP host, which does the judgment and writes artifacts with
+its own file tools; `muro agent` (`muro/agent.py`) relays a prepared step to an
+OpenAI-compatible endpoint under a strict output contract (allowlisted paths,
+env-only key, https off localhost refused) and the same validation; `muro init`
+(`muro/scaffold.py`) scaffolds a pinned, gated single-source package; `muro
+install` (`muro/installer.py`) executes a built adapter's own INSTALL.md
+against a caller-named harness home; `muro absorb` chains them. The
+AI-ownership rules above apply unchanged in every mode: Python validates, it
+never classifies, merges or reviews.
+
 ## Principles from the first real use (ADR-0015)
 
 - Design for the second time: specify and test every flow on its second pass

@@ -164,6 +164,110 @@ def _run_baseline(manifest: dict, project_root: Path, as_json: bool) -> int:
     return 0 if all(row["status"] in {"current", "frozen"} for row in rows) else 1
 
 
+def _run_init(directory: Path, repo_url: str, *, slug: str | None, license_name: str,
+              goal: str, selected: list[str], release: str | None, head: bool) -> int:
+    from .scaffold import scaffold_package
+    try:
+        print(scaffold_package(directory, repo_url, slug=slug, license_name=license_name,
+                               goal=goal, selected=selected, release=release, head=head))
+        return 0
+    except (OSError, ValueError) as e:
+        print(f"Init failed: {e}", file=sys.stderr)
+        return 1
+
+
+def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
+    from .installer import install_adapter
+    try:
+        for line in install_adapter(adapter_dir, harness, home):
+            print(line)
+        return 0
+    except (OSError, ValueError) as e:
+        print(f"Install failed: {e}", file=sys.stderr)
+        return 1
+
+
+def _captured(fn) -> tuple[int, str]:
+    import io
+    from contextlib import redirect_stderr, redirect_stdout
+    buffer = io.StringIO()
+    with redirect_stdout(buffer), redirect_stderr(buffer):
+        code = fn()
+    return code, buffer.getvalue().strip()
+
+
+def _intake_check(manifest: dict, project_root: Path) -> tuple[int, str]:
+    """Shape check after an API intake: the written artifacts must parse.
+
+    The full catalog validation belongs after harmonization, when ROUTER.md exists.
+    """
+    errs: list[str] = []
+    capabilities: list = []
+    try:
+        capabilities = _load_capabilities(project_root / "capabilities")
+    except (OSError, ValueError) as e:
+        errs.append(str(e))
+    from .delivery import load_delivery, validate_delivery
+    try:
+        document = load_delivery(project_root)
+        if document is not None:
+            source_ids = {s.get("id") for s in manifest.get("sources", []) if isinstance(s, dict)}
+            errs += validate_delivery(document, capabilities, source_ids)
+    except (OSError, ValueError) as e:
+        errs.append(str(e))
+    return (1, "\n".join(errs)) if errs else (0, "OK: intake artifacts parse")
+
+
+def _run_agent(step: str, source_id: str | None, manifest: dict, project_root: Path,
+               api_base: str, model: str, api_key_env: str | None, rounds: int) -> int:
+    from .agent import read_api_key, run_step
+    try:
+        api_key = read_api_key(api_key_env)
+    except ValueError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if step == "intake":
+        validate = lambda: _intake_check(manifest, project_root)
+    else:
+        validate = lambda: _captured(lambda: _run_validate(manifest, project_root))
+    try:
+        return run_step(step, source_id, manifest, project_root,
+                        api_base, model, api_key, rounds, validate)
+    except (OSError, ValueError) as e:
+        print(f"Agent step failed: {e}", file=sys.stderr)
+        return 1
+
+
+def _run_absorb(directory: Path, repo_url: str, *, slug: str | None, license_name: str,
+                goal: str, selected: list[str], release: str | None, head: bool,
+                harness: str | None, home: Path | None,
+                api_base: str, model: str, api_key_env: str | None, rounds: int,
+                out: Path | None) -> int:
+    """init -> agent intake -> agent harmonize -> validate -> build [-> install]."""
+    if _run_init(directory, repo_url, slug=slug, license_name=license_name, goal=goal,
+                 selected=selected, release=release, head=head) != 0:
+        return 1
+    loaded = _read_manifest(directory / "sources.json")
+    if loaded is None:
+        return 1
+    manifest, manifest_path, project_root = loaded
+    source_id = manifest["sources"][0]["id"]
+    for step, sid in (("intake", source_id), ("harmonize", None)):
+        print(f"== agent {step} ==")
+        if _run_agent(step, sid, manifest, project_root, api_base, model, api_key_env, rounds) != 0:
+            return 1
+    if _run_validate(manifest, project_root) != 0:
+        return 1
+    if _run_build(manifest_path, project_root, out, []) != 0:
+        return 1
+    if harness is None or home is None:
+        print("built; no --harness/--home given, so nothing was installed")
+        return 0
+    slug_built = manifest["plugin"]["slug"]
+    dist = (out.resolve() if out else project_root / "dist") / slug_built
+    return _run_install(dist / "adapters" / harness, harness, home)
+
+
 # --- Legacy flag interface (muro_build.py) -----------------------------------
 
 _LEGACY_ACTIONS = {"--check-sources", "--validate", "--build", "--prepare-eval",
@@ -216,8 +320,10 @@ def _modern_main(argv: list[str]) -> int:
 
     parser = argparse.ArgumentParser(
         prog="muro",
-        description="Muro factory CLI. Preparation commands bundle evidence and prompts "
-                    "for the host AI; they never call an LLM or classify anything themselves.",
+        description="Muro factory CLI. Preparation commands bundle evidence and prompts for "
+                    "the host AI and never call an LLM themselves; `mcp` serves them to an MCP "
+                    "host (Claude Code, Codex), and `agent`/`absorb` run the same AI-owned steps "
+                    "through an OpenAI-compatible endpoint. Python validates; it never classifies.",
         epilog="The legacy flag interface (muro_build.py --validate ...) keeps working.")
     sub = parser.add_subparsers(dest="command", metavar="command")
 
@@ -242,6 +348,55 @@ def _modern_main(argv: list[str]) -> int:
                        help="Report each source's pin against its upstream (read-only; "
                             "exit 1 when a source is behind, unknown or in error)")
     p.add_argument("--json", action="store_true", help="Machine-readable report")
+    p = sub.add_parser("init", help="Scaffold a single-source package from a repository link "
+                                    "(pin resolved upstream, license gate verified)")
+    p.add_argument("repo_url", help="Git URL (or local path) of the skill/plugin to absorb")
+    p.add_argument("directory", type=Path, help="New package directory (sources.json is written there)")
+    p.add_argument("--slug", help="Package slug (default: derived from the repository name)")
+    p.add_argument("--license", required=True, dest="license_name",
+                   help="MIT or Apache-2.0, as the source's LICENSE says; the gate verifies it")
+    p.add_argument("--goal", required=True, help="The source-specific intake goal")
+    p.add_argument("--select", action="append", default=[], metavar="PATH",
+                   help="Selected path/pattern (repeatable; the selection is curated, not implicit)")
+    p.add_argument("--release", help="Pin this published tag (default: the newest non-prerelease tag)")
+    p.add_argument("--head", action="store_true", help="Pin the upstream HEAD (for an upstream without releases)")
+    p = sub.add_parser("install", help="Install a built adapter into a harness home, "
+                                       "with the host's own command or config edit")
+    p.add_argument("adapter_dir", type=Path, help="A built release's adapters/<harness> directory")
+    p.add_argument("--harness", required=True, choices=("claude-code", "codex", "opencode", "pi"))
+    p.add_argument("--home", required=True, type=Path,
+                   help="The harness home to install into (e.g. resolved through Mukade's scan)")
+    sub.add_parser("mcp", parents=[common],
+                   help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
+    p = sub.add_parser("agent", parents=[common],
+                       help="Run an AI-owned step through an OpenAI-compatible endpoint "
+                            "(key from an environment variable, never an argument)")
+    p.add_argument("step", choices=("intake", "harmonize", "review"))
+    p.add_argument("source_id", nargs="?", help="With intake: the source id from the manifest")
+    p.add_argument("--api-base", default="https://api.openai.com/v1",
+                   help="OpenAI-compatible base URL (default: https://api.openai.com/v1)")
+    p.add_argument("--model", required=True, help="Model id the endpoint serves")
+    p.add_argument("--api-key-env", default=None,
+                   help="Environment variable holding the key (default: MURO_API_KEY, then OPENAI_API_KEY)")
+    p.add_argument("--rounds", type=int, default=2, help="Attempts, with rejected answers fed back (default 2)")
+    p = sub.add_parser("absorb", help="init + agent intake + agent harmonize + validate + build "
+                                      "[+ install], in one command")
+    p.add_argument("repo_url")
+    p.add_argument("directory", type=Path)
+    p.add_argument("--slug")
+    p.add_argument("--license", required=True, dest="license_name")
+    p.add_argument("--goal", required=True)
+    p.add_argument("--select", action="append", default=[], metavar="PATH")
+    p.add_argument("--release")
+    p.add_argument("--head", action="store_true")
+    p.add_argument("--api-base", default="https://api.openai.com/v1")
+    p.add_argument("--model", required=True)
+    p.add_argument("--api-key-env", default=None)
+    p.add_argument("--rounds", type=int, default=2)
+    p.add_argument("--harness", choices=("claude-code", "codex", "opencode", "pi"),
+                   help="With --home: install the built adapter there")
+    p.add_argument("--home", type=Path)
+    p.add_argument("--out", type=Path, help="Stage the release under this folder instead of dist/")
     p = sub.add_parser("eval", help="Routing eval for the host AI")
     eval_sub = p.add_subparsers(dest="eval_command", metavar="prepare|score", required=True)
     eval_sub.add_parser("prepare", parents=[common],
@@ -254,6 +409,23 @@ def _modern_main(argv: list[str]) -> int:
     if not args.command:
         parser.print_help()
         return 0
+
+    if args.command == "init":
+        return _run_init(args.directory, args.repo_url, slug=args.slug,
+                         license_name=args.license_name, goal=args.goal, selected=args.select,
+                         release=args.release, head=args.head)
+    if args.command == "install":
+        return _run_install(args.adapter_dir, args.harness, args.home)
+    if args.command == "absorb":
+        return _run_absorb(args.directory, args.repo_url, slug=args.slug,
+                           license_name=args.license_name, goal=args.goal, selected=args.select,
+                           release=args.release, head=args.head,
+                           harness=args.harness, home=args.home,
+                           api_base=args.api_base, model=args.model,
+                           api_key_env=args.api_key_env, rounds=args.rounds, out=args.out)
+    if args.command == "mcp":
+        from .mcp import serve
+        return serve(args.manifest)
 
     loaded = _read_manifest(args.manifest)
     if loaded is None:
@@ -274,6 +446,9 @@ def _modern_main(argv: list[str]) -> int:
         return _run_review(project_root)
     if args.command == "baseline":
         return _run_baseline(manifest, project_root, args.json)
+    if args.command == "agent":
+        return _run_agent(args.step, args.source_id, manifest, project_root,
+                          args.api_base, args.model, args.api_key_env, args.rounds)
     if args.command == "eval":
         if args.eval_command == "prepare":
             return _run_eval(project_root, True, None)
