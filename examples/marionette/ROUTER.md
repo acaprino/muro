@@ -34,10 +34,14 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | research-pitch | research-communication | — | — | value_verdict, value_deliverable, claim_ledger | research.value-communication |
 | session-handoff | session-handoff | — | — | handoff_state | engineering.session-handoff, engineering.session-resume |
 | token-economy | session-cost-control | — | — | economy_report, economy_changes | cost.economy-report, cost.tool-pruning, cost.economy-settings |
-
 | engineering-review | engineering-reviewer | — | — | code_review_findings, code_review_coverage | engineering.change-review, engineering.codebase-audit |
 | engineering-debt | engineering-debt-reporter | — | — | shortcut_ledger | engineering.shortcut-ledger |
 | engineering-guidance | engineering-method-guide | — | — | engineering_guidance | engineering.working-guidance, engineering.benchmark-evidence |
+| concept-brief | concept-ideation | — | — | concepts_brief | docs.idea-brainstorm |
+| design-doc | design-doc-authoring | — | — | design_document | docs.design-draft |
+| fresh-review | fresh-context-review | — | — | document_review_reports, document_review_outcome | docs.staged-review, docs.review-loop, docs.finding-resolution |
+| codebase-contracts | codebase-contract-docs | — | — | contract_files | docs.codebase-contracts |
+| design-drift | design-drift-report | — | — | drift_report | docs.design-drift |
 
 ## Runtime contract
 
@@ -94,7 +98,6 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   look. html-deck and office-deck differ by wanted format; unspecified stays office-deck.
   A motion-spec overrides the transition band; design-guidance stays lookup/report. Eval:
   32 of 33 historically; db-migration was later corrected as in scope.
-
 - ponytail v5.3.3 and i-have-adhd v0.4.1 (2026-11-12): one permanent policy that
   carries both in their own words; three marked lines let them coexist with the catalog.
   Ponytail enriches work-map; review/audit share engineering-review; shortcut ledgers
@@ -105,6 +108,8 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   complete adapter, acts before classification and creates no step for style alone.
 - 2026-11-13: multi-intent roles declare `intent_checks`, 14 checks `check_conditions` (from their
   bodies, ADR-0018); entries declare `absorbs`, i-have-adhd being policy only (ADR-0019).
-<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run
-files not selected; no maintained source for CSS scroll-driven animation; the
-host starters and tools named by claude-design-system-prompt are not packaged. -->
+- egm v0.1.1 (2026-11-14, trial intake): five on-demand `docs.*` roles, nothing session-wide. Review, loop and resolution are one role
+  (one thread in the source); bootstrap's drift offer is design-drift's step; design-doc and work-map's spec keep separate owners.
+<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run files not selected;
+no maintained source for CSS scroll-driven animation; the host starters and tools named by claude-design-system-prompt
+are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->

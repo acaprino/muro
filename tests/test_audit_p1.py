@@ -211,7 +211,7 @@ def test_factory_and_prompts_have_no_domain_leaks_and_use_manifest_stack_rules(t
 
 def test_strict_frontmatter_parser_tokened_lock_unlock_and_safe_launcher(marionette_pkg, portable_project, tmp_path):
     # Every Marionette capability passes the strict parser (29 after the Ponytail intake)
-    assert len(parse_capabilities(MARIONETTE / "capabilities")) == 29
+    assert len(parse_capabilities(MARIONETTE / "capabilities")) == 34
 
     # Unknown frontmatter key (`need` typo) is rejected
     typo_cap = tmp_path / "typo.md"

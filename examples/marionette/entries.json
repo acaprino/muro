@@ -163,6 +163,27 @@
         "ponytail-help",
         "ponytail-gain"
       ]
+    },
+    {
+      "name": "marionette-design-docs",
+      "description": "Use when turning a raw idea into a stress-tested concept brief, drafting a technical design document or RFC section by section with the author, having a design document, plan or proposal reviewed by fresh reviewers that never saw the conversation and resolving their findings, documenting an existing codebase with a contract README per directory, or reporting where the code drifted from its design documents. Not for implementing the change, reviewing code for bugs, or making Word, PDF or slide files.",
+      "capabilities": [
+        "concept-brief",
+        "design-doc",
+        "fresh-review",
+        "codebase-contracts",
+        "design-drift"
+      ],
+      "absorbs": [
+        "egm",
+        "egm-brainstorm",
+        "egm-draft",
+        "egm-review",
+        "egm-review-loop",
+        "egm-resolve",
+        "egm-bootstrap",
+        "egm-drift-report"
+      ]
     }
   ]
 }

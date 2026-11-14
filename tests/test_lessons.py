@@ -207,13 +207,13 @@ def test_router_line_cap_counts_prose_not_catalog_rows(tmp_path):
     from muro import parse_router
     text = (MARIONETTE / "ROUTER.md").read_text(encoding="utf-8")
     rows = [line for line in text.splitlines() if line.startswith("| ") and not line.startswith("| id ")]
-    assert len(rows) == 29
+    assert len(rows) == 34
     many = tmp_path / "ROUTER.md"
     extra = "".join(f"| extra-{n} | role-{n} | — | — | out_{n} | area.intent-{n} |\n" for n in range(40))
     anchor = rows[-1] + "\n"
     many.write_text(text.replace(anchor, anchor + extra), encoding="utf-8")
     assert len(many.read_text(encoding="utf-8").splitlines()) > 80
-    assert len(parse_router(many)) == 69                     # rows never hit the cap
+    assert len(parse_router(many)) == 74                     # rows never hit the cap
     prose = tmp_path / "prose" / "ROUTER.md"
     prose.parent.mkdir()
     prose.write_text(text + "\n".join(f"- note {n}" for n in range(80)) + "\n", encoding="utf-8")

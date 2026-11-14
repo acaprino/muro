@@ -283,6 +283,50 @@
       ],
       "reason": "Due passi della stessa capability, ciascuno con il suo intento: il primo risponde alle verifiche delle variazioni e segna quelle del pannello come non applicabili, perché il pannello arriva nel secondo; il secondo risponde solo alle verifiche del pannello (ADR-0018).",
       "questions": []
+    },
+    {
+      "title": "Dall'idea al design doc rivisto",
+      "task": "Ho un'idea per un sistema di notifiche: mettila alla prova, scrivi con me il design document e fallo rivedere da revisori che non hanno seguito la conversazione.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "concept-brief#1",
+          "capability": "concept-brief",
+          "intent": "docs.idea-brainstorm",
+          "reason": "L'idea è ancora grezza: va chiarita con domande e criticata prima di scrivere un design."
+        },
+        {
+          "step_id": "design-doc#1",
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Il design document si scrive sezione per sezione partendo dal brief approvato."
+        },
+        {
+          "step_id": "fresh-review#1",
+          "capability": "fresh-review",
+          "intent": "docs.staged-review",
+          "reason": "La revisione chiesta è quella di lettori senza contesto, sul documento salvato."
+        }
+      ],
+      "reason": "Tre passi in ordine, ciascuno di una capability diversa: il design legge il brief se è registrato ma non lo richiede, e la review parte dal documento salvato. Nessun passo scrive codice.",
+      "questions": []
+    },
+    {
+      "title": "Il codice segue ancora i documenti?",
+      "task": "Controlla se il codice si è allontanato dai design in docs/designs e scrivimi solo le differenze.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "design-drift#1",
+          "capability": "design-drift",
+          "intent": "docs.design-drift",
+          "reason": "Si confrontano i documenti con il codice attuale e si riportano solo le divergenze."
+        }
+      ],
+      "reason": "Un solo passo di sola lettura: non è una review del codice per bug né una revisione della qualità dei documenti.",
+      "questions": []
     }
   ]
 }
