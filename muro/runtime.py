@@ -17,6 +17,7 @@ import uuid
 
 from .core import CHECK_STATUSES, parse_capability, parse_router, validate_capabilities_and_router
 from .delivery import allows_empty_catalog, load_delivery, validate_delivery, unregistered_active_hooks
+from .entries import load_entries
 from .routing import (
     catalog_entries,
     catalog_digest,
@@ -82,24 +83,42 @@ def compact_catalog(catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
             for entry in catalog]
 
 
-def focused_catalog(catalog: list[dict[str, Any]], focus: set[str]) -> list[dict[str, Any]]:
-    """Compact catalog with full detail for `focus` and an index line for every other capability.
+def focused_catalog(catalog: list[dict[str, Any]], focus: set[str],
+                    entries: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Compact catalog with full detail for `focus` and an index of every other capability.
 
-    Nothing is hidden: a brief entry keeps its role and intent descriptions so the classifier can
-    see that it exists and ask for it. Its exclusions, tools and constraints come with --focus.
+    Nothing is hidden: every capability is either in full or named in the index, so the classifier
+    can see that it exists and ask for it with --focus. With discovery entries the index has one
+    group per entry (its AI-authored description, the names it absorbs and the ids of its
+    capabilities outside the focus), so it grows with the entries, not with the capabilities.
+    A package without entries, and a capability no entry lists, keep one line per capability
+    with its role and intent descriptions.
     """
     known = {entry["id"] for entry in catalog}
     unknown = sorted(focus - known)
     if unknown:
         raise ValueError("--focus names unknown capability: " + ", ".join(unknown))
-    result = []
-    for entry in compact_catalog(catalog):
-        if entry["id"] in focus:
-            result.append(entry)
-        else:
-            result.append({"id": entry["id"], "role": entry["role"], "brief": True,
-                           "intents": [{"id": i["id"], "description": i["description"]} for i in entry["intents"]]})
-    return result
+
+    def line(entry: dict[str, Any]) -> dict[str, Any]:
+        return {"id": entry["id"], "role": entry["role"], "brief": True,
+                "intents": [{"id": i["id"], "description": i["description"]} for i in entry["intents"]]}
+
+    compact = compact_catalog(catalog)
+    if not entries:
+        return [entry if entry["id"] in focus else line(entry) for entry in compact]
+    result = [entry for entry in compact if entry["id"] in focus]
+    indexed: set[str] = set()
+    for item in entries:
+        outside = [cap for cap in item["capabilities"] if cap in known and cap not in focus]
+        if not outside:
+            continue
+        # No skill name here: a group is part of this catalog, not another skill's work (live run, 2026-11-14).
+        group = {"brief": True, "description": item["description"], "capabilities": outside}
+        if item.get("absorbs"):
+            group["absorbs"] = item["absorbs"]
+        result.append(group)
+        indexed.update(outside)
+    return result + [line(entry) for entry in compact if entry["id"] not in focus and entry["id"] not in indexed]
 
 
 class Coordinator:
@@ -139,6 +158,8 @@ class Coordinator:
         if not self.routing_prompt.strip():
             raise ValueError("Missing AI classification prompt")
         self.catalog = catalog_entries(self.rows, self.capabilities)
+        # Discovery entries, when the package has them, index the capabilities outside a focused view.
+        self.entries = (load_entries(self.package_root) or {}).get("entries", [])
         self.conflicts = {key: cap.conflicts for key, cap in self.capabilities.items()}
         self.digest = catalog_digest(self.catalog, self.capabilities, self.routing_prompt, delivery)
         self.state_dir = self.project_root / f".{slug}"
@@ -530,11 +551,14 @@ class Coordinator:
                                      "(prompts/classify.md). Write the decision JSON with your file tool to "
                                      "classification_path, then rerun plan on one line with --classification <that file>."
                                      + ("" if focus is None else
-                                        " Entries marked brief show role and intents only: before selecting one, or when "
-                                        "the task may need one, rerun plan --compact with --focus <ids> (comma-separated, "
-                                        "together with the ones already in focus) to read its exclusions, tools and constraints.")),
+                                        " Entries marked brief index the capabilities outside the focus; they belong "
+                                        "to this same catalog. When any part of the task needs one, rerun plan --compact "
+                                        "with --focus <ids> (comma-separated, together with the ones already in focus) to "
+                                        "read its intents, exclusions, tools and constraints, then select it: the plan "
+                                        "covers the whole request, not only the capabilities in focus.")),
                     "classification_path": str(self.classification_path),
-                    "catalog": compact_catalog(self.catalog) if focus is None else focused_catalog(self.catalog, focus),
+                    "catalog": (compact_catalog(self.catalog) if focus is None
+                                else focused_catalog(self.catalog, focus, self.entries)),
                 }
             return {
                 "mode": "classification-required",

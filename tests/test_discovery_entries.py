@@ -73,6 +73,8 @@ def test_release_emits_one_hidden_entry_skill_per_area_that_drives_the_same_runt
         umbrella, entry = skills / "muro", skills / "muro-testing"
         assert (umbrella / "SKILL.md").is_file() and (umbrella / "muro.py").is_file()
         assert sorted(p.name for p in entry.iterdir()) == ["SKILL.md"]  # no second runtime copy
+        # The packaged runtime indexes a focused view by entry, so the entries travel with it.
+        assert (umbrella / "entries.json").read_bytes() == (release / "entries.json").read_bytes()
         text = (entry / "SKILL.md").read_text(encoding="utf-8")
         front, body = text.split("---", 2)[1], text.split("---", 2)[2]
         assert "name: muro-testing" in front

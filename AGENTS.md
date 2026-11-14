@@ -117,7 +117,9 @@ installation, publication or replacement of existing dist output without request
   the 80-line cap counts text only, never table rows (ADR-0015 amendment).
 - `prompts/classify.md`: the host AI interprets the runtime task and actual project
   context. `plan --compact --focus <ids>` gives those capabilities in full and
-  the rest as a brief index; `--brief` gives the index alone. Entry skills focus
+  the rest as a brief index, one group per discovery entry when the package has
+  entries (a group names no skill; live run, 2026-11-14); `--brief` gives the
+  index alone. Entry skills focus
   on their own capabilities, the umbrella starts from the index. `muro/routing.py` validates its structured decision and expands only
   explicit prerequisites. `muro/runtime.py` handles confirmation, state and evidence.
 - `muro/adapters.py` and `muro/release.py`: every host's standalone skill folder
@@ -316,7 +318,11 @@ built: hidden entries are absent from the init event, so ask one session to list
 the package's skills and compare with `entries.json`; a skill with invalid
 frontmatter is dropped silently. Start sessions one at a time: sessions started
 in parallel loaded no marketplace plugins. Delete the session folders the run leaves
-under `~/.claude/projects/`.
+under `~/.claude/projects/`. With the owner's own plugins and MCP servers loaded
+every turn carried about 114,000 tokens and cost about 2 dollars on the default
+model (2026-11-14), and `--max-budget-usd` is checked between turns. To test the
+package alone add `--setting-sources project,local --strict-mcp-config`, name the
+model with `--model`, and record both in the result.
 
 ## Adding or re-pinning a source
 

@@ -162,6 +162,41 @@ the build and the runtime, both under principle 4 (fit the host):
   `submit_check` and `submit_complete`. In the next run every host, Pi included,
   closed the map. Cost: a few hundred characters per step result.
 
+## Amendment after the fourteenth source (2026-11-14)
+
+The focused view was a second lever on scope again. Its index had one line per
+capability outside the focus (about 540 bytes each), so it grew with every intake:
+19.9 KB at 29 capabilities, 22.2 KB at 34 after EGM, over the 20 KB bound the
+test keeps under the size the host stopped showing inline.
+
+- **Index by discovery entry.** When the package has `entries.json`, the
+  capabilities outside the focus are indexed in one group per entry: the entry's
+  AI-authored description, the names it absorbs and the ids of its capabilities
+  outside the focus. The index now grows with the entries, which the harmonizing
+  AI authors, not with the capabilities. A package without entries, and a
+  capability no entry lists, keep one line per capability. `entries.json` travels
+  in every host's skill folder so the packaged runtime can read it. Measured on
+  Marionette: index 8.3 KB (the earlier index alone was 18.3), focused views 9.1
+  to 16.0 KB; the test's case went from 22.2 to 12.2 KB.
+- **A group names no skill.** The first live run carried each entry's skill name
+  in its group. The host read the presentation in "design document, then a
+  5-slide PowerPoint" as another skill's work and planned the document alone; with
+  the per-capability index the same request planned both steps. Groups now carry
+  no skill name and the instructions say that the index belongs to the same
+  catalog and that the plan covers the whole request. The rerun planned both.
+- **Pre-approval matches text.** The host quoted the launcher path and the
+  skill's `allowed-tools` rule, written unquoted, denied the call. Both forms
+  are now approved.
+- **A step may read its own plugin.** Opening a packaged original (ADR-0017) asked
+  the user for permission every time. Reads of the plugin's folder are now approved
+  by the skill (owner, 2026-11-14), in the two forms a read rule accepts for an
+  absolute path. Seen working on Windows only.
+- Cost: unchanged in calls. A capability outside the focus already needed one
+  more `plan --compact --focus` call before it could be selected; it now needs
+  that call also to read its intent ids.
+
+Evidence and limits: `docs/verification/2026-11-14-focused-index-by-entry.md`.
+
 ## Enforceable Invariants
 
 - **INV-000**: every capability in a package's catalog is reachable through a
@@ -177,8 +212,9 @@ the build and the runtime, both under principle 4 (fit the host):
 - **INV-005**: `plugin.replaces`, when declared, appears in every host's `INSTALL.md`.
 - **INV-006**: every generated `SKILL.md` description is a valid YAML scalar that
   round-trips to the authored text.
-- **INV-007**: a focused or brief catalog lists every capability of the package;
-  a focused entry equals its full compact entry; an unknown focus id fails.
+- **INV-007**: a focused or brief catalog names every capability of the package,
+  in full, in an entry group or on its own index line; a focused entry equals its
+  full compact entry; an index group names no skill; an unknown focus id fails.
 - **INV-008**: the router cap counts text lines only, never catalog rows.
 - **INV-009**: no file named `SKILL.md` exists below a host skill folder of a
   release except each skill's own.

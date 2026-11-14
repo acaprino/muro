@@ -131,6 +131,7 @@ def test_manifest_declares_a_mode_for_every_source():
         "genoffice": ("release", "v0.12.852"),
         "ponytail": ("release", "v5.3.3"),
         "i-have-adhd": ("release", "v0.4.1"),
+        "egm": ("release", "v0.1.1"),
         # These upstreams publish no release or tag: the owner follows their HEAD.
         "motion-design": ("head", None),
         "gsap-scrolltrigger": ("head", None),

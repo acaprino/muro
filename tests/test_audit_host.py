@@ -27,7 +27,7 @@ def packaged_marionette(tmp_path):
     pkg = tmp_path / "pkg"
     pkg.mkdir()
     shutil.copytree(MARIONETTE / "capabilities", pkg / "capabilities")
-    for name in ("ROUTER.md", "sources.json"):
+    for name in ("ROUTER.md", "sources.json", "entries.json"):
         shutil.copy2(MARIONETTE / name, pkg / name)
     copy_prompts(pkg)
     shutil.copytree(ROOT / "muro", pkg / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -61,22 +61,36 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     assert data["mode"] == "classification-required"
     assert data["context"]["task"] == task
     assert len(data["context"]["catalog_digest"]) == 64
-    assert len(data["instructions"]) < 600 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
+    assert len(data["instructions"]) < 800 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
     assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
     entries = {e["id"]: e for e in json.loads(full)["catalog"]}
     assert len(entries) == 34
-    focused = {e["id"]: e for e in data["catalog"]}
-    assert set(focused) == set(entries)                      # nothing is hidden from the classifier
-    for name in ("visual-direction", "design-guidance", "figma-design"):
-        assert focused[name] == entries[name]                # focused entries are complete
-    for name, entry in focused.items():
-        if name in ("visual-direction", "design-guidance", "figma-design"):
-            continue
-        assert entry["brief"] is True and set(entry) == {"id", "role", "brief", "intents"}
-        assert [set(i) for i in entry["intents"]] == [{"id", "description"}] * len(entry["intents"])
-        assert [i["description"] for i in entry["intents"]] == [i["description"] for i in entries[name]["intents"]]
-    assert all(e["brief"] is True for e in json.loads(brief_all)["catalog"])
+    in_focus = ("visual-direction", "design-guidance", "figma-design")
+    full_part = {e["id"]: e for e in data["catalog"] if "id" in e}
+    assert set(full_part) == set(in_focus)
+    for name in in_focus:
+        assert full_part[name] == entries[name]              # focused entries are complete
+    # The rest is indexed by discovery entry (2026-11-14): the per-capability index grew by ~540 bytes
+    # with every capability and crossed the bound at 34. Entries are what the harmonizing AI authored.
+    authored = {e["description"]: e for e in
+                json.loads((MARIONETTE / "entries.json").read_text(encoding="utf-8"))["entries"]}
+    groups = [e for e in data["catalog"] if "id" not in e]
+    listed = [cap for group in groups for cap in group["capabilities"]]
+    assert set(listed) | set(in_focus) == set(entries)       # nothing is hidden from the classifier
+    assert not set(listed) & set(in_focus) and len(listed) == len(set(listed))
+    assert len(groups) == len(authored) - 1                  # the entry wholly in focus leaves nothing to index
+    for group in groups:
+        source = authored[group["description"]]
+        # Live run of 2026-11-14: a group that carried its entry's skill name was read as "another skill's
+        # work" and left out of the plan. A group is part of this catalog and names no skill.
+        assert group["brief"] is True and set(group) == {"brief", "description", "capabilities", "absorbs"}
+        assert group["absorbs"] == source["absorbs"] and "marionette-" not in json.dumps(group["capabilities"])
+        assert group["capabilities"] == [cap for cap in source["capabilities"] if cap not in in_focus]
+    index = json.loads(brief_all)["catalog"]
+    assert all(e["brief"] is True and "id" not in e for e in index) and len(index) == len(authored)
+    assert {cap for group in index for cap in group["capabilities"]} == set(entries)
     assert "--focus" in data["instructions"] and "brief" in data["instructions"]
+    assert "whole request" in data["instructions"]
     bad = subprocess.run([sys.executable, str(pkg / "muro.py"), "plan", "--compact", "--focus", "ghost", "--task", task,
                           "--project", str(consumer)], capture_output=True, text=True, encoding="utf-8")
     assert bad.returncode == 1 and "ghost" in bad.stderr
@@ -129,6 +143,7 @@ def test_skill_embeds_rules_uses_one_line_calls_and_preapproves_them_on_claude_c
         assert "semantic decision" in body and "catalog_digest" in body
         assert "plan --compact --brief" in body          # the umbrella starts from the index
         assert "--focus <ids>" in body and "marked `brief`" in body
+        assert "the plan covers the whole request" in " ".join(body.split())
         assert ".muro/classification.json" in body
         assert "heredoc" in body  # tells the host not to use one
         for discouraged in ("--classification -", "--classification-json", "--step-json"):
@@ -137,7 +152,27 @@ def test_skill_embeds_rules_uses_one_line_calls_and_preapproves_them_on_claude_c
         if host == "claude-code":
             line = next(l for l in front.splitlines() if l.startswith("allowed-tools:"))
             assert "Bash(python ${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py *)" in line
+            # Live run of 2026-11-14: the host quoted the launcher path and the unquoted rule denied the call.
+            assert 'Bash(python "${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py" *)' in line
+            # Owner, 2026-11-14: a step opens its packaged originals without a permission prompt.
+            assert "Read(${CLAUDE_PLUGIN_ROOT}/**)" in line and "Read(/${CLAUDE_PLUGIN_ROOT}/**)" in line
             assert "Edit(./.muro/**)" in line
         else:
             assert "allowed-tools" not in front
     assert len(classify) > 1000
+
+
+def test_index_without_entries_or_for_a_capability_no_entry_lists_stays_per_capability():
+    from muro.runtime import focused_catalog
+    catalog = [{"id": name, "role": "r-" + name, "when": "—", "after": [], "outputs": ["o-" + name],
+                "intents": [{"id": "i." + name, "description": "d " + name, "excludes": ["x"]}]} for name in "abc"]
+    line = {"id": "c", "role": "r-c", "brief": True, "intents": [{"id": "i.c", "description": "d c"}]}
+    # A package that declares no discovery entries keeps the index of ADR-0015.
+    plain = focused_catalog(catalog, {"a"})
+    assert [e["id"] for e in plain] == ["a", "b", "c"] and plain[2] == line and "brief" not in plain[0]
+    # With entries, a capability outside the focus that no entry lists is still shown, never dropped.
+    entries = [{"name": "pkg-ab", "description": "Use when a or b.", "capabilities": ["a", "b"]}]
+    mixed = focused_catalog(catalog, {"a"}, entries)
+    assert mixed[0]["id"] == "a" and mixed[-1] == line
+    assert mixed[1] == {"brief": True, "description": "Use when a or b.", "capabilities": ["b"]}
+
