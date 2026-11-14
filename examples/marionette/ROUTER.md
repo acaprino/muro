@@ -103,6 +103,8 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   delivery.json explains exclusions of source mode controls, UI and telemetry.
   Originals carried as text are intake-only; the benchmark travels. Native policy needs the
   complete adapter, acts before classification and creates no step for style alone.
+- 2026-11-13: multi-intent roles declare `intent_checks`, 14 checks `check_conditions` (from their
+  bodies, ADR-0018); entries declare `absorbs`, i-have-adhd being policy only (ADR-0019).
 <!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run
 files not selected; no maintained source for CSS scroll-driven animation; the
 host starters and tools named by claude-design-system-prompt are not packaged. -->

@@ -84,6 +84,15 @@ capability or asking the owner whether a domain is allowed. Entries only help th
 runtime still classifies against the whole catalog. Review the entries whenever
 capabilities, intents or exclusions change.
 
+Give each entry `absorbs`: the names from `plugin.replaces` whose work it now
+does, judged from the capabilities' sources, not from similar names. The build
+appends to the entry's description a sentence that names them and tells the host
+to use the entry instead, also when the user asks for one of them by name ("usa
+ui pro max"): a host that sees an original installed beside the package, or hears
+its name, otherwise has no way to know the package holds it. A name whose source
+only became session policy belongs to no entry. Keep the description plus that
+sentence within 1024 characters.
+
 ## Delivery form
 
 Maintain `delivery.json` with the Delivery protocol appended below: what each
@@ -169,7 +178,17 @@ still require your analysis and the host's checks.
    work, what is already recorded); it is never matched by Python. Search every
    body for hidden conditional prerequisites ("for X without Y, do not…").
    Not for alternatives of the same role or conflicting capabilities.
-6. **Sequential execution:** one active capability body per step, no runtime MoE.
+6. **Check scope:** after a merge, a capability serves several intents and its
+   checks come from several sources. Declare in `intent_checks` the checks a step
+   serving each intent answers, and in `check_conditions` the case in which a
+   conditional check applies. Read every check against every intent: a check that
+   only makes sense for another intent's outcome is not in this intent's list, and
+   prose such as "not applicable to a tweak-only request" or "when nothing was
+   registered" becomes data here. Python requires a scope for every intent of a
+   multi-intent capability and rejects a check recorded outside it; the judgment
+   is yours. A capability reached through `after` has no chosen intent, so its
+   intents keep one scope.
+7. **Sequential execution:** one active capability body per step, no runtime MoE.
    The compact catalog is available to the classifying host AI. Static checks are
    instructions for collecting evidence, not proof of successful execution.
 

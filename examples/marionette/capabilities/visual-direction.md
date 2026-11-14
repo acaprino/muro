@@ -10,6 +10,7 @@ intents: [{"id":"ui.visual-direction","description":"Design and build, or restyl
 after: []
 outputs: ["offer", "page_outline", "palette", "typography", "layout", "constraints", "page"]
 checks: ["single_primary_action", "proof_supported", "palette_applied", "typography_consistent", "house_rules_met", "screens_reviewed", "automated_gate_disclosed"]
+intent_checks: {"ui.visual-direction": ["single_primary_action", "proof_supported", "palette_applied", "typography_consistent", "house_rules_met", "screens_reviewed", "automated_gate_disclosed"], "ui.landing-strategy": ["single_primary_action", "proof_supported"]}
 ---
 
 # Visual Direction (website and landing page)

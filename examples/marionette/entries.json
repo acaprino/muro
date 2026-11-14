@@ -7,6 +7,13 @@
         "visual-direction",
         "design-guidance",
         "figma-design"
+      ],
+      "absorbs": [
+        "taste-skill",
+        "design-taste-frontend",
+        "landing-page-design",
+        "figma-designer",
+        "ui-ux-pro-max"
       ]
     },
     {
@@ -18,6 +25,15 @@
         "ui-prototype",
         "design-options",
         "html-deck"
+      ],
+      "absorbs": [
+        "frontend-aesthetic-direction",
+        "discovery-questions",
+        "wireframe",
+        "make-a-prototype",
+        "generate-variations",
+        "make-tweakable",
+        "make-a-deck"
       ]
     },
     {
@@ -26,6 +42,15 @@
       "capabilities": [
         "design-review",
         "design-system-extract"
+      ],
+      "absorbs": [
+        "accessibility-audit",
+        "ai-slop-check",
+        "hierarchy-rhythm-review",
+        "interaction-states-pass",
+        "polish-pass",
+        "design-system-extract",
+        "component-extract"
       ]
     },
     {
@@ -35,6 +60,10 @@
         "motion-principles",
         "gsap-scrolltrigger",
         "css-scroll"
+      ],
+      "absorbs": [
+        "motion-design",
+        "gsap-scrolltrigger"
       ]
     },
     {
@@ -44,6 +73,9 @@
         "office-deck",
         "office-authoring",
         "office-files"
+      ],
+      "absorbs": [
+        "genoffice"
       ]
     },
     {
@@ -52,6 +84,11 @@
       "capabilities": [
         "interactive-explainer",
         "explainer-fact-check"
+      ],
+      "absorbs": [
+        "creating-explainers",
+        "explaining-codebases",
+        "fact-checking-explainers"
       ]
     },
     {
@@ -59,6 +96,10 @@
       "description": "Use when implementing a software change, fixing a bug, or coordinating a larger change: agreeing the destination, resolving open decisions, writing a spec, slicing vertical tickets, then building and reviewing with test evidence; or when recording, preparing or resuming a HANDOFF.md across sessions. A clear small change is implemented directly. Not for a report-only code review or a shortcut inventory.",
       "capabilities": [
         "work-map",
+        "session-handoff"
+      ],
+      "absorbs": [
+        "ponytail",
         "session-handoff"
       ]
     },
@@ -69,6 +110,12 @@
         "paper-search",
         "paper-wiki",
         "paper-figure"
+      ],
+      "absorbs": [
+        "paper-search",
+        "paper-wiki-manager",
+        "drawio-paper",
+        "codex-paper-figure-skill"
       ]
     },
     {
@@ -77,6 +124,10 @@
       "capabilities": [
         "research-practice",
         "research-pitch"
+      ],
+      "absorbs": [
+        "research-bible",
+        "sell-research-honestly"
       ]
     },
     {
@@ -84,6 +135,9 @@
       "description": "Use when the user asks what TokenEconomizer learned or saved in this repository or what their agent sessions cost, wants to see or change its repository facts (micro-skills), its tool pruning deny list or its loop guard, to give pruned tools back, to change its settings, or to turn its automatic mode on or off for a project. Not for questions about model pricing or for shrinking a prompt by hand.",
       "capabilities": [
         "token-economy"
+      ],
+      "absorbs": [
+        "tokeneconomizer"
       ]
     },
     {
@@ -92,6 +146,11 @@
       "capabilities": [
         "engineering-review",
         "engineering-debt"
+      ],
+      "absorbs": [
+        "ponytail-review",
+        "ponytail-audit",
+        "ponytail-debt"
       ]
     },
     {
@@ -99,6 +158,10 @@
       "description": "Use when asking how the absorbed Ponytail working method works, what its lite, full and ultra preferences mean, or what its published benchmark measured and what its limits are. Not for measuring current repository savings, changing a persistent source-plugin mode or reviewing code.",
       "capabilities": [
         "engineering-guidance"
+      ],
+      "absorbs": [
+        "ponytail-help",
+        "ponytail-gain"
       ]
     }
   ]

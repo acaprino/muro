@@ -149,8 +149,13 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
         if case["id"] == wrong:
             ids = ["office-files"]
         selections = []
-        for name in ids:
-            sel = {"capability": name, "intent": caps[name].intents[0]["id"], "reason": "fixture"}
+        for position, name in enumerate(ids):
+            # A capability expected twice is two steps: each occurrence gets its step_id and its own intent.
+            occurrence = ids[:position + 1].count(name)
+            intents = caps[name].intents
+            sel = {"capability": name, "intent": intents[min(occurrence, len(intents)) - 1]["id"], "reason": "fixture"}
+            if ids.count(name) > 1:
+                sel["step_id"] = f"{name}#{occurrence}"
             if caps[name].needs:
                 sel["needs"] = [{"requires": n["capability"], "applies": n["capability"] in ids, "reason": "fixture"}
                                 for n in caps[name].needs]

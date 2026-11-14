@@ -261,6 +261,28 @@
       "selections": [],
       "reason": "La policy permanente guida la comunicazione senza attivare una procedura o creare un piano. no_match riguarda il catalogo, non impedisce la risposta ordinaria dell’host.",
       "questions": []
+    },
+    {
+      "title": "Temi a confronto e pannello per provarli",
+      "task": "Fammi un bozzetto HTML con cinque temi della stessa schermata, dal più classico al più nuovo, e poi un pannello per cambiare tema e palette dal vivo.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "design-options#1",
+          "capability": "design-options",
+          "intent": "ui.design-variations",
+          "reason": "Cinque temi sono variazioni sostanziali della stessa schermata, da confrontare con una raccomandazione."
+        },
+        {
+          "step_id": "design-options#2",
+          "capability": "design-options",
+          "intent": "ui.tweak-controls",
+          "reason": "Sul file delle variazioni serve un pannello dal vivo per tema e palette: è un'operazione distinta, dopo la prima."
+        }
+      ],
+      "reason": "Due passi della stessa capability, ciascuno con il suo intento: il primo risponde alle verifiche delle variazioni e segna quelle del pannello come non applicabili, perché il pannello arriva nel secondo; il secondo risponde solo alle verifiche del pannello (ADR-0018).",
+      "questions": []
     }
   ]
 }

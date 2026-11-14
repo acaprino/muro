@@ -99,6 +99,20 @@ cases: `needs: [{"capability":"<id>","label":"<at most 5 words>","when":"<condit
 Write `when` for another AI to judge against a real task and project; never as
 keywords. Use `after` only for a stage required every time.
 
+`intent_checks` is required when a capability has more than one intent: map every
+intent id to the checks a step serving that intent answers, for example
+`intent_checks: {"ui.design-variations": ["options_differ", "single_file"], "ui.tweak-controls": ["single_file", "panel_hidden"]}`.
+Every check belongs to at least one intent. Decide from what the body does for
+each intent, never from names. The runtime asks a step only its intent's checks:
+without this field a step would have to answer checks written for another intent
+and record a pass that proves nothing. `check_conditions` is optional: for a check
+that applies only in some tasks ("when the user stated no direction", "when hook
+entries are registered"), give that case in plain language, e.g.
+`check_conditions: {"panel_hidden": "The design has a tweak panel."}`. The host
+judges it per task and records the check `not-applicable`, with the reason, when the
+case does not hold. A check written as "not applicable when..." in `## Checks`
+needs this entry, or the runtime cannot accept that status.
+
 `intents` must be a nonempty JSON array of records with exactly `id`, `description`
 and `excludes`. Descriptions must explain meaning rather than list trigger words;
 `excludes` is an array of nonempty strings (empty is allowed when justified).

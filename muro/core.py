@@ -53,6 +53,28 @@ class Capability:
     output_types: dict[str, str] = field(default_factory=dict)
     # AI-declared: a long or interactive step that gets a map even when it is the only step.
     resumable: bool = False
+    # AI-declared check scope (ADR-0018): the checks a step serving each intent answers. Required with
+    # more than one intent; without it a step would answer checks written for another intent.
+    intent_checks: dict[str, list[str]] = field(default_factory=dict)
+    # AI-declared: a check that applies only in some tasks, with that case in plain language. When the
+    # host judges that it does not hold, it records the check as not-applicable with the reason.
+    check_conditions: dict[str, str] = field(default_factory=dict)
+
+    def checks_for(self, intent: str | None) -> list[str]:
+        """The checks a step serving `intent` answers; None is a step reached only through `after`."""
+        if not self.intent_checks:
+            return list(self.checks)
+        if intent is None:
+            scopes = {frozenset(names) for names in self.intent_checks.values()}
+            if len(scopes) != 1:
+                raise ValueError(f"Capability {self.id} scopes different checks per intent, and this step "
+                                 "has no AI-chosen intent")
+            scoped = next(iter(scopes))
+        elif intent in self.intent_checks:
+            scoped = frozenset(self.intent_checks[intent])
+        else:
+            raise ValueError(f"Capability {self.id} declares no checks for intent {intent}")
+        return [name for name in self.checks if name in scoped]
 
     @property
     def after_str(self) -> str:
@@ -155,7 +177,9 @@ def validate_plugin_identity(plugin: dict[str, Any], installed_roots: list[Path]
 # Capability Parsing
 # ----------------------------------------------------------------------
 CAP_FIELDS = ("id", "role", "when", "after", "outputs", "checks", "intents", "tools", "hooks", "conflicts")
-ALLOWED_CAP_FIELDS = frozenset(CAP_FIELDS) | {"reads", "needs", "output_types", "resumable"}
+ALLOWED_CAP_FIELDS = frozenset(CAP_FIELDS) | {"reads", "needs", "output_types", "resumable", "intent_checks",
+                                              "check_conditions"}
+CHECK_STATUSES = frozenset({"pass", "fail", "not-tested", "not-applicable"})
 
 
 def validate_intents(intents: Any) -> list[str]:
@@ -179,6 +203,41 @@ def validate_intents(intents: Any) -> list[str]:
             errors.append("intent description must be nonempty")
         if not isinstance(item["excludes"], list) or any(not isinstance(x, str) or not x.strip() for x in item["excludes"]):
             errors.append("intent excludes must be a list of nonempty strings")
+    return errors
+
+
+def validate_check_scope(intents: Any, checks: list[str], intent_checks: dict[str, list[str]],
+                         check_conditions: dict[str, str]) -> list[str]:
+    """Shape of the AI-declared check scope; which check fits which intent stays an AI judgment."""
+    errors = []
+    ids = [item["id"] for item in intents if isinstance(item, dict) and isinstance(item.get("id"), str)] \
+        if isinstance(intents, list) else []
+    if len(set(checks)) != len(checks):
+        errors.append("duplicate check name")
+    if intent_checks:
+        missing = [identifier for identifier in ids if identifier not in intent_checks]
+        unknown = sorted(set(intent_checks) - set(ids))
+        if missing:
+            errors.append("intent_checks declares no checks for intent(s) " + ", ".join(missing))
+        if unknown:
+            errors.append("intent_checks names unknown intent(s) " + ", ".join(unknown))
+        for identifier, names in intent_checks.items():
+            if not names:
+                errors.append(f"intent_checks for {identifier} is empty")
+            if len(set(names)) != len(names):
+                errors.append(f"intent_checks for {identifier} repeats a check")
+            undeclared = [name for name in names if name not in checks]
+            if undeclared:
+                errors.append(f"intent_checks for {identifier} names undeclared check(s) " + ", ".join(undeclared))
+        uncovered = [name for name in checks if not any(name in names for names in intent_checks.values())]
+        if uncovered:
+            errors.append("check(s) " + ", ".join(uncovered) + " apply to no intent in intent_checks")
+    elif len(ids) > 1:
+        errors.append(f"{len(ids)} intents but no intent_checks: declare the checks a step serving each intent "
+                      "answers, or every step answers checks written for its other intents")
+    unknown_conditions = [name for name in check_conditions if name not in checks]
+    if unknown_conditions:
+        errors.append("check_conditions names undeclared check(s) " + ", ".join(unknown_conditions))
     return errors
 
 def validate_operations(tools: Any, hooks: Any) -> list[str]:
@@ -273,6 +332,15 @@ def parse_capability(path: Path) -> Capability:
         for k, v in front["output_types"].items()
     ):
         raise ValueError(f"{path}: output_types must map declared output keys to path, text or external")
+    front.setdefault("intent_checks", {})  # optional: AI-declared check scope per intent (ADR-0018)
+    if not isinstance(front["intent_checks"], dict) or any(
+            not isinstance(names, list) or any(not isinstance(name, str) or not name.strip() for name in names)
+            for names in front["intent_checks"].values()):
+        raise ValueError(f"{path}: intent_checks must map each intent id to a list of check names")
+    front.setdefault("check_conditions", {})  # optional: when a check applies, judged per task by the host AI
+    if not isinstance(front["check_conditions"], dict) or any(
+            not isinstance(when, str) or not when.strip() for when in front["check_conditions"].values()):
+        raise ValueError(f"{path}: check_conditions must map check names to plain-language conditions")
     for need in front["needs"] if isinstance(front["needs"], list) else [None]:
         if (not isinstance(need, dict) or set(need) != {"capability", "label", "when", "reason"}
                 or any(not isinstance(v, str) or not v.strip() for v in need.values())):
@@ -332,6 +400,8 @@ def parse_capability(path: Path) -> Capability:
         needs=front["needs"],
         output_types=dict(front["output_types"]),
         resumable=front["resumable"],
+        intent_checks={key: list(names) for key, names in front["intent_checks"].items()},
+        check_conditions=dict(front["check_conditions"]),
     )
 
 
@@ -438,6 +508,8 @@ def validate_capabilities_and_router(
     for c in capabilities:
         errors.extend(f"Capability {c.id}: {error}" for error in validate_intents(c.intents))
         errors.extend(f"Capability {c.id}: {error}" for error in validate_operations(c.tools, c.hooks))
+        errors.extend(f"Capability {c.id}: {error}"
+                      for error in validate_check_scope(c.intents, c.checks, c.intent_checks, c.check_conditions))
         if c.when != "—" and any(not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token.strip()) for token in c.when.split(",")):
             errors.append(f"Capability {c.id}: when accepts only stack constraints or —; classify intents separately")
         if c.id in seen:
@@ -460,6 +532,10 @@ def validate_capabilities_and_router(
         for dep in c.after:
             if dep not in graph:
                 errors.append(f"Capability {c.id}: missing prerequisite {dep}")
+            elif len({frozenset(names) for names in by_id[dep].intent_checks.values()}) > 1:
+                errors.append(f"Capability {c.id}: prerequisite {dep} scopes different checks per intent, but a step "
+                              "reached only through after has no AI-chosen intent; declare it in needs, or give "
+                              "its intents one check scope")
         required = [need["capability"] for need in c.needs]
         if len(set(required)) != len(required):
             errors.append(f"Capability {c.id}: duplicate needs entry")

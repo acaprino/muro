@@ -55,6 +55,11 @@ def catalog_digest(catalog: list[dict], capabilities: dict[str, Capability], pro
                    delivery: dict | None = None) -> str:
     payload = {"catalog": catalog, "bodies": {key: cap.body for key, cap in sorted(capabilities.items())},
                "checks": {key: cap.checks for key, cap in sorted(capabilities.items())}, "prompt": prompt}
+    # A declared check scope binds evidence; a catalog without one keeps its earlier digest.
+    scopes = {key: {"intent_checks": cap.intent_checks, "check_conditions": cap.check_conditions}
+              for key, cap in sorted(capabilities.items()) if cap.intent_checks or cap.check_conditions}
+    if scopes:
+        payload["check_scopes"] = scopes
     # Absent delivery preserves existing catalog bindings; declared policy and hooks belong to the release contract.
     if delivery is not None:
         payload["delivery"] = delivery

@@ -147,11 +147,15 @@
         {
           "path": "docs/adr/ADR-0013-runtime-lifecycle-discovery-and-factory-isolation.md",
           "excerpt": "Frontmatter parsing remains Python standard-library-only and rejects unknown keys and multiline '- ' YAML list lines."
+        },
+        {
+          "path": "docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md",
+          "excerpt": "A capability with more than one intent\n   declares `intent_checks`"
         }
       ],
       "id": "REQ-006",
       "status": "extracted",
-      "text": "Capabilities carry 10 mandatory frontmatter fields (id, role, when, after, outputs, checks, intents, tools, hooks, conflicts), optional reads, needs and output_types fields, and a mandatory ## Sources section, mirrored in a 6-column ROUTER.md (id | role | when | after | outputs | intents) and strictly validated with unknown frontmatter keys rejected."
+      "text": "Capabilities carry 10 mandatory frontmatter fields (id, role, when, after, outputs, checks, intents, tools, hooks, conflicts), optional reads, needs, output_types, resumable, intent_checks and check_conditions fields, and a mandatory ## Sources section, mirrored in a 6-column ROUTER.md (id | role | when | after | outputs | intents) and strictly validated with unknown frontmatter keys rejected. A capability with more than one intent must declare intent_checks."
     },
     {
       "evidence": [
@@ -203,11 +207,15 @@
         {
           "path": "docs/adr/ADR-0013-runtime-lifecycle-discovery-and-factory-isolation.md",
           "excerpt": "Maps track map_status (active or completed)... step validates outputs and batched checks in memory before publishing a single atomic state snapshot."
+        },
+        {
+          "path": "docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md",
+          "excerpt": "A step result carries its `intent`,\n   its scoped `checks` and the conditions among them."
         }
       ],
       "id": "REQ-010",
       "status": "extracted",
-      "text": "One-step tasks execute in direct mode whenever no active map exists, while multi-step maps support inline/stdin JSON, atomic step batches (outputs + checks), selective upstream preservation (--preserve-completed), token-bound lock recovery (unlock --token), and map completion (complete) restoring direct mode."
+      "text": "One-step tasks execute in direct mode whenever no active map exists, while multi-step maps support inline/stdin JSON, atomic step batches (outputs + checks), selective upstream preservation (--preserve-completed), token-bound lock recovery (unlock --token), and map completion (complete) restoring direct mode. Each step answers only the checks its capability declares for the intent chosen for that step; check results are pass, fail, not-tested or not-applicable, and not-applicable is accepted only for a check with a declared condition."
     },
     {
       "id": "REQ-011",
@@ -216,9 +224,13 @@
         {
           "path": "docs/adr/ADR-0014-discovery-entries.md",
           "excerpt": "The build emits one skill folder per entry in every host adapter, holding only"
+        },
+        {
+          "path": "docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md",
+          "excerpt": "An entry of `entries.json` may declare `absorbs`"
         }
       ],
-      "text": "A package's scope is exactly what its intake absorbed, in any domain. A package may declare AI-authored discovery entries (entries.json): area skills with sharp descriptions that route into the one coordinator, hidden from the slash menu where the host allows, with every absorbed capability in an entry."
+      "text": "A package's scope is exactly what its intake absorbed, in any domain. A package may declare AI-authored discovery entries (entries.json): area skills with sharp descriptions that route into the one coordinator, hidden from the slash menu where the host allows, with every absorbed capability in an entry. An entry may declare absorbs, the names from plugin.replaces whose work it does; the build appends a sentence naming them to its description."
     },
     {
       "id": "REQ-012",
@@ -238,9 +250,13 @@
         {
           "path": "docs/adr/ADR-0015-design-principles-from-first-real-use.md",
           "excerpt": "AI-authored catalog data, or an AI judgment, never a Python proxy."
+        },
+        {
+          "path": "docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md",
+          "excerpt": "**A rule names what it refers to.**"
         }
       ],
-      "text": "Facts about meaning are declared, not inferred: a capability declared resumable gets a map even as a single step, and plugin.replaces lists the absorbed originals that every INSTALL.md tells the user to switch off."
+      "text": "Facts about meaning are declared, not inferred: a capability declared resumable gets a map even as a single step; plugin.replaces lists the absorbed originals that every INSTALL.md tells the user to switch off, and the entries that absorb them name them where the host chooses a skill; a multi-intent capability declares which checks each intent answers."
     },
     {
       "id": "REQ-014",
@@ -365,6 +381,44 @@
         }
       ],
       "text": "What a source prescribes (its rules, numbers, conditions, exceptions and limits) is not altered in whatever form the AI chose for it (capability, permanent policy, hook). The text that selects and starts a part (a hook's text, a capability body as its entry prompt, intent and entry descriptions) is written or regenerated by the host LLM for the package and never drops, weakens, strengthens or invents a rule. An activated capability refers to the packaged original, kept whole and untouched, for the parts the task needs, by file and section; a selected file the generated plugin does not need is removed as a file and as a reference. What a source prescribes changes only to guarantee harmonization and coexistence under the package's principles, never for size, style or taste; each change is the smallest that removes the collision and is recorded with that collision in delivery.json or in the capability's Sources. Permanent policy keeps the source's own words, and every line in it that is not a source's is marked with the package name."
+    },
+    {
+      "id": "REQ-022",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md",
+          "excerpt": "**Evidence describes the step it is bound to.**"
+        },
+        {
+          "path": "docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md",
+          "excerpt": "`step` and `check` reject a\n   check outside the step's scope and a `not-applicable` without a condition, and\n   record nothing."
+        },
+        {
+          "path": "tests/test_check_scope.py",
+          "excerpt": "def test_a_check_of_another_intent_is_rejected_and_nothing_is_recorded"
+        }
+      ],
+      "text": "Evidence describes the step it is bound to. A capability with more than one intent declares intent_checks, every intent mapped to the checks a step serving it answers, with every check in at least one intent; check_conditions gives a check that applies only in some tasks its case in plain language. Both are AI judgments made at harmonization; Python checks their shape. The runtime returns each step's intent, scoped checks and conditions, rejects a check outside the step's scope or a not-applicable without a condition without recording anything, refuses a state holding either, and completes a map on exactly the scoped checks. A step reached only through after has no chosen intent, so its capability's intents share one scope. A catalog that declares a scope or condition binds it in the catalog digest; one without keeps its digest."
+    },
+    {
+      "id": "REQ-023",
+      "status": "extracted",
+      "evidence": [
+        {
+          "path": "docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md",
+          "excerpt": "**A rule names what it refers to.**"
+        },
+        {
+          "path": "docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md",
+          "excerpt": "The generated entry description is\n   the AI-authored description, unchanged, followed by one sentence"
+        },
+        {
+          "path": "tests/test_absorbed_names.py",
+          "excerpt": "def test_the_built_skills_name_the_originals_and_keep_the_umbrella_text_whole"
+        }
+      ],
+      "text": "A package names the originals it absorbs where the host chooses a skill. An entry declares absorbs, names from plugin.replaces judged by the harmonizing AI from the capabilities' sources; the build appends after the unchanged AI-authored description a sentence naming them and telling the host to use the entry instead, also when the user names one, within the 1024-character limit. The umbrella says that its entries name what it absorbs, or lists plugin.replaces when there are no entries, and its fixed text is short enough not to cut the AI-authored description. Python checks the names and lengths and never decides which entry absorbs what."
     }
   ],
   "schema_version": 1,
