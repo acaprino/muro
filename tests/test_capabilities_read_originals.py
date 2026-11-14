@@ -68,3 +68,12 @@ def test_every_packaged_original_a_body_names_is_in_the_release(release):
     for skill in ("ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"):
         assert (release / "scripts/ponytail/skills" / skill / "SKILL.source.md").is_file()
     assert not list(release.rglob("ponytail.md"))             # the rules file travels in the policy only
+    # Git blobs carry no mode: a shebang helper is re-marked executable, or a live host
+    # running it by its own path gets 'Permission denied' (superpowers task-start, 2026-11-14).
+    import os
+    for script in ("executing-plans/scripts/task-start", "executing-plans/scripts/task-done",
+                   "subagent-driven-development/scripts/sdd-workspace",
+                   "subagent-driven-development/scripts/task-brief",
+                   "subagent-driven-development/scripts/review-package"):
+        helper = release / "scripts/superpowers/skills" / script
+        assert helper.read_bytes().startswith(b"#!") and os.access(helper, os.X_OK), script

@@ -182,6 +182,10 @@ def copy_source_helpers(src: dict[str, Any], project_root: Path, dist: Path) -> 
             raise ValueError(f"Duplicate helper path in {src['id']}: {relative}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
+        if content.startswith(b"#!"):
+            # Git blobs carry no mode: an interpreter-script helper must stay runnable by its own
+            # path, or a live host gets 'Permission denied' (superpowers task-start, 2026-11-14).
+            target.chmod(target.stat().st_mode | 0o755)
         if Path(name).suffix.lower() not in {".js", ".mjs", ".cjs"}:
             continue
         try:
