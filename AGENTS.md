@@ -288,6 +288,13 @@ the same command with `--check-sources` and verify a fresh staged
 release. Source checks contact pinned Git remotes. Run targeted tests first for
 new behavior and preserve failure/success evidence in docs/verification/.
 
+The flag interface and the subcommand CLI (`muro <command>`, `python -m muro`;
+ADR-0021) run the same command functions in `muro/cli.py`: a new operation is a
+subcommand, and the legacy flags are frozen as they are. `muro review` prepares
+the decisions re-examination (prompts/review.md; it rewrites nothing itself)
+and `muro baseline` (`muro/baseline.py`) reports pins against upstreams
+read-only, by mechanical version order; re-pinning stays the procedure below.
+
 ## Principles from the first real use (ADR-0015)
 
 - Design for the second time: specify and test every flow on its second pass

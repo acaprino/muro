@@ -30,6 +30,8 @@ python muro_build.py --manifest examples/marionette/sources.json --validate
 python muro_build.py --manifest examples/marionette/sources.json --build
 ```
 
+The same operations are subcommands of one CLI: `python -m muro validate --manifest examples/marionette/sources.json`, or install the `muro` command with `pip install -e .` from this checkout (editable; the factory's prompts sit beside the package). `muro --help` lists every command, including two the flag interface does not have: `review` prepares a host-AI re-examination of the package's recorded decisions against its pinned sources, and `baseline` reports, read-only, which source pins are behind their upstream ([ADR-0021](docs/adr/ADR-0021-factory-cli-executable.md)).
+
 Open `examples/marionette/dist/marionette/GUIDE.html` and choose an example from **Percorsi** (Paths). If you already have a build there, pass `--out <fresh-directory>` to stage the next release elsewhere.
 
 To try the package in Claude Code, load the generated adapter from the repository root.
@@ -130,11 +132,14 @@ Start with Marionette's layout and give the new package its own identity and sou
 | `delivery.json` | Optional delivery decisions, session text, and hook declarations |
 | `eval-cases.json` | Optional routing examples with expected decisions for scoring a host AI |
 
-1. **Prepare intake.** Run `--prepare-intake <source-id>` with the new manifest. Give the host AI the prompt and evidence under `.muro/factory/intake/<source-id>/` beside the manifest.
-2. **Harmonize.** Run `--harmonize` and give the host AI the context under `.muro/factory/harmonization/`. Review the resulting catalog, rationale, and examples.
-3. **Verify and build.** Run `--validate`, `--check-sources`, and `--build` separately with `--manifest <path-to-sources.json>` each time. The release lands in `dist/<slug>/` beside the manifest unless you supply `--out`.
+1. **Prepare intake.** Run `muro intake <source-id>` with the new manifest. Give the host AI the prompt and evidence under `.muro/factory/intake/<source-id>/` beside the manifest.
+2. **Harmonize.** Run `muro harmonize` and give the host AI the context under `.muro/factory/harmonization/`. Review the resulting catalog, rationale, and examples.
+3. **Verify and build.** Run `muro validate`, `muro check-sources`, and `muro build` separately with `--manifest <path-to-sources.json>` each time. The release lands in `dist/<slug>/` beside the manifest unless you supply `--out`.
+4. **Keep it honest over time.** `muro baseline` says which pins fell behind their upstream (exit 1 when one did), and `muro review` prepares the host-AI re-examination of the recorded decisions before you re-pin or re-harmonize. Both change nothing by themselves.
 
-[Intake prompt](prompts/intake.md) · [Harmonizer prompt](prompts/harmonizer.md) · [Delivery prompt](prompts/delivery.md) · [Factory and package boundary](docs/adr/ADR-0011-factory-separate-from-its-packages.md)
+Every step also works through the legacy flags (`python muro_build.py --manifest … --validate`).
+
+[Intake prompt](prompts/intake.md) · [Harmonizer prompt](prompts/harmonizer.md) · [Delivery prompt](prompts/delivery.md) · [Review prompt](prompts/review.md) · [Factory and package boundary](docs/adr/ADR-0011-factory-separate-from-its-packages.md)
 
 <details>
 <summary>Source pins, licenses, and runtime dependencies</summary>

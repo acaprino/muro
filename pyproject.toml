@@ -1,0 +1,25 @@
+# Packaging for the `muro` console command (muro.exe on Windows). Install
+# editable from a checkout or an unpacked release source tree: the factory's
+# prompts/ directory and the packaged runtime sit next to the muro/ package,
+# so a non-editable site-packages install cannot find them yet (ADR-0021).
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "muro"
+description = "A factory for AI-routed skill packages"
+requires-python = ">=3.10"
+dynamic = ["version"]
+
+[project.scripts]
+muro = "muro.cli:main"
+
+[tool.setuptools]
+packages = ["muro"]
+
+[tool.setuptools.dynamic]
+version = { attr = "muro.__version__" }
+
+[tool.setuptools.package-data]
+muro = ["guide.html", "vendor/**/*"]
