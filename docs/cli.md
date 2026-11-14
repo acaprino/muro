@@ -109,14 +109,17 @@ harmonization.
 
 Reports, read-only, how each source's pin stands against its upstream:
 
-- `pin: release` — against the newest same-prefix, non-prerelease tag by
-  numeric order;
+- `pin: release` — first that the pinned tag still exists upstream **and still
+  points at the pinned commit**, then against the newest same-prefix,
+  non-prerelease tag by numeric order;
 - `pin: head` — against the upstream HEAD commit;
 - `pin: static` — reported `frozen`.
 
-Statuses: `current`, `behind`, `frozen`, `unknown` (tag scheme unreadable —
-never guessed), `error` (remote unreachable, with the reason). Exit `0` when
-everything is current or frozen, `1` otherwise — made for a watcher to poll.
+Statuses: `current`, `behind`, `drifted` (the pinned tag was deleted upstream,
+or was moved off the pinned commit — the retag case a supply-chain watcher
+must not miss), `frozen`, `unknown` (tag scheme unreadable — never guessed),
+`error` (remote unreachable, with the reason). Exit `0` when everything is
+current or frozen, `1` otherwise — made for a watcher to poll.
 `--json` prints `{"baseline": [{id, pin, pinned, upstream, status, note}…]}`.
 Re-pinning stays the documented procedure (AGENTS.md, "Adding or re-pinning a
 source"); this command changes no manifest.
@@ -161,12 +164,15 @@ install recipe:
 | `claude-code` | `claude plugin marketplace add` + `claude plugin install <slug>@<slug>` | `CLAUDE_CONFIG_DIR` |
 | `codex` | `codex plugin marketplace add` + `codex plugin add <slug>@<slug>` | `CODEX_HOME` |
 | `pi` | `pi install <adapter>` | `PI_CODING_AGENT_DIR` |
-| `opencode` | config edit: the adapter's `file://` URL appended to `plugins` in `opencode.json` (the home's, or `.config/opencode/opencode.json` when that exists) | — |
+| `opencode` | config edit: the adapter's `file://` URL appended to `plugins` in the home's existing `opencode.json` (project form), else in `.config/opencode/opencode.json` under the home (the user-level path its INSTALL.md names) | — |
 
 The home path is the caller's to supply — resolve it yourself or through
-Mukade's installation scan. A missing host CLI is a clear refusal pointing at
-the adapter's `INSTALL.md`. Hermes has no automated install; follow its
-adapter's `INSTALL.md` by hand. Verified live on claude-code; the codex and
+Mukade's installation scan. Re-running an install is safe: a marketplace the
+home already registered is kept (`already present, kept: …` in the output) and
+the plugin install still runs; a *changed* package still needs a version bump,
+because hosts cache an installed plugin by version. A missing host CLI is a
+clear refusal pointing at the adapter's `INSTALL.md`. Hermes has no automated
+install; follow its adapter's `INSTALL.md` by hand. Verified live on claude-code; the codex and
 pi recipes are their adapters' own commands, not yet run on real hosts
 (ADR-0022, Open).
 
@@ -222,8 +228,10 @@ allowlisted (`capabilities/<kebab-id>.md`, `ROUTER.md`,
 `guide-examples.json`, `entries.json`, `delivery.json`, `eval-cases.json`
 for intake/harmonize; only `REVIEW.md`, in the staged workbench, for review);
 traversal is rejected before anything is written. After writing, intake runs
-a shape check and harmonize runs the full catalog validation; failures are
-fed back within `--rounds`. For intake, the pinned evidence is inlined into
+a shape check and harmonize runs the full catalog validation; failures —
+including a file that fails to parse — are fed back within `--rounds`, and a
+file written by an earlier, rejected round that the repair round no longer
+names is removed, so a misnamed file cannot poison every later validation. For intake, the pinned evidence is inlined into
 the prompt (per-file and total budgets; what is not inlined is listed so the
 model reports it as a gap instead of guessing).
 

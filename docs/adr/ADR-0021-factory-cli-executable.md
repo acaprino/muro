@@ -126,6 +126,16 @@ commands arrive.
 - The keeper commands ("adapt", "install", "update" for one skill/plugin on
   one harness) have a CLI to land in when they are designed.
 
+## Amendment (2026-11-14, after the same-day code review)
+
+`baseline` also verifies that a `release` pin's tag still exists upstream and
+still points at the pinned commit, and reports `drifted` otherwise (a deleted
+or force-moved tag — the retag case a pin watcher must not miss). Comparing
+tag names alone had reported such a source `current`. Statuses are now
+`current`, `behind`, `drifted`, `frozen`, `unknown`, `error`; the exit-code
+rule is unchanged (only `current`/`frozen` exit 0). Fix record:
+`docs/verification/2026-11-14-CLI3-review-fixes.md`.
+
 ## Verification
 
 `docs/verification/2026-11-14-CLI1-factory-cli.md`: full test suite, both

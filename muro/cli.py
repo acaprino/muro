@@ -188,11 +188,21 @@ def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
 
 
 def _captured(fn) -> tuple[int, str]:
+    """Run a command function with stdout/stderr captured; errors become (1, text).
+
+    The one capture helper for the CLI and the MCP server. The exception net
+    matters: an agent repair round feeds the returned text back to the model,
+    so a parse error must come back as a report, never as a crash.
+    """
     import io
     from contextlib import redirect_stderr, redirect_stdout
     buffer = io.StringIO()
     with redirect_stdout(buffer), redirect_stderr(buffer):
-        code = fn()
+        try:
+            code = fn()
+        except (OSError, ValueError) as exc:
+            print(exc, file=sys.stderr)
+            code = 1
     return code, buffer.getvalue().strip()
 
 
@@ -256,8 +266,7 @@ def _run_absorb(directory: Path, repo_url: str, *, slug: str | None, license_nam
         print(f"== agent {step} ==")
         if _run_agent(step, sid, manifest, project_root, api_base, model, api_key_env, rounds) != 0:
             return 1
-    if _run_validate(manifest, project_root) != 0:
-        return 1
+    # The harmonize step only returns 0 after the full validation passed; build re-checks anyway.
     if _run_build(manifest_path, project_root, out, []) != 0:
         return 1
     if harness is None or home is None:

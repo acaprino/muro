@@ -274,6 +274,14 @@ Keep Python standard-library-only and host-neutral. Keep upstream code inert
 during intake. Respect license/provenance rules and the one-capability-per-step
 contract. Do not hand-edit generated dist copies; build to a fresh output location.
 
+Owner principle of 2026-11-14 ("il senso è progettare l'architettura in
+funzioni, moduli e classi riutilizzabili, senza duplicazioni"): every piece of
+knowledge lives once and is reused — per-harness delivery and adaptation in the
+adapter modules (harmonization stays host-neutral; `build` turns the one
+catalog into every host's native form), pin mechanics in one module shared by
+baseline and scaffold, one capture helper for CLI and MCP. A second copy of
+the same logic is a bug, not a convenience.
+
 For routing changes, cover the full chain: source prompt → capability schema →
 router/catalog → AI-response boundary → plan/state → portable host adapters.
 Test malformed/unknown/stale decisions, new non-UI intents, negation-sensitive

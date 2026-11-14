@@ -93,7 +93,12 @@ def _parse_files(content: str) -> tuple[dict[str, str], str]:
     for path, body in files.items():
         if not isinstance(path, str) or not isinstance(body, str):
             raise ValueError("every files entry must map a string path to string content")
-        clean[path.replace("\\", "/").lstrip("./")] = body
+        path = path.replace("\\", "/")
+        # Strip only an exact leading "./": a character-class strip would silently
+        # rewrite "../x" or ".muro/x" into something else before the ".." guard sees it.
+        while path.startswith("./"):
+            path = path[2:]
+        clean[path] = body
     notes = document.get("notes")
     return clean, notes if isinstance(notes, str) else ""
 
@@ -169,11 +174,20 @@ def run_step(step: str, source_id: str | None, manifest: dict, project_root: Pat
 
     messages = [{"role": "user", "content": prompt + _contract(where, names)}]
     failure = ""
+    written_before: set[str] = set()
     for round_index in range(max(1, rounds)):
         content = _post_chat(api_base, api_key, model, messages)
         try:
             files, notes = _parse_files(content)
             written = _write_files(files, root, allowed)
+            # A repair round returns the complete set again: a file an earlier,
+            # rejected round wrote and this round no longer names was a mistake,
+            # and leaving it would fail every later validation unrecoverably.
+            for stale in written_before - set(files):
+                target = root / stale
+                if target.is_file():
+                    target.unlink()
+            written_before = set(files)
         except ValueError as exc:
             failure = str(exc)
             messages += [{"role": "assistant", "content": content},

@@ -100,7 +100,10 @@ def source_repository(src: dict[str, Any], base_dir: Path) -> Iterator[Path]:
             _git(path, "fetch", "--no-tags", "--depth=1", "--", remote, commit)
             _git(path, "cat-file", "-e", f"{commit}^{{commit}}")
             if mode == "head":
-                remote_head = _git(path, "ls-remote", remote, "HEAD").decode("ascii").split()[0]
+                listing = _git(path, "ls-remote", remote, "HEAD").decode("ascii").split()
+                if not listing:
+                    raise ValueError("upstream reports no HEAD")
+                remote_head = listing[0]
                 if remote_head != commit:
                     raise ValueError(f"pinned commit {commit} does not match remote HEAD {remote_head}")
             elif mode == "release":

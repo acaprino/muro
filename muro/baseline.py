@@ -17,7 +17,7 @@ _NUMBER = re.compile(r"\d+")
 _PRERELEASE = re.compile(r"(?:^|[.\-_])(alpha|beta|rc|pre|preview|dev|canary|nightly|draft)(?:[.\-_]?\d+)?$",
                          re.IGNORECASE)
 
-STATUSES = ("current", "behind", "frozen", "unknown", "error")
+STATUSES = ("current", "behind", "drifted", "frozen", "unknown", "error")
 
 
 def _remote(src: dict[str, Any], base_dir: Path) -> str:
@@ -110,6 +110,16 @@ def _check_source(src: dict[str, Any], base_dir: Path) -> dict[str, Any]:
         # mode == "release"
         row["pinned"] = tag
         tags = _tags(_ls_remote(base_dir, remote, options=("--tags",)))
+        upstream_pinned = tags.get(tag)
+        if upstream_pinned is None:
+            row["status"] = "drifted"
+            row["note"] = f"pinned tag {tag} is no longer upstream"
+            return row
+        if upstream_pinned != commit:
+            row["upstream"] = upstream_pinned[:12]
+            row["status"] = "drifted"
+            row["note"] = f"upstream moved tag {tag} off the pinned commit"
+            return row
         newest = _newest_stable(tags, tag)
         if newest is None:
             row["status"] = "unknown"

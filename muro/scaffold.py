@@ -64,35 +64,42 @@ def scaffold_package(directory: Path, remote: str, *, slug: str | None, license_
         raise ValueError("at least one --select path is required: the selection is curated, not implicit")
     if not goal.strip():
         raise ValueError("an intake goal is required (--goal): it steers the intake AI")
+    created = not directory.exists()
     directory.mkdir(parents=True, exist_ok=True)
-    manifest_path = directory / "sources.json"
-    if manifest_path.exists():
-        raise ValueError(f"{manifest_path} already exists; edit it or choose another directory")
-    pin = resolve_pin(directory, remote, release, head)
-    local = Path(remote)
-    repo_field = {"repo_path": str(local.resolve())} if local.exists() else {"repo_url": remote}
-    source: dict[str, Any] = {
-        "id": _source_id(remote),
-        **repo_field,
-        **pin,
-        "license": license_name,
-        "selected_paths": list(selected),
-        "excluded_paths": [],
-        "runtime_deps": [],
-        "intake": {"goal": goal.strip()},
-    }
-    manifest = {
-        "plugin": {
-            "slug": slug,
-            "name": slug.replace("-", " ").title(),
-            "command": slug,
-            "version": "0.1.0",
-        },
-        "sources": [source],
-    }
-    errors = validate_plugin_identity(manifest["plugin"])
-    errors += check_sources(manifest, directory)
-    if errors:
-        raise ValueError("source verification failed:\n" + "\n".join(errors))
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return manifest_path
+    try:
+        manifest_path = directory / "sources.json"
+        if manifest_path.exists():
+            raise ValueError(f"{manifest_path} already exists; edit it or choose another directory")
+        pin = resolve_pin(directory, remote, release, head)
+        local = Path(remote)
+        repo_field = {"repo_path": str(local.resolve())} if local.exists() else {"repo_url": remote}
+        source: dict[str, Any] = {
+            "id": _source_id(remote),
+            **repo_field,
+            **pin,
+            "license": license_name,
+            "selected_paths": list(selected),
+            "excluded_paths": [],
+            "runtime_deps": [],
+            "intake": {"goal": goal.strip()},
+        }
+        manifest = {
+            "plugin": {
+                "slug": slug,
+                "name": slug.replace("-", " ").title(),
+                "command": slug,
+                "version": "0.1.0",
+            },
+            "sources": [source],
+        }
+        errors = validate_plugin_identity(manifest["plugin"])
+        errors += check_sources(manifest, directory)
+        if errors:
+            raise ValueError("source verification failed:\n" + "\n".join(errors))
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return manifest_path
+    except ValueError:
+        # A failed init leaves no phantom package behind.
+        if created and not any(directory.iterdir()):
+            directory.rmdir()
+        raise

@@ -9,10 +9,8 @@ stdin/stdout, one message per line.
 """
 from __future__ import annotations
 
-import io
 import json
 import sys
-from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any, Callable
 
@@ -65,20 +63,10 @@ def tool_definitions() -> list[dict[str, Any]]:
     ]
 
 
-def _captured(fn: Callable[[], int]) -> tuple[int, str]:
-    buffer = io.StringIO()
-    with redirect_stdout(buffer), redirect_stderr(buffer):
-        try:
-            code = fn()
-        except (OSError, ValueError) as exc:
-            print(exc, file=sys.stderr)
-            code = 1
-    return code, buffer.getvalue().strip()
-
-
 def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path) -> tuple[int, str]:
     from . import cli
 
+    _captured = cli._captured  # the one capture helper, exception net included
     manifest_arg = Path(arguments.get("manifest") or default_manifest)
 
     def with_manifest(run: Callable[[dict, Path, Path], int]) -> tuple[int, str]:

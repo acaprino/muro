@@ -32,7 +32,7 @@ def _marketplace_names(adapter: Path, harness: str) -> tuple[str, str]:
     return market, plugin
 
 
-def _run_host(command: list[str], harness: str, home: Path) -> None:
+def _run_host(command: list[str], harness: str, home: Path, tolerate_existing: bool = False) -> str | None:
     env = os.environ.copy()
     env[_HOME_ENV[harness]] = str(home)
     if shutil.which(command[0]) is None:
@@ -40,17 +40,24 @@ def _run_host(command: list[str], harness: str, home: Path) -> None:
     result = subprocess.run(command, env=env, capture_output=True, text=True, timeout=300)
     if result.returncode:
         detail = (result.stderr or result.stdout).strip()
+        # Re-running an install must not fail on its own earlier work ("design for
+        # the second time"): a marketplace that is already registered is kept.
+        if tolerate_existing and "already" in detail.lower():
+            return f"already present, kept: {' '.join(command)}"
         raise ValueError(f"{' '.join(command)} failed: {detail}")
+    return None
 
 
 def _opencode_config(home: Path) -> Path:
+    """An existing config wins; a fresh home gets the user-level path the
+    adapter's INSTALL.md names (`.config/opencode/opencode.json`): a bare
+    `opencode.json` is the project-config form and OpenCode may never read it
+    in a home directory."""
     named = home / "opencode.json"
     nested = home / ".config" / "opencode" / "opencode.json"
     if named.is_file():
         return named
-    if nested.is_file():
-        return nested
-    return named
+    return nested
 
 
 def install_adapter(adapter_dir: Path, harness: str, home: Path) -> list[str]:
@@ -66,16 +73,18 @@ def install_adapter(adapter_dir: Path, harness: str, home: Path) -> list[str]:
 
     if harness == "claude-code":
         market, plugin = _marketplace_names(adapter, harness)
-        _run_host(["claude", "plugin", "marketplace", "add", str(adapter)], harness, home)
-        done.append(f"claude plugin marketplace add {adapter} (CLAUDE_CONFIG_DIR={home})")
+        kept = _run_host(["claude", "plugin", "marketplace", "add", str(adapter)], harness, home,
+                         tolerate_existing=True)
+        done.append(kept or f"claude plugin marketplace add {adapter} (CLAUDE_CONFIG_DIR={home})")
         _run_host(["claude", "plugin", "install", f"{plugin}@{market}"], harness, home)
         done.append(f"claude plugin install {plugin}@{market}")
         return done
 
     if harness == "codex":
         market, plugin = _marketplace_names(adapter, harness)
-        _run_host(["codex", "plugin", "marketplace", "add", str(adapter)], harness, home)
-        done.append(f"codex plugin marketplace add {adapter} (CODEX_HOME={home})")
+        kept = _run_host(["codex", "plugin", "marketplace", "add", str(adapter)], harness, home,
+                         tolerate_existing=True)
+        done.append(kept or f"codex plugin marketplace add {adapter} (CODEX_HOME={home})")
         _run_host(["codex", "plugin", "add", f"{plugin}@{market}"], harness, home)
         done.append(f"codex plugin add {plugin}@{market}")
         return done

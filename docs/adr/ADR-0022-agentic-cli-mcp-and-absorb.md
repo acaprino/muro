@@ -119,6 +119,25 @@ native adapters are the conversion.
    configuration; with an MCP host, the host runs the same chain through the
    MCP tools instead.
 
+## Amendment (2026-11-14, after the same-day code review)
+
+- **Agent repair really repairs.** A validation failure of any kind — a file
+  that fails to parse included — comes back to the model as a report within
+  `--rounds` (the capture helper is one, shared with the MCP server, and turns
+  exceptions into reports), and a file written by a rejected round that the
+  repair round no longer names is removed, so a misnamed file cannot make every
+  later validation fail. Path cleaning strips only an exact leading `./`;
+  a traversal path stays visible and is rejected, never rewritten.
+- **Install is rerunnable.** A marketplace the home already registered is kept
+  (the host's "already exists" answer is tolerated for that one step) and the
+  plugin install still runs; a changed package still needs a version bump. A
+  fresh OpenCode home gets the user-level config path its adapter's INSTALL.md
+  names (`.config/opencode/opencode.json`); an existing project-form
+  `opencode.json` in the home still wins.
+- `absorb` no longer re-validates right after the harmonize step already did;
+  a failed `init` removes the directory it created when it stayed empty.
+- Fix record: `docs/verification/2026-11-14-CLI3-review-fixes.md`.
+
 ## Open
 
 - Direct native install without conversion: when the linked repository already
