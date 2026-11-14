@@ -107,7 +107,7 @@ def test_completed_map_restores_direct_mode_and_supports_direct_context_handoff(
         c.complete(s1["map_id"])
     c.record_check({"name": "engine_check_clean", "status": "fail", "evidence": "broken formula"}, s1["map_id"], "office-authoring")
     for cap_id in prop["plan"]:
-        for chk in c.capabilities[cap_id].checks:
+        for chk in checks_stage["checks_by_capability"][cap_id]:  # the step's intent decides its checks (ADR-0018)
             if not (cap_id == "office-authoring" and chk == "engine_check_clean"):
                 c.record_check({"name": chk, "status": "pass", "evidence": "ok"}, s1["map_id"], cap_id)
     with pytest.raises(ValueError, match="fail"):

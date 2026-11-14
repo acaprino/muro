@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 
 from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
+from .entries import entry_description
 from .claude_adapter import write_claude_policy
 from .hermes_adapter import write_hermes_adapter
 from .native_policy import write_opencode_adapter, write_pi_adapter
@@ -22,13 +23,18 @@ raise SystemExit(runtime_main(["--package", str(package), *sys.argv[1:]]))
 '''
 
 
-def _skill_description(plugin: dict, capabilities: list | None = None) -> str:
+def _skill_description(plugin: dict, capabilities: list | None = None, entries: list | None = None) -> str:
     name = plugin["name"]
-    suffix = (
-        f"{name} AI-routed coordinator for the capabilities in its catalog. "
-        "Classify requests by meaning before selecting work; load one capability per step. "
-        "Never invoke original absorbed skills."
-    )
+    replaces = [r for r in plugin.get("replaces", []) if isinstance(r, str) and r.strip()]
+    # A rule the host cannot apply is no rule: name what it absorbs, or say which skills name it (ADR-0019).
+    if entries and any(entry.get("absorbs") for entry in entries):
+        never = " Never invoke a skill it absorbs; its entries name them."
+    elif replaces:
+        never = " Never invoke a skill it absorbs: " + ", ".join(replaces) + "."
+    else:
+        never = ""
+    # Short, so the AI-authored description before it is not cut to fit the 1024-character limit.
+    suffix = f"{name} AI-routed coordinator: classify by meaning, one capability per step." + never
     custom = str(plugin.get("description") or "").strip().replace(":", ";")
     if custom:
         if not custom.lower().startswith("use when"):
@@ -70,7 +76,7 @@ def _embedded_rules(classify_prompt: str | None) -> str:
 
 
 def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_prompt: str | None = None,
-           entry: dict | None = None) -> str:
+           entry: dict | None = None, entries: list | None = None) -> str:
     slug, name = plugin["command"], plugin["name"]
     state = f".{plugin.get('slug', slug)}"
     skill_name = entry["name"] if entry else slug
@@ -86,7 +92,7 @@ def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_p
         # An entry folder holds only SKILL.md and drives the runtime of the umbrella folder beside it.
         launcher = f"<skill-directory>/../{slug}/muro.py" if entry else "<skill-directory>/muro.py"
         allowed = ""
-    desc = entry["description"] if entry else _skill_description(plugin, capabilities)
+    desc = entry_description(entry) if entry else _skill_description(plugin, capabilities, entries)
     # An entry asks for its own area in full and an index of the rest; the umbrella starts from the index.
     view = "--focus " + ",".join(entry["capabilities"]) if entry else "--brief"
     scope = ""
@@ -174,7 +180,10 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    the exact launcher arguments in `submit`. Do not start the work of a later step before
    this one is submitted, even when the user approved the whole plan. Write
    `{{"outputs": {{...}}, "checks": [...]}}` to `{state}/step.json` and run the launcher with
-   `submit`; the result is the next step, until `checks`. That is:
+   `submit`; the result is the next step, until `checks`. Record only the checks the step's
+   result lists in `checks`: those of the intent chosen for this step. The body's `## Checks`
+   describes every check of the capability; one outside that list belongs to another intent
+   or step and is rejected. That is:
    `python {launcher} step --project "<current project>" --map-id <map_id> --capability <step_id_or_capability> --step-data "<current project>/{state}/step.json"`
    (outputs alone: `record --project "<current project>" --map-id <map_id> --capability <capability> --outputs <json-file>`).
    Never edit `{state}/map.md` or `{state}/state.json` yourself, invent outputs or
@@ -186,7 +195,9 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    `check --project "<current project>" --map-id <map_id> --capability <owner> --result <json-file>`,
    taking the owner from `checks_by_capability`; then close the map with
    `complete --project "<current project>" --map-id <map_id>`. Each check object is
-   {{"name": "<check>", "status": "pass|fail|not-tested", "evidence": "<command/output or observation>"}}.
+   {{"name": "<check>", "status": "pass|fail|not-tested|not-applicable", "evidence": "<command/output or observation>"}}.
+   `not-tested`: the check applies but could not be run; say why. `not-applicable`: only for a
+   check in `check_conditions` whose condition does not hold for this task; the evidence says why.
    Static checklists are not evidence of passing. Do not modify source plugins.
 {_embedded_rules(classify_prompt)}'''
 
@@ -247,7 +258,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             (root / "policy.md").write_text(policy, encoding="utf-8", newline="")
         if capabilities:
             (skill_dir / "SKILL.md").write_text(
-                _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt), encoding="utf-8")
+                _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt, entries=entries),
+                encoding="utf-8")
         (skill_dir / "muro.py").write_text(_LAUNCHER, encoding="utf-8")
         # A skill directory is independently installable; omit build-only graph bundle inside runtime muro/.
         shutil.copytree(

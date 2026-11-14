@@ -73,14 +73,15 @@ def test_confirm_then_record_advances_one_step_at_a_time(package, tmp_path):
 def test_existing_outputs_skip_prerequisites_on_resume(package, tmp_path):
     # The shipped catalog has no prerequisite edges; declare fixture edges to test the mechanism.
     declare_prerequisite(package, "gsap-scrolltrigger", "motion-principles")
-    declare_prerequisite(package, "motion-principles", "visual-direction")
+    # An after prerequisite needs one check scope (ADR-0018): visual-direction scopes two, aesthetic-direction one.
+    declare_prerequisite(package, "motion-principles", "aesthetic-direction")
     coordinator = Coordinator(package, tmp_path / "consumer")
     state = tmp_path / "consumer" / ".muro" / "state.json"
     state.parent.mkdir(parents=True)
     task = "Build a landing page with scroll animation"
     route = decision(coordinator, task, ["gsap-scrolltrigger"], {"stack:gsap"})
     state.write_text(json.dumps({"schema_version": 2, "map_id": "saved-map", "classification": route, "task": task,
-                                "plan": ["visual-direction", "motion-principles", "gsap-scrolltrigger"],
+                                "plan": ["aesthetic-direction", "motion-principles", "gsap-scrolltrigger"],
                                 "stack_tokens": ["stack:gsap"],
                                 "outputs": {"motion-spec": "done", "reduced-motion": "done"},
                                 "results": []}), encoding="utf-8")

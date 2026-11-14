@@ -149,8 +149,13 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
         if case["id"] == wrong:
             ids = ["office-files"]
         selections = []
-        for name in ids:
-            sel = {"capability": name, "intent": caps[name].intents[0]["id"], "reason": "fixture"}
+        for position, name in enumerate(ids):
+            # A capability expected twice is two steps: each occurrence gets its step_id and its own intent.
+            occurrence = ids[:position + 1].count(name)
+            intents = caps[name].intents
+            sel = {"capability": name, "intent": intents[min(occurrence, len(intents)) - 1]["id"], "reason": "fixture"}
+            if ids.count(name) > 1:
+                sel["step_id"] = f"{name}#{occurrence}"
             if caps[name].needs:
                 sel["needs"] = [{"requires": n["capability"], "applies": n["capability"] in ids, "reason": "fixture"}
                                 for n in caps[name].needs]
@@ -202,13 +207,13 @@ def test_router_line_cap_counts_prose_not_catalog_rows(tmp_path):
     from muro import parse_router
     text = (MARIONETTE / "ROUTER.md").read_text(encoding="utf-8")
     rows = [line for line in text.splitlines() if line.startswith("| ") and not line.startswith("| id ")]
-    assert len(rows) == 29
+    assert len(rows) == 34
     many = tmp_path / "ROUTER.md"
     extra = "".join(f"| extra-{n} | role-{n} | — | — | out_{n} | area.intent-{n} |\n" for n in range(40))
     anchor = rows[-1] + "\n"
     many.write_text(text.replace(anchor, anchor + extra), encoding="utf-8")
     assert len(many.read_text(encoding="utf-8").splitlines()) > 80
-    assert len(parse_router(many)) == 69                     # rows never hit the cap
+    assert len(parse_router(many)) == 74                     # rows never hit the cap
     prose = tmp_path / "prose" / "ROUTER.md"
     prose.parent.mkdir()
     prose.write_text(text + "\n".join(f"- note {n}" for n in range(80)) + "\n", encoding="utf-8")

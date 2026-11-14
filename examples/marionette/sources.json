@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.2.0",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, looking up UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, making design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, specifying motion or implementing GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF Office files; implementing software changes, coordinating specs and handoffs, reviewing changes or auditing a repository, reporting deliberate shortcut debt or explaining the Ponytail method and published benchmark; authoring and fact-checking interactive HTML explainers; finding and reading papers, keeping a paper wiki, making paper figures, planning experiments and pitching research; or steering what TokenEconomizer learns and saves.",
+    "description": "Use when designing or building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, making design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, specifying motion or GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing software changes, coordinating specs and handoffs, reviewing changes or auditing a repository, listing shortcut debt or explaining the Ponytail method and benchmark; idea briefs, design documents and their review by fresh reviewers, codebase contract READMEs or design drift reports; making and fact-checking HTML explainers; finding papers, keeping a paper wiki, paper figures, planning and pitching research; or steering what TokenEconomizer learns and saves.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -46,7 +46,15 @@
       "ponytail-debt",
       "ponytail-gain",
       "ponytail-help",
-      "i-have-adhd"
+      "i-have-adhd",
+      "egm",
+      "egm-brainstorm",
+      "egm-draft",
+      "egm-review",
+      "egm-review-loop",
+      "egm-resolve",
+      "egm-bootstrap",
+      "egm-drift-report"
     ]
   },
   "stack": {
@@ -590,6 +598,76 @@
       "intake_only_paths": [
         "skills/i-have-adhd/SKILL.md",
         "README.md"
+      ]
+    },
+    {
+      "id": "egm",
+      "repo_url": "https://github.com/google/elephant-goldfish-model",
+      "commit": "dea7761de06ce5b51c177ebb9bba0469f24af5a4",
+      "pin": "release",
+      "release": "v0.1.1",
+      "license": "Apache-2.0",
+      "copyright": "Copyright 2026 Google LLC (stated in the headers of the upstream files and on egm.dev; the upstream LICENSE carries no copyright line)",
+      "selected_paths": [
+        "skills/egm-brainstorm/SKILL.md",
+        "skills/egm-draft/SKILL.md",
+        "skills/egm-draft/references/design_doc.md",
+        "skills/egm-review/SKILL.md",
+        "skills/egm-review-loop/SKILL.md",
+        "skills/egm-resolve/SKILL.md",
+        "skills/egm-bootstrap/SKILL.md",
+        "skills/egm-bootstrap/references/templates.md",
+        "skills/egm-bootstrap/references/worker-return.schema.json",
+        "skills/egm-drift-report/SKILL.md",
+        "agents/**",
+        "resources/**",
+        "docs/claude.md",
+        "docs/codex.md",
+        "docs/harnesses.md",
+        "README.md",
+        "docs/index.md",
+        "docs/getting_started.md",
+        "docs/faq.md",
+        "docs/privacy.md",
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/agents/**"
+      ],
+      "excluded_paths": [
+        "skills/*/TEST.md",
+        "skills/*/test_scenarios.yaml",
+        "skills/*/agents/**",
+        "skills/*/assets/**",
+        "site/**",
+        "tests/**",
+        "scripts/**",
+        "adapters/**",
+        "distributions/**",
+        "docs/designs/**",
+        "docs/site/**",
+        "docs/assets/**",
+        ".github/**",
+        ".agents/**",
+        ".codex-plugin/**",
+        ".cursor-plugin/**",
+        ".windsurf/**",
+        ".gemini/**",
+        ".plugin/**",
+        "com.github.copilot/**",
+        "assets/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Trial intake of 2026-11-14. Absorb EGM's method: an idea is developed and a design document drafted in the session that holds the context, and documents are reviewed by reviewers that never saw the conversation. Carry the seven skills (brainstorm, draft, review, review loop, resolve, bootstrap, drift report) as on-demand capabilities, with the reviewer personas, the document standards and the three host guides the skills open packaged unchanged. Register nothing by itself: the source ships no hook and its always-on rule for another host is routing. Leave out the upstream manifests, per-host adapters and wrappers, the site, tests and release tooling; the README, the remaining docs and the Claude adapters are read as evidence only."
+      },
+      "intake_only_paths": [
+        "README.md",
+        "docs/index.md",
+        "docs/getting_started.md",
+        "docs/faq.md",
+        "docs/privacy.md",
+        "resources/README.md",
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/agents/**"
       ]
     }
   ]

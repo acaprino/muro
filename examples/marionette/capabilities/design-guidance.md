@@ -9,6 +9,7 @@ intents: [{"id":"ui.design-guidance","description":"Recommend a design system, o
 after: []
 outputs: ["design_candidates", "stack_guidance"]
 checks: ["search_domain_fit", "search_stack_fit", "search_empty_disclosed", "master_not_overwritten"]
+check_conditions: {"master_not_overwritten": "The step persists the design system, or a MASTER.md already exists."}
 ---
 
 # Design Guidance (local design-system search)

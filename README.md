@@ -107,7 +107,7 @@ Intake sets the package scope. The host AI owns the meaning of intents and judge
 
 1. `plan --task "..." --project <path>` returns the classification context. The host AI copies `task`, `stack_tokens`, and `catalog_digest` into the decision and authors `status`, `selections`, `reason`, and `questions`, plus any declared `needs` judgments. Repeated capabilities can carry a distinct `step_id` such as `office-files#1`.
 2. The host writes its JSON in the state folder and passes it to the same `plan` call with `--classification <file>`. Use `--brief` for the index and `--compact --focus <ids>` to read selected capabilities in full. `direct` returns one step, `confirm` returns an ordered plan to approve with `--confirm`, and `no_match` or `needs_clarification` stops execution.
-3. Submit outputs and checks with the returned `step --project <path> --map-id <id> --capability <step> --step-data <file>` arguments. The runtime also accepts separate `record`, `check`, and `complete` calls. The coordinator holds a tokened writer lock during state changes. Use `unlock --token <token>` to recover after a crash.
+3. Submit outputs and checks with the returned `step --project <path> --map-id <id> --capability <step> --step-data <file>` arguments. A step answers only the checks its result lists: those its capability declares for the intent chosen for that step (`intent_checks`). A check recorded on the wrong step is rejected, and `not-applicable` is accepted only for a check with a declared condition (`check_conditions`, [ADR-0018](docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md)). The runtime also accepts separate `record`, `check`, and `complete` calls. The coordinator holds a tokened writer lock during state changes. Use `unlock --token <token>` to recover after a crash.
 4. Use `resume --project <path>` to continue the saved decision and `plan --amend` to refine an active task. Explicitly replacing a map uses `--new` and archives previous evidence on confirmation. `--preserve-completed <steps>` retains valid completed work when appropriate.
 
 Capabilities hand outputs over through their `## Output handoff` sections using the step's recorded outputs and state directory. The coordinator owns the map, and helpers resolve under the package root. `python muro.py session-context` prints the declared policy for inspection. Policy changes invalidate earlier decisions through the catalog digest.
@@ -123,10 +123,10 @@ Start with Marionette's layout and give the new package its own identity and sou
 | File | What it holds |
 | --- | --- |
 | `sources.json` | Package identity, source pins, licenses, selected paths, exclusions, runtime dependency notes, and intake goals. Optional `intake_only_paths` name selected files the generated plugin does not need at run time: they are read at intake and not shipped in the release |
-| `capabilities/*.md` | Intents and exclusions, procedures, outputs, checks, tools, hooks, and relationships |
+| `capabilities/*.md` | Intents and exclusions, procedures, outputs, checks, tools, hooks, and relationships. With more than one intent, `intent_checks` says which checks each intent answers; `check_conditions` gives the case in which a conditional check applies ([ADR-0018](docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md)) |
 | `ROUTER.md` | Catalog index with one row per capability and the harmonization record |
 | `guide-examples.json` | Reviewed requests with explicit decisions that the guide validates and illustrates |
-| `entries.json` | Optional discovery skills that point into the same catalog |
+| `entries.json` | Optional discovery skills that point into the same catalog. Each entry's `absorbs` names the originals from `plugin.replaces` it stands in for, written into its description by the build ([ADR-0019](docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md)) |
 | `delivery.json` | Optional delivery decisions, session text, and hook declarations |
 | `eval-cases.json` | Optional routing examples with expected decisions for scoring a host AI |
 

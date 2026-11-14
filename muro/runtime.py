@@ -15,7 +15,7 @@ import time
 from typing import Any
 import uuid
 
-from .core import parse_capability, parse_router, validate_capabilities_and_router
+from .core import CHECK_STATUSES, parse_capability, parse_router, validate_capabilities_and_router
 from .delivery import allows_empty_catalog, load_delivery, validate_delivery, unregistered_active_hooks
 from .routing import (
     catalog_entries,
@@ -246,10 +246,29 @@ class Coordinator:
                 not isinstance(item, dict)
                 or set(item) != {"name", "status", "evidence", "capability"}
                 or item["capability"] not in expected
-                or item["name"] not in self.capabilities[step_capability(item["capability"])].checks
+                or item["name"] not in self._step_checks(saved_cls, item["capability"])
+                or item["status"] not in CHECK_STATUSES
+                or (item["status"] == "not-applicable"
+                    and item["name"] not in self.capabilities[step_capability(item["capability"])].check_conditions)
             ):
                 raise ValueError("Invalid state check results")
         return state
+
+    @staticmethod
+    def _step_intent(classification: dict[str, Any] | None, step_ref: str) -> str | None:
+        """The intent the AI chose for this step; None for a step added only as an `after` prerequisite."""
+        for selection in (classification or {}).get("selections", []):
+            if isinstance(selection, dict) and selection_step_id(selection) == step_ref:
+                return selection["intent"]
+        return None
+
+    def _step_checks(self, classification: dict[str, Any] | None, step_ref: str) -> list[str]:
+        """The checks this step answers: its capability's checks for the intent of its selection."""
+        return self.capabilities[step_capability(step_ref)].checks_for(self._step_intent(classification, step_ref))
+
+    def _step_conditions(self, classification: dict[str, Any] | None, step_ref: str) -> dict[str, str]:
+        conditions = self.capabilities[step_capability(step_ref)].check_conditions
+        return {name: conditions[name] for name in self._step_checks(classification, step_ref) if name in conditions}
 
     def _write_state(self, state: dict[str, Any]) -> None:
         self.state_dir.mkdir(parents=True, exist_ok=True)
@@ -365,7 +384,8 @@ class Coordinator:
         if not plan:
             return self._checks_result(state)
         merged_outputs = {**self._direct_outputs(), **state["outputs"]}
-        result = self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs)
+        result = self._instruction(plan[0], state["task"], "step", state["map_id"], recorded_outputs=merged_outputs,
+                                   classification=state["classification"])
         remaining = list(plan[1:])
         result["remaining_steps"] = remaining
         later = ", ".join(remaining) if remaining else "none"
@@ -382,9 +402,11 @@ class Coordinator:
         mode: str,
         map_id: str | None = None,
         recorded_outputs: dict[str, str] | None = None,
+        classification: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         cap_id = step_capability(step_ref)
         cap = self.capabilities[cap_id]
+        intent = self._step_intent(classification, step_ref)
         result: dict[str, Any] = {
             "mode": mode,
             "task": task,
@@ -396,10 +418,15 @@ class Coordinator:
             "recorded_outputs": dict(recorded_outputs or {}),
             "instructions": cap.body,
             "required_outputs": cap.outputs,
-            "checks": cap.checks,
+            "checks": self._step_checks(classification, step_ref),
             "tools": cap.tools,
             "hooks": cap.hooks,
         }
+        if intent is not None:
+            result["intent"] = intent
+        conditions = self._step_conditions(classification, step_ref)
+        if conditions:
+            result["check_conditions"] = conditions
         if map_id is not None:
             result["map_id"] = map_id
         return result
@@ -429,8 +456,10 @@ class Coordinator:
         }
 
     def _checks_result(self, state: dict[str, Any]) -> dict[str, Any]:
-        owners = {step_ref: list(self.capabilities[step_capability(step_ref)].checks) for step_ref in state["plan"]}
-        return {
+        owners = {step_ref: self._step_checks(state["classification"], step_ref) for step_ref in state["plan"]}
+        conditions = {step_ref: found for step_ref in state["plan"]
+                      if (found := self._step_conditions(state["classification"], step_ref))}
+        result = {
             "mode": "checks",
             "map_id": state["map_id"],
             "results": state["results"],
@@ -442,14 +471,16 @@ class Coordinator:
                              f'--result "{self.state_dir / "checks.json"}"'),
             "submit_complete": f'complete --project "{self.project_root}" --map-id {state["map_id"]}',
         }
+        if conditions:
+            result["check_conditions"] = conditions
+        return result
 
     def _all_checks_passing_or_not_tested(self, state: dict[str, Any]) -> tuple[list[str], list[str]]:
         effective = self._effective_checks(state)
         missing: list[str] = []
         failing: list[str] = []
         for step_ref in state["plan"]:
-            cap_id = step_capability(step_ref)
-            for chk in self.capabilities[cap_id].checks:
+            for chk in self._step_checks(state["classification"], step_ref):
                 verdict = effective.get(step_ref, {}).get(chk)
                 if verdict is None:
                     missing.append(f"{step_ref}.{chk}")
@@ -521,7 +552,7 @@ class Coordinator:
             if self.capabilities[step_capability(plan[0])].resumable:
                 # Declared by the catalog, not inferred: this step is long enough to need a resumable map.
                 return {"mode": "confirm", "task": task, "plan": plan, "approval": "not-needed"}
-            return self._instruction(plan[0], task, "direct", recorded_outputs=self._direct_outputs())
+            return self._instruction(plan[0], task, "direct", recorded_outputs=self._direct_outputs(), classification=route)
         return {"mode": "confirm", "task": task, "plan": plan}
 
     def confirm(
@@ -721,13 +752,22 @@ class Coordinator:
         required = {"name", "status", "evidence"}
         if not isinstance(item, dict) or set(item) != required or not all(isinstance(item.get(k), str) and item[k].strip() for k in required):
             raise ValueError("Check requires name, status and evidence")
-        if item["status"] not in {"pass", "fail", "not-tested"}:
-            raise ValueError("status must be pass, fail or not-tested")
+        if item["status"] not in CHECK_STATUSES:
+            raise ValueError("status must be pass, fail, not-tested or not-applicable")
         if capability not in state["plan"]:
             raise ValueError(f"Check is bound to capability {capability}, which is not a step of this map")
-        cap_id = step_capability(capability)
-        if item["name"] not in self.capabilities[cap_id].checks:
+        cap = self.capabilities[step_capability(capability)]
+        scoped = self._step_checks(state["classification"], capability)
+        if item["name"] not in cap.checks:
             raise ValueError(f"Unknown check for capability {capability}: {item['name']}")
+        if item["name"] not in scoped:
+            raise ValueError(
+                f"Check {item['name']} does not apply to step {capability} "
+                f"(intent {self._step_intent(state['classification'], capability)}): its checks are "
+                f"{', '.join(scoped)}. Nothing was recorded; record a check only on the step it verifies")
+        if item["status"] == "not-applicable" and item["name"] not in cap.check_conditions:
+            raise ValueError(f"Check {item['name']} declares no condition, so it applies to every {capability} step: "
+                             "record pass, fail or not-tested")
         return {**item, "capability": capability}
 
     def record(self, outputs: dict[str, str], map_id: str, capability: str, verify_files: bool = False) -> dict[str, Any]:
@@ -841,8 +881,8 @@ class Coordinator:
             required = {"name", "status", "evidence"}
             if not isinstance(item, dict) or set(item) != required or not all(isinstance(item.get(k), str) and item[k].strip() for k in required):
                 raise ValueError("Check requires name, status and evidence")
-            if item["status"] not in {"pass", "fail", "not-tested"}:
-                raise ValueError("status must be pass, fail or not-tested")
+            if item["status"] not in CHECK_STATUSES:
+                raise ValueError("status must be pass, fail, not-tested or not-applicable")
         self._binding(map_id, capability)
         if not self.state_path.is_file():
             raise ValueError("No active map. Run plan first or work directly on a one-step task.")

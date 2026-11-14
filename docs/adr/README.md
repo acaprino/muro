@@ -151,3 +151,38 @@ original is not shipped, the always-on limit is proportional to the contributing
 sources, and an adapter installs with its host's own command. Proposed: the
 rule is the owner's, the wording is not separately approved. This manual note
 is outside the historical generated index.
+
+## Check scope amendment
+
+[ADR-0018 — Checks are scoped to the intent of the step](ADR-0018-checks-scoped-to-the-step-intent.md)
+records the 2026-11-13 failure the owner called "errori gravissimi": a
+two-intent capability forced its host to certify a tweak-panel test on a step
+that had no panel. A multi-intent capability now declares `intent_checks`, a
+conditional check declares `check_conditions`, `not-applicable` is accepted
+only under a declared condition, and the runtime rejects a check recorded on
+the wrong step. Proposed: the wording is not separately approved. This manual
+note is outside the historical generated index.
+
+## Absorbed names amendment
+
+[ADR-0019 — A package names the originals it absorbs where the host chooses a skill](ADR-0019-absorbed-originals-named-at-discovery.md)
+records the discovery half of the same session: the umbrella told the host
+"Never invoke original absorbed skills" without naming one, and the factory cut
+the umbrella's AI-authored description to fit 1024 characters. An entry now
+declares `absorbs` (names from `plugin.replaces`); the build appends a sentence
+naming them after the AI text, and the umbrella points to its entries. The
+project rule and the originals still installed in the user scope are recorded
+as configuration outside the factory. Proposed: the wording is not separately
+approved. This manual note is outside the historical generated index.
+
+## Official documentation design
+
+[ADR-0020 — Every package ships official documentation in a standard form, started from its sources' own documentation](ADR-0020-official-package-documentation.md)
+is a design, not an implemented contract. A package gets a README and one page
+per discovery entry, in English and in a fixed form: the host AI writes the
+prose starting from each source's official documentation, read from a pinned
+Git repository; the build fills in the facts from the package's data and
+refuses documentation written for another scope. The finished copy is also
+committed in the package directory. The owner approved the design on
+2026-11-14 and asked that it not be implemented yet. This manual note is
+outside the historical generated index.

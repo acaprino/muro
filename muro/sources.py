@@ -265,7 +265,8 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
                 except UnicodeDecodeError as exc:
                     raise ValueError(f"selected path is not UTF-8 text: {name}") from exc
                 headers = re.findall(r"SPDX-License-Identifier:\s*([^\r\n*<>]+)", content, re.I)
-                if any(header.strip() != src["license"] for header in headers):
+                # An HTML comment closes with "-->": the "--" is not part of the identifier.
+                if any(header.strip().rstrip("-").strip() != src["license"] for header in headers):
                     raise ValueError(f"selected path has a conflicting SPDX license: {name}")
         for pattern in intake_only:
             if not any(_matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/") for name in selected_names):

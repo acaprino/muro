@@ -139,6 +139,26 @@ def test_source_content_is_text_not_executable_html_or_template_instructions(por
     assert len(parsed.ids) == len(set(parsed.ids))
 
 
+def test_sources_registry_shows_where_each_source_comes_from(portable_project):
+    # Owner, 2026-11-14: the registry of origins (name, starting version, link, licence) is visible in the guide.
+    from muro.guide import write_release_guide
+    manifest = json.loads((portable_project / 'sources.json').read_text(encoding='utf-8'))
+    source = manifest['sources'][0]
+    source.update(repo_url='https://github.com/example/demo.git', copyright='Copyright (c) 2026 Example <b>Author</b>')
+    local = dict(source, id='local-only', repo_url='file:///C:/private/checkout')
+    local.pop('copyright')
+
+    text, parsed = read_guide(write_release_guide(portable_project, manifest['plugin'], [source, local]))
+
+    assert '<a href="https://github.com/example/demo.git" rel="noopener noreferrer">' in text
+    assert 'Copyright (c) 2026 Example &lt;b&gt;Author&lt;/b&gt;' in text
+    assert parsed.payload['sources'][0]['repo_url'] == 'https://github.com/example/demo.git'
+    assert parsed.payload['sources'][0]['copyright'].startswith('Copyright (c) 2026 Example')
+    # Only a public web address is shown or stored: a local checkout path stays out of the page.
+    assert 'private/checkout' not in text and 'repo_url' not in parsed.payload['sources'][1]
+    assert not parsed.external_resources and not parsed.event_attributes
+
+
 def test_guide_failure_cannot_publish_a_partial_release(portable_project, tmp_path, monkeypatch):
     def fail(*args):
         raise ValueError('Guide generation failed')

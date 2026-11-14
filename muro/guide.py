@@ -10,7 +10,8 @@ import re
 
 from .core import parse_router, validate_capabilities_and_router
 from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
-from .routing import catalog_digest, catalog_entries, resolve_selection, validate_classification, validate_stack
+from .routing import (catalog_digest, catalog_entries, resolve_selection, selection_step_id, step_capability,
+                      validate_classification, validate_stack)
 from .sources import parse_capabilities
 
 
@@ -87,6 +88,7 @@ _I18N: dict[str, dict[str, str]] = {
         "wirings_h3": "Hooks registered by the release",
         "checks_h3": "Verification checks",
         "no_checks": "No check declared.",
+        "intent_checks_label": "Checks a step with this intent answers:",
         "checks_note": "Listing checks is not proof of passing results.",
         "full_instr_summary": "Complete instructions and provenance",
         "examples_summary": "Illustrative paths in text",
@@ -193,6 +195,7 @@ _I18N: dict[str, dict[str, str]] = {
         "wirings_h3": "Hook registrati dalla release",
         "checks_h3": "Verifiche da eseguire",
         "no_checks": "Nessuna verifica dichiarata.",
+        "intent_checks_label": "Verifiche di un passo con questo intento:",
         "checks_note": "L’elenco delle verifiche non equivale a risultati superati.",
         "full_instr_summary": "Istruzioni complete e provenienza",
         "examples_summary": "Percorsi esemplari in testo",
@@ -351,6 +354,9 @@ def _capability_html(cap: dict, catalog: list[dict], tr: dict[str, str]) -> str:
             f'<p><strong>{_text(tr["excludes_label"])}</strong></p>',
             _items(intent['excludes'], tr['no_excludes']),
         ])
+        if cap.get('intent_checks'):
+            parts.extend([f'<p><strong>{_text(tr["intent_checks_label"])}</strong></p>',
+                          _items(cap['intent_checks'][intent['id']], tr['no_checks'])])
     parts.extend([
         f'<h3>{_text(tr["stack_h3"])}</h3>', f'<p>{_text(constraints)}</p>',
         f'<h3>{_text(tr["prec_h3"])}</h3>',
@@ -391,13 +397,24 @@ def _capability_html(cap: dict, catalog: list[dict], tr: dict[str, str]) -> str:
         ])
     parts.extend([
         f'<p>{_text(tr["hooks_note"])}</p>',
-        f'<h3>{_text(tr["checks_h3"])}</h3>', _items(cap['checks'], tr['no_checks']),
+        f'<h3>{_text(tr["checks_h3"])}</h3>',
+        _items([f"{name} — {tr['only_if']} {cap['check_conditions'][name]}" if name in cap.get('check_conditions', {})
+                else name for name in cap['checks']], tr['no_checks']),
         f'<p>{_text(tr["checks_note"])}</p>',
         f'<details class="instructions"><summary>{_text(tr["full_instr_summary"])}</summary>',
         f'<pre class="source-body">{_text(cap["body"])}</pre></details>',
         '</div></details>',
     ])
     return '\n'.join(parts)
+
+
+def _public_source(source: dict) -> dict:
+    """What the guide shows of a source: its name, pin, licence, copyright and public web address."""
+    public = {key: source[key] for key in ('id', 'pin', 'release', 'commit', 'license', 'copyright') if key in source}
+    url = str(source.get('repo_url') or '')
+    if url.startswith('https://'):  # a local checkout path never reaches the page
+        public['repo_url'] = url
+    return public
 
 
 def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | None = None) -> str:
@@ -413,6 +430,11 @@ def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | 
             f'<p>{_text(source["license"])} · {_text(revision)}</p>',
             f'<p><code>{_text(source["commit"])}</code></p>',
         ])
+        if source.get('repo_url'):
+            link = _text(source['repo_url'])
+            parts.append(f'<p><a href="{link}" rel="noopener noreferrer">{link}</a></p>')
+        if source.get('copyright'):
+            parts.append(f'<p>{_text(source["copyright"])}</p>')
         decisions = [d for d in delivery.get('decisions', []) if d['source'] == source['id']]
         if decisions:
             parts.append(f'<details><summary>{_text(tr["delivery_h4"])}</summary>')
@@ -461,10 +483,14 @@ def _examples(dist: Path, rows: list, capabilities: dict, digest: str, stack_con
         decision['catalog_digest'] = digest
         context = {key: decision[key] for key in ('task', 'stack_tokens', 'catalog_digest')}
         decision = validate_classification(decision, context, capabilities)
-        path_ids = resolve_selection(rows, [selection['capability'] for selection in decision['selections']], set(stack), set(),
-                                     {key: cap.conflicts for key, cap in capabilities.items()},
-                                     conflict_groups=stack_conflicts)
-        result.append({**example, 'path': path_ids})
+        # Repeated capabilities keep one step each (`<capability>#<n>`), as the runtime plans them.
+        steps = resolve_selection(rows, [selection_step_id(selection) for selection in decision['selections']], set(stack),
+                                  set(), {key: cap.conflicts for key, cap in capabilities.items()},
+                                  conflict_groups=stack_conflicts)
+        intents = {selection_step_id(selection): selection['intent'] for selection in decision['selections']}
+        result.append({**example, 'path': list(dict.fromkeys(step_capability(step) for step in steps)),
+                       'steps': [{'step': step, 'capability': step_capability(step), 'intent': intents.get(step)}
+                                 for step in steps]})
     return result
 
 
@@ -472,9 +498,11 @@ def _examples_html(examples: list[dict], tr: dict[str, str]) -> str:
     parts = [f'<details class="instructions"><summary>{_text(tr["examples_summary"])}</summary>']
     for example in examples:
         parts.extend([f'<h3>{_text(example["title"])}</h3>', f'<p>{_text(example["task"])}</p>'])
-        if example['path']:
-            parts.append('<ol>' + ''.join(f'<li><a href="#cap-{_text(identifier)}">{_text(identifier)}</a></li>'
-                                         for identifier in example['path']) + '</ol>')
+        if example['steps']:
+            parts.append('<ol>' + ''.join(
+                f'<li><a href="#cap-{_text(step["capability"])}">{_text(step["step"])}</a>'
+                + (f' <code>{_text(step["intent"])}</code>' if step['intent'] else '') + '</li>'
+                for step in example['steps']) + '</ol>')
         else:
             parts.append(f'<p>{_text(example["status"])}: {_text(tr["no_cap_exec"])}</p>')
         parts.append(f'<p>{_text(example["reason"])}</p>')
@@ -521,8 +549,9 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         entry['title'] = next((line[2:].strip() for line in cap.body.splitlines() if line.startswith('# ')), cap.id)
         entry['body'] = cap.body
         entry['checks'] = list(cap.checks)
-    public_sources = [{key: source[key] for key in ('id', 'pin', 'release', 'commit', 'license') if key in source}
-                      for source in sources]
+        entry['intent_checks'] = {key: list(names) for key, names in cap.intent_checks.items()}
+        entry['check_conditions'] = dict(cap.check_conditions)
+    public_sources = [_public_source(source) for source in sources]
     data = {
         'plugin': {key: plugin[key] for key in ('name', 'slug', 'command', 'version')},
         'capabilities': catalog,

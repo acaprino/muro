@@ -106,6 +106,13 @@ installation, publication or replacement of existing dist output without request
   for each and holds the plan to it. AI-written graph labels are 5 words at most
   (ADR-0012). `when` is only `—` or comma-separated stack constraints. Router rows must
   match the capability exactly, including ordered intent IDs in column six.
+  Check scope (ADR-0018): with more than one intent, `intent_checks` maps every
+  intent to the checks a step serving it answers, and every check belongs to at
+  least one intent; the runtime asks a step only those and rejects any other.
+  `check_conditions` gives a check that applies only in some tasks its case in plain
+  language; the host may record it `not-applicable` with the reason, and no other
+  check may be. Both are AI judgments at harmonization, never derived by Python. An
+  `after` prerequisite has no AI-chosen intent, so its intents share one check scope.
 - `ROUTER.md`: one table row per capability plus a short harmonization record;
   the 80-line cap counts text only, never table rows (ADR-0015 amendment).
 - `prompts/classify.md`: the host AI interprets the runtime task and actual project
@@ -147,7 +154,11 @@ installation, publication or replacement of existing dist output without request
   emits one extra skill per entry that runs the same coordinator against the
   whole catalog, hidden from the slash menu on Claude Code. Python checks names,
   references, length and that every capability has an entry; it never groups
-  capabilities or writes descriptions (ADR-0014).
+  capabilities or writes descriptions (ADR-0014). An entry's `absorbs` lists the
+  names from `plugin.replaces` whose work it does, judged by the harmonizing AI
+  from the sources; the build appends after the AI text a sentence naming them,
+  and the umbrella says its entries name what it absorbs. A name delivered only
+  as session policy has no entry (ADR-0019).
 - `delivery.json` (optional) and `prompts/delivery.md`: what each part of each
   source becomes in this package, decided by the host AI at intake and reviewed
   at harmonization: `decisions` of `{source, content, form, targets, reason}`
@@ -286,6 +297,13 @@ new behavior and preserve failure/success evidence in docs/verification/.
 - Fit the host: one-line calls, JSON written with the host's file tool, output
   small enough to stay inline, pre-approval through the host's own field.
 - State the per-task cost (calls, tokens, denials) of every safeguard you add.
+- Evidence describes the step it is bound to (ADR-0018): never ask a step for a
+  check written for another intent or step, and give a check that may not apply
+  a declared condition and an honest `not-applicable`, or the runtime manufactures
+  a `pass` that proves nothing and then certifies it.
+- A rule names what it refers to (ADR-0019): an instruction the host cannot apply
+  without knowledge it lacks is no rule. Put the names where the host decides
+  (skill descriptions it reads before invoking), not in `INSTALL.md` or a body.
 
 Live host recipe (Claude Code, leaves the owner's configuration untouched):
 stage a release with `--build --out <scratch>`, then in an empty test project run

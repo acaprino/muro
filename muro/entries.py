@@ -11,6 +11,20 @@ ENTRIES_FILE = "entries.json"
 MAX_DESCRIPTION = 1024  # Agent Skills description limit; Claude Code lists at most 1,536 characters
 
 
+def absorbs_sentence(names: list[str]) -> str:
+    """The build's own sentence naming the absorbed originals an entry stands in for (empty without any)."""
+    if not names:
+        return ""
+    listed = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+    return (f" It replaces the absorbed {listed}: use this skill instead of them, also when the user "
+            "names one of them.")
+
+
+def entry_description(entry: dict[str, Any]) -> str:
+    """An entry's AI-authored description followed, unchanged, by the names of what it replaces."""
+    return entry["description"] + absorbs_sentence(entry.get("absorbs", []))
+
+
 def load_entries(package_dir: Path) -> dict[str, Any] | None:
     """The package's entries document, or None when it declares no discovery entries."""
     path = package_dir / ENTRIES_FILE
@@ -29,10 +43,22 @@ def validate_entries(document: Any, capabilities: list, plugin: dict[str, Any]) 
         return ["entries.json entries must be a nonempty array"]
     names: set[str] = set()
     routed: set[str] = set()
+    replaces = [name for name in plugin.get("replaces", []) if isinstance(name, str)]
     for entry in entries:
-        if not isinstance(entry, dict) or set(entry) != {"name", "description", "capabilities"}:
-            errors.append("each entry requires exactly name, description and capabilities")
+        if not isinstance(entry, dict) or not {"name", "description", "capabilities"} <= set(entry) \
+                or set(entry) - {"name", "description", "capabilities", "absorbs"}:
+            errors.append("each entry requires exactly name, description and capabilities, and optional absorbs")
             continue
+        absorbs = entry.get("absorbs", [])
+        if (not isinstance(absorbs, list) or ("absorbs" in entry and not absorbs)
+                or any(not isinstance(item, str) or not item.strip() for item in absorbs)):
+            errors.append(f"entry {entry['name']}: absorbs must be a nonempty list of names from plugin.replaces")
+            absorbs = []
+        elif len(set(absorbs)) != len(absorbs):
+            errors.append(f"entry {entry['name']}: duplicate absorbed name")
+        for item in absorbs:
+            if item not in replaces:
+                errors.append(f"entry {entry['name']}: absorbs {item}, which plugin.replaces does not list")
         name, description, members = entry["name"], entry["description"], entry["capabilities"]
         if not isinstance(name, str) or not SLUG_PATTERN.fullmatch(name):
             errors.append(f"entry name must be kebab-case: {name}")
@@ -46,8 +72,9 @@ def validate_entries(document: Any, capabilities: list, plugin: dict[str, Any]) 
             names.add(name)
         if not isinstance(description, str) or not description.strip() or "\n" in description:
             errors.append(f"entry {name}: description must be one nonempty line")
-        elif len(description) > MAX_DESCRIPTION:
-            errors.append(f"entry {name}: description exceeds {MAX_DESCRIPTION} characters")
+        elif len(description) + len(absorbs_sentence(absorbs)) > MAX_DESCRIPTION:
+            errors.append(f"entry {name}: description, with the sentence naming what it absorbs, exceeds "
+                          f"{MAX_DESCRIPTION} characters")
         if not isinstance(members, list) or not members or any(not isinstance(m, str) for m in members):
             errors.append(f"entry {name}: capabilities must be a nonempty list of capability ids")
             continue

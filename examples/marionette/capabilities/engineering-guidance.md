@@ -5,6 +5,7 @@ when: "—"
 after: []
 outputs: ["engineering_guidance"]
 checks: ["request_answered_without_mutation", "method_and_transport_distinguished", "benchmark_provenance_and_limits", "no_counterfactual_savings"]
+intent_checks: {"engineering.working-guidance": ["request_answered_without_mutation", "method_and_transport_distinguished", "no_counterfactual_savings"], "engineering.benchmark-evidence": ["request_answered_without_mutation", "benchmark_provenance_and_limits", "no_counterfactual_savings"]}
 intents: [{"id":"engineering.working-guidance","description":"Explain the Ponytail method, safeguards, review/audit/debt procedures and task-level simplification preferences.","excludes":["Executing a code change or producing a full code review.","Installing the original Ponytail plugin or promising its absent global mode toggles, statusline, band, dashboard or webhooks.","Changing the host's model, permission settings or system identity."]},{"id":"engineering.benchmark-evidence","description":"Explain Ponytail's published code, token, cost, time and testing benchmark, its method and limits.","excludes":["Claiming measured savings for Marionette or the current repository without a real comparison.","Running a paid benchmark or projecting provider prices.","Substituting published benchmark figures for actual TokenEconomizer session measurements."]}]
 tools: [{"name":"file-access","purpose":"Read the packaged method and published benchmark reference when answering, without editing project files or source mode state.","required":true}]
 hooks: []

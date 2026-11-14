@@ -170,7 +170,7 @@
       // single-line label is clipped on both sides) until a label style value changes in a later frame.
       if(relabelled.length)requestAnimationFrame(()=>requestAnimationFrame(()=>cy.batch(()=>relabelled.forEach(node=>node.data('tw',node.data('tw')===158?159:158)))));
       exampleButtons.forEach((button,index)=>button.setAttribute('aria-pressed',String(index===exampleIndex)));
-      if(exampleIndex!==null){const example=currentExample();status.textContent=example.status==='selected'?(tr.status_ex||'Example: ')+example.title+' · '+path.length+(tr.status_steps||' steps'):example.status==='needs_clarification'?(tr.status_ex||'Example: ')+example.title+' · '+(tr.status_clarify||'clarification required'):(tr.status_ex||'Example: ')+example.title+' · '+(tr.status_none||'no active capability');}
+      if(exampleIndex!==null){const example=currentExample();status.textContent=example.status==='selected'?(tr.status_ex||'Example: ')+example.title+' · '+(ids(example.steps).length||path.length)+(tr.status_steps||' steps'):example.status==='needs_clarification'?(tr.status_ex||'Example: ')+example.title+' · '+(tr.status_clarify||'clarification required'):(tr.status_ex||'Example: ')+example.title+' · '+(tr.status_none||'no active capability');}
       else if(activeIntent)status.textContent=(tr.status_intent||'Intent: ')+activeIntent+' · '+active.size+(tr.status_caps||' capabilities');
       else status.textContent=tr.status_idle||'Drag a node to move it, drag background to pan, scroll to zoom. Click a node for details.';
     }

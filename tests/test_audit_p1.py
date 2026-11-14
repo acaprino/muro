@@ -87,7 +87,7 @@ def test_atomic_step_cli_with_stdin_and_inline_json_completes_without_temp_files
     c_ref = Coordinator(marionette_pkg, consumer)
     good_batch_1 = {
         "outputs": bad_batch["outputs"],
-        "checks": [{"name": chk, "status": "pass", "evidence": "verified"} for chk in c_ref.capabilities["visual-direction"].checks],
+        "checks": [{"name": chk, "status": "pass", "evidence": "verified"} for chk in step1["checks"]],  # landing-strategy scope (ADR-0018)
     }
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(good_batch_1)))
     assert runtime_main([
@@ -100,7 +100,7 @@ def test_atomic_step_cli_with_stdin_and_inline_json_completes_without_temp_files
     # 4. Valid atomic `step` for final step 2 auto-completes map and reports attestation
     good_batch_2 = {
         "outputs": {"motion-spec": "fade 200ms", "reduced-motion": "opacity only"},
-        "checks": [{"name": chk, "status": "pass", "evidence": "verified"} for chk in c_ref.capabilities["motion-principles"].checks],
+        "checks": [{"name": chk, "status": "pass", "evidence": "verified"} for chk in step2["checks"]],
     }
     assert runtime_main([
         "step", "--package", str(marionette_pkg), "--project", str(consumer),
@@ -110,7 +110,8 @@ def test_atomic_step_cli_with_stdin_and_inline_json_completes_without_temp_files
     assert final_res["mode"] == "completed"
     assert final_res["output_attestation"]["page"] == "verified-file"
     assert final_res["output_attestation"]["motion-spec"] == "self-attested"
-    assert final_res["effective_checks"]["visual-direction"]["palette_applied"] == "pass"
+    # A landing-strategy step answers its own checks; palette_applied belongs to a built page (ADR-0018).
+    assert final_res["effective_checks"]["visual-direction"] == {"single_primary_action": "pass", "proof_supported": "pass"}
 
 
 def test_multi_instance_steps_support_distinct_intents_and_files_with_namespaced_outputs(marionette_pkg, tmp_path):
@@ -210,7 +211,7 @@ def test_factory_and_prompts_have_no_domain_leaks_and_use_manifest_stack_rules(t
 
 def test_strict_frontmatter_parser_tokened_lock_unlock_and_safe_launcher(marionette_pkg, portable_project, tmp_path):
     # Every Marionette capability passes the strict parser (29 after the Ponytail intake)
-    assert len(parse_capabilities(MARIONETTE / "capabilities")) == 29
+    assert len(parse_capabilities(MARIONETTE / "capabilities")) == 34
 
     # Unknown frontmatter key (`need` typo) is rejected
     typo_cap = tmp_path / "typo.md"
