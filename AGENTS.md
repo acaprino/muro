@@ -304,7 +304,8 @@ env-only key, https off localhost refused) and the same validation; `muro init`
 install` (`muro/installer.py`) executes a built adapter's own INSTALL.md
 against a caller-named harness home; `muro absorb` chains them. The
 AI-ownership rules above apply unchanged in every mode: Python validates, it
-never classifies, merges or reviews.
+never classifies, merges or reviews. The command reference with parameters,
+exit codes and examples is docs/cli.md; keep it current when a command changes.
 
 ## Principles from the first real use (ADR-0015)
 
