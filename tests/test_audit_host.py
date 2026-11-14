@@ -64,7 +64,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     assert len(data["instructions"]) < 800 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
     assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
     entries = {e["id"]: e for e in json.loads(full)["catalog"]}
-    assert len(entries) == 34
+    assert len(entries) == 36
     in_focus = ("visual-direction", "design-guidance", "figma-design")
     full_part = {e["id"]: e for e in data["catalog"] if "id" in e}
     assert set(full_part) == set(in_focus)

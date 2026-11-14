@@ -327,6 +327,86 @@
       ],
       "reason": "Un solo passo di sola lettura: non è una review del codice per bug né una revisione della qualità dei documenti.",
       "questions": []
+    },
+    {
+      "title": "Dal design approvato al piano eseguibile",
+      "task": "Il design doc docs/designs/export.md è approvato: scrivi il piano di implementazione a task, con file esatti, test che falliscono prima e punti di commit.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "impl-plan#1",
+          "capability": "impl-plan",
+          "intent": "plans.impl-plan-writing",
+          "reason": "C'è una spec approvata e si chiede il piano eseguibile che ne deriva, non il design né l'esecuzione."
+        }
+      ],
+      "reason": "Un solo passo di scrittura del piano: l'esecuzione parte solo dopo la revisione dell'utente e la scelta del metodo, al gate del passo stesso.",
+      "questions": []
+    },
+    {
+      "title": "Esegui il piano senza fermarti",
+      "task": "Esegui il piano docs/superpowers/plans/2026-11-14-export.md task per task, senza chiedermi conferme tra i task, con la review finale a contesto fresco.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "plan-execution#1",
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Esiste già un piano scritto e si chiede di eseguirlo fino alla review finale; il metodo (inline o a subagent) lo decide la regola della fonte o la scelta dell'utente.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": false,
+              "reason": "Il piano esiste già: la richiesta ne nomina il file in docs/superpowers/plans/."
+            }
+          ]
+        }
+      ],
+      "reason": "Un solo passo: il piano c'è, quindi impl-plan non serve come prerequisito; la review finale è la chiusura interna del flusso, non un engineering-review a sé.",
+      "questions": []
+    },
+    {
+      "title": "Brief, design, piano, esecuzione",
+      "task": "Partiamo dalla mia idea di un rate limiter condiviso: mettila alla prova in un brief, scrivi il design document, poi il piano e la sua esecuzione.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "concept-brief#1",
+          "capability": "concept-brief",
+          "intent": "docs.idea-brainstorm",
+          "reason": "L'idea è grezza e la richiesta nomina il brief come primo prodotto."
+        },
+        {
+          "step_id": "design-doc#2",
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Il design document si scrive dal brief, sezione per sezione con l'autore."
+        },
+        {
+          "step_id": "impl-plan#3",
+          "capability": "impl-plan",
+          "intent": "plans.impl-plan-writing",
+          "reason": "Il piano eseguibile argomenta dal design document registrato (reads)."
+        },
+        {
+          "step_id": "plan-execution#4",
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "L'esecuzione parte dal piano registrato, dopo la revisione dell'utente al gate del piano.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": true,
+              "reason": "Nessun piano esiste ancora: lo scrive il passo impl-plan che precede nell'ordine."
+            }
+          ]
+        }
+      ],
+      "reason": "La catena in simbiosi: ogni passo consuma l'output registrato del precedente e ognuno ha i propri gate con l'utente.",
+      "questions": []
     }
   ]
 }

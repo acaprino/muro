@@ -184,6 +184,19 @@
         "egm-bootstrap",
         "egm-drift-report"
       ]
+    },
+    {
+      "name": "marionette-implementation",
+      "description": "Use when turning an approved spec or design document into an executable implementation plan — bite-sized tasks with exact files, signatures and failing-test-first steps — or when executing such a plan task by task without pausing, inline or with a fresh implementer and reviewer per task, under TDD with a progress ledger, a fresh whole-branch review at the end and the integration choice left to you. Not for writing the design document or brief, reviewing a document or a branch on its own, or implementation work that follows no plan document.",
+      "capabilities": [
+        "impl-plan",
+        "plan-execution"
+      ],
+      "absorbs": [
+        "writing-plans",
+        "executing-plans",
+        "subagent-driven-development"
+      ]
     }
   ]
 }
