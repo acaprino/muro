@@ -42,6 +42,8 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | fresh-review | fresh-context-review | — | — | document_review_reports, document_review_outcome | docs.staged-review, docs.review-loop, docs.finding-resolution |
 | codebase-contracts | codebase-contract-docs | — | — | contract_files | docs.codebase-contracts |
 | design-drift | design-drift-report | — | — | drift_report | docs.design-drift |
+| impl-plan | implementation-plan-authoring | — | — | implementation_plan | plans.impl-plan-writing |
+| plan-execution | plan-execution | — | — | plan_execution_report | plans.plan-execution |
 
 ## Runtime contract
 
@@ -110,6 +112,6 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   bodies, ADR-0018); entries declare `absorbs`, i-have-adhd being policy only (ADR-0019).
 - egm v0.1.1 (2026-11-14, trial intake): five on-demand `docs.*` roles, nothing session-wide. Review, loop and resolution are one role
   (one thread in the source); bootstrap's drift offer is design-drift's step; design-doc and work-map's spec keep separate owners.
-<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run files not selected;
-no maintained source for CSS scroll-driven animation; the host starters and tools named by claude-design-system-prompt
-are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->
+- superpowers v7.0.2 (2026-11-14): the planning chain in symbiosis with EGM — a design-doc or brief is the spec impl-plan argues from; the two executors are one role (plan-execution; the source shares their workspace and ledger) with the required method texts packaged as the step's files. using-superpowers, its SessionStart hook and brainstorming are dropped or evidence-only: self-activating routing competes with the coordinator and concept-brief owns the idea stage (`delivery.json`). work-map keeps plan-less implementation; engineering-review keeps standalone code review; fresh-review reviews the plan as a document.
+<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run files not selected; no maintained source for CSS scroll-driven animation;
+the host starters and tools named by claude-design-system-prompt are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->

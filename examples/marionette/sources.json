@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.2.0",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, making design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, specifying motion or GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing software changes, coordinating specs and handoffs, reviewing changes or auditing a repository, listing shortcut debt or explaining the Ponytail method and benchmark; idea briefs, design documents and their review by fresh reviewers, codebase contract READMEs or design drift reports; making and fact-checking HTML explainers; finding papers, keeping a paper wiki, paper figures, planning and pitching research; or steering what TokenEconomizer learns and saves.",
+    "description": "Use when designing or building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, motion or GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing changes, coordinating specs and handoffs, reviewing changes or auditing a repository, shortcut debt or the Ponytail method and benchmark; idea briefs, design documents and their fresh-reviewer review, contract READMEs or design drift reports; implementation plans from an approved spec and their task-by-task execution under TDD; making and fact-checking HTML explainers; finding papers, a paper wiki, paper figures, planning and pitching research; or steering TokenEconomizer.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -54,7 +54,10 @@
       "egm-review-loop",
       "egm-resolve",
       "egm-bootstrap",
-      "egm-drift-report"
+      "egm-drift-report",
+      "writing-plans",
+      "executing-plans",
+      "subagent-driven-development"
     ]
   },
   "stack": {
@@ -668,6 +671,70 @@
         "resources/README.md",
         ".claude-plugin/plugin.json",
         ".claude-plugin/agents/**"
+      ]
+    },
+    {
+      "id": "superpowers",
+      "repo_url": "https://github.com/obra/superpowers",
+      "commit": "22f0b463e7a5e579904dd6211a520321035526f7",
+      "pin": "release",
+      "release": "v7.0.2",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Jesse Vincent (root LICENSE)",
+      "selected_paths": [
+        "skills/writing-plans/SKILL.md",
+        "skills/executing-plans/SKILL.md",
+        "skills/executing-plans/scripts/task-start",
+        "skills/executing-plans/scripts/task-done",
+        "skills/subagent-driven-development/SKILL.md",
+        "skills/subagent-driven-development/implementer-prompt.md",
+        "skills/subagent-driven-development/task-reviewer-prompt.md",
+        "skills/subagent-driven-development/re-review-prompt.md",
+        "skills/subagent-driven-development/references/**",
+        "skills/subagent-driven-development/scripts/**",
+        "skills/test-driven-development/SKILL.md",
+        "skills/test-driven-development/writing-good-tests.md",
+        "skills/systematic-debugging/**",
+        "skills/verification-before-completion/SKILL.md",
+        "skills/using-git-worktrees/SKILL.md",
+        "skills/finishing-a-development-branch/SKILL.md",
+        "skills/requesting-code-review/SKILL.md",
+        "skills/requesting-code-review/code-reviewer.md",
+        "skills/using-superpowers/references/**",
+        "skills/using-superpowers/SKILL.md",
+        "skills/brainstorming/SKILL.md",
+        "hooks/hooks.json",
+        "README.md"
+      ],
+      "excluded_paths": [
+        "skills/dispatching-parallel-agents/**",
+        "skills/receiving-code-review/**",
+        "skills/writing-skills/**",
+        "skills/diagnosing-superpowers/**",
+        "hooks/session-start",
+        "hooks/run-hook.cmd",
+        "hooks/hooks-cursor.json",
+        "index.js",
+        "package.json",
+        "gemini-extension.json",
+        "GEMINI.md",
+        "AGENTS.md",
+        "CODE_OF_CONDUCT.md",
+        "RELEASE-NOTES.md",
+        "scripts/**",
+        "tests/**",
+        "docs/**",
+        "assets/**"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Intake of 2026-11-14, owner direction: the planning chain in symbiosis with EGM. A spec or design document of this package (design-doc, concept-brief) is what writing-plans argues from, and the plan it writes is what the two executors run task by task. Carry writing-plans as one capability and the two executors (inline and subagent-driven) as one, with the method texts they require — TDD, systematic debugging, verification before completion, git worktrees, finishing a branch, the code-reviewer template and the per-platform subagent notes — packaged unchanged as the files the step opens; their standalone upstream triggers are not part of this package's scope. Register nothing by itself: the upstream SessionStart hook injects skill routing and competes with the coordinator, so it and using-superpowers are read as evidence only, as are brainstorming (concept-brief's ground in this package) and the README. Leave out the remaining skills, the hook trampolines, the node packaging and the release tooling."
+      },
+      "intake_only_paths": [
+        "skills/using-superpowers/SKILL.md",
+        "skills/brainstorming/SKILL.md",
+        "hooks/hooks.json",
+        "README.md"
       ]
     }
   ]
