@@ -174,3 +174,15 @@ naming them after the AI text, and the umbrella points to its entries. The
 project rule and the originals still installed in the user scope are recorded
 as configuration outside the factory. Proposed: the wording is not separately
 approved. This manual note is outside the historical generated index.
+
+## Official documentation design
+
+[ADR-0020 — Every package ships official documentation in a standard form, started from its sources' own documentation](ADR-0020-official-package-documentation.md)
+is a design, not an implemented contract. A package gets a README and one page
+per discovery entry, in English and in a fixed form: the host AI writes the
+prose starting from each source's official documentation, read from a pinned
+Git repository; the build fills in the facts from the package's data and
+refuses documentation written for another scope. The finished copy is also
+committed in the package directory. The owner approved the design on
+2026-11-14 and asked that it not be implemented yet. This manual note is
+outside the historical generated index.
