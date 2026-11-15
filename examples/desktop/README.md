@@ -34,4 +34,4 @@ To create and inspect a plugin's Markdown instruction folder, replace the ID in 
 
 Write `.md` files under the returned `path`, then run an AI adaptation before syncing. Editing or removing a file makes prior distributions stale; the folder's original content remains separate from generated policy. `open_custom_instructions` with the same payload opens the folder explicitly.
 
-See `docs/desktop-cli.md` for the full Markdown workflow, target/plugin payloads, source resolution, adaptation, cancellation, reinstall and exclusive synchronization.
+See `docs/desktop-cli.md` for the full Markdown workflow and its "Request actions" table: every action with its payload, including target/plugin saves, source resolution, adaptation, cancellation, reinstall plans, maintenance and exclusive synchronization.

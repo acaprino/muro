@@ -509,14 +509,14 @@ fn ordinary_windows_path(path: &Path) -> PathBuf {
 
 pub fn main_args(args: Vec<String>) -> Result<()> {
     prepare_environment()?;
-    let mut args = args.into_iter();
-    let first = args.next().unwrap_or_else(|| "--help".into());
-    if first == "--help" || first == "-h" {
+    if args.is_empty() || args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "muroctl [--data DIRECTORY] serve\nmuroctl [--data DIRECTORY] request ACTION [--input PAYLOAD.json]\nserve uses correlated NDJSON requests. One-shot adapt waits for completion."
+            "muroctl [--data DIRECTORY] serve\nmuroctl [--data DIRECTORY] request ACTION [--input PAYLOAD.json]\nserve uses correlated NDJSON requests. One-shot adapt waits for completion.\nActions and payloads: docs/desktop-cli.md, section \"Request actions\"."
         );
         return Ok(());
     }
+    let mut args = args.into_iter();
+    let first = args.next().context("Missing command")?;
     let (data, command) = if first == "--data" {
         (
             PathBuf::from(args.next().context("Missing data directory")?),

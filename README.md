@@ -27,7 +27,7 @@ Bring the agent skills and plugins you already use into **one package with its o
 
 The native Tauri desktop application manages a global desired plugin registry, explicit harness instances, versioned distributions, sync plans, reinstall and maintenance. Its interface follows the [approved mockup](docs/mockups/muro-registry.html). The portable folder includes `Muro.exe`, the `muroctl.exe` backend, `mukade.exe`, Git, curl and private Python. The UI calls the same CLI tools available to terminal users. Its registry and WebView profile stay in the portable folder's `data/` directory. No plugin is installed merely by opening the app.
 
-Open `Muro.exe` from the complete portable folder. From PowerShell, `./tools/muroctl.exe request snapshot` reads its registry; `./tools/muroctl.exe request plan` prepares a sync plan. See [CLI reference and usage examples](docs/desktop-cli.md), [example request files](examples/desktop/README.md), and [desktop setup and behavior](docs/desktop.md). This implementation is separate from the standard-library Python factory and has not been published as a release.
+No portable release is published yet: build the folder with the steps in [desktop setup](docs/desktop.md#run-from-source), then open `Muro.exe` from it. From PowerShell, `./tools/muroctl.exe request snapshot` reads its registry; `./tools/muroctl.exe request plan` prepares a sync plan. See [CLI reference and usage examples](docs/desktop-cli.md), [example request files](examples/desktop/README.md), and [desktop setup and behavior](docs/desktop.md); the design record is [ADR-0023](docs/adr/ADR-0023-global-desktop-registry.md). This implementation is separate from the standard-library Python factory and has not been published as a release.
 
 From the repository root, run these commands with **Python 3.10+** and **Git**. Building needs network access to verify the pinned sources.
 
@@ -179,7 +179,8 @@ refuses delivery tied to older inputs. Original files stay untouched in your
 source package. A release carries only originals that its runtime needs.
 
 See the [complete user guide](docs/custom-instructions.md) for the desktop path,
-removal, verification and delivery metadata. Marionette's recap rule is session
+removal, verification and delivery metadata, and
+[ADR-0024](docs/adr/ADR-0024-custom-instructions-markdown.md) for the decision. Marionette's recap rule is session
 policy, so it needs the complete native adapter; invoking a skill alone does not
 activate permanent instructions.
 

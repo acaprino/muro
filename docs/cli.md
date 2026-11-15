@@ -209,6 +209,9 @@ configuration.
 
 ### `muro agent <intake|harmonize|review> [source-id] --model M [--api-base URL] [--api-key-env VAR] [--rounds N] [--manifest PATH]`
 
+Runs one AI-owned step through an OpenAI-compatible `/chat/completions`
+endpoint.
+
 Owner Markdown in `custom-instructions/` beside the manifest is included in
 intake, harmonization and review evidence. After editing those files, run
 `muro agent harmonize --manifest <package>/sources.json --model <your-model>`
@@ -217,11 +220,10 @@ existing host LLM instead, run `muro harmonize --manifest <package>/sources.json
 and give it the generated `PROMPT.md`, or use the MCP `prepare_harmonize` tool.
 The input files remain unchanged. Validation rejects delivery tied to older
 file contents, names or membership; no command infers their meaning itself.
-See [custom instructions](custom-instructions.md) for folder layout, removal,
-runtime retention and a complete Marionette example.
-
-Runs one AI-owned step through an OpenAI-compatible `/chat/completions`
-endpoint.
+If the Markdown changes while the model works, the step stops with
+`custom-instructions changed during AI work; prepare again before writing results`
+before writing that round's files. See [custom instructions](custom-instructions.md) for folder
+layout, removal, runtime retention and a complete Marionette example.
 
 - `--model` (required): the model id the endpoint serves.
 - `--api-base`: base URL, default `https://api.openai.com/v1`. Plain `http`

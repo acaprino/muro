@@ -646,6 +646,11 @@ mod tests {
             .unwrap();
         let skill = Path::new(installed["path"].as_str().unwrap()).join("skills/verify/SKILL.md");
         assert_eq!(fs::read_to_string(&skill).unwrap(), "ORIGINAL");
+        // The service's post-reinstall content check relies on Claude installing an exact copy.
+        assert_eq!(
+            tree_hash(Path::new(installed["path"].as_str().unwrap())).unwrap(),
+            tree_hash(&artifact).unwrap()
+        );
         fs::write(&skill, "BROKEN AGAIN").unwrap();
         install(&target, "demo", &artifact, Some(&id), "update").unwrap();
         let updated = inventory(&target, &json!({}));
