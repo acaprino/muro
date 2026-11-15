@@ -13,7 +13,9 @@ npm run desktop
 
 The resource command verifies the official embedded Python archive hash and refuses to replace an existing directory; `--archive` takes an already downloaded copy of that archive for an offline build. The staged `factory/` is a copy of `muro/`, `prompts/` and the ADRs, and AI adaptation in the app runs that copy. When the factory changes, stage to a new directory and swap it in place of `apps/desktop/src-tauri/resources`; a stale copy runs the old factory. Build the CLI tools with `cargo build -p muro-desktop-runtime --bins` before launching the app. `npm run build` builds the frontend, `cargo build -p muro-desktop --features custom-protocol` embeds it in a native development executable (the one the packaging command below expects; a debug build keeps a console window). `npm run desktop:build` builds the optimized executable without publishing or installing it.
 
-To prepare a complete portable folder, use fresh output paths:
+For an optimized production folder in one step, run `build-release.bat` from the repository root. It runs `npm ci`, stages fresh resources and tools under `.scratch\release-<timestamp>`, builds release executables, fetches the Mukade license at the revision pinned in `crates/muro-desktop-runtime/Cargo.toml`, and writes `dist\Muro-portable-<timestamp>`. It never replaces an existing output, and it does not publish, sign or zip the folder.
+
+To prepare a complete portable folder by hand, use fresh output paths:
 
 ```powershell
 python scripts/desktop_tools.py --out .scratch/portable-tools

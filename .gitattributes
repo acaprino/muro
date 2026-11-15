@@ -3,3 +3,5 @@ muro/vendor/cytoscape/cytoscape.min.js -text
 muro/vendor/cytoscape/LICENSE -text
 # Owner Markdown hashes bind exact bytes, including line endings, across hosts.
 **/custom-instructions/** -text
+# cmd labels and goto need CRLF.
+*.bat text eol=crlf
