@@ -20,7 +20,7 @@ handoff improvements are included in the bundled runtime.
 
 ## Use and upgrade
 
-Read [the custom-instructions guide](../custom-instructions.md) for Markdown
+Read [the custom-instructions guide](https://github.com/acaprino/muro/blob/marionette-v0.2.1/docs/custom-instructions.md) for Markdown
 layout, factory/host-AI commands, edit/removal and verification. Desktop users
 have folder access, file listing and stale-distribution indicators; this release
 asset is the **Marionette plugin**, not a Windows desktop binary or a new factory
@@ -33,12 +33,16 @@ upgrade; its long-policy transport retains the documented host limitations.
 
 ## Verification
 
-The [verification record](../verification/2026-11-15-custom-instructions.md)
+The [verification record](https://github.com/acaprino/muro/blob/main/docs/verification/2026-11-15-custom-instructions.md)
 records unit/integration checks, the 62-case blind host-AI routing evaluation,
 source-pin verification, staged standalone launchers and live-host evidence.
 The owner Markdown is retained byte-for-byte and its generated session text is
 checked alongside the pinned upstream originals. Fixtures prove mechanics, not
 universal compliance by an AI model.
+
+The publication workflow passed **601 tests**, with **16 skipped**, plus source
+validation and a fresh build. The downloaded ZIP's SHA-256 and standalone Codex
+launcher were independently verified after publication.
 
 No user's personal plugins or settings were installed or replaced during this
 work. Publication uses the repository's Release workflow and a new versioned ZIP
