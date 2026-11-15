@@ -7,6 +7,11 @@ The Windows desktop calls the bundled native `muroctl.exe` service. The same exe
 ```text
 Muro.exe
 portable.marker
+SHA256.json
+README.md
+docs/desktop.md, docs/desktop-cli.md
+examples/desktop/
+LICENSES/Mukade-MIT.txt
 tools/
   muroctl.exe
   mukade.exe
@@ -16,6 +21,7 @@ tools/
   curl/bin/curl.exe
   PROVENANCE.json
 resources/
+  PROVENANCE.json
   python/python.exe
   factory/muro_build.py
 data/
@@ -88,6 +94,34 @@ The `save_plugin`, `remove_plugin`, `save_target`, `remove_target` and `settings
 
 When changing an existing plugin's source, discard its old `distributions` and resolved upstream metadata, then resolve or adapt the replacement source. A display-name edit alone does not invalidate those artifacts.
 
+## Request actions
+
+Every action works the same through `request ACTION --input PAYLOAD.json` and through `serve`. An omitted `--input` sends `{}`.
+
+| Action | Payload | Effect |
+|---|---|---|
+| `registry` | `{}` | Desired configuration only. |
+| `snapshot` | `{}` | Registry, observed inventory, activity, jobs, custom-instruction state and `data_dir`. |
+| `scan` | `{}` | Like `snapshot`, after refreshing every target's inventory. |
+| `discover` | `{}` | Mukade harness discovery records. |
+| `save_plugin` | `{"revision":N,"plugin":{...}}` | Adds or replaces a plugin by `id`. |
+| `save_target` | `{"revision":N,"target":{...}}` | Adds or replaces a target instance by `id`. |
+| `remove_plugin`, `remove_target` | `{"revision":N,"id":"..."}` | Removes it from the desired registry. Uninstalling happens only through a plan. |
+| `settings` | `{"revision":N,"settings":{"auto_sync":bool,"interval_minutes":N,"agent":"...","python":"...","factory_path":"..."}}` | All five fields are required; `interval_minutes` is at least 1. |
+| `resolve` | `{"id":"plugin-id"}` | Resolves the source, records upstream metadata and native distributions. |
+| `plan` | `{}` or `{"reinstall":"plugin-id"}` | Calculates a sync plan, or a reinstall plan from the retained verified artifact. |
+| `apply` | `{"plan_id":"..."}` | Applies a saved plan after rechecking its inputs. |
+| `maintenance` | `{"kind":"verify"}` or `{"kind":"cleanup"}` | `verify` rehashes stored artifacts. `cleanup` removes artifacts no receipt references; existing plans must then be recalculated. |
+| `custom_instructions` | `{"id":"plugin-id","create":bool}` | Folder path, Markdown files, digest and stale harnesses. |
+| `open_custom_instructions` | `{"id":"plugin-id"}` | Creates the folder if needed and opens it in the OS file manager. |
+| `adapt` | `{"id":"plugin-id","harness":"...","agent":"claude-code","budget_usd":2}` | Starts an AI adaptation job. `budget_usd` defaults to 2 and must be above 0 and at most 100. |
+| `jobs` | `{}` | Job records. |
+| `cancel_job` | `{"id":"job-id"}` | Requests cancellation. |
+
+`recover_jobs` and `automation_record` are used internally by the desktop app. In `serve`, each request `id` must be an unsigned integer.
+
+At startup, `serve` and `request` point `settings.python` and `settings.factory_path` at the bundled private Python and factory when both are present and the folder is portable (or the registry is new), so a moved portable folder keeps working. Moving the folder also rebases registry, receipt and plan paths that lived inside the old folder; external target roots are left as they are.
+
 ## Custom instructions in Markdown
 
 Each registry plugin has a persistent instruction folder. By default it is `data/custom-instructions/<plugin-id>/`, separate from replaceable upstream checkouts and job packages. The optional `custom_instructions_dir` field on the plugin selects an absolute directory instead, including an existing package's `custom-instructions/` directory. A blank or absent field selects the managed folder. Saving or resolving another upstream source preserves that field and the instruction files.
@@ -132,7 +166,7 @@ Jobs preserve an input snapshot under their `inputs/custom-instructions/` direct
 
 Adding, changing, renaming or deleting Markdown makes older distributions stale, including deleting the last file. A native artifact without the requested customization cannot satisfy a sync plan. `snapshot` includes a `custom_instructions` array for the UI; reopening or refreshing it observes external editor changes. Plan application rechecks instruction digests even when the registry revision did not change. A retained artifact used for reinstall must match the current instructions too. These checks do not prove that an AI or host follows the instructions semantically.
 
-Markdown content and Unicode relative filenames are hashed exactly; line endings are not normalized. Linked directories, symlinks/junctions, nonregular Markdown and invalid UTF-8 are rejected. Files with other extensions are not included. Renaming a file changes provenance and requires another harmonization. No instruction content is stored as a second editable text field in the registry.
+Markdown content and Unicode relative filenames are hashed exactly; line endings are not normalized. Linked directories, symlinks/junctions, nonregular Markdown, invalid UTF-8 and names containing a backslash, colon or line break are rejected. Files with other extensions are not included. Renaming a file changes provenance and requires another harmonization. No instruction content is stored as a second editable text field in the registry.
 
 ## Persistent service
 

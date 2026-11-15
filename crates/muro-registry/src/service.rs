@@ -414,6 +414,14 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
                "custom_instructions_digest":custom_digest}),
     )
 }
+/// A repair must restore the files, not only the version. Codex reports no install path, and
+/// Hermes installs a Git clone whose `.git` is not part of the artifact, so neither is compared.
+fn reinstalled_files_match(harness: &str, entry: &Value, op: &Value) -> bool {
+    match entry["path"].as_str().filter(|p| !p.is_empty() && harness != "hermes") {
+        Some(path) => tree_hash(Path::new(path)).ok().as_deref() == op["artifact"]["digest"].as_str(),
+        None => true,
+    }
+}
 fn retained_artifact(root: &Path, receipt: &Value, harness: &str) -> Result<Value> {
     let path = Path::new(str_field(receipt, "path")?);
     let owned = root.join("artifacts").canonicalize()?;
@@ -703,11 +711,24 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                 op["name"]
             );
         } else {
+            let entry = entries
+                .iter()
+                .find(|p| p["registry_id"] == op["plugin_id"] && p["version"] == op["to_version"])
+                .with_context(|| format!("Installed version did not match {}", op["name"]))?;
             ensure!(
-                entries.iter().any(
-                    |p| p["registry_id"] == op["plugin_id"] && p["version"] == op["to_version"]
-                ),
-                "Installed version did not match {}",
+                op["kind"] != "reinstall"
+                    || reinstalled_files_match(
+                        reg["targets"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .find(|t| t["id"] == op["target_id"])
+                            .and_then(|t| t["harness"].as_str())
+                            .unwrap_or(""),
+                        entry,
+                        op
+                    ),
+                "Reinstalled files of {} do not match the verified artifact",
                 op["name"]
             );
         }
@@ -790,5 +811,23 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
             )
         }
         _ => bail!("Unknown maintenance action"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn reinstall_check_compares_installed_files_with_the_artifact() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("SKILL.md"), "ORIGINAL").unwrap();
+        let op = json!({"artifact":{"digest":tree_hash(tmp.path()).unwrap()}});
+        let entry = json!({"path":tmp.path()});
+        assert!(reinstalled_files_match("claude-code", &entry, &op));
+        fs::write(tmp.path().join("SKILL.md"), "BROKEN").unwrap();
+        assert!(!reinstalled_files_match("claude-code", &entry, &op));
+        assert!(!reinstalled_files_match("claude-code", &json!({"path":tmp.path().join("missing")}), &op));
+        assert!(reinstalled_files_match("codex", &json!({"path":""}), &op));
+        assert!(reinstalled_files_match("hermes", &entry, &op));
     }
 }

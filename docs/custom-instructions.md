@@ -16,7 +16,8 @@ my-package/
 
 Use UTF-8 `.md` files, with no required headings or frontmatter. Subdirectories
 are optional. Files must be ordinary files inside this folder, not symlinks or
-junctions. Non-Markdown files are not inputs. Keep this folder under version
+junctions. A file or folder name must not contain a backslash, a colon or a
+line break. Non-Markdown files are not inputs. Keep this folder under version
 control with the package; preserve its exact bytes across checkouts because
 file hashes include line endings. This repository's `.gitattributes` does so.
 

@@ -193,3 +193,30 @@ refuses documentation written for another scope. The finished copy is also
 committed in the package directory. The owner approved the design on
 2026-11-14 and asked that it not be implemented yet. This manual note is
 outside the historical generated index.
+
+## Factory CLI
+
+[ADR-0021 — One factory CLI executable, with review and baseline commands](ADR-0021-factory-cli-executable.md)
+makes `muro <command>` (also `python -m muro`) the interface. The legacy flags
+run the same command functions. `muro review` prepares the decisions
+re-examination, and `muro baseline` reports pins against upstreams read-only.
+Proposed: the wording is not separately approved. This manual note is outside
+the historical generated index.
+
+## Agentic CLI
+
+[ADR-0022 — The CLI runs the AI-owned steps itself](ADR-0022-agentic-cli-mcp-and-absorb.md)
+adds `muro mcp`, `muro agent`, `muro init`, `muro install` and `muro absorb`.
+Python still validates and never classifies, merges or reviews. Proposed: the
+wording is not separately approved. This manual note is outside the historical
+generated index.
+
+## Desktop registry
+
+[ADR-0023 — A desktop registry alongside the factory](ADR-0023-global-desktop-registry.md)
+records the native portable Tauri app and its `muroctl`/`mukade` command-line
+tools. They manage harness instances and a desired plugin registry with
+reviewable sync plans, and adapt sources through the factory with a real host
+AI. The factory stays independent. Proposed: it implements the owner's approved
+design, and the text is not separately approved. This manual note is outside
+the historical generated index.

@@ -11,7 +11,7 @@ python scripts/desktop_resources.py --out apps/desktop/src-tauri/resources
 npm run desktop
 ```
 
-The resource command verifies the official embedded Python archive hash and refuses to replace an existing directory. An existing staged resource directory can be used for development; regenerate to a fresh location when the factory changes. Build the CLI tools with `cargo build -p muro-desktop-runtime --bins` before launching the app. `npm run build` builds the frontend, `cargo build -p muro-desktop --features custom-protocol` embeds it in a native development executable. `npm run desktop:build` builds the optimized executable without publishing or installing it.
+The resource command verifies the official embedded Python archive hash and refuses to replace an existing directory; `--archive` takes an already downloaded copy of that archive for an offline build. The staged `factory/` is a copy of `muro/`, `prompts/` and the ADRs, and AI adaptation in the app runs that copy. When the factory changes, stage to a new directory and swap it in place of `apps/desktop/src-tauri/resources`; a stale copy runs the old factory. Build the CLI tools with `cargo build -p muro-desktop-runtime --bins` before launching the app. `npm run build` builds the frontend, `cargo build -p muro-desktop --features custom-protocol` embeds it in a native development executable (the one the packaging command below expects; a debug build keeps a console window). `npm run desktop:build` builds the optimized executable without publishing or installing it.
 
 To prepare a complete portable folder, use fresh output paths:
 
@@ -34,7 +34,7 @@ The tools script verifies the official Git and curl archive hashes, retaining li
 
 Upstream version/revision and each native or Muro-generated distribution version are shown separately. Changing a plugin's source clears every prepared distribution and its resolved upstream metadata; resolve or adapt the new source before syncing. Editing only a name preserves existing provenance. Stable resolution prefers published GitHub releases; explicit pins and HEAD are available. Sources without sufficient release information require an explicit choice instead of a guessed version.
 
-Registry writes are revision-checked and atomic; native operations have a journal and are followed by an inventory scan. Failed or interrupted operations require inspection and a fresh plan, not blind replay. Reinstall is an explicit plan operation. Maintenance verifies stored artifacts and cleans unused resources while preserving referenced distributions.
+Registry writes are revision-checked and atomic; native operations have a journal and are followed by an inventory scan. Failed or interrupted operations require inspection and a fresh plan, not blind replay. Reinstall is an explicit plan operation that uses the retained verified artifact, not today's source. After it, the installed files must hash like that artifact on Claude Code, OpenCode and Pi; Codex reports no install folder and Hermes installs a Git clone, so there only the version and activation are checked. Maintenance verifies stored artifacts and removes artifacts no installation receipt references; plans calculated before a cleanup must be recalculated.
 
 ## Custom instructions from Markdown
 
@@ -50,7 +50,9 @@ The original files stay separate from upstream snapshots and survive source upda
 
 ## Runtime and storage
 
-Portable distributions contain `portable.marker` and keep state under `data/` beside `Muro.exe`. Development builds without the marker use the application data directory for `dev.muro.registry`. `MURO_DATA_DIR` or CLI `--data` selects an explicit registry. External harness target roots stay explicit and are not moved with the app. The app always uses its own WebView2 profile, avoiding collisions with a parent application such as Shinatama. Closing the window leaves Muro in the notification area; **Esci** quits it. Automatic synchronization is opt-in and runs only while the application is running, including in the notification area. Its latest result appears in Activity.
+Portable distributions contain `portable.marker` and keep state under `data/` beside `Muro.exe`. Development builds without the marker use the application data directory for `dev.muro.registry`. `MURO_DATA_DIR` or CLI `--data` selects an explicit registry. External harness target roots stay explicit and are not moved with the app. The app always uses its own WebView2 profile, avoiding collisions with a parent application such as Shinatama. Closing the window leaves Muro in the notification area; **Esci** quits it. Automatic synchronization is opt-in and runs only while the application is running, including in the notification area. Each interval it resolves every plugin, calculates a plan and applies it without a review step, stopping only on blockers. On an exclusive target that includes removing plugins outside the registry. Its latest result appears in Activity.
+
+For diagnostics, `Muro.exe --request ACTION '<json>'` runs one request through the bundled `muroctl` and prints the result without opening a window (the windowed release build has no console, so prefer `tools\muroctl.exe` for scripts). The actions are listed in [the CLI reference](desktop-cli.md#request-actions). Moving the portable folder rebases registry, receipt and plan paths inside it at the next start.
 
 Claude Code, Codex, OpenCode, Pi and Hermes have separate installation contracts. DeepSeek is discoverable through Mukade but has no Muro plugin adapter. An unavailable command or failed inventory is shown as incomplete, never as an empty installation. Existing host permissions remain authoritative.
 
