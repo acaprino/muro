@@ -150,6 +150,7 @@ def run_step(step: str, source_id: str | None, manifest: dict, project_root: Pat
              validate: Callable[[], tuple[int, str]]) -> int:
     """Prepare the step, ask the endpoint, write the answer, validate. 0 on success."""
     from .factory import harmonize_prompt, prepare_intake, review_prompt
+    from .custom_instructions import collect, inventory
 
     if step == "intake":
         source = next((s for s in manifest.get("sources", []) if s.get("id") == source_id), None)
@@ -172,11 +173,19 @@ def run_step(step: str, source_id: str | None, manifest: dict, project_root: Pat
     else:
         raise ValueError(f"step must be one of {', '.join(STEPS)}")
 
+    input_snapshot = inventory(collect(workbench))
+
+    def verify_inputs():
+        if inventory(collect(project_root)) != input_snapshot:
+            raise ValueError("custom-instructions changed during AI work; prepare again before writing results")
+
     messages = [{"role": "user", "content": prompt + _contract(where, names)}]
     failure = ""
     written_before: set[str] = set()
     for round_index in range(max(1, rounds)):
+        verify_inputs()
         content = _post_chat(api_base, api_key, model, messages)
+        verify_inputs()
         try:
             files, notes = _parse_files(content)
             written = _write_files(files, root, allowed)

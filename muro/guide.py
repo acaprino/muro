@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from html import escape
 from hashlib import sha256
 import json
+from .custom_instructions import provenance_ids
 from pathlib import Path
 import re
 
@@ -444,6 +445,17 @@ def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | 
                              f'{_text(item["content"])}<br>{_text(item["reason"])}</p>')
             parts.append('</details>')
         parts.append('</article>')
+    custom = delivery.get('custom_instructions')
+    if custom:
+        for path, sha in custom['files'].items():
+            parts.extend(['<article class="source-entry">', f'<h3>{_text(path)}</h3>',
+                          f'<p><code>{_text(sha)}</code></p>'])
+            for item in delivery.get('decisions', []):
+                if item['source'] == path:
+                    targets = ' → ' + ', '.join(item['targets']) if item['targets'] else ''
+                    parts.append(f'<p><strong>{_text(tr["form_" + item["form"]])}{_text(targets)}</strong><br>'
+                                 f'{_text(item["content"])}<br>{_text(item["reason"])}</p>')
+            parts.append('</article>')
     if delivery.get('always_on'):
         text = delivery['always_on']
         parts.extend([
@@ -522,13 +534,13 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
     capabilities = parse_capabilities(dist / 'capabilities')
     rows = parse_router(dist / 'ROUTER.md')
     source_ids = {source['id'] for source in sources}
-    delivery = load_delivery(dist)
+    delivery = load_delivery(dist, packaged=True)
     errors = (unregistered_active_hooks(capabilities) if delivery is None
               else validate_delivery(delivery, capabilities, source_ids))
     if errors:
         raise ValueError('Invalid guide delivery: ' + '; '.join(errors))
     errors = validate_capabilities_and_router(
-        capabilities, rows, source_ids, plugin_slug=plugin.get('slug'),
+        capabilities, rows, provenance_ids(source_ids, delivery), plugin_slug=plugin.get('slug'),
         allow_empty=allows_empty_catalog(delivery, capabilities, source_ids),
     )
     if errors:

@@ -83,6 +83,13 @@ dependencies are judged at runtime, with no manifest gate. Proposed: the decisio
 are the owner's, the wording is not separately approved. This manual note is
 outside the historical generated index.
 
+## Owner Markdown instructions
+
+Manual note outside the generated index: [ADR-0024 — Owner Markdown enters AI
+harmonization](ADR-0024-custom-instructions-markdown.md) records the approved
+`custom-instructions/` input model, per-file delivery provenance, stale-input
+checks and Marionette's permanent ADHD progress recaps.
+
 ## Data flow and conditional prerequisites amendment
 
 [ADR-0012 — Declared data flow (reads) and AI-judged conditional prerequisites (needs)](ADR-0012-data-flow-and-conditional-prerequisites.md)

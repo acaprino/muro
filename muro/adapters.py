@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 
 from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
+from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
 from .hermes_adapter import write_hermes_adapter
@@ -288,6 +289,10 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         shutil.copy2(dist / "guide-examples.json", skill_dir / "guide-examples.json")
         if (dist / DELIVERY_FILE).is_file():
             shutil.copy2(dist / DELIVERY_FILE, skill_dir / DELIVERY_FILE)
+        if (dist / CUSTOM_RECEIPT).is_file():
+            shutil.copy2(dist / CUSTOM_RECEIPT, skill_dir / CUSTOM_RECEIPT)
+        if (dist / CUSTOM_DIRECTORY).is_dir():
+            shutil.copytree(dist / CUSTOM_DIRECTORY, skill_dir / CUSTOM_DIRECTORY)
         if (dist / ENTRIES_FILE).is_file():        # the runtime indexes a focused view by entry
             shutil.copy2(dist / ENTRIES_FILE, skill_dir / ENTRIES_FILE)
         if (dist / "scripts").is_dir():

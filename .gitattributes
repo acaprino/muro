@@ -1,3 +1,5 @@
 # Preserve official vendored bytes used by the release guide's SHA-256 pins.
 muro/vendor/cytoscape/cytoscape.min.js -text
 muro/vendor/cytoscape/LICENSE -text
+# Owner Markdown hashes bind exact bytes, including line endings, across hosts.
+**/custom-instructions/** -text

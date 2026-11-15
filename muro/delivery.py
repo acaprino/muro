@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .custom_instructions import metadata_errors, reference_errors, validate_binding
+
 DELIVERY_FILE = "delivery.json"
 FORMS = ("capability", "always-on", "hook", "dropped")
 # Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
@@ -24,15 +26,18 @@ def always_on_limit(document: Any) -> int:
     decisions = document.get("decisions") if isinstance(document, dict) else None
     sources = {item["source"] for item in decisions if isinstance(item, dict) and item.get("form") == "always-on"
                and isinstance(item.get("source"), str)} if isinstance(decisions, list) else set()
+    sources = {"custom-instructions" if source.startswith("custom-instructions/") else source for source in sources}
     return ALWAYS_ON_PER_SOURCE * len(sources)
 _DECISION_KEYS = {"source", "content", "form", "targets", "reason"}
 _WIRING_KEYS = {"host", "capability", "event", "matcher", "run"}
 
 
-def load_delivery(package_dir: Path) -> dict[str, Any] | None:
+def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
     """The package's delivery document, or None: then everything is an on-demand capability and nothing registers."""
     path = package_dir / DELIVERY_FILE
-    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    document = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    validate_binding(package_dir, document, packaged=packaged)
+    return document
 
 
 def session_text(document: dict[str, Any] | None) -> str:
@@ -45,13 +50,21 @@ def _text(value: Any) -> bool:
 
 def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -> list[str]:
     """Check shape, references and that every declared form has something behind it. Forms stay the AI's decision."""
-    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks"}:
-        return ["delivery.json must be an object with decisions and only decisions, always_on and hooks"]
+    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "custom_instructions"}:
+        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks and custom_instructions"]
+    custom = document.get("custom_instructions")
+    if "custom_instructions" in document:
+        errors = metadata_errors(custom)
+        if errors:
+            return errors
+        if "custom-instructions" in source_ids or any(isinstance(s, str) and s.startswith("custom-instructions/") for s in source_ids):
+            return ["custom-instructions is reserved for owner Markdown, not an upstream source id"]
+        source_ids = source_ids | set(custom["files"])
     decisions = document["decisions"]
     if not isinstance(decisions, list) or not decisions:
         return ["delivery.json decisions must be a nonempty array"]
     known = {cap.id: cap for cap in capabilities}
-    errors: list[str] = []
+    errors: list[str] = reference_errors(document, capabilities)
     decided_sources: set[str] = set()
     forms: set[str] = set()
     hook_targets: set[str] = set()

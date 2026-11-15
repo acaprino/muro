@@ -9,6 +9,16 @@ scoring script, fixed taxonomy or manifest-order winner to perform it for you.
 
 ## Functional synthesis and graph placement
 
+Include all owner Markdown supplied from `custom-instructions/`. Compare it with
+the current catalog and policy, using AI judgment to decide which parts become
+session policy, on-demand capabilities or supported hooks. One file may have
+several forms and several files may contribute to one owner. Preserve the input
+files, attribute decisions to their exact relative paths, and review previous
+decisions after additions, edits, renames or removals. Never select a form from a
+filename or make every Markdown file automatically always-on. Use the supplied
+digest and file inventory in `delivery.custom_instructions`; a prepared prompt
+is evidence for this work, not proof it has happened.
+
 Understand what each capability actually does, including its instructions and
 source evidence, before comparing labels. Use the current router as context to
 review, not an unquestionable tree. Organize the graph around desired outcomes,

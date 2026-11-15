@@ -76,6 +76,19 @@ installation, publication or replacement of existing dist output without request
 
 ## Architecture and ownership
 
+- `custom-instructions/**/*.md` beside a package's `sources.json`: owner-authored
+  UTF-8 input, including subdirectories, with no required frontmatter. The host
+  LLM decides its meaning, scope, coexistence and delivery form. Filename and
+  order never classify it. Preparations include exact snapshots and inventory;
+  `delivery.custom_instructions` records `digest`, `files` and AI-authored
+  `intake_only_paths`. Every file has a delivery decision with its exact relative
+  path as `source`. One collection contributes one 6000-character always-on
+  allowance. Changes, renames and removals require re-harmonization. Originals
+  stay in the source package; only runtime-needed files ship, with `SKILL.md`
+  renamed `SKILL.source.md`. The build receipt `custom-instructions.lock.json`
+  permits that declared pruning at runtime, never at source validation. Preserve
+  raw bytes across Git checkouts. See ADR-0024 and docs/custom-instructions.md.
+
 - `sources.json`: source identity, pinned revision, license gate, selected paths,
   exclusions, runtime dependencies and source-specific intake goal. Optional
   `intake_only_paths`: selected files the intake AI read and that the generated

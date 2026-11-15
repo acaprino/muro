@@ -23,6 +23,12 @@ Bring the agent skills and plugins you already use into **one package with its o
 
 ## Quickstart
 
+### Desktop registry (Windows development build)
+
+The native Tauri desktop application manages a global desired plugin registry, explicit harness instances, versioned distributions, sync plans, reinstall and maintenance. Its interface follows the [approved mockup](docs/mockups/muro-registry.html). The portable folder includes `Muro.exe`, the `muroctl.exe` backend, `mukade.exe`, Git, curl and private Python. The UI calls the same CLI tools available to terminal users. Its registry and WebView profile stay in the portable folder's `data/` directory. No plugin is installed merely by opening the app.
+
+Open `Muro.exe` from the complete portable folder. From PowerShell, `./tools/muroctl.exe request snapshot` reads its registry; `./tools/muroctl.exe request plan` prepares a sync plan. See [CLI reference and usage examples](docs/desktop-cli.md), [example request files](examples/desktop/README.md), and [desktop setup and behavior](docs/desktop.md). This implementation is separate from the standard-library Python factory and has not been published as a release.
+
 From the repository root, run these commands with **Python 3.10+** and **Git**. Building needs network access to verify the pinned sources.
 
 ```sh
@@ -134,6 +140,7 @@ Start with Marionette's layout and give the new package its own identity and sou
 | `guide-examples.json` | Reviewed requests with explicit decisions that the guide validates and illustrates |
 | `entries.json` | Optional discovery skills that point into the same catalog. Each entry's `absorbs` names the originals from `plugin.replaces` it stands in for, written into its description by the build ([ADR-0019](docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md)) |
 | `delivery.json` | Optional delivery decisions, session text, and hook declarations |
+| `custom-instructions/**/*.md` | Your own instructions in free Markdown; the host AI decides their form and scope during harmonization |
 | `eval-cases.json` | Optional routing examples with expected decisions for scoring a host AI |
 
 1. **Prepare intake.** Run `muro intake <source-id>` with the new manifest. Give the host AI the prompt and evidence under `.muro/factory/intake/<source-id>/` beside the manifest.
@@ -144,6 +151,37 @@ Start with Marionette's layout and give the new package its own identity and sou
 Every step also works through the legacy flags (`python muro_build.py --manifest … --validate`).
 
 [Intake prompt](prompts/intake.md) · [Harmonizer prompt](prompts/harmonizer.md) · [Delivery prompt](prompts/delivery.md) · [Review prompt](prompts/review.md) · [Factory and package boundary](docs/adr/ADR-0011-factory-separate-from-its-packages.md)
+
+### Add your own instructions
+
+Create `custom-instructions/` beside your package's `sources.json` and add any
+UTF-8 `.md` files, including subfolders. No frontmatter or special filenames are
+required. For example, Marionette's [recap-adhd.md](examples/marionette/custom-instructions/recap-adhd.md)
+asks for short progress updates while waiting, making important changes or
+deciding autonomously.
+
+1. Write or edit your Markdown files.
+2. Prepare the AI handoff: `python muro_build.py --manifest examples/marionette/sources.json --harmonize`.
+3. Ask your host AI to read `.muro/factory/harmonization/PROMPT.md` beside that manifest and apply its resulting delivery/catalog changes to the package. The preparation includes an exact snapshot of your Markdown. **The command prepares evidence; the host LLM performs the harmonization.**
+4. Validate and build into a fresh directory using the commands below, then install the resulting complete adapter following its `INSTALL.md`.
+
+```sh
+python muro_build.py --manifest examples/marionette/sources.json --validate
+python muro_build.py --manifest examples/marionette/sources.json --check-sources
+python muro_build.py --manifest examples/marionette/sources.json --build --out .scratch/custom-instructions-release
+```
+
+The AI chooses whether each part becomes permanent system/developer guidance,
+an on-demand capability or a supported hook, and records its reasons and any
+coexistence changes. Filenames and ordering never decide precedence. Adding,
+editing, renaming or removing files requires another harmonization; validation
+refuses delivery tied to older inputs. Original files stay untouched in your
+source package. A release carries only originals that its runtime needs.
+
+See the [complete user guide](docs/custom-instructions.md) for the desktop path,
+removal, verification and delivery metadata. Marionette's recap rule is session
+policy, so it needs the complete native adapter; invoking a skill alone does not
+activate permanent instructions.
 
 <details>
 <summary>Source pins, licenses, and runtime dependencies</summary>

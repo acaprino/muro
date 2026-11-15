@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Muro",
+  "version": "0.0.0",
+  "identifier": "dev.muro.registry",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../.. run dev",
+    "beforeBuildCommand": "npm --prefix ../.. run build",
+    "devUrl": "http://127.0.0.1:1421", "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [{"label": "main", "title": "Muro — Registry", "width": 1512, "height": 982, "minWidth": 760, "minHeight": 580, "theme": "Dark", "backgroundColor": "#090c14"}],
+    "security": {"csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"}
+  },
+  "bundle": {"active": false, "icon": ["icons/icon.ico"], "resources": {"resources/": "resources/"}}
+}
