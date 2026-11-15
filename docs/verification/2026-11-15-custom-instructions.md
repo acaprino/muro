@@ -55,6 +55,18 @@ before validation, source checks, build and publication, on the merged commit.
 The workflow result is the authoritative full-suite publication gate; targeted
 results above are not represented as a completed full-suite pass.
 
+Final publication evidence: [Release run 43727948476](https://github.com/acaprino/muro/actions/runs/43727948476)
+passed on merged commit `1c696d8dfb0e0bbd6bdd05242383611386f90e1b`:
+**601 tests passed, 16 skipped in 101.58 seconds** on Ubuntu/Python 3.13,
+followed by successful validation, remote source checks and a fresh build.
+Marionette 0.2.1 was published at **2026-11-15T15:08:17Z**. The downloaded
+13,720,471-byte ZIP matched its published SHA-256:
+`db7d9c7d83f4c8099b90af6966d44f59751d41ade20ded4e3780bdaedeba9fb6`.
+Its delivery matched the reviewed source, and its extracted standalone Codex
+launcher returned the exact policy outside the checkout. The slower local
+full-suite run was stopped once the merged-commit workflow had completed;
+the two earlier locally observed failures had already passed after correction.
+
 ## Host-AI routing and live policy delivery
 
 A fresh host-LLM worker read the prepared evaluation prompt and contexts without
