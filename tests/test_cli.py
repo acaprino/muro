@@ -114,6 +114,7 @@ def review_package(tmp_path):
     root = tmp_path / "package"
     root.mkdir()
     shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
+    shutil.copytree(PACKAGE / "custom-instructions", root / "custom-instructions")
     for name in ("ROUTER.md", "sources.json", "delivery.json", "entries.json", "guide-examples.json"):
         shutil.copy2(PACKAGE / name, root / name)
     return root

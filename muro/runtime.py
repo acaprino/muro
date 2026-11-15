@@ -140,7 +140,7 @@ class Coordinator:
         self.stack_rules: list[dict[str, Any]] | None = stack_cfg.get("detectors") if stack_cfg is not None else None
         self.stack_conflicts: list[list[str]] | None = stack_cfg.get("conflicts") if stack_cfg is not None else None
         capabilities = list(self.capabilities.values())
-        delivery = load_delivery(self.package_root)
+        delivery = load_delivery(self.package_root, packaged=True)
         source_ids = {source.get("id") for source in manifest.get("sources", [])}
         delivery_errors = (unregistered_active_hooks(capabilities) if delivery is None
                            else validate_delivery(delivery, capabilities, source_ids))
@@ -986,7 +986,7 @@ def runtime_main(argv: list[str] | None = None) -> int:
         # as a hook failure instead of a successful session silently missing its policy.
         try:
             from .delivery import always_on_limit
-            document = load_delivery(args.package)
+            document = load_delivery(args.package, packaged=True)
             if document is not None and not isinstance(document, dict):
                 raise ValueError("delivery.json must be an object")
             text = (document or {}).get("always_on", "")

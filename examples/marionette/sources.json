@@ -3,7 +3,7 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "language": "it",
     "description": "Use when designing or building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, motion or GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing changes, coordinating specs and handoffs, reviewing changes or auditing a repository, shortcut debt or the Ponytail method and benchmark; idea briefs, design documents and their fresh-reviewer review, contract READMEs or design drift reports; implementation plans from an approved spec and their task-by-task execution under TDD; making and fact-checking HTML explainers; finding papers, a paper wiki, paper figures, planning and pitching research; or steering TokenEconomizer.",
     "replaces": [

@@ -32,6 +32,7 @@ def coordinator(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     shutil.copytree(PACKAGE / "capabilities", package / "capabilities")
+    shutil.copytree(PACKAGE / "custom-instructions", package / "custom-instructions")
     shutil.copytree(ROOT / "prompts", package / "prompts")
     for name in ("ROUTER.md", "sources.json", "delivery.json"):
         shutil.copy2(PACKAGE / name, package / name)
@@ -74,8 +75,8 @@ def test_combined_policy_has_a_bounded_cost_and_reasoned_source_contributions():
     manifest = read_json("sources.json")
     document = read_json("delivery.json")
     policy = document.get("always_on")
-    # The budget is one allowance per source with an always-on decision (owner, 2026-11-12), two here.
-    assert always_on_limit(document) == 2 * ALWAYS_ON_PER_SOURCE
+    # Two absorbed sources and one owner Markdown collection contribute to the policy.
+    assert always_on_limit(document) == 3 * ALWAYS_ON_PER_SOURCE
     assert isinstance(policy, str) and policy.strip() and len(policy) <= always_on_limit(document)
     contributions = {item["source"] for item in document["decisions"] if item["form"] == "always-on"}
     assert {SOURCE, "ponytail"} <= contributions

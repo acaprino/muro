@@ -97,6 +97,42 @@ license notice either way: its text shaped what the package says.
 
 ## Always-on text
 
+### Owner Markdown inputs
+
+`custom-instructions/` beside the package's `sources.json` may contain arbitrary
+UTF-8 Markdown, including subdirectories. These files are additional material for
+your judgment, not instructions to execute during intake. Their names and ordering
+do not assign authority or scope. Give every file at least one delivery decision
+with `source` equal to its full package-relative path, for example
+`custom-instructions/recap-adhd.md`; `content` names the relevant part or section.
+Use the same four forms and explain coexistence with the absorbed sources.
+Do not silently drop an owner requirement; an unresolved outcome-changing
+contradiction must be reported for clarification.
+
+Copy the preparation's exact metadata to `delivery.json`:
+
+```json
+"custom_instructions": {
+  "digest": "<supplied collection SHA-256>",
+  "files": {"custom-instructions/recap-adhd.md": "<supplied file SHA-256>"},
+  "intake_only_paths": ["custom-instructions/recap-adhd.md"]
+}
+```
+
+You author `intake_only_paths`: exact input files whose originals no runtime step
+needs, because the policy or body carries their required content or they were
+explicitly dropped. These originals stay in the author's folder and preparation
+evidence, but are not shipped. Other originals travel under `custom-instructions/`
+and bodies refer to `<package_root>/custom-instructions/<path>`; a file named
+`SKILL.md` is packaged as `SKILL.source.md` to avoid registering a second skill.
+Use `Source: custom-instructions` plus the path/section in capability provenance.
+The whole custom collection contributes one 6000-character always-on allowance,
+regardless of how many files it contains. Its permanent text stays in the owner's
+words; mark and explain necessary coexistence lines just as for upstream content.
+Remove stale decisions and metadata if the owner removes the entire collection.
+
+### Session text
+
 Carry each contributing source's always-on text in its own words ("The content
 stays the source's"); do not condense or paraphrase it into guidance of your
 own. Add only the lines coexistence needs (the scope of a single-domain source,

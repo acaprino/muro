@@ -133,7 +133,7 @@ def test_hermes_registers_a_policy_longer_than_one_source_allowance_whole(tmp_pa
 
 @pytest.mark.parametrize("broken, message", [
     ({"decisions": []}, "nonempty"),
-    ({"extra": 1}, "only decisions, always_on and hooks"),
+    ({"extra": 1}, "only decisions, always_on, hooks and custom_instructions"),
     ({"decisions": [dict(decision("capability", ["x"]), weight=3)]}, "exactly source, content, form, targets and reason"),
     ({"decisions": [decision("system-prompt", [])]}, "form must be one of"),
     ({"decisions": [decision("capability", ["x"], source="ghost")]}, "unknown source ghost"),
@@ -194,7 +194,8 @@ def test_marionette_records_a_decision_for_every_source():
     document = json.loads((MARIONETTE / "delivery.json").read_text(encoding="utf-8"))
     capabilities = parse_capabilities(MARIONETTE / "capabilities")
     assert validate_delivery(document, capabilities, {s["id"] for s in manifest["sources"]}) == []
-    assert {d["source"] for d in document["decisions"]} == {s["id"] for s in manifest["sources"]}
+    assert {d["source"] for d in document["decisions"]} == ({s["id"] for s in manifest["sources"]}
+                                                         | set(document["custom_instructions"]["files"]))
 
 
 def test_a_package_without_the_document_registers_nothing(portable_project, tmp_path):

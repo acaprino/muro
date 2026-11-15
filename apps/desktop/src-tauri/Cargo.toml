@@ -1,0 +1,18 @@
+[package]
+name = "muro-desktop"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[build-dependencies]
+tauri-build = "2.5"
+
+[dependencies]
+anyhow = "1"
+tauri = { version = "2.9", features = ["tray-icon"] }
+serde_json = "1"
+muro-registry = { path = "../../../crates/muro-registry" }
+muro-desktop-runtime = { path = "../../../crates/muro-desktop-runtime" }
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

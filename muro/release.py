@@ -12,6 +12,7 @@ from .entries import ENTRIES_FILE, load_entries, validate_entries
 from .factory import copy_source_helpers, prompts_dir, runtime_source, unpackaged_reference_errors
 from .guide import write_release_guide
 from .sources import copyright_notices, inspect_source, parse_capabilities
+from .custom_instructions import copy_runtime, provenance_ids
 
 
 def build_release(manifest_path: Path, project_root: Path, out_root: Path,
@@ -37,7 +38,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     errors = validate_capabilities_and_router(
         capabilities,
         router_rows,
-        source_ids,
+        provenance_ids(source_ids, delivery_doc),
         plugin_slug=plugin.get("slug"),
         allow_empty=allows_empty_catalog(delivery_doc, capabilities, source_ids),
     )
@@ -80,6 +81,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             shutil.copy2(project_root / ENTRIES_FILE, dist / ENTRIES_FILE)
         if delivery_doc is not None:
             shutil.copy2(project_root / DELIVERY_FILE, dist / DELIVERY_FILE)
+        copy_runtime(project_root, dist, delivery_doc)
         for src in sources:
             # A file the intake AI declared as evidence only is not shipped, and no step may point at it.
             unpackaged = copy_source_helpers(src, project_root, dist)

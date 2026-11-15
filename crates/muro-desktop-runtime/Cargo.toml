@@ -1,0 +1,21 @@
+[package]
+name = "muro-desktop-runtime"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+mukade = { git = "https://github.com/acaprino/mukade", rev = "f189a705b12692ffe92a63de52a161681be75fd8", default-features = false }
+muro-registry = { path = "../muro-registry" }
+uuid = { version = "1", features = ["v4"] }
+fs2 = "0.4"
+tempfile = "3"
+
+[dev-dependencies]
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }

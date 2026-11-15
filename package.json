@@ -1,0 +1,15 @@
+{
+  "name": "muro-desktop",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config apps/desktop/vite.config.ts",
+    "build": "tsc --noEmit && vite build --config apps/desktop/vite.config.ts",
+    "desktop": "cargo build -p muro-desktop-runtime --bins && cd apps/desktop && tauri dev",
+    "desktop:build": "cargo build -p muro-desktop-runtime --bins --release && cd apps/desktop && tauri build --no-bundle",
+    "test": "node --experimental-strip-types --test apps/desktop/tests/*.test.ts"
+  },
+  "dependencies": {"@tauri-apps/api": "2.12.4"},
+  "devDependencies": {"@tauri-apps/cli": "2.12.4", "typescript": "7.0.2", "vite": "8.3.5", "@playwright/test": "1.64.1"}
+}

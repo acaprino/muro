@@ -83,24 +83,28 @@ def test_the_originals_keep_their_order_and_their_strict_rules(originals, policy
 
 def test_everything_else_in_the_policy_is_marked_as_marionettes(originals, policy):
     source_lines = {line for text in originals.values() for line in lines(text)}
+    owner = (PACKAGE / "custom-instructions" / "recap-adhd.md").read_text(encoding="utf-8")
+    assert owner.strip() in policy
+    source_lines.update(lines(owner))
     own = [line for line in lines(policy) if line not in source_lines]
     header = own[:2]
     assert header[0] == "# Marionette session policy" and "each in its own words" in header[1]
     assert all(MARK in line for line in own[2:]), own[2:]
-    # Three changes, each one a coexistence rule: reply versus artifact, code scope, the end of the reply.
-    assert len(own) == 5
+    # Original three coexistence lines plus the distinction between progress and final recaps.
+    assert len(own) == 6
 
 
 def test_each_change_is_explained_as_coexistence_in_the_delivery_decisions(policy):
     document = read_json("delivery.json")
     assert len(policy) <= always_on_limit(document)
     reasons = {item["source"]: item for item in document["decisions"] if item["form"] == "always-on"}
-    assert set(reasons) == {"ponytail", "i-have-adhd"}
-    for item in reasons.values():
+    assert set(reasons) == {"ponytail", "i-have-adhd", "custom-instructions/recap-adhd.md"}
+    for item in (reasons["ponytail"], reasons["i-have-adhd"]):
         assert "not altered except for harmonization and coexistence" in item["reason"]
         assert MARK in item["reason"] and "coexistence" in item["reason"]
     assert "i-have-adhd rule 3" in reasons["ponytail"]["reason"]
     assert "artifact" in reasons["i-have-adhd"]["reason"]
+    assert "rule 10" in reasons["custom-instructions/recap-adhd.md"]["reason"]
     # What the policy now carries is no longer recorded as dropped.
     dropped = [item["content"] for item in document["decisions"]
                if item["source"] == "i-have-adhd" and item["form"] == "dropped"]

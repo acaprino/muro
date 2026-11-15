@@ -1,0 +1,10 @@
+[workspace]
+members = ["crates/muro-registry", "crates/muro-desktop-runtime", "apps/desktop/src-tauri"]
+default-members = ["crates/muro-registry", "crates/muro-desktop-runtime"]
+resolver = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = "symbols"
+

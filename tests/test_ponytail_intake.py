@@ -54,6 +54,7 @@ def coordinator(tmp_path):
     package = tmp_path / "package"
     package.mkdir()
     shutil.copytree(PACKAGE / "capabilities", package / "capabilities")
+    shutil.copytree(PACKAGE / "custom-instructions", package / "custom-instructions")
     shutil.copytree(ROOT / "prompts", package / "prompts")
     for name in ("ROUTER.md", "sources.json", "delivery.json"):
         shutil.copy2(PACKAGE / name, package / name)
