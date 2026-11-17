@@ -13,8 +13,9 @@ gate (ADR-0026), declared media (ADR-0027), the batched read, the helper check
 and the hook timeout (ADR-0016 amendment). The package work is in
 `2026-11-17-taste-skill-whole-intake.md`.
 
-Everything is in the working tree on `develop`. Nothing was committed, pushed,
-released, installed or version-bumped.
+The work is on the short branch `source-coverage-gate`, committed and pushed on
+the owner's "ok" so that the full suite could run. It is not merged into
+`develop`. Nothing was released, installed or version-bumped.
 
 ## What was found (before any change)
 
@@ -234,10 +235,61 @@ command spelling changed after it.
 and `--check-sources` both pass on the final tree (the second with the gate, on
 all seventeen sources).
 
+## The full suite in the `Tests` workflow
+
+On the owner's "ok" the work was committed on the short branch
+`source-coverage-gate` (`9ee9819`, the factory; `2e009cc`, the package) and
+pushed. The three runs below are of commit `2e009cc`.
+
+| Run | Tests | Validate, check sources, build |
+|---|---|---|
+| 44184182752, push, attempt 1 | `1 failed, 734 passed, 16 skipped in 195.14s` | passed |
+| the same run, attempt 2 (the failed job run again) | `729 passed, 16 skipped, 6 errors in 238.01s` | failed at the source check |
+| 44186516410, dispatched by hand three minutes later | `735 passed, 16 skipped in 127.13s` | `OK: capabilities and ROUTER.md valid`, `OK: all sources and plugin identity valid`, `Built …/stage/marionette` |
+
+No assertion failed in any of the three. Every failure and error is the same
+message: the `git fetch --no-tags --depth=1` of a pinned source `timed out
+after 45 seconds`, the limit of every Git call in `sources._git`. Attempt 1:
+the build in `test_live_host_fixes.py`, fetching ui-ux-pro-max. Attempt 2: the
+release fixtures of `test_claude_design_intake.py` and
+`test_tokeneconomizer_intake.py` and the `originals` fixture of
+`test_policy_original_wording.py` (ponytail twice, taste-skill once), then
+`[genoffice]` in the source check.
+
+The cause of the timeouts is not established. What is known:
+
+- The third run had none. Its Test step took 132 s; the Test step of a green
+  run on `develop` that afternoon took 171 s.
+- From the developer machine the same fetches took 5.6 s (ponytail) and 2.7 s
+  (ui-ux-pro-max) while the runs were failing, and GitHub's status page showed
+  no incident.
+- The seven earlier runs of the workflow that day show none (five green, two
+  red on assertions).
+- This work did not change how many fetches a run makes: each real build
+  fetches every source twice, and four test modules build the real release. It
+  did change what each of those builds writes: 283 MB instead of a few.
+- Not tested: whether the heavier builds contribute. A run on `develop`
+  dispatched at the same time could not answer it (below).
+
+The 16 skipped tests are the ones skipped before this work: twelve
+Windows-shell cases of `test_hook_command_argv.py` and four checks that need an
+installed host (`test_claude_policy.py`, `test_native_policy.py`, two in
+`test_hermes_policy.py`). The progress marks of the green run were matched to
+the collected order: the 65 tests of the six new files all passed. Because the
+hook wiring code changed, those four files were also run on Windows: 31 passed,
+8 skipped (the POSIX-shell cases, and the Pi and Hermes installed-host checks,
+which ran on neither machine).
+
+`develop` is red apart from this work. Run 44186503881 on `e66b891` gave
+`1 failed, 651 passed, 16 skipped, 4 errors in 37.15s` and `[motion-design]
+pinned commit f9a8a041… does not match remote HEAD 2e1f3c05…`: the upstream of
+that `head` pin moved on 2026-11-17, and the re-pin is in this branch. Its
+builds stop at that source, so it is no comparison for the timeouts.
+
 ## Not executed
 
-- The full suite. By the owner's rule it runs in the `Tests` workflow on a
-  pushed branch; nothing was pushed.
+- Nothing was done about the fetch timeouts seen in two of the three workflow
+  runs: their cause is not established.
 - No host AI has read a `coverage.json` through the prepared prompt. The intake
   of taste-skill was done in this session with the evidence, by the model that
   wrote the prompt text; an independent intake has not exercised it.

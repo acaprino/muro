@@ -10,9 +10,11 @@ usare?") and then said: "fai in modo che non accada mai più questa perdita di
 tempo". This record covers what changed in the package. The factory changes are
 in `2026-11-17-source-coverage-evidence.md`, ADR-0026 and ADR-0027.
 
-Everything is in the working tree on `develop`. Nothing was committed, pushed,
-released or installed, and `plugin.version` is still 0.3.0. The Marionette the
-owner has installed is unchanged: it still carries 11 files of taste-skill.
+The work is on the short branch `source-coverage-gate`, committed and pushed on
+the owner's "ok"; it is not merged into `develop`. Nothing was released or
+installed, and `plugin.version` is still 0.3.0. The Marionette the owner has
+installed is unchanged: it still carries 11 files of taste-skill. The runs of
+the full suite are in `2026-11-17-source-coverage-evidence.md`.
 
 ## taste-skill
 
@@ -211,5 +213,4 @@ in `2026-11-17-source-coverage-evidence.md`.
   `consistency.mjs` at five widths, and a gate run to PASS.
 - The routing eval (`--prepare-eval`, `--score-eval`), although one intent
   description and one discovery entry changed.
-- The full suite in the `Tests` workflow: nothing was pushed.
 - Not re-read: the capabilities of the nine sources that only gained omissions.
