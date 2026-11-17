@@ -71,6 +71,10 @@ echo [1/5] Tools and dependencies
 for %%T in (cargo node npm git %TOOLS%) do (
   where %%T >nul 2>nul || (echo [ERROR] %%T not found in PATH. & goto :fail)
 )
+rem Tauri's build scripts compile the Windows resources with rc.exe (embed-resource). Its own Windows SDK
+rem lookup can name an rc.exe that is not there, and only RC_<target> or RC come before it: unless
+rem RC_x86_64_pc_windows_msvc is already set, point it at the rc.exe of the newest SDK that has one.
+if not defined RC_x86_64_pc_windows_msvc call :find_rc
 set "VERSION=?"
 for /f "usebackq delims=" %%V in (`node -p "require('./%NPM_DIR:\=/%/package.json').version"`) do set "VERSION=%%V"
 set "COMMIT=?"
@@ -147,6 +151,15 @@ goto :install_wait
 :install_copy
 robocopy "%RELEASE%" "%INSTALL%" /E /XD "%RELEASE%\installer" /R:10 /W:2 /NFL /NDL /NJH /NP
 if errorlevel 8 (echo [ERROR] copy into %INSTALL% failed: a file may still be in use. & goto :sub_fail)
+exit /b 0
+
+:find_rc
+set "KITS=%ProgramFiles(x86)%\Windows Kits\10\bin"
+set "RC_DIR="
+for /f "delims=" %%D in ('dir /b /ad /o-n "%KITS%\10.*" 2^>nul') do if not defined RC_DIR if exist "%KITS%\%%D\x64\rc.exe" set "RC_DIR=%KITS%\%%D\x64"
+if not defined RC_DIR echo     rc.exe not found in a Windows SDK: Tauri builds that recompile their resources will fail.
+if defined RC_DIR set "RC_x86_64_pc_windows_msvc=%RC_DIR%\rc.exe"
+if defined RC_DIR echo     rc.exe: %RC_DIR%\rc.exe
 exit /b 0
 
 :pause_if_clicked
