@@ -189,11 +189,11 @@ activate permanent instructions.
 
 Each source records a full commit SHA. `pin: release` ties it to a published tag, `pin: head` follows an upstream without releases or tags, and `pin: static` freezes a reviewed commit. Re-pinning calls for a review of the selected paths and license notices.
 
-The source gate accepts MIT and Apache-2.0, checks selected paths for nested licenses and SPDX conflicts, and ships applicable licenses and notices. A declared `license_path` covers its own subtree. Third-party asset rights need their own review.
+The source gate accepts MIT and Apache-2.0, checks selected paths for nested licenses and SPDX conflicts, and ships applicable licenses and notices. A declared `license_path` covers its own subtree. A source that bundles third-party code in a prebuilt file declares the file listing those notices in `notice_paths`; it ships with the source and the aggregated notice points at it. Third-party asset rights need their own review.
 
 Upstream code stays inert during intake and build. If a selected capability needs a missing runtime tool, the host checks permissions, reports the official source and install location, uses the narrowest workable scope, and verifies the tool before continuing. Active hooks must have an explicit delivery declaration. Hook commands use literal argv, and Windows batch shims require declaring the executable and script directly.
 
-[Pin policy](docs/adr/ADR-0009-pin-mode-per-source.md) · [Apache notices](docs/adr/ADR-0005-apache-appendix-notice-in-license-gate.md) · [License scope](docs/adr/ADR-0006-license-file-inside-the-source-folder.md) · [Runtime dependencies](docs/adr/ADR-0007-capabilities-install-missing-runtime-dependencies.md)
+[Pin policy](docs/adr/ADR-0009-pin-mode-per-source.md) · [Apache notices](docs/adr/ADR-0005-apache-appendix-notice-in-license-gate.md) · [License scope](docs/adr/ADR-0006-license-file-inside-the-source-folder.md) · [Bundled third-party notices](docs/adr/ADR-0025-declared-third-party-notices.md) · [Runtime dependencies](docs/adr/ADR-0007-capabilities-install-missing-runtime-dependencies.md)
 
 </details>
 

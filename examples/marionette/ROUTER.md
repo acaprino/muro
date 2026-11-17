@@ -42,6 +42,11 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | design-drift | design-drift-report | — | — | drift_report | docs.design-drift |
 | impl-plan | implementation-plan-authoring | — | — | implementation_plan | plans.impl-plan-writing |
 | plan-execution | plan-execution | — | — | plan_execution_report | plans.plan-execution |
+| design-file | design-file-authoring | — | — | design_brief, design_file | design-file.brief, design-file.create, design-file.extract, design-file.update |
+| design-file-apply | design-file-implementation | — | — | design_application | design-file.apply |
+| design-file-inspection | design-file-inspection | — | — | design_inspection_report | design-file.document-review, design-file.interface-drift, design-file.accessibility-inspection |
+| design-file-integration | design-file-integration | — | — | token_export, design_code_checks | design-file.token-export, design-file.code-checks |
+| text-humanize | prose-humanization | — | — | humanize_report | writing.humanize-prose |
 
 ## Runtime contract
 
@@ -59,14 +64,12 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 
 ## Harmonization record (re-harmonized 2026-11-10 against the pinned sources)
 
-- No row has a mandatory prerequisite. Consumers start from existing work or stated
-  behavior, reading earlier outputs when recorded; the AI orders selected producers
-  and consumers. Forced edges had made hover timing run a website direction.
+- No row has a mandatory prerequisite. Consumers start from existing work or stated behavior, reading earlier outputs when recorded; the AI orders selected producers and consumers. Forced edges had made hover timing run a website direction.
 - visual-direction merges taste-skill v2.5.1 (plan, copy, dealt palette/type,
   build, screenshot review) and landing-page-design (offer, proof, FAQ, outline):
   both build the page; taste's brief/copy step is the landing strategy and owns the
   look. Landing's font list, hero gradient and Tailwind scale are scoped out;
-  a client's brand wins over source bans and is recorded.
+  the user's explicit instruction wins over source bans and is recorded; a brand alone does not (its colours go through `brand`).
 - design-guidance (ui-ux-pro-max) is split out: guidance for any interface,
   app screens included; beside a dealt palette its results are candidates.
 - figma-design keeps a recorded pairing and palette as the user's choice. Its
@@ -111,6 +114,8 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - egm v0.1.1 (2026-11-14, trial intake): five on-demand `docs.*` roles, nothing session-wide. Review, loop and resolution are one role
   (one thread in the source); bootstrap's drift offer is design-drift's step; design-doc and work-map's spec keep separate owners.
 - superpowers v7.0.2 (2026-11-14): the planning chain in symbiosis with EGM — a design-doc or brief is the spec impl-plan argues from; the two executors are one role (plan-execution; the source shares their workspace and ledger) with the required method texts packaged as the step's files. using-superpowers, its SessionStart hook and brainstorming are dropped or evidence-only: self-activating routing competes with the coordinator and concept-brief owns the idea stage (`delivery.json`). work-map keeps plan-less implementation; engineering-review keeps standalone code review; fresh-review reviews the plan as a document.
+- zero-slop-design v0.2.1 (2026-11-17): fourteen skills, four on-demand roles, nothing session-wide. design-file is the only writer of the brief and `DESIGN.md`; apply, inspection (report-only; its drift output is not `drift_report`) and integration (token export, code checks in CI) read it; no forced chain. Look authority, owner decision: the user's request in the turn, then a project `DESIGN.md` that is not a starter or a reference (minus `unresolved` and `proposed`), then tokens or a Master in the repository, then a direction recorded in the plan; candidates stay proposals. For visual-direction such a file is the user's explicit instruction; no building or reviewing step rewrites it. Its ban on unrequested tests governs interface checks in its steps; Ponytail's self-check for new logic and plan-execution's TDD stand.
+- text-humanizer 2.0.0 (2026-11-17, head c4d8276c: no release upstream): one on-demand role, text-humanize; nothing session-wide, since as policy its rules would rewrite every reply. The skill, its editor agent and three references are one procedure; the editor is an optional subagent with the packaged agent file, or inline by the source's own fallback. The command and trigger lines are dropped as routing; a file is written only on the user's choice.
 - 2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.
 <!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run files not selected; no maintained source for CSS scroll-driven animation;
 the host starters and tools named by claude-design-system-prompt are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->

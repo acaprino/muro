@@ -139,6 +139,23 @@ def _intake_only_patterns(src: dict[str, Any]) -> list[str]:
     return patterns
 
 
+def notice_paths(src: dict[str, Any]) -> list[str]:
+    """Selected files the source declares as carrying third-party notices for what it ships (ADR-0025).
+
+    A prebuilt artifact can embed code under other licenses than the verified one; the gate cannot see
+    inside it. The manifest names the file that lists those notices, and the release points at it.
+    Declared, never guessed from a file name.
+    """
+    paths = src.get("notice_paths", [])
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        raise ValueError("notice_paths must be a list of file paths")
+    if not all(_safe_pattern(path) and not any(char in path for char in "*?[") for path in paths):
+        raise ValueError("notice_paths entries must be plain repository-relative file paths")
+    if len(set(paths)) != len(paths):
+        raise ValueError("notice_paths lists a file twice")
+    return paths
+
+
 def _blob(repo: Path, commit: str, path: str) -> bytes:
     return _git(repo, "show", f"{commit}:{path}")
 
@@ -274,6 +291,11 @@ def inspect_source(src: dict[str, Any], base_dir: Path) -> tuple[bytes, bytes | 
         for pattern in intake_only:
             if not any(_matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/") for name in selected_names):
                 raise ValueError(f"intake_only_paths matched no selected file: {pattern}")
+        for declared in notice_paths(src):
+            if declared not in selected_names:
+                raise ValueError(f"notice_paths entry is not a selected file: {declared}")
+            if any(_matches(declared, pattern) or declared.startswith(pattern.rstrip("/") + "/") for pattern in intake_only):
+                raise ValueError(f"notice_paths entry is read at intake only and would not ship: {declared}")
         # The NOTICE that travels with a license is the one beside it.
         notice_path = "NOTICE" if rooted else str(scope / "NOTICE")
         notice = _blob(repo, commit, notice_path) if notice_path in entries else None
@@ -301,6 +323,7 @@ def _validate_source_shape(src: dict[str, Any]) -> None:
     if not all(_safe_pattern(p) for p in selected + excluded):
         raise ValueError("unsafe source path or pattern")
     _intake_only_patterns(src)
+    notice_paths(src)
     license_path = src.get("license_path", "LICENSE")
     if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
         raise ValueError("license_path must be a plain repository-relative file path")

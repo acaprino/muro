@@ -133,10 +133,12 @@ def test_manifest_declares_a_mode_for_every_source():
         "i-have-adhd": ("release", "v0.4.1"),
         "egm": ("release", "v0.1.1"),
         "superpowers": ("release", "v7.0.2"),
+        "zero-slop-design": ("release", "v0.2.1"),
         # These upstreams publish no release or tag: the owner follows their HEAD.
         "motion-design": ("head", None),
         "gsap-scrolltrigger": ("head", None),
         "ai-design-skills": ("head", None),
         "explain-this": ("head", None),
         "claude-design-system-prompt": ("head", None),
+        "text-humanizer": ("head", None),
     }

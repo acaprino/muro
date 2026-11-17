@@ -9,9 +9,9 @@ from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
 from .delivery import DELIVERY_FILE, allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
 from .entries import ENTRIES_FILE, load_entries, validate_entries
-from .factory import copy_source_helpers, prompts_dir, runtime_source, unpackaged_reference_errors
+from .factory import _helper_name, copy_source_helpers, prompts_dir, runtime_source, unpackaged_reference_errors
 from .guide import write_release_guide
-from .sources import copyright_notices, inspect_source, parse_capabilities
+from .sources import copyright_notices, inspect_source, notice_paths, parse_capabilities
 from .custom_instructions import copy_runtime, provenance_ids
 
 
@@ -101,6 +101,10 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             lines.append(f"  Modified and merged into {name}.")
             if upstream_notice:
                 lines.append(upstream_notice.decode("utf-8"))
+            for declared in notice_paths(src):
+                # The file itself is packaged with the source; the aggregated notice says where it is.
+                lines.append(f"  Third-party notices for material included in this source: "
+                             f"scripts/{src['id']}/{_helper_name(src['id'], declared)}")
             lines.append("")
         if any(src["license"] == "Apache-2.0" for src, _, _ in verified):
             for cap_file in (dist / "capabilities").glob("*.md"):
