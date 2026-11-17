@@ -1,4 +1,4 @@
-// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel and Qemille: the same file in each, run by
+// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel, Qemille and artcraft-web: the same file in each, run by
 // .github/workflows/release.yml at every merge of develop into main. What is project-specific is in .github/release.json:
 //   app        the name of the release and of its zip
 //   tagPrefix  the tag is <tagPrefix><version> (v0.1.2)
@@ -6,7 +6,10 @@
 //              [workspace.package] version), Python (__version__); the first one holds the current version
 //   locks      Cargo.lock files whose entries for `crates` (the project's own crates) carry the version
 //   crates     the project's own crate names
-//   prepare    commands run before build-release.bat on a fresh checkout (dependencies it does not install)
+//   prepare    commands run before the build on a fresh checkout (dependencies the build does not install)
+//   build      the build (default: build-release.bat --no-install --ci), which fills release/
+//   runner     the GitHub runner (default: windows-latest)
+//   assets     zip (default: release/ zipped, plus its .exe and release/installer/) or files (release/'s files)
 // Usage:
 //   node .github/scripts/release.mjs current                   the current version
 //   node .github/scripts/release.mjs next <patch|minor|major>  the version after it
@@ -15,7 +18,8 @@
 //   node .github/scripts/release.mjs paths                     every file `bump` writes
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const config = JSON.parse(readFileSync('.github/release.json', 'utf8'));
+const DEFAULTS = { build: 'build-release.bat --no-install --ci', runner: 'windows-latest', assets: 'zip', prepare: [], locks: [], crates: [] };
+const config = { ...DEFAULTS, ...JSON.parse(readFileSync('.github/release.json', 'utf8')) };
 const fail = (message) => { console.error(`release: ${message}`); process.exit(1); };
 
 const eol = (text) => (text.includes('\r\n') ? '\r\n' : '\n');
@@ -68,7 +72,16 @@ function bump(level) {
     const file = load(path);
     const [a, b] = locate(path, file.text);
     if (file.text.slice(a, b) !== current) fail(`${path} is ${file.text.slice(a, b)}, ${config.files[0]} is ${current}: align them first`);
-    save(path, file, file.text.slice(0, a) + next + file.text.slice(b));
+    let text = file.text.slice(0, a) + next + file.text.slice(b);
+    // package-lock.json repeats the version for the root package, under packages[""].
+    if (path.endsWith('package-lock.json')) {
+      const root = new RegExp(`("":\\s*\\{[^{}]*?"version"\\s*:\\s*")${current.replace(/\./g, '\\.')}"`);
+      if (!root.test(text)) fail(`${path}: packages[""].version is not ${current}`);
+      text = text.replace(root, `$1${next}"`);
+      const check = JSON.parse(text);
+      if (check.version !== next || check.packages[''].version !== next) fail(`${path}: version not written`);
+    }
+    save(path, file, text);
   }
   const crates = new Set(config.crates ?? []);
   for (const path of config.locks ?? []) {

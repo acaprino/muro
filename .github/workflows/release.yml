@@ -1,12 +1,14 @@
 name: Release
 
-# A release at every merge of develop into main. The same workflow is in Shinatama, Mukade, Xiox, Muro, Ethel and
-# Qemille; what is project-specific is in .github/release.json, the version logic in .github/scripts/release.mjs.
+# A release at every merge of develop into main. The same workflow is in Shinatama, Mukade, Xiox, Muro, Ethel,
+# Qemille and artcraft-web; what is project-specific is in .github/release.json, the version logic in
+# .github/scripts/release.mjs.
 #   1. the merged pull request's label chooses the step: release:major, release:minor, otherwise patch;
 #   2. the next version is written in every version file (and the project's Cargo.lock entries);
-#   3. build-release.bat --no-install builds .\release on Windows, as on the owner's machine;
-#   4. the version commit and the tag <prefix><version> go on main, the GitHub Release gets release\ zipped, its
-#      programs and its installers;
+#   3. the build runs on the project's runner: build-release.bat --no-install on Windows unless release.json
+#      says otherwise;
+#   4. the version commit and the tag <prefix><version> go on main, the GitHub Release gets release\ zipped with
+#      its programs and installers (or release/'s files as they are, for "assets": "files");
 #   5. main is merged back into develop, so develop carries the new version.
 # Nothing is published when the build fails. Run by hand (Actions, Run workflow) it only builds, unless "publish"
 # is ticked. RELEASE_TOKEN (a token that reads the owner's other private repositories) is needed where the build
@@ -36,10 +38,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  plan:
     # The release commit itself ("release v1.2.3") is pushed by this workflow and must not start another one.
     if: ${{ !startsWith(github.event.head_commit.message, 'release ') }}
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.plan.outputs.runner }}
+      step: ${{ steps.plan.outputs.step }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        shell: pwsh
+        run: |
+          $config = Get-Content .github/release.json -Raw | ConvertFrom-Json
+          $runner = if ($config.runner) { $config.runner } else { 'windows-latest' }
+          $step = '${{ inputs.step }}'
+          if ('${{ github.event_name }}' -eq 'push') {
+            $labels = @(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].labels[].name')
+            $step = if ($labels -contains 'release:major') { 'major' } elseif ($labels -contains 'release:minor') { 'minor' } else { 'patch' }
+          }
+          "runner=$runner" >> $env:GITHUB_OUTPUT
+          "step=$step" >> $env:GITHUB_OUTPUT
+          Write-Host "Runner $runner, version step $step"
+
+  release:
+    needs: plan
+    runs-on: ${{ needs.plan.outputs.runner }}
     timeout-minutes: 360
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
@@ -60,22 +86,11 @@ jobs:
         with:
           python-version: '3.13'
 
-      - name: Version step
-        id: step
-        run: |
-          $step = '${{ inputs.step }}'
-          if ('${{ github.event_name }}' -eq 'push') {
-            $labels = @(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0].labels[].name')
-            $step = if ($labels -contains 'release:major') { 'major' } elseif ($labels -contains 'release:minor') { 'minor' } else { 'patch' }
-          }
-          "step=$step" >> $env:GITHUB_OUTPUT
-          Write-Host "Version step: $step"
-
       - name: Next version
         id: version
         run: |
           $current = node .github/scripts/release.mjs current
-          $version = node .github/scripts/release.mjs bump '${{ steps.step.outputs.step }}'
+          $version = node .github/scripts/release.mjs bump '${{ needs.plan.outputs.step }}'
           if ($LASTEXITCODE) { exit 1 }
           $tag = (node .github/scripts/release.mjs config tagPrefix) + $version
           git fetch --tags --quiet
@@ -85,28 +100,29 @@ jobs:
           "app=$(node .github/scripts/release.mjs config app)" >> $env:GITHUB_OUTPUT
           Write-Host "$current -> $version ($tag)"
 
-      - name: Prepare
+      - name: Prepare and build
         run: |
-          foreach ($command in @(node .github/scripts/release.mjs config prepare)) {
+          $commands = @(node .github/scripts/release.mjs config prepare) + @(node .github/scripts/release.mjs config build)
+          foreach ($command in $commands) {
             if (-not $command) { continue }
             Write-Host "> $command"
-            cmd /c $command
+            if ($IsWindows) { cmd /c $command } else { bash -c $command }
             if ($LASTEXITCODE) { exit 1 }
           }
 
-      - name: Build (build-release.bat --no-install)
-        shell: cmd
-        run: build-release.bat --no-install --ci
-
       - name: Package
-        id: package
         run: |
-          $zip = "${{ steps.version.outputs.app }}-${{ steps.version.outputs.version }}-windows-x64.zip"
-          Compress-Archive -Path (Get-ChildItem release -Exclude installer).FullName -DestinationPath $zip
-          $assets = @((Resolve-Path $zip).Path) + @(Get-ChildItem release -File -Filter *.exe | ForEach-Object FullName)
-          if (Test-Path release/installer) { $assets += @(Get-ChildItem release/installer -File | ForEach-Object FullName) }
+          if ((node .github/scripts/release.mjs config assets) -eq 'files') {
+            $assets = @(Get-ChildItem release -File | ForEach-Object FullName)
+          } else {
+            $zip = "${{ steps.version.outputs.app }}-${{ steps.version.outputs.version }}-windows-x64.zip"
+            Compress-Archive -Path (Get-ChildItem release -Exclude installer).FullName -DestinationPath $zip
+            $assets = @((Resolve-Path $zip).Path) + @(Get-ChildItem release -File -Filter *.exe | ForEach-Object FullName)
+            if (Test-Path release/installer) { $assets += @(Get-ChildItem release/installer -File | ForEach-Object FullName) }
+          }
+          if (-not $assets) { Write-Error 'release/ is empty'; exit 1 }
           $assets | ForEach-Object { Write-Host $_ }
-          ($assets -join "`n") | Set-Content -Path assets.txt
+          ($assets -join "`n") | Set-Content -Path "$env:RUNNER_TEMP/assets.txt"
 
       - name: Commit, tag and publish
         if: env.PUBLISH == 'true'
@@ -119,7 +135,7 @@ jobs:
           git tag -a $tag -m "${{ steps.version.outputs.app }} ${{ steps.version.outputs.version }}"
           git push origin "HEAD:refs/heads/main" "refs/tags/$tag"
           if ($LASTEXITCODE) { exit 1 }
-          $assets = @(Get-Content assets.txt)
+          $assets = @(Get-Content "$env:RUNNER_TEMP/assets.txt")
           gh release create $tag --repo '${{ github.repository }}' --verify-tag --title "${{ steps.version.outputs.app }} ${{ steps.version.outputs.version }}" --generate-notes @assets
           if ($LASTEXITCODE) { exit 1 }
 
