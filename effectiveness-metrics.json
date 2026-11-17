@@ -5,13 +5,13 @@
     "eligibleTurns": 0,
     "indexReadyTurns": 0,
     "turnsWithIndex": 3,
-    "turnsWithFallback": 10,
-    "fallbackTurnsWithoutIndex": 7,
+    "turnsWithFallback": 11,
+    "fallbackTurnsWithoutIndex": 8,
     "indexCalls": 3,
     "emptyResults": 0,
     "resultErrors": 0,
     "returnedTokenEstimate": 183,
-    "fallbackCalls": 362,
-    "fallbackTokenEstimate": 1066630
+    "fallbackCalls": 405,
+    "fallbackTokenEstimate": 1312491
   }
 }
