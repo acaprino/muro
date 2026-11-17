@@ -119,10 +119,10 @@ def _write_files(files: dict[str, str], root: Path, allowed: Callable[[str], boo
 
 
 def _inline_evidence(workbench: Path) -> str:
-    """The intake workbench's source.json and files/, inlined for an API model."""
+    """The intake workbench's source.json, coverage.json and files/, inlined for an API model."""
     parts = ["\n\n## Inlined evidence (this API run has no file tools; ./files/ follows inline)\n"]
-    source = workbench / "source.json"
-    parts.append(f"\n### source.json\n\n```json\n{source.read_text(encoding='utf-8')}\n```\n")
+    for name in ("source.json", "coverage.json"):
+        parts.append(f"\n### {name}\n\n```json\n{(workbench / name).read_text(encoding='utf-8')}\n```\n")
     total = 0
     skipped: list[str] = []
     for path in sorted((workbench / "files").rglob("*")):

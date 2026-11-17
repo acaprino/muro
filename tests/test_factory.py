@@ -68,7 +68,7 @@ def test_intake_supplies_existing_graph_without_deciding_or_mutating_it(repo, tm
     prompt = (destination / "PROMPT.md").read_text(encoding="utf-8")
     assert body in prompt and router in prompt
     assert all(path.read_bytes() == data for path, data in before.items())
-    assert sorted(path.name for path in destination.iterdir()) == ["PROMPT.md", "files", "source.json"]
+    assert sorted(path.name for path in destination.iterdir()) == ["PROMPT.md", "coverage.json", "files", "source.json"]
 
 
 def test_unreadable_catalog_leaves_intake_destination_available_for_retry(repo, tmp_path):

@@ -62,7 +62,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     target = out_root / plugin["slug"]
     if target.exists():
         raise FileExistsError(f"Output already exists: {target}")
-    verified = [(src, *inspect_source(src, project_root)) for src in sources]
+    verified = [(src, *inspect_source(src, project_root, coverage=True)) for src in sources]
     slug, name, version = plugin["slug"], plugin["name"], plugin["version"]
     out_root.mkdir(parents=True, exist_ok=True)
     dist = out_root / f".{slug}.muro-build"

@@ -15,7 +15,7 @@ from muro import (
 from muro.runtime import Coordinator
 from muro.routing import resolve_selection
 from test_regressions import git
-from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts, decision, proposed
+from routing_helpers import INTENTS, ROUTER_HEADER, copy_delivery, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
@@ -27,6 +27,7 @@ def runtime_package(tmp_path):
     shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
     shutil.copy2(PACKAGE / "ROUTER.md", root / "ROUTER.md")
     copy_prompts(root)
+    copy_delivery(root)
     return root
 
 
@@ -137,3 +138,54 @@ def test_installed_identity_collision_is_detected_only_when_roots_are_supplied(t
     (tmp_path / "other" / ".claude-plugin" / "plugin.json").write_text('{"name":"muro"}', encoding="utf-8")
     plugin = {"slug": "muro", "name": "Muro", "command": "muro", "version": "1"}
     assert validate_plugin_identity(plugin, installed_roots=[tmp_path])
+
+
+def _helper_project(tmp_path, root, selected):
+    src = {"id": "demo", "repo_path": str(root), "commit": git(root, "rev-parse", "HEAD"), "pin": "head", "license": "MIT",
+           "selected_paths": selected, "excluded_paths": [], "intake": {"goal": "test"}}
+    project = tmp_path / "project"
+    (project / "capabilities").mkdir(parents=True)
+    (project / "capabilities" / "x.md").write_text(
+        '---\n' + INTENTS + 'id: x\nrole: testing\nwhen: "—"\nafter: []\noutputs: ["x"]\nchecks: ["ok"]\n---\n## Sources\nSource: demo\n', encoding="utf-8")
+    (project / "ROUTER.md").write_text(ROUTER_HEADER + "| x | testing | — | — | x | testing.verify |\n", encoding="utf-8")
+    copy_prompts(project)
+    shutil.copytree(ROOT / "muro", project / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    (project / "sources.json").write_text(json.dumps(
+        {"plugin": {"slug": "muro", "name": "Muro", "command": "muro", "version": "1"}, "sources": [src]}), encoding="utf-8")
+    return project
+
+
+def _commit_helpers(root, files):
+    for name, text in files.items():
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_text(text, encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "helpers")
+
+
+def test_an_import_quoted_in_a_string_or_a_url_on_a_runtime_base_is_not_a_missing_helper(repo, tmp_path):
+    # taste-skill v2.5.1, 2026-11-17: both stopped the build of a source selected whole.
+    root, _commit = repo
+    _commit_helpers(root, {
+        "kit/build-index.mjs": "export const doc = {\n  load: \"import ui from './ui.js'; ui.loadAll(document)\",\n};\n",
+        "kit/demo.js": "export async function meta(base) {\n  return fetch(new URL('./meta.json', base));\n}\n",
+    })
+    project = _helper_project(tmp_path, root, ["kit/**"])
+    result = build_release(project / "sources.json", project, tmp_path / "out")
+    assert (result / "scripts" / "demo" / "kit" / "demo.js").is_file()
+
+
+@pytest.mark.parametrize("code, missing", [
+    ("import { a } from './absent.js';\n", "absent.js"),
+    ("import {\n  a,\n  b,\n} from './absent.js';\n", "absent.js"),
+    ("export { a } from './absent.js';\n", "absent.js"),
+    ("const a = 1;import{b}from'./absent.js';\n", "absent.js"),
+    ("const data = new URL('./absent.json', import.meta.url);\n", "absent.json"),
+    ("const mod = await import('./absent.js');\n", "absent.js"),
+], ids=["import", "multiline", "re-export", "minified", "module-url", "dynamic"])
+def test_a_real_relative_dependency_that_is_not_packaged_still_stops_the_build(repo, tmp_path, code, missing):
+    root, _commit = repo
+    _commit_helpers(root, {"kit/tool.mjs": code})
+    project = _helper_project(tmp_path, root, ["kit/**"])
+    with pytest.raises(ValueError, match=f"Missing helper dependency.*{missing}"):
+        build_release(project / "sources.json", project, tmp_path / "out")

@@ -134,7 +134,7 @@ Start with Marionette's layout and give the new package its own identity and sou
 
 | File | What it holds |
 | --- | --- |
-| `sources.json` | Package identity, source pins, licenses, selected paths, exclusions, runtime dependency notes, and intake goals. Optional `intake_only_paths` name selected files the generated plugin does not need at run time: they are read at intake and not shipped in the release |
+| `sources.json` | Package identity, source pins, licenses, selected paths, exclusions, runtime dependency notes, and intake goals. Optional `intake_only_paths` name selected files the generated plugin does not need at run time: they are read at intake and not shipped in the release. `omissions` (`{paths, reason}`) explain each file the selected files name and the plugin does not need; `media_paths` declare the images, fonts and other binary files that travel ([ADR-0026](docs/adr/ADR-0026-source-coverage-evidence-at-intake.md), [ADR-0027](docs/adr/ADR-0027-declared-binary-media.md)) |
 | `capabilities/*.md` | Intents and exclusions, procedures, outputs, checks, tools, hooks, and relationships. With more than one intent, `intent_checks` says which checks each intent answers; `check_conditions` gives the case in which a conditional check applies ([ADR-0018](docs/adr/ADR-0018-checks-scoped-to-the-step-intent.md)) |
 | `ROUTER.md` | Catalog index with one row per capability and the harmonization record |
 | `guide-examples.json` | Reviewed requests with explicit decisions that the guide validates and illustrates |
@@ -143,7 +143,7 @@ Start with Marionette's layout and give the new package its own identity and sou
 | `custom-instructions/**/*.md` | Your own instructions in free Markdown; the host AI decides their form and scope during harmonization |
 | `eval-cases.json` | Optional routing examples with expected decisions for scoring a host AI |
 
-1. **Prepare intake.** Run `muro intake <source-id>` with the new manifest. Give the host AI the prompt and evidence under `.muro/factory/intake/<source-id>/` beside the manifest.
+1. **Prepare intake.** Run `muro intake <source-id>` with the new manifest. Give the host AI the prompt and evidence under `.muro/factory/intake/<source-id>/` beside the manifest. The evidence includes `coverage.json`: what the source holds outside your selection and which of it the selected files name, so the AI can complete `selected_paths` before it writes a capability ([ADR-0026](docs/adr/ADR-0026-source-coverage-evidence-at-intake.md)).
 2. **Harmonize.** Run `muro harmonize` and give the host AI the context under `.muro/factory/harmonization/`. Review the resulting catalog, rationale, and examples.
 3. **Verify and build.** Run `muro validate`, `muro check-sources`, and `muro build` separately with `--manifest <path-to-sources.json>` each time. The release lands in `dist/<slug>/` beside the manifest unless you supply `--out`.
 4. **Keep it honest over time.** `muro baseline` says which pins fell behind their upstream (exit 1 when one did), and `muro review` prepares the host-AI re-examination of the recorded decisions before you re-pin or re-harmonize. Both change nothing by themselves.
@@ -189,7 +189,7 @@ activate permanent instructions.
 
 Each source records a full commit SHA. `pin: release` ties it to a published tag, `pin: head` follows an upstream without releases or tags, and `pin: static` freezes a reviewed commit. Re-pinning calls for a review of the selected paths and license notices.
 
-The source gate accepts MIT and Apache-2.0, checks selected paths for nested licenses and SPDX conflicts, and ships applicable licenses and notices. A declared `license_path` covers its own subtree. A source that bundles third-party code in a prebuilt file declares the file listing those notices in `notice_paths`; it ships with the source and the aggregated notice points at it. Third-party asset rights need their own review.
+The source gate accepts MIT and Apache-2.0, checks selected paths for nested licenses and SPDX conflicts, and ships applicable licenses and notices. A declared `license_path` covers its own subtree. A source that bundles third-party code in a prebuilt file declares the file listing those notices in `notice_paths`; it ships with the source and the aggregated notice points at it. Images, fonts and other binary files are refused unless the source declares them in `media_paths`, which the intake does after reading how the source licenses them; the gate does not read those rights. A file that the selected files name must be selected or explained in `omissions`, or the check and the build fail.
 
 Upstream code stays inert during intake and build. If a selected capability needs a missing runtime tool, the host checks permissions, reports the official source and install location, uses the narrowest workable scope, and verifies the tool before continuing. Active hooks must have an explicit delivery declaration. Hook commands use literal argv, and Windows batch shims require declaring the executable and script directly.
 

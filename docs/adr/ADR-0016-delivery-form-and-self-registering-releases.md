@@ -362,6 +362,22 @@ Cost: two small JSON files per release; no run-time cost. Evidence and limits:
 session in a host where the plugin was installed through the marketplace
 commands, Codex's review step itself, Hermes.
 
+## Amendment of 2026-11-17: a wiring may carry the source's hook timeout
+
+taste-skill declares `timeout: 600` on its Stop hook, because its finish gate
+runs headless browsers for minutes. A wiring had no place for it, so the host's
+default would have cut the gate short. A wiring now accepts an optional
+`timeout`, a positive whole number of seconds, written on the hook entry for
+Claude Code and Codex. It is the source's value, carried as content, never a
+default of the factory; without it nothing is written and the host decides.
+`tests/test_delivery.py` covers the accepted value, both hosts' output and the
+refused values.
+
+The same day Marionette declared its first active source hook (ADR-0026). The
+runtime already refused a catalog with an active hook and no delivery document,
+so eight test fixtures that copied only capabilities and router now copy the
+document, the owner Markdown it binds and the source ids through one helper.
+
 ## Confirmation
 
 `python -m pytest -q tests/test_delivery.py`, the full suite and `--validate` on
