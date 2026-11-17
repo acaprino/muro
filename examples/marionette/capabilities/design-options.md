@@ -11,7 +11,7 @@ intents: [{"id":"ui.design-variations","description":"Produce three or more subs
 tools: [{"name":"file-access","purpose":"Read the design and its system, and write the variations or the panel into one HTML file.","required":true},{"name":"browser","purpose":"Compare the variations as rendered and operate each control, including a reload.","required":false}]
 hooks: []
 conflicts: []
-reads: ["aesthetic_direction", "palette", "typography", "constraints", "design_tokens", "prototype_file"]
+reads: ["aesthetic_direction", "palette", "typography", "constraints", "design_tokens", "prototype_file", "design_file"]
 ---
 
 # Design Options (hi-fi variations and tweak controls)
@@ -37,6 +37,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 
 ## Specifics
 
+- **A project design file comes first.** A `DESIGN.md` of the project that is not a starter or a reference (the recorded `design_file`, or the file found in the project) is the first look to match: its confirmed values win where a recorded direction, tokens or a `MASTER.md` differ, its `unresolved` entries and `proposed` values are not decisions, and this step never rewrites it (`design-file` owns it; a value it lacks is asked of the user). Where the project runs design code checks (`design-check.config.json`), source code in the checked paths with a colour value, a colour function such as `rgb()` or `oklch()`, a utility palette class, a font family or a `must-avoid` effect the file does not permit fails them: use the project's tokens there, or say that the check will fail.
 - **One file, many variants.** Never `v1.html` / `v2.html` / `v3.html`: one file, all variations visible or toggle-able.
 - The source's panel is switched by a toolbar of its own host. Only inside a host that provides that toolbar, open `## Phase 4: Implement the host protocol` and `## Phase 5: Persist defaults on disk` of `<CD>/skills/make-tweakable.md` and follow them as written; everywhere else the panel opens by itself and persists in the browser.
 - A recorded direction stays the owner of the look. A variation that leaves it is labelled as doing so, and a control never writes outside the file it lives in.
@@ -60,6 +61,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 - Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, head; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `head`). Opened at run time, by section, from `<package_root>/scripts/claude-design-system-prompt/`: `claude/skills/generate-variations.md`, `claude/skills/make-tweakable.md` and `claude/skills/discovery-questions.md`. This capability opens no chapter of `claude/system-prompt.md`.
 - Provenance: the upstream README describes the repository as a "Reverse-engineered system prompt of Claude Design from Anthropic" (from the intake brief; README.md is excluded and was not read).
 - Changes for coexistence (ADR-0017):
+  - Added by the package (2026-11-17, with the intake of zero-slop-design): a project `DESIGN.md` that is not a starter or a reference comes first among the looks to match, before a recorded direction, tokens or a Master, and is never rewritten in this step (competing design authority between recorded looks; one owner of the file, `design-file`; owner decision of 2026-11-17).
   - The trigger phrases ("different takes," "show me a few", "play with options," "see different versions") are not activation rules: the coordinator classifies by meaning (competing routing). Two skills are one capability: the selected intent sets which steps run, the other part is `not requested`.
   - make-tweakable Phase 4 (`__activate_edit_mode`, `__deactivate_edit_mode`, `__edit_mode_available`, `__edit_mode_set_keys`) and Phase 5 (the `/*EDITMODE-BEGIN*/ ... /*EDITMODE-END*/` block the host rewrites on disk) need a toolbar no supported host has: the panel has its own opening control and persists in `localStorage`, and "to match the toolbar toggle", "With Tweaks toggled off" and "toggle the panel on/off via the toolbar" mean the panel's own control.
   - The `design_canvas.jsx` starter belongs to the source's host and is not in the snapshot: variations sit in a plain CSS grid in the same file.

@@ -104,6 +104,10 @@ installation, publication or replacement of existing dist output without request
   is the root `LICENSE` unless `license_path` names the file that licenses the
   source's own folder; that file covers only paths under its folder, and a
   license deeper than the verified one always needs review (ADR-0005, ADR-0006).
+  Optional `notice_paths`: selected files that list the third-party notices of
+  code a source bundles in a prebuilt file, which the gate cannot see inside.
+  They must ship; the aggregated `NOTICE.md` points at each one. Declared at
+  intake, never guessed from a file name (ADR-0025).
 - `prompts/intake.md`: AI reads selected source skills, classifies all their
   supported outcomes and extracts capabilities with source-to-intent provenance.
   `prompts/harmonizer.md`: AI normalizes intent meanings, merges overlapping roles
@@ -302,6 +306,13 @@ examples supplied as AI fixtures, variant constraints, dependencies, state
 preservation, missing tools, hook metadata and delivery declarations (a release
 registers exactly what `delivery.json` declares, and nothing without it). A fixture does not prove
 AI reasoning quality. Report real and simulated integrations separately.
+
+Owner rule of 2026-11-17 ("le suite falle sempre in remoto in github actions"):
+the full suite runs in GitHub Actions, in the `Tests` workflow
+(`.github/workflows/tests.yml`: every push and pull request, or `gh workflow run
+tests.yml --ref <branch>`), not on the developer machine, where it took about an
+hour against about two minutes on a runner. Locally run only the targeted tests
+of what changed, then push the branch and read the run.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 examples/marionette/sources.json --validate`. For source/build changes also run

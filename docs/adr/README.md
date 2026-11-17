@@ -220,3 +220,10 @@ reviewable sync plans, and adapt sources through the factory with a real host
 AI. The factory stays independent. Proposed: it implements the owner's approved
 design, and the text is not separately approved. This manual note is outside
 the historical generated index.
+
+## Declared third-party notices
+
+Manual note outside the generated index: [ADR-0025 — Third-party notices
+declared by the source](ADR-0025-declared-third-party-notices.md) records the
+optional `notice_paths` field for a source that bundles third-party code in a
+prebuilt file, and what the license gate still does not check.

@@ -197,6 +197,44 @@
         "executing-plans",
         "subagent-driven-development"
       ]
+    },
+    {
+      "name": "marionette-design-file",
+      "description": "Use when recording a developer's design choices in a design brief or a DESIGN.md file (writing it, extracting it from an existing interface, changing its colours, typography, layout or interaction states), implementing interface changes from that file, examining the file for defects, comparing an interface with it for drift, inspecting accessibility against a stated standard without fixing, exporting its tokens as CSS, DTCG JSON or Tailwind theme data, or adding design code checks to a project and its CI. Not for a technical design document or RFC, for choosing a look, or for auditing and fixing an HTML design.",
+      "capabilities": [
+        "design-file",
+        "design-file-apply",
+        "design-file-inspection",
+        "design-file-integration"
+      ],
+      "absorbs": [
+        "zero-slop-design",
+        "define-design",
+        "create-design-md",
+        "extract-design",
+        "review-design-md",
+        "update-design-md",
+        "apply-design",
+        "review-design-drift",
+        "define-typography",
+        "define-color-system",
+        "define-responsive-layout",
+        "define-interaction-states",
+        "review-accessibility",
+        "export-design-tokens",
+        "enforce-design"
+      ]
+    },
+    {
+      "name": "marionette-writing",
+      "description": "Use when asked to humanize, de-AI, make natural or polish the prose of an existing text or file in any language (an article, post, email, reply or documentation), to make it clearer or flow better, or to correct only its errors, without adding facts; it returns the full final text with the changes and the open points and writes a file only on your choice. Not for translating, refactoring code, writing a text from scratch, fact-checking claims or editing Word, PowerPoint or PDF files.",
+      "capabilities": [
+        "text-humanize"
+      ],
+      "absorbs": [
+        "text-humanizer",
+        "humanize"
+      ]
     }
   ]
 }
