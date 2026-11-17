@@ -9,13 +9,14 @@ rem   build-release.bat --target <dir>    install folder (default D:\Software\Mu
 rem   build-release.bat --ci              npm ci even when node_modules is already there
 rem   build-release.bat --jobs N          parallel Rust compilations (CARGO_BUILD_JOBS)
 rem
-rem The same script, with the same steps and options, is in Shinatama, Mukade, Xiox and Muro:
-rem only the PROJECT parts (the settings below and the subroutines at the end) differ.
-rem   1. tools, version, npm dependencies (npm ci only when node_modules is missing, or --ci)
+rem The same script, with the same steps and options, is in Shinatama, Mukade, Xiox, Muro, Ethel and
+rem Qemille: only the PROJECT parts (the settings below and the subroutines at the end) differ.
+rem   1. tools, version, npm dependencies in NPM_DIR (npm ci only when node_modules is missing, or --ci)
 rem   2. build                                                          PROJECT :build
 rem   3. .\release made from nothing: the programs and their files      PROJECT :assemble
 rem   4. install: .\release is copied over D:\Software\Muro, made if missing. What only the
 rem      install holds (data, mukade-data, webview ...) stays as it is; nothing is backed up.
+rem      release\installer\, where there is one, holds installers to hand out: it is not installed.
 rem      While a program of the install folder is running, it waits for it to close.
 rem   5. clean: what the build staged is removed, on success and on failure. PROJECT :clean_project
 rem      Cargo's target\ stays (the build cache: the next build is incremental), node_modules stays.
@@ -37,6 +38,8 @@ rem Tools beyond cargo, node, npm and git.
 set "TOOLS=python curl.exe powershell"
 rem Parallel Rust jobs when neither CARGO_BUILD_JOBS nor --jobs is given (empty: cargo decides).
 set "DEFAULT_JOBS="
+rem The folder (relative to the repo) with package.json and node_modules.
+set "NPM_DIR=."
 rem ===============================================================================================
 
 set "INSTALL=D:\Software\%APP%"
@@ -69,7 +72,7 @@ for %%T in (cargo node npm git %TOOLS%) do (
   where %%T >nul 2>nul || (echo [ERROR] %%T not found in PATH. & goto :fail)
 )
 set "VERSION=?"
-for /f "usebackq delims=" %%V in (`node -p "require('./package.json').version"`) do set "VERSION=%%V"
+for /f "usebackq delims=" %%V in (`node -p "require('./%NPM_DIR:\=/%/package.json').version"`) do set "VERSION=%%V"
 set "COMMIT=?"
 for /f "usebackq delims=" %%C in (`git rev-parse --short HEAD`) do set "COMMIT=%%C"
 set "DIRTY="
@@ -80,9 +83,13 @@ if "%DO_INSTALL%"=="1" echo     install into %INSTALL%
 if not "%DO_INSTALL%"=="1" echo     no install: .\release only
 
 if "%NPM_CI%"=="1" goto :npm_ci
-if exist "node_modules\.package-lock.json" goto :npm_done
+if exist "%NPM_DIR%\node_modules\.package-lock.json" goto :npm_done
 :npm_ci
-call npm ci || goto :fail
+pushd "%NPM_DIR%" || goto :fail
+call npm ci
+set "RC=%ERRORLEVEL%"
+popd
+if not "%RC%"=="0" goto :fail
 :npm_done
 
 rem --- 2. Build ----------------------------------------------------------------------------------
@@ -138,7 +145,7 @@ set "SHOWN=1"
 ping -n 4 127.0.0.1 >nul
 goto :install_wait
 :install_copy
-robocopy "%RELEASE%" "%INSTALL%" /E /R:10 /W:2 /NFL /NDL /NJH /NP
+robocopy "%RELEASE%" "%INSTALL%" /E /XD "%RELEASE%\installer" /R:10 /W:2 /NFL /NDL /NJH /NP
 if errorlevel 8 (echo [ERROR] copy into %INSTALL% failed: a file may still be in use. & goto :sub_fail)
 exit /b 0
 
