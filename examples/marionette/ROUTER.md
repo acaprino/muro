@@ -64,9 +64,7 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 
 ## Harmonization record (re-harmonized 2026-11-10 against the pinned sources)
 
-- No row has a mandatory prerequisite. Consumers start from existing work or stated
-  behavior, reading earlier outputs when recorded; the AI orders selected producers
-  and consumers. Forced edges had made hover timing run a website direction.
+- No row has a mandatory prerequisite. Consumers start from existing work or stated behavior, reading earlier outputs when recorded; the AI orders selected producers and consumers. Forced edges had made hover timing run a website direction.
 - visual-direction merges taste-skill v2.5.1 (plan, copy, dealt palette/type,
   build, screenshot review) and landing-page-design (offer, proof, FAQ, outline):
   both build the page; taste's brief/copy step is the landing strategy and owns the

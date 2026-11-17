@@ -173,6 +173,8 @@ def test_skill_md_synthesizes_domain_rich_bounded_discovery_description():
     fm = skill_text.split("---")[1]
     desc_line = next(line for line in fm.splitlines() if line.startswith("description:"))
     desc = desc_line.split(":", 1)[1].strip()
+    if desc.startswith('"'):
+        desc = json.loads(desc)             # the YAML quotes are not part of the description
     assert len(desc) <= 1024
     assert "Use when" in desc
     for keyword in ("landing", "Figma", "scroll", "Office", "explainer"):
