@@ -172,7 +172,16 @@ the owner's request ("skippa la suite"), after showing two failures in its first
 identified. By the owner's rule of the same day it runs in GitHub Actions, in the `Tests` workflow added
 with this change. The result of that run is recorded below once the branch is pushed.
 
-`Tests` workflow: not yet run when this record was first committed.
+`Tests` workflow on `develop` (GitHub Actions, Ubuntu, Python 3.13). The first run, on commit `5844a0d`,
+reported 653 passed, 3 failed, 16 skipped in 113 seconds: the router at exactly 80 text lines left no room for
+the row `tests/test_ai_routing.py` appends, `tests/test_pin_modes.py` did not name the two new sources, and
+`tests/test_audit_p0.py` built the umbrella description without the package's entries. The third run, on
+commit `e96f8df` (run 44087423614), passed: 656 passed, 16 skipped in 179 seconds, then `--validate`,
+`--check-sources` and a fresh build on the runner.
+
+Found by that test and left as it is: a package with no `entries.json` and a long `plugin.replaces` list gets an
+umbrella description that is only the list of names, because the list alone passes 1024 characters
+(`muro/adapters.py`, `_skill_description`). Marionette has entries, so its release is not affected.
 
 ## After the intake
 

@@ -67,6 +67,9 @@ staged, and a 77-case routing evaluation by a model that did not see the
 expected answers matched 76; the one miss is an older case unrelated to these
 sources. Fixtures prove mechanics, not that a model always understands a request.
 
+The `Tests` workflow passed on `develop` with **656 tests**, **16 skipped**, followed by
+source validation, source checks and a fresh build.
+
 Not executed: the design tool itself (it was read and hashed, not run), and no
 capability of the two sources in a live host. No project was put under the code
 check.
