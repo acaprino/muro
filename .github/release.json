@@ -1,0 +1,10 @@
+{
+  "app": "Muro",
+  "tagPrefix": "muro-v",
+  "files": [
+    "muro/__init__.py"
+  ],
+  "locks": [],
+  "crates": [],
+  "prepare": []
+}

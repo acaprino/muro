@@ -1,0 +1,51 @@
+name: Release Marionette
+
+# Publishes the Marionette package (marionette-v<version>) from the commit it runs on, on the owner's request.
+# The factory and its desktop app (muro-v<version>) are released by release.yml at every merge of develop into
+# main. See AGENTS.md, "Releasing".
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MANIFEST: examples/marionette/sources.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Read the version
+        run: |
+          echo "PKG_VERSION=$(python -c 'import json,os; print(json.load(open(os.environ["MANIFEST"]))["plugin"]["version"])')" >> "$GITHUB_ENV"
+      - name: Refuse a tag that already exists
+        run: |
+          PKG_TAG="marionette-v$PKG_VERSION"
+          echo "PKG_TAG=$PKG_TAG" >> "$GITHUB_ENV"
+          git fetch --tags --quiet
+          if git rev-parse -q --verify "refs/tags/$PKG_TAG" >/dev/null; then
+            echo "::error::$PKG_TAG already exists; bump the version instead"; exit 1
+          fi
+      - name: Test the release commit
+        run: |
+          python -m pip install pytest
+          python -m pytest -q
+      - name: Validate, check sources and build
+        run: |
+          python muro_build.py --manifest "$MANIFEST" --validate
+          python muro_build.py --manifest "$MANIFEST" --check-sources
+          python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/release"
+          cd "$RUNNER_TEMP/release"
+          python -c "import shutil; shutil.make_archive('marionette-$PKG_VERSION', 'zip', '.', 'marionette')"
+          sha256sum "marionette-$PKG_VERSION.zip" | tee "marionette-$PKG_VERSION.zip.sha256"
+      - name: Publish Marionette
+        run: |
+          notes="docs/releases/$PKG_TAG.md"
+          if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
+          gh release create "$PKG_TAG" --target "$GITHUB_SHA" --title "Marionette $PKG_VERSION" "$@" \
+            "$RUNNER_TEMP/release/marionette-$PKG_VERSION.zip" "$RUNNER_TEMP/release/marionette-$PKG_VERSION.zip.sha256"

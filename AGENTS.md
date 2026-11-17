@@ -381,28 +381,25 @@ proves packaging; say what was not executed.
 
 ## Releasing
 
-Two products are released from this repository, each with its own tag: the
-factory as `muro-v<version>` (version in `muro/__init__.py`, `__version__`) and
-a package as `<slug>-v<version>` (version in its `sources.json`,
-`plugin.version`; Marionette is `marionette-v<version>`). No release, tag or
-version bump without the owner's request.
+Two products are released from this repository, each with its own tag.
 
-1. Bump the version of what is being released, in a pull request to `main`. A
-   package changes version whenever its catalog, policy or packaged files
-   changed: hosts cache an installed plugin by version.
-2. Write `docs/releases/<tag>.md`: what changed for a user, the verification
-   results, and what was not executed. Without that file GitHub generates the
-   notes from the merged pull requests.
-3. On the merged commit run `python -m pytest -q`, `--validate` and
-   `--check-sources`, and stage a fresh build with `--build --out <scratch>`.
-4. Run the `Release` workflow (GitHub, Actions, "Run workflow" on `main`, or
-   `gh workflow run release.yml -f target=<muro|marionette|both>`). It repeats
-   validation, source checks and the build, creates the tags on that commit and
-   publishes the GitHub releases; the package release carries
-   `<slug>-<version>.zip` with its SHA-256. It refuses a tag that already
-   exists: a published release is never replaced, bump the version instead.
-5. Do not commit `dist/`, and do not push tags by hand from a session whose
-   access is limited to its own branch: the workflow is the way.
+- The factory and its desktop app, `muro-v<version>` (version in `muro/__init__.py`, `__version__`): released
+  at every merge of `develop` into `main` by `.github/workflows/release.yml` (see "Git"). The GitHub Release
+  carries `Muro-<version>-windows-x64.zip`, the portable folder `build-release.bat` makes. Do not bump
+  `__version__` or create `muro-v*` tags by hand.
+- A package, `<slug>-v<version>` (version in its `sources.json`, `plugin.version`; Marionette is
+  `marionette-v<version>`), on the owner's request only:
+  1. Bump the package version on `develop`. A package changes version whenever its catalog, policy or
+     packaged files changed: hosts cache an installed plugin by version.
+  2. Write `docs/releases/<tag>.md`: what changed for a user, the verification results, and what was not
+     executed. Without that file GitHub generates the notes from the merged pull requests.
+  3. On the commit to release run `python -m pytest -q`, `--validate` and `--check-sources`, and stage a
+     fresh build with `--build --out <scratch>`.
+  4. Run the `Release Marionette` workflow (GitHub, Actions, "Run workflow", or
+     `gh workflow run release-marionette.yml`). It repeats validation, source checks and the build, creates
+     the tag and publishes the GitHub release with `<slug>-<version>.zip` and its SHA-256. It refuses a tag
+     that already exists: a published release is never replaced, bump the version instead.
+  5. Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
 
 The README header shows `docs/assets/branding/muro-logo.png`. Keep that
 line and that file when rewriting the README.
@@ -419,6 +416,13 @@ verification records belong in docs/verification/. Never write new docs/superpow
 ## Git
 
 - Two branches, and only two: `main` (what is released) and `develop` (where work is integrated).
-- Work on `develop`, or on a short branch from `develop` that is merged back into `develop` and then
-  deleted. Only `develop` goes into `main`, with a merge, at a release.
-- Leave no other branch, locally or on GitHub.
+- Work always on `develop`, or on a short branch from `develop` that is merged back into `develop` and then
+  deleted. Never merge or push into `main`, and leave no other branch, locally or on GitHub.
+- A release is the pull request `develop` → `main`, opened and merged by the owner: every merge into `main`
+  is a release (`.github/workflows/release.yml`, the same in Shinatama, Mukade, Xiox, Muro, Ethel and Qemille).
+  The version goes up by a patch, or by a minor or major step when the pull request has the label
+  `release:minor` or `release:major`; `build-release.bat` builds on Windows; the tag `muro-v<version>` and the GitHub
+  Release (`release\` zipped, its programs, its installers) are published, and `main` is merged back into
+  `develop`. Nothing is published when the build fails.
+- Never change the version or create release tags by hand: the workflow does it (`.github/release.json` lists
+  the version files, `.github/scripts/release.mjs` writes them).

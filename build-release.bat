@@ -163,7 +163,8 @@ if defined RC_DIR echo     rc.exe: %RC_DIR%\rc.exe
 exit /b 0
 
 :pause_if_clicked
-rem Started with a double-click from Explorer: keep the window open to read the result.
+rem Started with a double-click from Explorer: keep the window open to read the result. Never in CI.
+if defined CI exit /b 0
 echo %CMDCMDLINE% | "%SystemRoot%\System32\find.exe" /i "%SELF%" >nul && pause
 exit /b 0
 
