@@ -4,7 +4,7 @@ role: motion-spec
 tools: [{"name":"file-access","purpose":"Read existing UI context and record the motion specification.","required":true},{"name":"browser","purpose":"Measure timing and reduced-motion behavior when implemented UI is available.","required":false}]
 hooks: []
 conflicts: []
-reads: ["palette", "typography", "layout", "constraints", "aesthetic_direction"]
+reads: ["palette", "typography", "layout", "constraints", "aesthetic_direction", "design_file"]
 when: —
 intents: [{"id":"ui.motion-design","description":"Decide what moves in a UI and how: motion personality, durations, directional easing, choreography and reduced-motion alternatives, as a specification for later implementation or on its own. Needed before scroll or transition code when the request leaves the motion open.","excludes":["A static hero or page does not imply animation.","A motion specification or hover request does not imply scroll implementation.","A request that already states the exact behavior (for example pin this section and scrub this image) needs no separate specification step.","Animation inside an interactive explainer is part of its own canvas figures."]}]
 after: []
@@ -37,6 +37,7 @@ Return every required output key as a JSON string. For a mapped step, submit the
 
 ## Specifics
 
+- **A project design file's motion values come first.** The confirmed `x-zsd.motion` values (durations, easing) and the reduced-motion behaviour of a project `DESIGN.md` that is not a starter or a reference (the recorded `design_file`, or the file found in the project) win over the durations and easings of the source's tables where they differ. Its `unresolved` entries and `proposed` values are not decisions, and this step never rewrites the file (`design-file` owns it; a value it lacks is asked of the user).
 - **Quality rules** (`<MD>/SKILL.source.md`, `## Quality Rules`, which also lists four HIGH rules). Four are critical, never break: the linear rule of step 5, the 1/3-screen rule of step 6, never opacity-only for an important state change (combine it with position or scale), and always three motion layers: primary, secondary and ambient (`<MD>/director/core-philosophy.md`, `## Three Motion Layers`). Before recording, run the spec against `<MD>/reference/quality-checklist.md`.
 - **Layers and an approved direction.** When a recorded visual direction limits motion (for example a hover layer, one hero entrance and one or two moments per page, nothing moving with the scroll outside a moment, or no gradients), that constraint wins over the three-layer rule: add secondary detail inside the accent, leave out ambient background motion, and state the deviation in `motion-spec`. Without such a constraint, follow the source.
 - **Scroll-linked motion:** total displacement under 100px, avoid it on mobile, never parallax text (`<MD>/patterns/ambient-continuous.md`, `## Parallax`, with the layer speed ratios). Whether it is built with GSAP ScrollTrigger or CSS is the scroll-code step's choice, not this one's.
@@ -57,6 +58,7 @@ Return every required output key as a JSON string. For a mapped step, submit the
 - AI intent mapping: motion-design → ui.motion-design, from its "When to Apply", 8-step checklist, Motion Personality, Duration Table, Easing Selection, Choreography Essentials and Quality Rules sections and the `director/`, `reference/` and `patterns/` files.
 - Source: motion-design (LottieFiles/motion-design-skill@f9a8a041) — `skills/motion-design/SKILL.md`, `director/**`, `patterns/**`, `reference/**`, packaged under `<package_root>/scripts/motion-design/` (the skill file as `SKILL.source.md`). The body states the method in this package's words and points at the section a task needs.
 - Changes for coexistence (ADR-0017):
+  - Added by the package (2026-11-17, with the intake of zero-slop-design): the confirmed `x-zsd.motion` values of a project `DESIGN.md` win over the source's duration and easing tables, as a recorded direction already limits its three-layer rule, and the file is never rewritten in this step (competing design authority; one owner of the file, `design-file`; owner decision of 2026-11-17).
   - The source's frontmatter and `## When to Apply` list and decision tree activate nothing: the coordinator owns routing and classifies by meaning.
   - The source creates the animation; this step delivers only the specification (`motion-spec`, `reduced-motion`), because scroll code belongs to the `scroll-code` capabilities, one capability per step. For that handoff each row also carries a trigger and, for scroll-linked motion, the scroll range and displacement, which the source does not ask for.
   - "Always three motion layers" (Quality Rules, CRITICAL 4, and the layer items of the decision framework and quality checklist) yields to a recorded visual direction that limits motion: `visual-direction` owns `constraints`.

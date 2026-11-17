@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.2.1",
     "language": "it",
-    "description": "Use when designing or building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, updating Figma, motion or GSAP and CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing changes, coordinating specs and handoffs, reviewing changes or auditing a repository, shortcut debt or the Ponytail method and benchmark; idea briefs, design documents and their fresh-reviewer review, contract READMEs or design drift reports; implementation plans from an approved spec and their task-by-task execution under TDD; making and fact-checking HTML explainers; finding papers, a paper wiki, paper figures, planning and pitching research; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX and accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animations; creating, editing or converting Word, Excel, PowerPoint and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents and their fresh review, contract READMEs or design drift reports; implementation plans from a spec and their execution under TDD; making and fact-checking HTML explainers; humanizing prose; paper search, wiki, figures, planning and pitching research; or steering TokenEconomizer.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -57,7 +57,24 @@
       "egm-drift-report",
       "writing-plans",
       "executing-plans",
-      "subagent-driven-development"
+      "subagent-driven-development",
+      "zero-slop-design",
+      "define-design",
+      "create-design-md",
+      "extract-design",
+      "review-design-md",
+      "update-design-md",
+      "apply-design",
+      "review-design-drift",
+      "define-typography",
+      "define-color-system",
+      "define-responsive-layout",
+      "define-interaction-states",
+      "review-accessibility",
+      "export-design-tokens",
+      "enforce-design",
+      "text-humanizer",
+      "humanize"
     ]
   },
   "stack": {
@@ -735,6 +752,118 @@
         "skills/brainstorming/SKILL.md",
         "hooks/hooks.json",
         "README.md"
+      ]
+    },
+    {
+      "id": "zero-slop-design",
+      "repo_url": "https://github.com/zero-slop-design/zero-slop-design-plugin",
+      "commit": "c5cdc7ce499846c23d90732e4958b44f92823756",
+      "pin": "release",
+      "release": "v0.2.1",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 zero-slop-design contributors (root LICENSE; the bundled tools/zsd.mjs also carries third-party code under MIT, ISC and Apache-2.0, listed in THIRD_PARTY_NOTICES.md)",
+      "notice_paths": [
+        "THIRD_PARTY_NOTICES.md"
+      ],
+      "selected_paths": [
+        "skills/define-design/SKILL.md",
+        "skills/create-design-md/SKILL.md",
+        "skills/extract-design/SKILL.md",
+        "skills/review-design-md/SKILL.md",
+        "skills/update-design-md/SKILL.md",
+        "skills/apply-design/SKILL.md",
+        "skills/review-design-drift/SKILL.md",
+        "skills/define-typography/SKILL.md",
+        "skills/define-color-system/SKILL.md",
+        "skills/define-responsive-layout/SKILL.md",
+        "skills/define-interaction-states/SKILL.md",
+        "skills/review-accessibility/SKILL.md",
+        "skills/export-design-tokens/SKILL.md",
+        "skills/enforce-design/SKILL.md",
+        "references/procedure.md",
+        "references/design-format.md",
+        "references/code-checks.md",
+        "references/observations.md",
+        "references/technical-terms.md",
+        "references/technical-terms.json",
+        "references/authoring.md",
+        "spec/zsd-design-md.md",
+        "templates/DESIGN.md",
+        "templates/ci/github-actions.yml",
+        "tools/zsd.mjs",
+        "tools/spec-config.yaml",
+        "tools/build-info.json",
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md",
+        "README.md",
+        "catalog.json",
+        "docs/template-guide.md",
+        "docs/design-md-standard.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "excluded_paths": [
+        "skills/*/agents/**",
+        "src/**",
+        "packages/**",
+        "scripts/**",
+        "examples/**",
+        "docs/language-review.md",
+        "package.json",
+        "package-lock.json",
+        "plugin.json",
+        "AGENTS.md",
+        ".gitignore",
+        ".github/**",
+        ".agents/**",
+        ".codex-plugin/**",
+        ".claude-plugin/marketplace.json"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Intake of 2026-11-17, owner decision after review. Absorb zero-slop-design whole: the fourteen skills that record a developer's design selections in a DESIGN.md file, apply them, compare an interface with them, export their tokens and enforce them in source code and continuous integration, with the bundled tool tools/zsd.mjs and the references, specification and template the skills open packaged unchanged. Everything is on demand: the source ships no hook and nothing here is session-wide. Compare with the catalog's look-producing and look-consuming capabilities and resolve competing design authority. Owner decisions of 2026-11-17: (1) a DESIGN.md of the project that is not a starter or a reference counts, minus its unresolved and proposed entries, as the user's explicit instruction for visual-direction; a step that builds never rewrites DESIGN.md, it asks and the change belongs to the capability that owns the file; (2) the source's ban on adding or doing tests stays in every one of its steps for interface checks, Ponytail's small test or self-check holds for new non-trivial logic, and TDD stays inside plan-execution; (3) pin the tag v0.2.1 and ship LICENSE and THIRD_PARTY_NOTICES.md beside the bundle. Keep the bundle inert during intake: it is read and hashed, not run. Leave out the upstream manifests and per-host agent files, the tool's sources and build scripts, the example exports and the language review record; the README, catalogue, template guide, format research and Claude manifest are read as evidence."
+      },
+      "intake_only_paths": [
+        "references/technical-terms.md",
+        "references/technical-terms.json",
+        "references/authoring.md",
+        "README.md",
+        "catalog.json",
+        "docs/design-md-standard.md",
+        ".claude-plugin/plugin.json"
+      ]
+    },
+    {
+      "id": "text-humanizer",
+      "repo_url": "https://github.com/acaprino/text-humanizer",
+      "commit": "c4d8276cd0c7dea91a60c9ba49431785d07aea1c",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2025 Alfio (root LICENSE; portions of the pattern catalog derive from blader/humanizer, MIT, Copyright (c) 2025 Siqi Chen, whose license is skills/humanize/references/upstream-license.txt)",
+      "notice_paths": [
+        "skills/humanize/references/upstream-license.txt"
+      ],
+      "selected_paths": [
+        "skills/humanize/SKILL.md",
+        "skills/humanize/references/rules.md",
+        "skills/humanize/references/italiano.md",
+        "skills/humanize/references/pattern-catalog.md",
+        "skills/humanize/references/upstream-license.txt",
+        "agents/text-humanizer.md",
+        "README.md",
+        ".claude-plugin/plugin.json"
+      ],
+      "excluded_paths": [
+        "evals/**",
+        ".claude-plugin/marketplace.json",
+        ".gitignore"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Intake of 2026-11-17, owner request. Absorb the owner's own text-humanizer plugin (version 2.0.0): the humanize skill, its read-only editor agent and the three references (rules, Italian profile, pattern catalog) as one on-demand capability that makes existing prose read as written by a person without inventing content, with the report and the write-back on the user's choice. Nothing is session-wide: the rules edit a text the user brings, they are not a style for the package's own replies. The upstream has no release or tag, so the pin follows its head. The slash command and its trigger lines are routing and are not carried; the editor runs as a subagent with the packaged agent file, or inline by the source's own fallback. The upstream license of the catalog's origin (blader/humanizer, MIT) ships with the references and is declared as a third-party notice. Leave out the evals and their grader and the marketplace manifest; the README and the plugin manifest are read as evidence."
+      },
+      "intake_only_paths": [
+        "README.md",
+        ".claude-plugin/plugin.json"
       ]
     }
   ]

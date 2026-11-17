@@ -407,6 +407,76 @@
       ],
       "reason": "La catena in simbiosi: ogni passo consuma l'output registrato del precedente e ognuno ha i propri gate con l'utente.",
       "questions": []
+    },
+    {
+      "title": "Fissa le scelte di design in un DESIGN.md",
+      "task": "Abbiamo deciso palette, font e spaziature dell'app di prenotazioni: mettile in un DESIGN.md nel repo, così ogni sessione le rispetta.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "design-file#1",
+          "capability": "design-file",
+          "intent": "design-file.create",
+          "reason": "Le scelte esistono già e si chiede il file che le registra; non si chiede di scegliere un look né di cambiare l'interfaccia."
+        }
+      ],
+      "reason": "Un solo passo: scrivere il file dalle scelte dello sviluppatore. Applicarlo al codice o farlo rispettare in CI sono richieste distinte.",
+      "questions": []
+    },
+    {
+      "title": "Fai fallire la CI sui colori fuori dal design",
+      "task": "Nel progetto c'è già il DESIGN.md: esporta i token come tema Tailwind e aggiungi alla CI il controllo che blocca colori e font non previsti.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "design-file-integration#1",
+          "capability": "design-file-integration",
+          "intent": "design-file.token-export",
+          "reason": "I token si generano dal file, che resta la fonte primaria."
+        },
+        {
+          "step_id": "design-file-integration#2",
+          "capability": "design-file-integration",
+          "intent": "design-file.code-checks",
+          "reason": "Il controllo sul codice e il passo di CI si aggiungono dopo l'export, i cui file generati vanno tra i percorsi ignorati."
+        }
+      ],
+      "reason": "Due esiti della stessa capability, in ordine: prima l'export, poi i controlli. La modifica ai file di CI aspetta l'approvazione dello sviluppatore.",
+      "questions": []
+    },
+    {
+      "title": "L'interfaccia rispetta ancora il design?",
+      "task": "Confronta la dashboard con il nostro DESIGN.md e dimmi dove i valori sono diversi; non correggere niente.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "design-file-inspection#1",
+          "capability": "design-file-inspection",
+          "intent": "design-file.interface-drift",
+          "reason": "Si misura un'interfaccia contro il file di design e si riporta soltanto; non sono documenti tecnici contro codice, che è il drift report di design-drift."
+        }
+      ],
+      "reason": "Un'ispezione che riporta le differenze misurate e lascia irrisolto ciò che non ha dati.",
+      "questions": []
+    },
+    {
+      "title": "Rendi naturale un'email senza inventare",
+      "task": "Questa email al cliente suona scritta da una macchina: rendila naturale, registro business, senza aggiungere niente che non ci sia già.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "step_id": "text-humanize#1",
+          "capability": "text-humanize",
+          "intent": "writing.humanize-prose",
+          "reason": "Si chiede di riscrivere un testo esistente perché si legga come scritto da una persona; il registro è dichiarato e nessun fatto va aggiunto."
+        }
+      ],
+      "reason": "Un solo passo: l'editor riscrive, il report mostra testo finale, modifiche e punti aperti. Con testo incollato non si scrive alcun file.",
+      "questions": []
     }
   ]
 }

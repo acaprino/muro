@@ -81,8 +81,8 @@ def test_reads_declares_the_data_flow_and_is_validated(tmp_path):
     """`reads` is optional data flow: validated against producers, never a prerequisite."""
     from muro import parse_router, validate_capabilities_and_router
     assert CAPS["figma-design"].reads == ["palette", "typography", "layout", "constraints", "offer", "page_outline",
-                                          "aesthetic_direction", "design_tokens"]
-    assert CAPS["motion-principles"].reads == ["palette", "typography", "layout", "constraints", "aesthetic_direction"]
+                                          "aesthetic_direction", "design_tokens", "design_file"]
+    assert CAPS["motion-principles"].reads == ["palette", "typography", "layout", "constraints", "aesthetic_direction", "design_file"]
     assert CAPS["gsap-scrolltrigger"].reads == CAPS["css-scroll"].reads == ["motion-spec", "reduced-motion"]
     assert CAPS["office-files"].reads == [] and all(cap.after == [] for cap in CAPS.values())
     caps = list(CAPS.values())

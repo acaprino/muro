@@ -59,7 +59,8 @@ muro validate --manifest examples/marionette/sources.json
 
 Verifies every pinned source against its upstream: the commit, the release
 tag, the license gate (MIT/Apache-2.0 template match), selected paths, nested
-licenses and SPDX conflicts. Contacts the pinned Git remotes;
+licenses, SPDX conflicts and that every declared `notice_paths` file is a
+selected file that ships. Contacts the pinned Git remotes;
 `--offline-pins` checks manifest shape and local repositories only.
 
 ```sh
