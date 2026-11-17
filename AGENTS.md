@@ -415,3 +415,8 @@ owner requirements, implementation choices and separately approved text. Do not
 rewrite generated ADR/FRD index blocks by hand. If their generators are unavailable,
 add a clearly labeled note outside those blocks. Keep plans outside the repository;
 verification records belong in docs/verification/. Never write new docs/superpowers/.
+
+## Git
+
+The main branch is `main`, the only one (there is no `master`): branch from `main`
+and merge back into `main`.
