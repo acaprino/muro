@@ -99,6 +99,12 @@ with this change. The result of that run is recorded below once the branch is pu
 
 `Tests` workflow: not yet run when this record was first committed.
 
+## After the intake
+
+On the owner's request of the same day the work was merged into `develop` and `plugin.version` went
+from 0.2.1 to 0.3.0 (`docs/releases/marionette-v0.3.0.md`). The statements above about the version
+describe the tree at the end of the intake.
+
 ## Not executed
 
 - No live host session: the capability was not run in any host, so the subagent dispatch, the
