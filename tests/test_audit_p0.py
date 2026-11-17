@@ -169,7 +169,10 @@ def test_catalog_upgrade_does_not_block_fresh_task_and_names_state_json_on_activ
 def test_skill_md_synthesizes_domain_rich_bounded_discovery_description():
     manifest = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))
     caps = parse_capabilities(MARIONETTE / "capabilities")
-    skill_text = _skill(manifest["plugin"], "opencode", capabilities=caps)
+    # Built as the release builds it, with the package's discovery entries: without them the umbrella lists
+    # every absorbed name itself, and Marionette's 68 names leave no room for the description (2026-11-17).
+    entries = json.loads((MARIONETTE / "entries.json").read_text(encoding="utf-8"))["entries"]
+    skill_text = _skill(manifest["plugin"], "opencode", capabilities=caps, entries=entries)
     fm = skill_text.split("---")[1]
     desc_line = next(line for line in fm.splitlines() if line.startswith("description:"))
     desc = desc_line.split(":", 1)[1].strip()
