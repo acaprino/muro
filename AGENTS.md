@@ -418,5 +418,7 @@ verification records belong in docs/verification/. Never write new docs/superpow
 
 ## Git
 
-The main branch is `main`, the only one (there is no `master`): branch from `main`
-and merge back into `main`.
+- Two branches, and only two: `main` (what is released) and `develop` (where work is integrated).
+- Work on `develop`, or on a short branch from `develop` that is merged back into `develop` and then
+  deleted. Only `develop` goes into `main`, with a merge, at a release.
+- Leave no other branch, locally or on GitHub.
