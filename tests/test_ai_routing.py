@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from muro.runtime import Coordinator
-from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts, decision, proposed
+from routing_helpers import INTENTS, ROUTER_HEADER, copy_delivery, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
@@ -20,6 +20,7 @@ def coordinator(tmp_path):
     for directory in ("capabilities", "prompts"):
         shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
     shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
+    copy_delivery(package)
     return Coordinator(package, tmp_path / "consumer")
 
 

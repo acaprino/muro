@@ -8,7 +8,7 @@ import pytest
 from muro import build_release, parse_capabilities, parse_router, validate_capabilities_and_router
 from muro.adapters import _skill
 from muro.runtime import Coordinator, runtime_main
-from routing_helpers import copy_prompts, decision, proposed
+from routing_helpers import copy_delivery, copy_prompts, decision, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
 MARIONETTE = ROOT / "examples" / "marionette"
@@ -22,6 +22,7 @@ def marionette_pkg(tmp_path):
     shutil.copy2(MARIONETTE / "ROUTER.md", pkg / "ROUTER.md")
     shutil.copy2(MARIONETTE / "sources.json", pkg / "sources.json")
     copy_prompts(pkg)
+    copy_delivery(pkg)
     return pkg
 
 

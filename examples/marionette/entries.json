@@ -55,7 +55,7 @@
     },
     {
       "name": "marionette-motion",
-      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
+      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
       "capabilities": [
         "motion-principles",
         "gsap-scrolltrigger",

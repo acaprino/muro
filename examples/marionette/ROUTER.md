@@ -65,11 +65,11 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 ## Harmonization record (re-harmonized 2026-11-10 against the pinned sources)
 
 - No row has a mandatory prerequisite. Consumers start from existing work or stated behavior, reading earlier outputs when recorded; the AI orders selected producers and consumers. Forced edges had made hover timing run a website direction.
-- visual-direction merges taste-skill v2.5.1 (plan, copy, dealt palette/type,
-  build, screenshot review) and landing-page-design (offer, proof, FAQ, outline):
+- visual-direction merges taste-skill v2.5.1 (plan, copy, dealt hero, palette, type and moments, build from its kit, its checker and finish gate) and landing-page-design (offer, proof, FAQ, outline):
   both build the page; taste's brief/copy step is the landing strategy and owns the
   look. Landing's font list, hero gradient and Tailwind scale are scoped out;
-  the user's explicit instruction wins over source bans and is recorded; a brand alone does not (its colours go through `brand`).
+  the user's explicit instruction wins over source bans and is recorded; a brand alone does not (its colours go through `brand`). 2026-11-17 (ADR-0026, ADR-0027): taste-skill travels whole (1,631 files; until then 11, and the page was written by hand); its Stop hook, the finish gate, is active on Claude Code and Codex.
+- 2026-11-17, same pass: work-map follows wayfinder's own `research` skill for a research item (selected; the other sibling skills stay inline). motion-design re-pinned to head 2e1f3c05: a request for a rendered animation file is handed to Creator MCP by the source's rules, inside motion-principles; no new role, output or edge.
 - design-guidance (ui-ux-pro-max) is split out: guidance for any interface,
   app screens included; beside a dealt palette its results are candidates.
 - figma-design keeps a recorded pairing and palette as the user's choice. Its
@@ -117,5 +117,5 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - zero-slop-design v0.2.1 (2026-11-17): fourteen skills, four on-demand roles, nothing session-wide. design-file is the only writer of the brief and `DESIGN.md`; apply, inspection (report-only; its drift output is not `drift_report`) and integration (token export, code checks in CI) read it; no forced chain. Look authority, owner decision: the user's request in the turn, then a project `DESIGN.md` that is not a starter or a reference (minus `unresolved` and `proposed`), then tokens or a Master in the repository, then a direction recorded in the plan; candidates stay proposals. For visual-direction such a file is the user's explicit instruction; no building or reviewing step rewrites it. Its ban on unrequested tests governs interface checks in its steps; Ponytail's self-check for new logic and plan-execution's TDD stand.
 - text-humanizer 2.0.0 (2026-11-17, head c4d8276c: no release upstream): one on-demand role, text-humanize; nothing session-wide, since as policy its rules would rewrite every reply. The skill, its editor agent and three references are one procedure; the editor is an optional subagent with the packaged agent file, or inline by the source's own fallback. The command and trigger lines are dropped as routing; a file is written only on the user's choice.
 - 2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.
-<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: taste-skill run files not selected; no maintained source for CSS scroll-driven animation;
+<!-- Dependencies are judged at runtime (ADR-0007). Open gaps: no maintained source for CSS scroll-driven animation;
 the host starters and tools named by claude-design-system-prompt are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->
