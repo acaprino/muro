@@ -10,8 +10,10 @@ explain-anything-html and paper search, and nothing else.
 
 On the owner's "go" the work was committed on the short branch
 `explain-anything-intake` (`88af670`, the factory rule; `675f46d`, the package)
-and pushed. Nothing was released or installed, and `plugin.version` is still
-0.3.0: the release is held, see "The release does not fit Shinatama's sync".
+and pushed, then merged into `develop` as `f343b6d`. The release was held, see
+"The release does not fit Shinatama's sync", until the owner chose to raise
+Shinatama's bound; version 0.4.0 follows in the commit that adds this sentence.
+Nothing was installed on the owner's machine.
 
 ## What was found
 
@@ -200,9 +202,35 @@ choice (raise Shinatama's bound, or make the release smaller) is the owner's.
 Yesterday's record noted the 283 MB release as a cost and did not check it
 against Shinatama.
 
+## After the bounds were raised in Shinatama
+
+The owner chose to raise the bound. Shinatama `develop`, `5e48ab6`: zip 512 MiB,
+tree 2 GiB, 65,536 files, lock 16 MiB, each four times what it was. The zip of
+this tree (197,039,241 bytes) was installed through Shinatama's own sync code,
+its manual test `real_zip_installs_through_system_tar`, twice; the published
+0.3.0 zip once, for comparison. One machine, a store under the user's temp
+folder.
+
+| | 0.3.0 zip | This build |
+|---|---:|---:|
+| Install and verification of the four adapters | 46.6 s | 191.5 s, 203.2 s |
+| Files, and the lock Shinatama writes | 2,484; 553,933 bytes | 12,061; 2,732,682 bytes |
+| Files of the Claude Code adapter | 418 | 2,014 |
+| A Claude Code launch: lock read, verification, private copy | 0.30 to 0.32 s | 2.9 s |
+| The launch that first reads a copy the launch before wrote | 5.9 s | 28.4 s |
+
+The longest path in the release is 143 characters. The cause of the one slow
+launch was not established; Shinatama gives the preparation of a Claude Code
+launch 60 s.
+
 ## Not executed
 
-- The release and the installation: held, as above.
+- The installation: Shinatama on the owner's machine is 0.1.0 and has the old
+  bound. It follows 0.4.0 once it runs a build of its `develop` or a release
+  after 0.1.1, which is the owner's pull request there.
+- A session from Shinatama's desktop app with the new package, and Shinatama's
+  `Verify` workflow beyond its `plan` check, which fails on its `develop` before
+  the Rust checks.
 - Codex, Pi, OpenCode and Hermes. On Hermes the policy is over the section cap
   and goes through `pre_llm_call`; the new line was not checked there.
 - A request that should go to `interactive-explainer` (an interactive explainer
