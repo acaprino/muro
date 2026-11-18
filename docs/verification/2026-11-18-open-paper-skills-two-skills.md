@@ -8,9 +8,10 @@ open-paper-skills would remove six capabilities, the owner answered "lasciamo
 anche solo ricerca paper": from that source the package takes
 explain-anything-html and paper search, and nothing else.
 
-Everything here is in the working tree on `develop`. Nothing was committed,
-pushed, released or installed, and `plugin.version` is still 0.3.0. The full
-suite was not run: it runs in the `Tests` workflow on a push.
+On the owner's "go" the work was committed on the short branch
+`explain-anything-intake` (`88af670`, the factory rule; `675f46d`, the package)
+and pushed. Nothing was released or installed, and `plugin.version` is still
+0.3.0: the release is held, see "The release does not fit Shinatama's sync".
 
 ## What was found
 
@@ -149,11 +150,59 @@ Limits of this evidence:
   `Documents\2026-11-18-explanation-attention-transformer.html`) and nothing
   under `~/.claude/projects/` (110 folders before and after).
 
+## The full suite and the routing evaluation
+
+`Tests` workflow, run 44277975289 on `675f46d`: `733 passed, 16 skipped in
+192.16s`, then `OK: capabilities and ROUTER.md valid`, `OK: all sources and
+plugin identity valid` and the build. No fetch timeout.
+
+Routing evaluation, 75 cases: `--prepare-eval`, then a separate model session
+that was given only the prepared `PROMPT.md` and `contexts.json` wrote the
+decisions; `--score-eval` gave **74 of 75**. The miss is `scroll-css-only`
+(expected `motion-principles` then `css-scroll`, got `css-scroll` alone), a
+case older than this change. The three new cases matched
+(`explain-paper-no-html-word`, `explain-concept-as-html`,
+`find-paper-then-explain`), and so did `summary-in-chat` (no match) and
+`paper-explainer-not-wiki` (`interactive-explainer`).
+
+Limit of that run, reported by the classifier itself: several case ids name the
+intended route (`…-stays-review`, `…-stays-explainer`, `…-not-doc-drift`) and
+are visible in both input files, so it is not fully blind. It also named five
+cases it found ambiguous: `scroll-css-only`, `ponytail-visual-only`,
+`th-proofread-file`, `db-migration`, `ponytail-implement-no-review`.
+
+## The release does not fit Shinatama's sync
+
+The owner's sessions get Marionette from Shinatama, which follows the highest
+`marionette-v*` release of this repository at every start (Shinatama ADR-0052;
+its log on this machine: `marionette: UpToDate("marionette-v0.3.0")`,
+2026-11-18). Its sync refuses a release asset over `MAX_ASSET_BYTES`, 128 MiB
+(134,217,728 bytes, `crates/engine/src/marionette.rs` in Shinatama), and then
+keeps the copy it has.
+
+A fresh staged build of this tree, zipped as the `Release Marionette` workflow
+zips it:
+
+| | Measured | Shinatama's bound |
+|---|---:|---:|
+| Zip asset | 197,039,241 bytes (187.9 MiB) | 134,217,728 bytes (128 MiB) |
+| Files | 12,060 | 16,384 |
+| Tree | 269,446,410 bytes (257.0 MiB) | 512 MiB |
+| Largest file | 1,644,144 bytes | 32 MiB |
+| Deepest path | 12 components | 24 |
+
+The size comes from the intake of 2026-11-17, not from this change: each of
+the five adapters holds about 2,014 files and 43 MiB, and the release root
+another 1,897 files under `scripts/`, because taste-skill travels whole with
+its images in every one of them. A 0.4.0 published as it is would be refused,
+and the owner's sessions would stay on 0.3.0. So nothing was published: the
+choice (raise Shinatama's bound, or make the release smaller) is the owner's.
+Yesterday's record noted the 283 MB release as a cost and did not check it
+against Shinatama.
+
 ## Not executed
 
-- The full suite in the `Tests` workflow: nothing was pushed.
-- The routing eval (`--prepare-eval`, `--score-eval`), although five cases were
-  removed, three added and several intent texts changed.
+- The release and the installation: held, as above.
 - Codex, Pi, OpenCode and Hermes. On Hermes the policy is over the section cap
   and goes through `pre_llm_call`; the new line was not checked there.
 - A request that should go to `interactive-explainer` (an interactive explainer
