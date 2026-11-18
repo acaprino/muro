@@ -186,3 +186,19 @@ two ways to satisfy it, a named folder, malformed and contradictory
 declarations, the cut of a long message, intake preparation and scaffolding
 left ungated, and a build that is refused and then succeeds. The measurement on Marionette's seventeen sources is in
 `docs/verification/2026-11-17-source-coverage-evidence.md`.
+
+## Amendment of 2026-11-18: a skill left out as a duplicate
+
+The gate sees a file that a selected file names. It does not see a whole skill
+that the intake leaves out by judgment. In Marionette the intake of 2026-11-11
+left `explain-anything-html` out of open-paper-skills, unread, as "served by
+explain-this". The two start on different requests and make different pages.
+The owner asked on 2026-11-18 how that skill was used, and it was not.
+
+`prompts/intake.md` now says that a skill is read before it is left out as a
+duplicate, that the comparison (when it starts, what it produces, what it
+requires) is written in the `dropped` decision, and that only the owner narrows
+a source without that reading. No code enforces it: whether two skills repeat
+each other is a judgment, and Python does not make it.
+`tests/test_source_coverage.py` checks that the prompt carries the rule. The
+package record is `docs/verification/2026-11-18-open-paper-skills-two-skills.md`.

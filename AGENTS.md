@@ -69,6 +69,17 @@ selection from the evidence the factory prepares; the source check and the
 build refuse a named file that is neither selected nor explained (ADR-0026).
 Binary media is not refused for being binary (ADR-0027).
 
+Owner question of 2026-11-18 ("controlla come viene usata la skill explain
+anything html"): it was not used. The intake of 2026-11-11 had left it out of
+its source, unread, as "served by explain-this", which starts on other requests
+and makes another page. A skill is read before it is left out as a duplicate,
+and the comparison goes in its `dropped` decision; only the owner narrows a
+source without that reading (`prompts/intake.md`, ADR-0026 amendment). Absorbing
+it was not enough either: a rule of the always-on policy ("Explain fully")
+answered the same request in the chat. A text that acts in every session can
+own a request that a capability also answers: harmonization names the one owner
+there, in a marked line, and a live session checks it.
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin

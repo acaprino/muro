@@ -158,3 +158,13 @@ def test_an_api_model_without_file_tools_receives_the_coverage_inline(tmp_path):
     workbench = prepare_intake(_source_with_unselected_helper(tmp_path), tmp_path, tmp_path / "intake")
     evidence = _inline_evidence(workbench)
     assert "### coverage.json" in evidence and '"scripts/gate.mjs"' in evidence
+
+
+def test_the_intake_prompt_has_a_skill_read_before_it_is_left_out_as_a_duplicate():
+    # Marionette, 2026-11-11: explain-anything-html was left out of open-paper-skills, unread, as
+    # "served by explain-this", which starts on other requests and makes another page.
+    from pathlib import Path
+    prompt = (Path(__file__).resolve().parent.parent / "prompts" / "intake.md").read_text(encoding="utf-8")
+    section = " ".join(prompt.split("## What the selection leaves out", 1)[1].split("\n## ", 1)[0].split())
+    assert "another source already serves" in section and "read its skill file first" in section
+    assert "when it starts" in section and "what it produces" in section
