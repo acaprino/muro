@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.3.0",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; making and fact-checking HTML explainers; humanizing prose; paper search, wiki, figures, planning and pitching research; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -18,13 +18,8 @@
       "creating-explainers",
       "explaining-codebases",
       "fact-checking-explainers",
+      "explain-anything-html",
       "paper-search",
-      "paper-wiki-manager",
-      "drawio-paper",
-      "codex-paper-figure-skill",
-      "research-bible",
-      "sell-research-honestly",
-      "session-handoff",
       "tokeneconomizer",
       "discovery-questions",
       "frontend-aesthetic-direction",
@@ -408,79 +403,17 @@
       "selected_paths": [
         "skills/paper-search/SKILL.md",
         "skills/paper-search/scripts/paper_search.py",
-        "skills/paper-wiki-manager/SKILL.md",
-        "skills/paper-wiki-manager/assets/**",
-        "skills/paper-wiki-manager/references/**",
-        "skills/paper-wiki-manager/scripts/create_paper_body_profile.py",
-        "skills/paper-wiki-manager/scripts/generate_viz.py",
-        "skills/paper-wiki-manager/scripts/set_status.py",
-        "skills/paper-wiki-manager/scripts/validate_paper_wiki.py",
-        "skills/paper-wiki-manager/scripts/static/**",
-        "skills/paper-wiki-manager/scripts/templates/**",
-        "skills/paper-wiki-manager/scripts/vendor/README.md",
-        "skills/drawio-paper/SKILL.md",
-        "skills/drawio-paper/neurips2025_diagram_style_guide.md",
-        "skills/drawio-paper/neurips2025_plot_style_guide.md",
-        "skills/drawio-paper/scripts/extract_bench.py",
-        "skills/codex-paper-figure-skill/SKILL.md",
-        "skills/research-bible/SKILL.md",
-        "skills/sell-research-honestly/SKILL.md",
-        "skills/sell-research-honestly/references/**",
-        "skills/session-handoff/SKILL.md",
-        "skills/session-handoff/references/**"
+        "skills/explain-anything-html/SKILL.md"
       ],
       "excluded_paths": [
-        "collected-skills/**",
-        "skills/research-bible/references/**",
-        "skills/paper-wiki-manager/scripts/vendor/cytoscape.min.js",
-        "skills/paper-wiki-manager/scripts/vendor/layout-base.js",
-        "skills/paper-wiki-manager/scripts/vendor/cose-base.js",
-        "skills/paper-wiki-manager/scripts/vendor/cytoscape-fcose.js",
-        "skills/paper-wiki-manager/scripts/vendor/marked.min.js",
-        "skills/paper-wiki-manager/scripts/test_set_status.py",
-        "skills/paper-wiki-manager/scripts/test_validate_paper_wiki.py",
-        "skills/paper-search/scripts/test_paper_search.py",
-        "skills/drawio-paper/evals/**",
-        "skills/paper-wiki-manager/agents/**",
-        "skills/codex-paper-figure-skill/agents/**",
-        "skills/research-bible/agents/**",
-        "skills/sell-research-honestly/agents/**",
-        "skills/discover-academic-skills/**",
-        "skills/explain-anything-html/**",
-        "skills/explain-paper-html/**",
-        "skills/filetree-simple/**",
-        "skills/human-cognition-cache/**",
-        "skills/karpathy-coding-rules/**",
-        "skills/map-then-territory/**",
-        "skills/okf-repo-organizer/**",
-        "skills/project-dispatch/**",
-        "skills/research-project-manager/**",
-        "skills/skill-organizer/**",
-        "skills/task-file-builder/**",
-        "skills/uv-env/**",
-        "skills/writing-great-prompt/**",
-        "scripts/**",
-        "assets/**"
+        "collected-skills/**"
       ],
       "omissions": [
         {
           "paths": [
-            ".gitignore",
-            "skills/index.md"
+            ".gitignore"
           ],
-          "reason": "Coincidences of name: paper_search.py names the .gitignore of the user's project, and the paper-wiki skill names the index.md pages of the user's wiki, not the repository's list of skills."
-        },
-        {
-          "paths": [
-            "skills/paper-wiki-manager/scripts/vendor/*.js"
-          ],
-          "reason": "Five third-party libraries the viewer inlines (cytoscape, layout-base, cose-base, cytoscape-fcose, marked). The earlier intake did not redistribute them: other copyright holders, and two files carry no licence notice. The method still runs whole: paper-wiki downloads the exact versions listed in the packaged vendor/README.md into that folder when one is missing, and reports viewer and validation as not done if the download fails. Open for the owner: the source ships them so the viewer works offline; selecting them with vendor/README.md as their notice would restore that."
-        },
-        {
-          "paths": [
-            "skills/research-bible/references/**"
-          ],
-          "reason": "An essay by another author, a copy of The Bitter Lesson and the skill author's short notes on other authors' texts. The repository's MIT licence does not cover those texts. research-practice reads and links each at its public address and says so when one cannot be opened (research-practice, Sources)."
+          "reason": "A coincidence of name: paper_search.py names the .gitignore of the user's project, where the keys file is listed, not the repository's own."
         }
       ],
       "runtime_deps": [
@@ -488,30 +421,10 @@
           "name": "uv, or Python 3.11+ (standard library; optional truststore)",
           "license": "External runtime, not bundled by Muro; installed at runtime from astral.sh when missing and wanted",
           "bundled": false
-        },
-        {
-          "name": "cytoscape 3.28.1, layout-base 2.0.1, cose-base 2.2.0, cytoscape-fcose 2.2.0, marked 12.0.0",
-          "license": "MIT (third-party viewer libraries, not bundled by Muro; fetched at runtime from the jsDelivr npm mirror)",
-          "bundled": false
-        },
-        {
-          "name": "PaperBananaBench reference dataset",
-          "license": "Apache-2.0 (about 266 MB, not bundled by Muro; downloaded at runtime from Hugging Face)",
-          "bundled": false
-        },
-        {
-          "name": "matplotlib, numpy, pillow",
-          "license": "Their own open-source licences (target environment packages, not bundled by Muro)",
-          "bundled": false
-        },
-        {
-          "name": "draw.io desktop command line",
-          "license": "Apache-2.0 (external application, not bundled by Muro)",
-          "bundled": false
         }
       ],
       "intake": {
-        "goal": "Classify every outcome of the author's own research skills that stand on their own: literature search and paper reading with per-source switches, the OKF paper wiki with its viewer and validator, publication diagrams and plots (the two figure skills as one method), research-practice guidance, honest research communication, and the cross-session HANDOFF.md. Keep the scripts, references and style guides as packaged helpers. Leave out collected-skills (other authors' work), the third-party essays under research-bible/references, the vendored viewer libraries (fetched at runtime), and the skills that operate the author's own Research OS or repeat a need another source already serves."
+        "goal": "Owner decision of 2026-11-18: from this source take explain-anything-html and paper search, and nothing else. Classify every outcome of the two skills: the rich single-file HTML explanation of a paper, post, article, documentation or hard concept, which the source starts on any request to explain or understand even when HTML is not asked for, and literature search and paper reading with per-source switches. Keep the search script as a packaged helper. Every other skill of the repository stays out, including the wiki, figure, research-guidance, pitch and handoff skills absorbed on 2026-11-11, and collected-skills (other authors' work)."
       }
     },
     {

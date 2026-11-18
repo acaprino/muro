@@ -92,7 +92,7 @@ Marionette shows what the factory produces from sources covering product design,
 | Convert this Word document to PDF | Office file operations |
 | Design a new landing page in Figma. We still need a content outline | Visual direction → Figma design |
 | Design a landing page and implement the scroll animations in our GSAP project | Visual direction → Motion specification → GSAP implementation |
-| Find recent papers on a method and add the three most relevant to the wiki | Literature search → Paper wiki |
+| Find the original paper on a method and explain it to me | Literature search → HTML explanation page |
 | Explain a mechanism in this codebase as interactive HTML | Interactive explainer with claim verification |
 
 Marionette also embeds **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**. Their synthesized session policy promotes complete, focused work and clear communication. It loads through the native system/developer channel when the complete adapter is installed, before any skill is selected. Concise conversation preserves the requested detail, artifact quality and verification.

@@ -53,6 +53,15 @@ method can also hand work to a part it names without a path (another skill of
 the repository by its name, a command): the evidence cannot see that. Find the
 part in `left_out` and judge it the same way.
 
+A skill or folder of the source is never left out because another source
+already serves its need, judged on its name or its description alone: read its
+skill file first. Compare when it starts, what it produces and what it requires
+with the capability said to cover it. Where they differ, it is a capability of
+its own or a declared alternative, harmonized with the other. Where it really
+repeats, write that comparison in its `dropped` decision. Only the owner narrows
+what a source contributes without that reading, and the decision is recorded as
+the owner's.
+
 Open the selected file behind each `referenced` entry and judge what the source
 does with it. A script the method runs, a file it copies, links or mounts, a
 reference it orders read, a check or gate it must pass: the method needs it at

@@ -65,7 +65,9 @@ def test_explainer_capabilities_match_the_router_and_stay_passive():
         assert cap.role == role and router[name].role == role
         assert [intent["id"] for intent in cap.intents] == intents == router[name].intents_list()
         assert all(intent["description"].strip() and intent["excludes"] for intent in cap.intents)
-        assert cap.when == "—" and cap.after == [] and cap.conflicts == [] and cap.hooks == []
+        assert cap.when == "—" and cap.after == [] and cap.hooks == []
+        # One explanation has one owner: authoring and html-explanation never share a plan (2026-11-18).
+        assert cap.conflicts == (["html-explanation"] if name == "interactive-explainer" else [])
         assert any(tool["name"] == "file-access" and tool["required"] for tool in cap.tools)
         for tool in cap.tools:
             if tool["name"] == "web-research":
