@@ -11,7 +11,7 @@ tempo". This record covers what changed in the package. The factory changes are
 in `2026-11-17-source-coverage-evidence.md`, ADR-0026 and ADR-0027.
 
 The work is on the short branch `source-coverage-gate`, committed and pushed on
-the owner's "ok"; it is not merged into `develop`. Nothing was released or
+the owner's "ok"; it was merged into `develop` as `ada4740` on 2026-11-18 (run 44257571989 of the `Tests` workflow: 735 passed, 16 skipped). Nothing was released or
 installed, and `plugin.version` is still 0.3.0. The Marionette the owner has
 installed is unchanged: it still carries 11 files of taste-skill. The runs of
 the full suite are in `2026-11-17-source-coverage-evidence.md`.

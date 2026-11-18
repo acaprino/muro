@@ -90,8 +90,25 @@ def test_everything_else_in_the_policy_is_marked_as_marionettes(originals, polic
     header = own[:2]
     assert header[0] == "# Marionette session policy" and "each in its own words" in header[1]
     assert all(MARK in line for line in own[2:]), own[2:]
-    # Original three coexistence lines plus the distinction between progress and final recaps.
-    assert len(own) == 6
+    # Original three coexistence lines, the distinction between progress and final recaps, and the
+    # line that hands an explanation request to the explainer skill (2026-11-18).
+    assert len(own) == 7
+
+
+def test_an_explanation_request_is_handed_to_the_explainer_skill(policy):
+    # Live run of 2026-11-18: with html-explanation in the catalog, a host asked to explain a concept still
+    # answered in the chat. i-have-adhd's first break-rule ("Explain fully") owns that reply in every session,
+    # and html-explanation (explain-anything-html) answers the same request with a page: one owner is named.
+    carried = lines(policy)
+    marked = [line for line in carried if MARK in line and "marionette-explainer" in line]
+    assert len(marked) == 1
+    assert "even when HTML is not asked for" in marked[0] and "HTML page" in marked[0]
+    assert "stay in the reply" in marked[0]
+    # It sits under the source rule it coexists with, and that rule keeps its own words.
+    assert carried[carried.index(marked[0]) - 1].startswith('1. User asks to "explain" or "walk me through." Explain fully.')
+    reason = next(item["reason"] for item in read_json("delivery.json")["decisions"]
+                  if item["source"] == "i-have-adhd" and item["form"] == "always-on")
+    assert "html-explanation" in reason and "Two changes for coexistence" in reason
 
 
 def test_each_change_is_explained_as_coexistence_in_the_delivery_decisions(policy):

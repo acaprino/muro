@@ -25,12 +25,8 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | office-files | office-file-operations | — | — | file_reading, file_result | office.file-editing, office.format-conversion, office.content-extraction, office.editor-handoff |
 | interactive-explainer | explainer-authoring | — | — | explainer_outline, explainer_file, explainer_claims | explainer.source-walkthrough, explainer.topic-research, explainer.codebase-walkthrough |
 | explainer-fact-check | claim-verification | — | — | verification_report, verification_verdict | explainer.fact-check |
+| html-explanation | explanation-authoring | — | — | explanation_file | explanation.html-page |
 | paper-search | literature-search | — | — | literature_findings | research.literature-search, research.paper-reading |
-| paper-wiki | paper-knowledge-base | — | — | wiki_changes, wiki_validation | research.paper-notes, research.wiki-upkeep |
-| paper-figure | academic-figure | — | — | figure_plan, figure_file, figure_review | research.paper-diagram, research.paper-plot |
-| research-practice | research-guidance | — | — | research_guidance | research.planning, research.experiment-debugging |
-| research-pitch | research-communication | — | — | value_verdict, value_deliverable, claim_ledger | research.value-communication |
-| session-handoff | session-handoff | — | — | handoff_state | engineering.session-handoff, engineering.session-resume |
 | token-economy | session-cost-control | — | — | economy_report, economy_changes | cost.economy-report, cost.tool-pruning, cost.economy-settings |
 | engineering-review | engineering-reviewer | — | — | code_review_findings, code_review_coverage | engineering.change-review, engineering.codebase-audit |
 | engineering-debt | engineering-debt-reporter | — | — | shortcut_ledger | engineering.shortcut-ledger |
@@ -82,10 +78,10 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - visual-direction is `resumable`: a site build with screenshot rounds gets a map
   even as the only step (2026-11-11, ADR-0015).
 - Office/explainer roles stay separate from UI; converting to PDF belongs to office-files.
-- open-paper-skills (2026-11-11): six new roles. Both figure skills form paper-figure.
-  paper-wiki runs paper-search's script inside its step and only `reads` its findings.
-  Explainers and map-then-territory are excluded: explain-this and wayfinder cover
-  them. session-handoff links work maps, never copies.
+- open-paper-skills (2026-11-18, owner decision): only paper-search and html-explanation
+  (explain-anything-html, left out unread on 2026-11-11 as covered by explain-this) stay;
+  the wiki, figure, research and handoff roles are removed. html-explanation conflicts
+  with interactive-explainer, one owner per explanation, and `reads` the search findings.
 - tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six
   default hooks are passive `host-approved` entries; registering them is an
   explicit user-requested step of the capability, never done at build or install.

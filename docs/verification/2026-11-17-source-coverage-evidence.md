@@ -14,8 +14,7 @@ and the hook timeout (ADR-0016 amendment). The package work is in
 `2026-11-17-taste-skill-whole-intake.md`.
 
 The work is on the short branch `source-coverage-gate`, committed and pushed on
-the owner's "ok" so that the full suite could run. It is not merged into
-`develop`. Nothing was released, installed or version-bumped.
+the owner's "ok" so that the full suite could run. It was merged into `develop` as `ada4740` on 2026-11-18 (run 44257571989 of the `Tests` workflow: 735 passed, 16 skipped). Nothing was released, installed or version-bumped.
 
 ## What was found (before any change)
 

@@ -158,7 +158,6 @@ def test_explicit_ai_fixtures_select_the_humanizer_as_one_direct_step(coordinato
 
 @pytest.mark.parametrize("task, capability", [
     ("Check this article claim by claim against its sources; do not rewrite it.", "explainer-fact-check"),
-    ("Review my pitch for claims the evidence does not support.", "research-pitch"),
 ])
 def test_explicit_negation_fixtures_preserve_existing_owners(coordinator, task, capability):
     answer = decision(coordinator, task, [capability])
