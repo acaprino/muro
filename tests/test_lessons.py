@@ -16,7 +16,7 @@ from muro import build_release, parse_capabilities, validate_plugin_identity
 from muro.evals import prepare_eval, score_eval, validate_cases
 from muro.factory import harmonize_prompt, prepare_intake
 from muro.runtime import Coordinator
-from routing_helpers import copy_prompts, proposed, response
+from routing_helpers import copy_delivery, copy_prompts, proposed, response
 
 ROOT = Path(__file__).resolve().parent.parent
 MARIONETTE = ROOT / "examples" / "marionette"
@@ -30,6 +30,7 @@ def pkg(tmp_path):
     for name in ("ROUTER.md", "sources.json"):
         shutil.copy2(MARIONETTE / name, root / name)
     copy_prompts(root)
+    copy_delivery(root)
     return root
 
 

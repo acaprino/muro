@@ -30,6 +30,7 @@ def always_on_limit(document: Any) -> int:
     return ALWAYS_ON_PER_SOURCE * len(sources)
 _DECISION_KEYS = {"source", "content", "form", "targets", "reason"}
 _WIRING_KEYS = {"host", "capability", "event", "matcher", "run"}
+_WIRING_OPTIONAL = {"timeout"}
 
 
 def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
@@ -117,9 +118,13 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
         return errors + ["hooks must be an array of wirings"]
     wired: set[str] = set()
     for wiring in wirings:
-        if not isinstance(wiring, dict) or set(wiring) != _WIRING_KEYS:
-            errors.append("each hook wiring requires exactly host, capability, event, matcher and run")
+        if not isinstance(wiring, dict) or set(wiring) - _WIRING_OPTIONAL != _WIRING_KEYS:
+            errors.append("each hook wiring requires exactly host, capability, event, matcher and run, "
+                          "and may add timeout")
             continue
+        if "timeout" in wiring and (type(wiring["timeout"]) is not int or wiring["timeout"] < 1):
+            errors.append(f"hook wiring for {wiring['capability']}: timeout must be a positive number of whole "
+                          "seconds, the one the source declares for its hook")
         host, capability, run = wiring["host"], wiring["capability"], wiring["run"]
         if not isinstance(host, str) or host not in KNOWN_HOSTS:
             errors.append(f"hook wiring names unknown host {host}")
@@ -191,6 +196,14 @@ def _command(run: list[str], package_root: str) -> str:
     return f'python -c "{script}"'
 
 
+def _hook(wiring: dict[str, Any], package_root: str) -> dict[str, Any]:
+    """One declared command hook as both hosts read it; the source's own timeout when the wiring carries one."""
+    hook: dict[str, Any] = {"type": "command", "command": _command(wiring["run"], package_root)}
+    if "timeout" in wiring:
+        hook["timeout"] = wiring["timeout"]
+    return hook
+
+
 def claude_code_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[str, Any] | None:
     """The `hooks/hooks.json` a Claude Code plugin registers when enabled, or None when nothing is declared."""
     if not document:
@@ -200,7 +213,7 @@ def claude_code_hooks(document: dict[str, Any] | None, slug: str, name: str) -> 
     for wiring in document.get("hooks", []):
         if wiring["host"] != "claude-code":
             continue
-        group: dict[str, Any] = {"hooks": [{"type": "command", "command": _command(wiring["run"], package_root)}]}
+        group: dict[str, Any] = {"hooks": [_hook(wiring, package_root)]}
         if wiring["matcher"]:
             group = {"matcher": wiring["matcher"], **group}
         events.setdefault(wiring["event"], []).append(group)
@@ -226,7 +239,7 @@ def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[s
     for wiring in document.get("hooks", []):
         if wiring["host"] != "codex":
             continue
-        group: dict[str, Any] = {"hooks": [{"type": "command", "command": _command(wiring["run"], package_root)}]}
+        group: dict[str, Any] = {"hooks": [_hook(wiring, package_root)]}
         if wiring["matcher"]:
             group["matcher"] = wiring["matcher"]
         events.setdefault(wiring["event"], []).append(group)

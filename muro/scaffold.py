@@ -93,7 +93,8 @@ def scaffold_package(directory: Path, remote: str, *, slug: str | None, license_
             "sources": [source],
         }
         errors = validate_plugin_identity(manifest["plugin"])
-        errors += check_sources(manifest, directory)
+        # The intake has not run yet: completing the file selection is its work (ADR-0026).
+        errors += check_sources(manifest, directory, coverage=False)
         if errors:
             raise ValueError("source verification failed:\n" + "\n".join(errors))
         manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

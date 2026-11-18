@@ -60,8 +60,14 @@ muro validate --manifest examples/marionette/sources.json
 Verifies every pinned source against its upstream: the commit, the release
 tag, the license gate (MIT/Apache-2.0 template match), selected paths, nested
 licenses, SPDX conflicts and that every declared `notice_paths` file is a
-selected file that ships. Contacts the pinned Git remotes;
-`--offline-pins` checks manifest shape and local repositories only.
+selected file that ships. Two declared fields are checked against the pinned
+tree: a binary file (an image, a font, a video) is refused unless `media_paths`
+names it (ADR-0027), and an unselected file that a selected file names is
+refused unless `omissions` explains it with a reason (ADR-0026). `muro build`
+applies the same two rules; `muro intake` and `muro init` do not apply the
+second, because completing the selection is the intake's work. Contacts the
+pinned Git remotes; `--offline-pins` checks manifest shape and local
+repositories only.
 
 ```sh
 muro check-sources --manifest examples/marionette/sources.json
@@ -82,8 +88,12 @@ muro build --manifest examples/marionette/sources.json --out /tmp/stage
 ### `muro intake <source-id> [--manifest PATH]`
 
 Stages one source's intake workbench for the host AI:
-`.muro/factory/intake/<source-id>/` with `PROMPT.md`, `source.json` and the
-pinned files under `files/`. The source must already be in the manifest with
+`.muro/factory/intake/<source-id>/` with `PROMPT.md`, `source.json`, the
+pinned files under `files/` and `coverage.json`: what the pinned commit holds
+outside `selected_paths` (`left_out`) and which of those files and folders the
+selected files name (`referenced`, with `named_in`). The host AI judges from it
+whether the selection is complete; when it adds paths to `selected_paths`, run
+the command again (ADR-0026). The source must already be in the manifest with
 an `intake.goal` (for a new source, add it — or scaffold a new package with
 `muro init`). Prints the workbench path.
 

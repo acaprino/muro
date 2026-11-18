@@ -227,3 +227,19 @@ Manual note outside the generated index: [ADR-0025 — Third-party notices
 declared by the source](ADR-0025-declared-third-party-notices.md) records the
 optional `notice_paths` field for a source that bundles third-party code in a
 prebuilt file, and what the license gate still does not check.
+
+## Source coverage evidence
+
+Manual note outside the generated index: [ADR-0026 — Source coverage evidence
+at intake](ADR-0026-source-coverage-evidence-at-intake.md) records why an
+intake could ship a capability written around files its source needs, and the
+`coverage.json` evidence the intake AI now receives, and the gate: the source
+check and the build refuse a named file that is neither selected nor explained
+in `omissions`.
+
+## Declared binary media
+
+Manual note outside the generated index: [ADR-0027 — Binary media travels when
+the intake declares it](ADR-0027-declared-binary-media.md) replaces the refusal
+of images, fonts and video by extension (ADR-0002) with `media_paths`, declared
+by the intake after it read how the source licenses them.

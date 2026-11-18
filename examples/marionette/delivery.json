@@ -2,29 +2,31 @@
   "decisions": [
     {
       "source": "taste-skill",
-      "content": "skills/taste-skill/SKILL.md (house rules, sections 1 to 6), references/{system,sections,layout-v4,motion,copy}.md, library/{type,palettes}.json, scripts/start.mjs and scripts/shoot.mjs",
+      "content": "The whole skills/taste-skill/ folder (1,631 files): SKILL.md (house rules, sections 1 to 6), the 22 references, the 12 scripts, library/ and the kit under assets/ (system, layout with its dealer and checker, motion, ui, icons, diagrams, backgrounds, effects, components, objects, moments, scenes, photos with their credit files)",
       "form": "capability",
       "targets": [
         "visual-direction"
       ],
-      "reason": "Breadth: rules for building a company website or landing page, one domain of a package that also does Office files, research and engineering. Timing: nothing acts before a task is classified. Fit: merged with landing-page-design into the one step that plans, deals and builds the page (visual-direction, Sources; ROUTER.md harmonization record of 2026-11-10)."
+      "reason": "Breadth: rules and tools for building a company website or landing page, one domain of a package that also does Office files, research and engineering. Timing: nothing acts before a task is classified. Function: the method is its kit and scripts as much as its text (SKILL.md \"4. The run\": the page starts from assets/starter.html, the hero, palette and moments are dealt by scripts, five checkers and the finish gate run in a browser), so the folder travels whole and the step follows that run. Fit: merged with landing-page-design into the one step that plans, deals, builds and checks the page (visual-direction, Sources; ROUTER.md harmonization record of 2026-11-10). Changed on 2026-11-17 (ADR-0026, ADR-0027): until then 11 files travelled and the step wrote the page by hand; a real session built a flat page that way and the owner rejected it. Cost: about 37 MB in each host's skill folder, six copies in a release. Images are declared in media_paths and their eight credit files in notice_paths; the licence each entry states was not checked against its page."
     },
     {
       "source": "taste-skill",
       "content": "The Stop command hook declared in SKILL.md, which runs gate.mjs (the finish gate) when the agent stops",
-      "form": "dropped",
-      "targets": [],
-      "reason": "Function: the hook only runs gate.mjs, which is not among the selected paths, so it would have nothing to run. Cost: it would fire at every stop of every session, including Office and research work. Recorded as not adopted in visual-direction, Sources ('Hooks'); the capability discloses that the automated gate was not run (check automated_gate_disclosed)."
+      "form": "hook",
+      "targets": [
+        "visual-direction"
+      ],
+      "reason": "Timing: it must act at the moment the agent stops, which no on-demand step can do; it exists for the build that ends without a gate run, the case the owner met on 2026-11-17 (a page reported as passed with no automated check). Authority: none in text; it blocks a stop only while a build armed in the folder has fixable FAILs, within the gate's rounds, and the user ends it with gate.mjs --done. Breadth and cost: every stop of every session on Claude Code and Codex starts Python and Node once; with no build armed the registered command printed nothing, wrote nothing and returned in 0.5 to 0.6 s over four runs (owner's machine, 2026-11-17, Node 24; the script alone 0.24 s), which is the 'exits at once' of references/gate.md \"As a hook\", where the source itself gives this command for a host's settings and says it runs in every session of the project. With a build armed it runs the checks in headless Chrome (up to 9.5 minutes, the source's own budget, hence its 600-second timeout), makes no model call and writes .taste-skill/gate.json in the project. Function: the gate is also run by hand in step 6 of the capability; the hook is the part that holds when that run is skipped. Form changed (visual-direction, Sources, Changes for coexistence): the release registers the command with its own package path instead of the skill's POSIX line that searches the host's skill folders. Not active on Pi, OpenCode and Hermes: this factory registers source command hooks only on Claude Code and Codex. Run live on Claude Code on 2026-11-17, two sessions: it allowed a stop with no build and blocked one with 33 open FAILs (docs/verification/2026-11-17-taste-skill-whole-intake.md). Open: not run on Codex, which shows a plugin's hooks in /hooks for review first. Supersedes the 2026-11-10 decision that dropped the hook because gate.mjs was not selected."
     },
     {
       "source": "motion-design",
-      "content": "skills/motion-design/SKILL.md, director/**, patterns/** and reference/** (personality, duration and easing tables, choreography, reduced motion)",
+      "content": "skills/motion-design/SKILL.md, director/**, patterns/** and reference/** (personality, duration and easing tables, choreography, reduced motion); since the re-pin of 2026-11-17 also SKILL.md 'Rendered File Exports (Creator MCP)' and reference/export-and-render.md",
       "form": "capability",
       "targets": [
         "motion-principles",
         "css-scroll"
       ],
-      "reason": "Breadth: applies only when a task decides how an interface moves. Timing: on demand; the source itself starts from purpose, audience and context of one animation (SKILL.md 'When to Apply'). Fit: one specification role (motion-principles); css-scroll takes only the scroll-linked limits of patterns/ambient-continuous.md and director/context-adaptation.md. The selected files define no hook."
+      "reason": "Breadth: applies only when a task decides how an interface moves. Timing: on demand; the source itself starts from purpose, audience and context of one animation (SKILL.md 'When to Apply'). Fit: one specification role (motion-principles); css-scroll takes only the scroll-linked limits of patterns/ambient-continuous.md and director/context-adaptation.md. The selected files define no hook. Re-pin of 2026-11-17 (head 2e1f3c05): the new handoff to Creator MCP for a rendered animation file is one more rule of the same on-demand method (suggest the hosted service once, only on an explicit request for a file), so it joins motion-principles as its step 0 with an optional tool; nothing acts before a task is classified."
     },
     {
       "source": "gsap-scrolltrigger",
@@ -37,7 +39,7 @@
     },
     {
       "source": "wayfinder",
-      "content": "skills/engineering/wayfinder/SKILL.md, docs/engineering/wayfinder.md, skills/engineering/to-spec/SKILL.md and skills/engineering/to-tickets/SKILL.md (map, decisions, spec, vertical slices)",
+      "content": "skills/engineering/wayfinder/SKILL.md, docs/engineering/wayfinder.md, skills/engineering/to-spec/SKILL.md, skills/engineering/to-tickets/SKILL.md (map, decisions, spec, vertical slices) and skills/engineering/research/SKILL.md (how a research item is resolved; selected on 2026-11-17, ADR-0026)",
       "form": "capability",
       "targets": [
         "work-map"
@@ -763,5 +765,33 @@
     "intake_only_paths": [
       "custom-instructions/recap-adhd.md"
     ]
-  }
+  },
+  "hooks": [
+    {
+      "host": "claude-code",
+      "capability": "visual-direction",
+      "event": "Stop",
+      "matcher": "",
+      "run": [
+        "node",
+        "<package_root>/scripts/taste-skill/scripts/gate.mjs",
+        "--hook",
+        "claude"
+      ],
+      "timeout": 600
+    },
+    {
+      "host": "codex",
+      "capability": "visual-direction",
+      "event": "Stop",
+      "matcher": "",
+      "run": [
+        "node",
+        "<package_root>/scripts/taste-skill/scripts/gate.mjs",
+        "--hook",
+        "codex"
+      ],
+      "timeout": 600
+    }
+  ]
 }

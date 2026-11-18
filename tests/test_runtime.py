@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from muro.runtime import Coordinator
-from routing_helpers import copy_prompts, decision, declare_prerequisite, proposed
+from routing_helpers import copy_delivery, copy_prompts, decision, declare_prerequisite, proposed
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
@@ -19,6 +19,7 @@ def package(tmp_path):
     shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
     shutil.copy2(PACKAGE / "ROUTER.md", root / "ROUTER.md")
     copy_prompts(root)
+    copy_delivery(root)
     return root
 
 

@@ -25,11 +25,14 @@ def test_rules_from_unpinned_taste_copy_are_gone():
     assert "Leonxlnx/taste-skill@f6b76575, release v2.5.1" in CAPS["visual-direction"].body
 
 
-def test_taste_stop_hook_is_recorded_and_not_adopted():
-    body = CAPS["visual-direction"].body
-    assert CAPS["visual-direction"].hooks == []
-    assert "`Stop` command hook" in body and "gate.mjs" in body
-    assert "Do not call them and do not claim their results" in body
+def test_taste_stop_hook_is_adopted_since_the_source_travels_whole():
+    # 2026-11-10: recorded and not adopted, because gate.mjs was not among the selected files.
+    # Superseded on 2026-11-17 (ADR-0026): the source travels whole and its finish gate is the
+    # active Stop hook; the step no longer tells the host to leave the source's tools alone.
+    cap = CAPS["visual-direction"]
+    assert [(hook["event"], hook["policy"]) for hook in cap.hooks] == [("Stop", "active")]
+    assert "`Stop` command hook" in cap.body and "gate.mjs" in cap.body
+    assert "Do not call them and do not claim their results" not in cap.body
 
 
 def test_gsap_capability_drops_claims_absent_from_its_only_selected_file():
