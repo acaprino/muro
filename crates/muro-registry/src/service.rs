@@ -1,4 +1,4 @@
-use crate::{instructions, native, sources, storage::*};
+use crate::{instructions, native, sources, storage::*, sync_status};
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use serde_json::{Value, json};
@@ -100,6 +100,10 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                     let s = payload["settings"].clone();
                     ensure!(s["auto_sync"].is_boolean(), "auto_sync must be boolean");
                     ensure!(
+                        s["close_to_tray"].is_boolean(),
+                        "close_to_tray must be boolean"
+                    );
+                    ensure!(
                         s["interval_minutes"].as_u64().is_some_and(|v| v >= 1),
                         "interval_minutes must be at least 1"
                     );
@@ -114,20 +118,54 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             log(data_dir, action, "complete", "Registry configuration saved")?;
             snapshot(data_dir, &registry, &receipts, false)
         }
-        "plan" => {
-            let plan = plan(
-                data_dir,
-                &registry,
-                &receipts,
-                payload["reinstall"].as_str(),
-            )?;
-            write(
-                &data_dir
-                    .join("plans")
-                    .join(format!("{}.json", str_field(&plan, "id")?)),
-                &plan,
-            )?;
-            Ok(plan)
+        "plan" => check_plan(
+            data_dir,
+            &registry,
+            &receipts,
+            payload["reinstall"].as_str(),
+            only_target(&payload)?,
+        ),
+        "check" => {
+            let only = only_target(&payload)?;
+            // Refuse an unknown or disabled target before resolving anything.
+            planned_targets(&registry, only)?;
+            let mut errors = vec![];
+            for index in 0..registry["plugins"].as_array().context("plugins")?.len() {
+                let plugin = registry["plugins"][index].clone();
+                match sources::resolve(data_dir, &plugin) {
+                    Ok(resolved) => registry["plugins"][index] = resolved,
+                    Err(e) => {
+                        errors.push(json!({"plugin_id":plugin["id"],"message":format!("{e:#}")}))
+                    }
+                }
+            }
+            save_registry(data_dir, &mut registry)?;
+            let plan = check_plan(data_dir, &registry, &receipts, None, only)?;
+            if errors.is_empty() {
+                log(
+                    data_dir,
+                    "check",
+                    "complete",
+                    "Sources resolved and plan calculated",
+                )?;
+            } else {
+                let failed: Vec<_> = errors
+                    .iter()
+                    .filter_map(|e| e["plugin_id"].as_str())
+                    .collect();
+                log(
+                    data_dir,
+                    "check",
+                    "failed",
+                    &format!(
+                        "Plan calculated; sources not resolved: {}",
+                        failed.join(", ")
+                    ),
+                )?;
+            }
+            Ok(
+                json!({"snapshot":snapshot(data_dir, &registry, &receipts, false)?,"plan":plan,"errors":errors}),
+            )
         }
         "apply" => apply(data_dir, &registry, &mut receipts, &payload),
         "resolve" => {
@@ -157,20 +195,24 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
 }
 fn load_registry(root: &Path) -> Result<Value> {
     let path = root.join("registry.json");
-    if !path.exists() {
-        return Ok(
-            json!({"schema":1,"revision":0,"plugins":[],"targets":[],"settings":{"auto_sync":false,"interval_minutes":60,"agent":"claude-code","python":"python","factory_path":""}}),
+    let mut v = if path.exists() {
+        let v = read(&path)?;
+        ensure!(
+            v["schema"] == 1
+                && v["revision"].is_u64()
+                && v["plugins"].is_array()
+                && v["targets"].is_array()
+                && v["settings"].is_object(),
+            "Unsupported or corrupt registry schema"
         );
+        v
+    } else {
+        json!({"schema":1,"revision":0,"plugins":[],"targets":[],"settings":{"auto_sync":false,"interval_minutes":60,"agent":"claude-code","python":"python","factory_path":""}})
+    };
+    // A setting added after registries were first written starts at its default.
+    if v["settings"].get("close_to_tray").is_none() {
+        v["settings"]["close_to_tray"] = json!(true);
     }
-    let v = read(&path)?;
-    ensure!(
-        v["schema"] == 1
-            && v["revision"].is_u64()
-            && v["plugins"].is_array()
-            && v["targets"].is_array()
-            && v["settings"].is_object(),
-        "Unsupported or corrupt registry schema"
-    );
     Ok(v)
 }
 fn revision(reg: &Value, payload: &Value) -> Result<()> {
@@ -321,7 +363,7 @@ fn snapshot(root: &Path, reg: &Value, receipts: &Value, fresh: bool) -> Result<V
     };
     Ok(
         json!({"registry":reg,"inventory":inventories(root,reg,receipts,fresh)?,"activity":activity,
-               "custom_instructions":instructions::states(root,reg)}),
+               "custom_instructions":instructions::states(root,reg),"sync":sync_status::load(root)?}),
     )
 }
 fn log(root: &Path, action: &str, status: &str, message: &str) -> Result<()> {
@@ -444,15 +486,61 @@ fn retained_artifact(root: &Path, receipt: &Value, harness: &str) -> Result<Valu
                "custom_instructions_digest":receipt["custom_instructions_digest"]}),
     )
 }
-fn plan(root: &Path, reg: &Value, receipts: &Value, reinstall: Option<&str>) -> Result<Value> {
+/// The optional `target_id` of a `plan` or `check` payload.
+fn only_target(payload: &Value) -> Result<Option<&str>> {
+    match &payload["target_id"] {
+        Value::Null => Ok(None),
+        v => Ok(Some(v.as_str().context("target_id must be a string")?)),
+    }
+}
+/// The targets a plan compares: every enabled target, or only the one named.
+fn planned_targets<'a>(reg: &'a Value, only: Option<&str>) -> Result<Vec<&'a Value>> {
+    let targets = reg["targets"].as_array().context("targets")?;
+    let Some(tid) = only else {
+        return Ok(targets.iter().filter(|t| t["enabled"] == true).collect());
+    };
+    let target = targets
+        .iter()
+        .find(|t| t["id"] == tid)
+        .context("Target not found")?;
+    ensure!(target["enabled"] == true, "Target is disabled");
+    Ok(vec![target])
+}
+/// Calculates a plan, stores it for `apply` and records the check.
+fn check_plan(
+    root: &Path,
+    reg: &Value,
+    receipts: &Value,
+    reinstall: Option<&str>,
+    only: Option<&str>,
+) -> Result<Value> {
+    let plan = plan(root, reg, receipts, reinstall, only)?;
+    write(
+        &root
+            .join("plans")
+            .join(format!("{}.json", str_field(&plan, "id")?)),
+        &plan,
+    )?;
+    let checked = planned_targets(reg, only)?
+        .into_iter()
+        .map(|t| str_field(t, "id"))
+        .collect::<Result<Vec<_>>>()?;
+    sync_status::record_check(root, &plan, &checked)?;
+    Ok(plan)
+}
+fn plan(
+    root: &Path,
+    reg: &Value,
+    receipts: &Value,
+    reinstall: Option<&str>,
+    only_target: Option<&str>,
+) -> Result<Value> {
+    let targets = planned_targets(reg, only_target)?;
     let instruction_bindings = instructions::bindings(root, reg)?;
     let invs = inventories(root, reg, receipts, true)?;
     let mut ops = vec![];
     let mut blockers = vec![];
-    for target in reg["targets"].as_array().context("targets")? {
-        if target["enabled"] != true {
-            continue;
-        }
+    for target in targets {
         let tid = str_field(target, "id")?;
         let h = str_field(target, "harness")?;
         let inv = invs
@@ -743,6 +831,13 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         "complete",
         &format!("{} operations verified", ops.len()),
     )?;
+    let mut synced = ops
+        .iter()
+        .map(|op| str_field(op, "target_id"))
+        .collect::<Result<Vec<_>>>()?;
+    synced.sort_unstable();
+    synced.dedup();
+    sync_status::record_sync(root, &synced)?;
     snapshot(root, reg, receipts, false)
 }
 fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<Value> {

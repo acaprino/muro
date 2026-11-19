@@ -6,3 +6,4 @@ pub fn artifact_digest(path: &std::path::Path) -> anyhow::Result<String> {
 }
 mod sources;
 mod storage;
+mod sync_status;

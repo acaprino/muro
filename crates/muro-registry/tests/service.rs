@@ -6,12 +6,18 @@ fn snapshot(root: &Path) -> Value {
     request(root, "snapshot", json!({})).unwrap()
 }
 fn target(root: &Path, profile: &Path) {
+    target_as(root, profile, "oc", true);
+}
+fn target_as(root: &Path, profile: &Path, id: &str, enabled: bool) {
     let s = snapshot(root);
-    request(root,"save_target",json!({"revision":s["registry"]["revision"],"target":{"id":"oc","harness":"opencode","name":"Test","root":profile,"executable":"","exclusive":true,"enabled":true}})).unwrap();
+    request(root,"save_target",json!({"revision":s["registry"]["revision"],"target":{"id":id,"harness":"opencode","name":"Test","root":profile,"executable":"","exclusive":true,"enabled":enabled}})).unwrap();
 }
 fn plugin(root: &Path, artifact: &Path) {
+    plugin_as(root, artifact, "example", &["oc"]);
+}
+fn plugin_as(root: &Path, artifact: &Path, id: &str, targets: &[&str]) {
     let s = snapshot(root);
-    request(root,"save_plugin",json!({"revision":s["registry"]["revision"],"plugin":{"id":"example","name":"Example","source":artifact,"policy":"pinned","pinned_version":"1.0.0","targets":["oc"],"distributions":[{"harness":"opencode","path":artifact,"version":"1.0.0"}]}})).unwrap();
+    request(root,"save_plugin",json!({"revision":s["registry"]["revision"],"plugin":{"id":id,"name":"Example","source":artifact,"policy":"pinned","pinned_version":"1.0.0","targets":targets,"distributions":[{"harness":"opencode","path":artifact,"version":"1.0.0"}]}})).unwrap();
 }
 fn fixture() -> (
     tempfile::TempDir,
@@ -316,6 +322,181 @@ fn two_logical_plugins_cannot_own_one_native_install() {
             .unwrap()
             .is_empty()
     );
+}
+
+fn is_epoch_seconds(v: &Value) -> bool {
+    v.as_str()
+        .is_some_and(|s| s.len() == 10 && s.chars().all(|c| c.is_ascii_digit()))
+}
+
+#[test]
+fn snapshot_carries_an_empty_sync_state_before_any_check() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    assert_eq!(
+        snapshot(&r)["sync"],
+        json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"targets":{}})
+    );
+    assert!(!r.join("sync-status.json").exists());
+}
+
+#[test]
+fn plan_records_the_check_and_the_pending_count() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 1);
+    assert!(r.join("sync-status.json").is_file());
+    let s = snapshot(&r);
+    let sync = &s["sync"];
+    assert!(is_epoch_seconds(&sync["last_check"]), "{sync}");
+    assert_eq!(sync["pending"], 1);
+    assert_eq!(sync["blockers"], 0);
+    assert_eq!(sync["revision"], s["registry"]["revision"]);
+    assert_eq!(sync["targets"]["oc"]["checked"], sync["last_check"]);
+    assert!(sync["targets"]["oc"]["synced"].is_null());
+    assert!(sync["last_sync"].is_null());
+}
+
+#[test]
+fn apply_records_the_sync_and_clears_the_pending_count() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    let applied = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let sync = &applied["sync"];
+    assert!(is_epoch_seconds(&sync["last_sync"]), "{sync}");
+    assert_eq!(sync["targets"]["oc"]["synced"], sync["last_sync"]);
+    assert_eq!(sync["pending"], 0);
+    assert_eq!(snapshot(&r)["sync"], *sync);
+}
+
+#[test]
+fn apply_that_fails_does_not_record_a_sync() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    fs::write(a.join("index.js"), "changed").unwrap();
+    assert!(request(&r, "apply", json!({"plan_id":plan["id"]})).is_err());
+    let sync = &snapshot(&r)["sync"];
+    assert!(sync["last_sync"].is_null());
+    assert!(sync["targets"]["oc"]["synced"].is_null());
+    assert_eq!(sync["pending"], 1);
+}
+
+#[test]
+fn plan_for_one_target_leaves_the_others_out() {
+    let (t, r, p, a) = fixture();
+    let other = t.path().join("other-profile");
+    let off = t.path().join("disabled-profile");
+    fs::create_dir_all(&other).unwrap();
+    fs::create_dir_all(&off).unwrap();
+    target(&r, &p);
+    target_as(&r, &other, "other", true);
+    target_as(&r, &off, "off", false);
+    plugin_as(&r, &a, "example", &["oc", "other"]);
+    assert_eq!(
+        request(&r, "plan", json!({})).unwrap()["operations"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    let plan = request(&r, "plan", json!({"target_id":"other"})).unwrap();
+    let ops = plan["operations"].as_array().unwrap();
+    assert_eq!(ops.len(), 1);
+    assert_eq!(ops[0]["target_id"], "other");
+    assert_eq!(plan["blockers"], json!([]));
+    assert!(
+        request(&r, "plan", json!({"target_id":"missing"}))
+            .unwrap_err()
+            .to_string()
+            .contains("Target not found")
+    );
+    assert!(
+        request(&r, "plan", json!({"target_id":"off"}))
+            .unwrap_err()
+            .to_string()
+            .contains("disabled")
+    );
+    assert!(request(&r, "plan", json!({"target_id":7})).is_err());
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let sync = &snapshot(&r)["sync"];
+    assert_eq!(sync["targets"]["other"]["synced"], sync["last_sync"]);
+    assert!(sync["targets"]["oc"]["synced"].is_null());
+    assert!(sync["targets"].get("off").is_none());
+}
+
+#[test]
+fn check_reports_a_source_that_cannot_be_resolved_and_still_plans() {
+    let (t, r, p, a) = fixture();
+    let gone = t.path().join("gone");
+    fs::create_dir_all(&gone).unwrap();
+    target(&r, &p);
+    plugin_as(&r, &gone, "broken", &[]);
+    plugin(&r, &a);
+    fs::remove_dir_all(&gone).unwrap();
+    let out = request(&r, "check", json!({})).unwrap();
+    let errors = out["errors"].as_array().unwrap();
+    assert_eq!(errors.len(), 1, "{out}");
+    assert_eq!(errors[0]["plugin_id"], "broken");
+    assert!(errors[0]["message"].as_str().is_some_and(|m| !m.is_empty()));
+    let plan = &out["plan"];
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 1);
+    assert!(
+        r.join("plans")
+            .join(format!("{}.json", plan["id"].as_str().unwrap()))
+            .is_file()
+    );
+    let s = snapshot(&r);
+    assert_eq!(out["snapshot"]["registry"], s["registry"]);
+    assert_eq!(out["snapshot"]["sync"], s["sync"]);
+    assert!(is_epoch_seconds(&s["sync"]["last_check"]));
+    let plugins = s["registry"]["plugins"].as_array().unwrap();
+    assert_eq!(plugins[1]["upstream_version"], "local");
+    assert!(plugins[0]["upstream_revision"].is_null());
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+}
+
+#[test]
+fn close_to_tray_defaults_to_true_and_must_be_boolean() {
+    let (_t, r, _p, _a) = fixture();
+    let s = snapshot(&r);
+    assert_eq!(s["registry"]["settings"]["close_to_tray"], true);
+    let mut older = s["registry"].clone();
+    older["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("close_to_tray");
+    fs::write(r.join("registry.json"), serde_json::to_vec(&older).unwrap()).unwrap();
+    assert_eq!(snapshot(&r)["registry"]["settings"]["close_to_tray"], true);
+    let mut settings = s["registry"]["settings"].clone();
+    for wrong in [json!("no"), json!(null)] {
+        settings["close_to_tray"] = wrong;
+        assert!(
+            request(
+                &r,
+                "settings",
+                json!({"revision":s["registry"]["revision"],"settings":settings})
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("close_to_tray")
+        );
+    }
+    settings["close_to_tray"] = json!(false);
+    request(
+        &r,
+        "settings",
+        json!({"revision":s["registry"]["revision"],"settings":settings}),
+    )
+    .unwrap();
+    assert_eq!(snapshot(&r)["registry"]["settings"]["close_to_tray"], false);
 }
 
 #[test]
