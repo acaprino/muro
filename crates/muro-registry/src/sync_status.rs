@@ -1,5 +1,7 @@
 //! When the registry last compared the installed plugins with the desired ones, and when it last
 //! brought a target in line: `<data>/sync-status.json`, read into every snapshot as `sync`.
+//! The overall fields describe the last full plan; a plan for one target moves only that
+//! target's `checked`.
 use crate::storage::{event, read, write};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -24,28 +26,34 @@ pub fn load(root: &Path) -> Result<Value> {
     Ok(state)
 }
 
-/// Records a calculated plan: its time, revision, operation and blocker counts, and the targets
-/// it compared.
-pub fn record_check(root: &Path, plan: &Value, checked: &[&str]) -> Result<()> {
+/// Records a calculated plan: the targets it compared get its time as `checked`; a full plan
+/// (`full`, every enabled target) also sets the overall time, revision, and operation and
+/// blocker counts.
+pub fn record_check(root: &Path, plan: &Value, checked: &[&str], full: bool) -> Result<()> {
     let mut state = load(root)?;
     let time = plan["created"].clone();
     ensure!(time.is_string(), "Plan has no creation time");
-    state["last_check"] = time.clone();
-    state["revision"] = plan["revision"].clone();
-    state["pending"] = json!(plan["operations"].as_array().context("operations")?.len());
-    state["blockers"] = json!(plan["blockers"].as_array().context("blockers")?.len());
+    if full {
+        state["last_check"] = time.clone();
+        state["revision"] = plan["revision"].clone();
+        state["pending"] = json!(plan["operations"].as_array().context("operations")?.len());
+        state["blockers"] = json!(plan["blockers"].as_array().context("blockers")?.len());
+    }
     for id in checked {
         target(&mut state, id)["checked"] = time.clone();
     }
     write(&root.join(FILE), &state)
 }
 
-/// Records an applied plan: nothing is pending any more, and the targets it changed are synced.
-pub fn record_sync(root: &Path, synced: &[&str]) -> Result<()> {
+/// Records an applied plan: the targets it changed are synced, and the operations it applied
+/// are no longer pending.
+pub fn record_sync(root: &Path, synced: &[&str], applied: usize) -> Result<()> {
     let mut state = load(root)?;
     let time = event("sync", "complete", "")["time"].clone();
     state["last_sync"] = time.clone();
-    state["pending"] = json!(0);
+    if let Some(pending) = state["pending"].as_u64() {
+        state["pending"] = json!(pending.saturating_sub(applied as u64));
+    }
     for id in synced {
         target(&mut state, id)["synced"] = time.clone();
     }

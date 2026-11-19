@@ -324,6 +324,20 @@ fn two_logical_plugins_cannot_own_one_native_install() {
     );
 }
 
+/// Targets `oc` and `other` with the example plugin to install on both, a disabled target
+/// `off`, and a full plan already calculated (2 operations).
+fn two_targets(temp: &Path, root: &Path, profile: &Path, artifact: &Path) {
+    let other = temp.join("other-profile");
+    let off = temp.join("disabled-profile");
+    fs::create_dir_all(&other).unwrap();
+    fs::create_dir_all(&off).unwrap();
+    target(root, profile);
+    target_as(root, &other, "other", true);
+    target_as(root, &off, "off", false);
+    plugin_as(root, artifact, "example", &["oc", "other"]);
+    let plan = request(root, "plan", json!({})).unwrap();
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 2);
+}
 fn is_epoch_seconds(v: &Value) -> bool {
     v.as_str()
         .is_some_and(|s| s.len() == 10 && s.chars().all(|c| c.is_ascii_digit()))
@@ -391,21 +405,7 @@ fn apply_that_fails_does_not_record_a_sync() {
 #[test]
 fn plan_for_one_target_leaves_the_others_out() {
     let (t, r, p, a) = fixture();
-    let other = t.path().join("other-profile");
-    let off = t.path().join("disabled-profile");
-    fs::create_dir_all(&other).unwrap();
-    fs::create_dir_all(&off).unwrap();
-    target(&r, &p);
-    target_as(&r, &other, "other", true);
-    target_as(&r, &off, "off", false);
-    plugin_as(&r, &a, "example", &["oc", "other"]);
-    assert_eq!(
-        request(&r, "plan", json!({})).unwrap()["operations"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2
-    );
+    two_targets(t.path(), &r, &p, &a);
     let plan = request(&r, "plan", json!({"target_id":"other"})).unwrap();
     let ops = plan["operations"].as_array().unwrap();
     assert_eq!(ops.len(), 1);
@@ -424,8 +424,54 @@ fn plan_for_one_target_leaves_the_others_out() {
             .contains("disabled")
     );
     assert!(request(&r, "plan", json!({"target_id":7})).is_err());
+}
+
+#[test]
+fn plan_for_one_target_records_only_that_targets_check() {
+    let (t, r, p, a) = fixture();
+    two_targets(t.path(), &r, &p, &a);
+    // Age the recorded full check, so a new time shows within the same second.
+    let mut aged = snapshot(&r)["sync"].clone();
+    let old = json!("1000000000");
+    aged["last_check"] = old.clone();
+    aged["targets"]["oc"]["checked"] = old.clone();
+    aged["targets"]["other"]["checked"] = old.clone();
+    fs::write(
+        r.join("sync-status.json"),
+        serde_json::to_vec(&aged).unwrap(),
+    )
+    .unwrap();
+    let plan = request(&r, "plan", json!({"target_id":"other"})).unwrap();
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 1);
+    let sync = snapshot(&r)["sync"].clone();
+    assert_eq!(sync["last_check"], old);
+    assert_eq!(sync["pending"], 2);
+    assert_eq!(sync["blockers"], 0);
+    assert_eq!(sync["revision"], aged["revision"]);
+    assert_eq!(sync["targets"]["oc"]["checked"], old);
+    assert!(
+        is_epoch_seconds(&sync["targets"]["other"]["checked"]),
+        "{sync}"
+    );
+    assert_ne!(sync["targets"]["other"]["checked"], old);
+    request(&r, "check", json!({"target_id":"oc"})).unwrap();
+    let sync = snapshot(&r)["sync"].clone();
+    assert_eq!(sync["last_check"], old);
+    assert_eq!(sync["pending"], 2);
+    assert_eq!(sync["revision"], aged["revision"]);
+    assert_ne!(sync["targets"]["oc"]["checked"], old);
+}
+
+#[test]
+fn apply_for_one_target_lowers_the_pending_count() {
+    let (t, r, p, a) = fixture();
+    two_targets(t.path(), &r, &p, &a);
+    assert_eq!(snapshot(&r)["sync"]["pending"], 2);
+    let plan = request(&r, "plan", json!({"target_id":"other"})).unwrap();
     request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
     let sync = &snapshot(&r)["sync"];
+    assert_eq!(sync["pending"], 1);
+    assert_eq!(sync["blockers"], 0);
     assert_eq!(sync["targets"]["other"]["synced"], sync["last_sync"]);
     assert!(sync["targets"]["oc"]["synced"].is_null());
     assert!(sync["targets"].get("off").is_none());
@@ -444,7 +490,11 @@ fn check_reports_a_source_that_cannot_be_resolved_and_still_plans() {
     let errors = out["errors"].as_array().unwrap();
     assert_eq!(errors.len(), 1, "{out}");
     assert_eq!(errors[0]["plugin_id"], "broken");
-    assert!(errors[0]["message"].as_str().is_some_and(|m| !m.is_empty()));
+    assert_eq!(
+        errors[0]["message"],
+        format!("Source folder not found: {}", gone.display())
+    );
+    assert!(!r.join("sources").exists());
     let plan = &out["plan"];
     assert_eq!(plan["blockers"], json!([]), "{plan}");
     assert_eq!(plan["operations"].as_array().unwrap().len(), 1);

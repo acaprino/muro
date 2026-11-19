@@ -525,7 +525,7 @@ fn check_plan(
         .into_iter()
         .map(|t| str_field(t, "id"))
         .collect::<Result<Vec<_>>>()?;
-    sync_status::record_check(root, &plan, &checked)?;
+    sync_status::record_check(root, &plan, &checked, only.is_none())?;
     Ok(plan)
 }
 fn plan(
@@ -837,7 +837,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         .collect::<Result<Vec<_>>>()?;
     synced.sort_unstable();
     synced.dedup();
-    sync_status::record_sync(root, &synced)?;
+    sync_status::record_sync(root, &synced, ops.len())?;
     snapshot(root, reg, receipts, false)
 }
 fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<Value> {
