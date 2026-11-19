@@ -545,6 +545,10 @@ fn check_plan(
     sync_status::record_check(root, &plan, &checked, only.is_none())?;
     Ok(plan)
 }
+/// A value as a person reads it in a message: a string without its JSON quotes.
+fn text(value: &Value) -> String {
+    value.as_str().map_or_else(|| value.to_string(), str::to_owned)
+}
 fn plan(
     root: &Path,
     reg: &Value,
@@ -567,7 +571,7 @@ fn plan(
             .find(|i| i["target_id"] == tid)
             .unwrap();
         if inv["complete"] != true {
-            blockers.push(format!("{}: {}", target["name"], inv["error"]));
+            blockers.push(format!("{}: {}", text(&target["name"]), text(&inv["error"])));
             continue;
         }
         let installed = inv["plugins"].as_array().context("inventory plugins")?;
@@ -596,7 +600,11 @@ fn plan(
                 } {
                     Ok(a) => a,
                     Err(e) => {
-                        blockers.push(format!("{} / {}: {e:#}", target["name"], plugin["name"]));
+                        blockers.push(format!(
+                            "{} / {}: {e:#}",
+                            text(&target["name"]),
+                            text(&plugin["name"])
+                        ));
                         // A listed plugin whose build fails is still wanted: its copy stays.
                         if let Some(old) = previous {
                             desired_native.push(old["id"].clone());
@@ -607,7 +615,8 @@ fn plan(
             if desired_native.contains(&artifact["native_id"]) {
                 blockers.push(format!(
                     "{}: more than one registry plugin owns native installation {}",
-                    target["name"], artifact["native_id"]
+                    text(&target["name"]),
+                    text(&artifact["native_id"])
                 ));
                 continue;
             }

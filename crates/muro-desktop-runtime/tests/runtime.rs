@@ -301,10 +301,76 @@ fn sync_now_syncs_a_healthy_harness_when_another_harness_folder_is_gone() {
     assert_eq!(out["applied"], 1, "{out}");
     let blockers = out["blockers"].as_array().unwrap();
     assert_eq!(blockers.len(), 1, "{out}");
-    // The registry names the harness as a JSON string.
-    let blocker = blockers[0].as_str().unwrap();
-    assert!(blocker.starts_with(r#""gone": "#), "{out}");
+    // A person reads the blocker: the harness name and the error as text, not as JSON values
+    // with their quotes and doubled backslashes.
+    let missing = format!("gone: Target configuration directory does not exist: {}", gone.display());
+    assert_eq!(blockers[0], missing.as_str(), "{out}");
+    assert_eq!(registry.automation()["message"], missing.as_str());
     assert_eq!(plugins_in(&healthy), 1);
+}
+
+/// What `sync_now` leaves for the Activity page: a run that applies is an automatic sync, a
+/// run that only checks is a background check, and each says what it found or did.
+#[test]
+fn sync_now_records_what_it_did_and_what_it_only_checked() {
+    let registry = Registry::new();
+    let profile = registry.harness("one", "{}");
+    registry.plugin(&["one"]);
+    let recorded = |action: &str, message: &str| {
+        let status = registry.automation();
+        assert_eq!(status["status"], "complete", "{status}");
+        assert_eq!(status["action"], action, "{status}");
+        assert_eq!(status["message"], message, "{status}");
+    };
+
+    // Checking only never says "verified": it says what is waiting.
+    registry.sync(json!({"apply":false}));
+    recorded("Background check", "1 change waiting");
+    assert_eq!(plugins_in(&profile), 0);
+    registry.sync(json!({}));
+    recorded("Automatic sync", "1 change applied");
+    assert_eq!(plugins_in(&profile), 1);
+    registry.sync(json!({}));
+    recorded("Automatic sync", "Nothing to apply");
+    registry.sync(json!({"apply":false}));
+    recorded("Background check", "Everything is in sync");
+
+    // The plural.
+    let two = Registry::new();
+    let (a, b) = (two.harness("a", "{}"), two.harness("b", "{}"));
+    two.plugin(&["a", "b"]);
+    two.sync(json!({"apply":false}));
+    assert_eq!(two.automation()["message"], "2 changes waiting");
+    two.sync(json!({}));
+    assert_eq!(two.automation()["message"], "2 changes applied");
+    assert_eq!((plugins_in(&a), plugins_in(&b)), (1, 1));
+}
+
+#[test]
+fn a_background_check_with_blockers_lists_them_and_fails() {
+    let registry = Registry::new();
+    registry.harness("oc", "{broken");
+    registry.plugin(&["oc"]);
+    let out = registry.sync(json!({"apply":false}));
+    let blockers = out["blockers"].as_array().unwrap();
+    assert_eq!(blockers.len(), 1, "{out}");
+    let status = registry.automation();
+    assert_eq!(status["action"], "Background check", "{status}");
+    assert_eq!(status["status"], "failed", "{status}");
+    assert_eq!(status["message"], blockers[0], "{status}");
+}
+
+#[test]
+fn a_failed_background_check_is_recorded_as_one() {
+    let registry = Registry::new();
+    registry.harness("oc", "{}");
+    fs::write(registry.data().join("registry.json"), "{broken").unwrap();
+    let error = muro_desktop_runtime::request(&registry.data(), "sync_now", json!({"apply":false}))
+        .unwrap_err();
+    let status = registry.automation();
+    assert_eq!(status["action"], "Background check", "{status}");
+    assert_eq!(status["status"], "failed", "{status}");
+    assert_eq!(status["message"], format!("{error:#}"));
 }
 
 #[test]

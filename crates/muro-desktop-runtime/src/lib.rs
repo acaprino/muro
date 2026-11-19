@@ -55,17 +55,18 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
 
 /// One sync of the enabled harnesses, for the tray and the background worker: a registry
 /// `check`, then, when `apply` (default true) and the plan has operations, an `apply` of that
-/// plan that leaves its blockers out. With `apply` false it only checks. The outcome goes to
-/// `record_automation`: the error, else the blockers as its message. Blockers are a result,
-/// not an error.
+/// plan that leaves its blockers out. With `apply` false it only checks. The outcome is
+/// recorded for the Activity page: an `Automatic sync` when it applies, a `Background check`
+/// when it only checks; failed with the error, or with the blockers as the message (they are a
+/// result, not an error), else complete with what was applied or is waiting.
 fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
     let apply = match &payload["apply"] {
         Value::Null => true,
         v => v.as_bool().context("apply must be a boolean")?,
     };
     let outcome = check_and_apply(data, apply);
-    let message = match &outcome {
-        Err(e) => Some(format!("{e:#}")),
+    let (failed, message) = match &outcome {
+        Err(e) => (true, format!("{e:#}")),
         Ok(result) => {
             let blockers: Vec<&str> = result["blockers"]
                 .as_array()
@@ -73,13 +74,34 @@ fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
                 .flatten()
                 .filter_map(Value::as_str)
                 .collect();
-            (!blockers.is_empty()).then(|| blockers.join("; "))
+            if blockers.is_empty() {
+                (false, summary(apply, result))
+            } else {
+                (true, blockers.join("; "))
+            }
         }
     };
-    let recorded = record_automation(data, message.as_deref());
+    let action = if apply { "Automatic sync" } else { "Background check" };
+    let recorded = record(data, action, failed, &message);
     let result = outcome?;
     recorded?;
     Ok(result)
+}
+
+/// What a sync that found no blocker tells a person: the changes it applied, or the changes
+/// that are waiting when it only checked.
+fn summary(apply: bool, result: &Value) -> String {
+    let (count, said) = if apply {
+        (&result["applied"], "applied")
+    } else {
+        (&result["pending"], "waiting")
+    };
+    match count.as_u64() {
+        Some(1) => format!("1 change {said}"),
+        Some(n) if n > 1 => format!("{n} changes {said}"),
+        _ if apply => "Nothing to apply".into(),
+        _ => "Everything is in sync".into(),
+    }
 }
 
 fn check_and_apply(data: &Path, apply: bool) -> Result<Value> {
@@ -101,11 +123,21 @@ fn check_and_apply(data: &Path, apply: bool) -> Result<Value> {
 }
 
 pub fn record_automation(data: &Path, error: Option<&str>) -> Result<()> {
+    record(
+        data,
+        "Automatic sync",
+        error.is_some(),
+        error.unwrap_or("Automatic sync verified"),
+    )
+}
+
+/// Replaces `automation-status.json`, the event the Activity page shows for the background work.
+fn record(data: &Path, action: &str, failed: bool, message: &str) -> Result<()> {
     use std::io::Write;
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-    let event = json!({"id":"automation","time":time.to_string(),"action":"Automatic sync","status":if error.is_some(){"failed"}else{"complete"},"message":error.unwrap_or("Automatic sync verified")});
+    let event = json!({"id":"automation","time":time.to_string(),"action":action,"status":if failed{"failed"}else{"complete"},"message":message});
     let mut file = tempfile::NamedTempFile::new_in(data)?;
     file.write_all(&serde_json::to_vec_pretty(&event)?)?;
     file.as_file().sync_all()?;
