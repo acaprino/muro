@@ -73,7 +73,12 @@ try {
  await page.getByRole('textbox',{name:'Search plugins'}).fill('');
  await page.getByRole('button',{name:'Harnesses',exact:true}).click();
  await page.getByRole('button',{name:'Manage with Muro',exact:true}).click();
- assert.equal(await page.getByLabel('Configuration folder').inputValue(),'','Session store must not become plugin root');
+ assert.equal(await page.getByLabel('Configuration folder').inputValue(),'D:/config/codex','Mukade names the configuration folder');
+ await page.getByText('Muro filled in the folder').waitFor();
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Add harness',exact:true}).click();
+ assert.equal(await page.getByLabel('Configuration folder').inputValue(),'','No detected harness, no folder');
+ await page.getByText('Tell Muro where this harness keeps its plugin configuration.').waitFor();
  await page.keyboard.press('Escape');
  await page.screenshot({path:shots+'/smooth-dark-harnesses.png',fullPage:true});
  await page.getByRole('button',{name:'Sync',exact:true}).click();

@@ -10,7 +10,7 @@ export interface Inventory { target_id:string; complete:boolean; error:string|nu
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
 export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
 export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[] }
-export interface Discovered { harness:string; name:string; executable:string; version:string|null; session_root:string|null; available:boolean; supported:boolean }
+export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }
 export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string }
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
 export interface Maintenance { message:string; details:string[] }

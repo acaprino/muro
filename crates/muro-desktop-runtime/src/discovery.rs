@@ -1,4 +1,4 @@
-use mukade::{catalog as source, exe, model::HarnessId, roots::StoreRoots};
+use mukade::{catalog as source, exe, model::HarnessId};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -11,18 +11,15 @@ pub fn id(h: HarnessId) -> &'static str {
 }
 
 pub fn catalog() -> Vec<Value> {
-    let roots = StoreRoots::from_env();
     source::catalog()
         .harnesses
         .iter()
         .map(|entry| {
             let (executable, _) = exe::resolve_source(entry.id, None);
-            let session_root = roots
-                .root(entry.id)
-                .map(ToOwned::to_owned)
-                .or_else(|| source::store_default(entry.id));
+            // Mukade's catalog states where each harness keeps its configuration.
+            let config_root = source::config_root(entry.id).map(|(path, _)| path);
             json!({"harness":id(entry.id),"name":entry.display,"executable":executable,
-            "session_root":session_root,"supported":entry.id != HarnessId::DeepSeekHarness})
+            "config_root":config_root,"supported":entry.id != HarnessId::DeepSeekHarness})
         })
         .collect()
 }

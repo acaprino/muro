@@ -86,7 +86,7 @@ To build Muro from source, see [desktop setup](docs/desktop.md#run-from-source).
 
 <img src="docs/assets/screenshots/first-use.png" alt="First use: the Plugins page shows three steps. Add a harness is done, Add a plugin is the current step with its button, Sync comes next." width="880">
 
-1. **Add a harness.** On **Harnesses**, press **Manage with Muro** on a harness Muro found, or **Add harness**. Its configuration folder is where the harness keeps its settings: for OpenCode the folder of `opencode.json`, for Pi the folder of `settings.json`.
+1. **Add a harness.** On **Harnesses**, press **Manage with Muro** on a harness Muro found, or **Add harness**. Muro fills in its configuration folder, where the harness keeps its settings, from Mukade's catalog (for OpenCode the folder of `opencode.json`, for Pi the folder of `settings.json`); change it for a custom installation.
 2. **Add a plugin.** On **Plugins**, press **Add plugin**, give its source (a repository, a marketplace entry or a folder) and tick the harnesses it goes on. Then press **Check for updates** in its detail.
 3. **Sync.** On **Sync**, press **Check for changes**, read the list, then **Apply changes**.
 

@@ -35,7 +35,7 @@ const snapshot=empty
  ?{registry:{schema:1,revision:1,plugins:[],targets:[targets[0]],settings:{auto_sync:false,interval_minutes:60,agent:'claude-code',python:'python',factory_path:''}},inventory:[{...inventory[0],plugins:[]}],activity:[],jobs:[],custom_instructions:[]}
  :{registry:{schema:1,revision:12,plugins,targets,settings:{auto_sync:true,interval_minutes:60,agent:'claude-code',python:'python',factory_path:''}},inventory,activity,jobs,custom_instructions:instructions};
 // Harnesses not managed yet come first, so the screenshot shows what Manage with Muro is for.
-const discovered=[['pi','Pi','0.9.1'],['hermes','Hermes Agent','0.7.0'],['deepseek','DeepSeek','1.3.0'],['claude-code','Claude Code','2.1.4'],['codex','Codex','0.58.0'],['opencode','OpenCode','1.4.2']].map(([harness,name,version])=>({harness,name,executable:`${home}/.local/bin/${harness}.exe`,version,session_root:null,available:true,supported:harness!=='deepseek'}));
+const discovered=[['pi','Pi','0.9.1'],['hermes','Hermes Agent','0.7.0'],['deepseek','DeepSeek','1.3.0'],['claude-code','Claude Code','2.1.4'],['codex','Codex','0.58.0'],['opencode','OpenCode','1.4.2']].map(([harness,name,version])=>({harness,name,executable:`${home}/.local/bin/${harness}.exe`,version,config_root:null,available:true,supported:harness!=='deepseek'}));
 const plan={id:'plan-demo',revision:12,blockers:[],operations:[
  {target_id:'claude',plugin_id:'marionette',name:'Marionette',kind:'update',from_version:'0.3.0',to_version:'0.4.0',reason:'Reconcile desired artifact'},
  {target_id:'opencode',plugin_id:'test-runner',name:'test-runner',kind:'install',from_version:'',to_version:'1.0.4',reason:'Missing desired distribution'},

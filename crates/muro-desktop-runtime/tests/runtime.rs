@@ -11,6 +11,17 @@ fn discovery_uses_all_mukade_entries_without_inventing_plugin_roots() {
             .any(|e| e["harness"] == "deepseek" && e["supported"] == false)
     );
     assert!(entries.iter().all(|e| e.get("plugin_root").is_none()));
+    // The configuration folder is Mukade's, never Muro's guess: DeepSeek's is not established.
+    for entry in mukade::catalog::catalog().harnesses.iter() {
+        let found = entries
+            .iter()
+            .find(|e| e["harness"] == discovery::id(entry.id))
+            .unwrap();
+        let expected = mukade::catalog::config_root(entry.id).map(|(path, _)| path);
+        assert_eq!(found["config_root"], serde_json::json!(expected));
+    }
+    let deepseek = entries.iter().find(|e| e["harness"] == "deepseek").unwrap();
+    assert!(deepseek["config_root"].is_null());
 }
 
 #[test]
