@@ -39,8 +39,8 @@
           "reason": "Manca offerta e struttura della pagina: servono prima di disegnare le sezioni."
         },
         {
-          "capability": "figma-design",
-          "intent": "ui.figma-design",
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
           "reason": "Il risultato richiesto è un design dentro il file Figma.",
           "needs": [
             {
@@ -51,7 +51,7 @@
           ]
         }
       ],
-      "reason": "Il prerequisito condizionato di Figma Design vale in questo caso: prima la strategia della landing, poi il design. Per un componente o una schermata app l'IA avrebbe risposto che non si applica.",
+      "reason": "Il prerequisito condizionato di Canvas Design vale in questo caso: prima la strategia della landing, poi il design. Per un componente o una schermata app l'IA avrebbe risposto che non si applica.",
       "questions": []
     },
     {
@@ -178,8 +178,8 @@
           "reason": "I valori reali vanno letti dal codice e scritti in un file di token, segnalando lacune e incoerenze."
         },
         {
-          "capability": "figma-design",
-          "intent": "ui.figma-design",
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
           "reason": "Le fondamenta nel file Figma si costruiscono con i token registrati dal passo precedente.",
           "needs": [
             {
@@ -491,6 +491,28 @@
         }
       ],
       "reason": "Un solo passo: l'editor riscrive, il report mostra testo finale, modifiche e punti aperti. Con testo incollato non si scrive alcun file.",
+      "questions": []
+    },
+    {
+      "title": "Schermata in FigCraft",
+      "task": "Nel nostro file FigCraft crea il componente Card con gli stati hover e disabled, usando le variabili che il file ha già. Il server MCP di FigCraft è collegato.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
+          "reason": "Il risultato richiesto è un componente dentro il file dello strumento di design, qui FigCraft, tramite la sua integrazione.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": false,
+              "reason": "È un componente, non una landing nuova: non servono offerta e outline."
+            }
+          ]
+        }
+      ],
+      "reason": "Il passo vale per qualunque editor a canvas con variabili, stili, auto layout e componenti: le regole di design restano quelle della sorgente, le operazioni sono quelle dell'editor del file.",
       "questions": []
     }
   ]

@@ -127,7 +127,7 @@ def test_outputs_have_one_owner_and_the_look_has_one_authority():
         assert caps[name].needs == [] and caps[name].resumable is False
     assert caps["aesthetic-direction"].reads == ["design_candidates"]
     assert {"motion-spec", "reduced-motion", "palette", "aesthetic_direction"} <= set(caps["design-review"].reads)
-    assert "aesthetic_direction" in caps["figma-design"].reads and "design_tokens" in caps["figma-design"].reads
+    assert "aesthetic_direction" in caps["canvas-design"].reads and "design_tokens" in caps["canvas-design"].reads
     assert "A recorded `motion-spec`" in caps["design-review"].body      # the timing contradiction has one owner
 
 

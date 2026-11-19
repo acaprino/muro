@@ -23,8 +23,8 @@ def test_router_has_registered_landing_and_figma_capabilities():
     router = {row.id: row for row in parse_router(PACKAGE / "ROUTER.md")}
     assert "offer" in caps["visual-direction"].outputs
     assert "page_outline" in caps["visual-direction"].outputs
-    assert "figma-design" in caps
-    assert router["figma-design"].role == "figma-design"
+    assert "canvas-design" in caps
+    assert router["canvas-design"].role == "canvas-design"
     assert "Elaya" in caps["visual-direction"].body or "ai-design-skills" in caps["visual-direction"].body
 
 

@@ -125,7 +125,6 @@ def test_manifest_declares_a_mode_for_every_source():
     assert modes == {
         "open-paper-skills": ("head", None),
         "tokeneconomizer": ("release", "v0.1.0"),
-        "taste-skill": ("release", "v2.5.1"),
         "wayfinder": ("release", "v1.3.2"),
         "ui-ux-pro-max": ("release", "v2.15.0"),
         "genoffice": ("release", "v0.12.852"),

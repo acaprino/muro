@@ -178,16 +178,16 @@ def test_preserve_completed_retains_valid_upstream_outputs_and_rejects_orphaned_
     assert s_resumed["recorded_outputs"]["palette"] == "val_palette"
     assert any((consumer / ".marionette" / "archive").iterdir())
 
-    # Falsifier: cannot preserve figma-design (which needs visual-direction) while dropping visual-direction
+    # Falsifier: cannot preserve canvas-design (which needs visual-direction) while dropping visual-direction
     task_f = "Landing in Figma"
-    pf1 = proposed(c, task_f, ["visual-direction", "figma-design"], new=True)
+    pf1 = proposed(c, task_f, ["visual-direction", "canvas-design"], new=True)
     sf1 = c.confirm(task_f, pf1["plan"])
     sf2 = c.record(page_out, sf1["map_id"], "visual-direction")
-    c.record({k: "done" for k in sf2["required_outputs"]}, sf2["map_id"], "figma-design")
+    c.record({k: "done" for k in sf2["required_outputs"]}, sf2["map_id"], "canvas-design")
 
-    pf2 = proposed(c, "Updated Landing in Figma", ["visual-direction", "figma-design"], new=True)
+    pf2 = proposed(c, "Updated Landing in Figma", ["visual-direction", "canvas-design"], new=True)
     with pytest.raises(ValueError, match="prerequisite|needs|visual-direction"):
-        c.confirm("Updated Landing in Figma", pf2["plan"], preserve_completed=["figma-design"])
+        c.confirm("Updated Landing in Figma", pf2["plan"], preserve_completed=["canvas-design"])
 
 
 def test_factory_and_prompts_have_no_domain_leaks_and_use_manifest_stack_rules(tmp_path):

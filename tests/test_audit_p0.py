@@ -34,15 +34,15 @@ def test_marionette_package_has_no_hardcoded_dot_muro_paths_and_validator_reject
     assert validate_capabilities_and_router(caps, rows, plugin_slug="marionette") == []
 
     # Even inside a fenced code block, .muro/ is rejected when plugin_slug != "muro"
-    leaked = tmp_path / "figma-design.md"
+    leaked = tmp_path / "canvas-design.md"
     leaked.write_text(
-        (MARIONETTE / "capabilities" / "figma-design.md").read_text(encoding="utf-8").replace(
+        (MARIONETTE / "capabilities" / "canvas-design.md").read_text(encoding="utf-8").replace(
             "## Behavior", "## Behavior\n```sh\ncat .muro/state.json\n```"
         ),
         encoding="utf-8",
     )
     from muro import parse_capability
-    broken_caps = [parse_capability(leaked) if c.id == "figma-design" else c for c in caps]
+    broken_caps = [parse_capability(leaked) if c.id == "canvas-design" else c for c in caps]
     errs = validate_capabilities_and_router(broken_caps, rows, plugin_slug="marionette")
     assert any(".muro/" in e for e in errs)
     assert validate_capabilities_and_router(broken_caps, rows, plugin_slug="muro") == []
@@ -52,8 +52,8 @@ def test_step_handoff_injects_state_dir_map_path_and_recorded_outputs_under_pack
     consumer = tmp_path / "consumer"
     c = Coordinator(marionette_pkg, consumer)
     task = "Design a new landing page in Figma"
-    prop = proposed(c, task, ["visual-direction", "figma-design"])
-    assert prop == {"mode": "confirm", "task": task, "plan": ["visual-direction", "figma-design"]}
+    prop = proposed(c, task, ["visual-direction", "canvas-design"])
+    assert prop == {"mode": "confirm", "task": task, "plan": ["visual-direction", "canvas-design"]}
 
     step1 = c.confirm(task, prop["plan"])
     assert step1["state_dir"] == str((consumer / ".marionette").resolve())
@@ -70,7 +70,7 @@ def test_step_handoff_injects_state_dir_map_path_and_recorded_outputs_under_pack
         "page": "not requested: strategy only",
     }
     step2 = c.record(page_out, step1["map_id"], "visual-direction")
-    assert step2["capability"] == "figma-design"
+    assert step2["capability"] == "canvas-design"
     assert step2["recorded_outputs"]["palette"] == "ink-ivory"
     assert step2["recorded_outputs"]["offer"] == "Free 14-day trial"
     assert not (consumer / ".muro").exists()
@@ -134,7 +134,7 @@ def test_completed_map_restores_direct_mode_and_supports_direct_context_handoff(
         "record", "--package", str(marionette_pkg), "--project", str(consumer),
         "--direct", "--capability", "visual-direction", "--outputs", str(out_file)
     ]) == 0
-    d2 = proposed(Coordinator(marionette_pkg, consumer), "Edit existing Figma button", ["figma-design"])
+    d2 = proposed(Coordinator(marionette_pkg, consumer), "Edit existing Figma button", ["canvas-design"])
     assert d2["mode"] == "direct"
     assert d2["recorded_outputs"]["palette"] == "slate"
 

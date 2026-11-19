@@ -283,9 +283,11 @@ After a policy upgrade, Hermes needs a new session because resumed sessions may
 retain their persisted prompt. Do not claim refresh from registration alone.
 TokenEconomizer's hooks are still `host-approved` and registered on the user's
 request by its capability: activating them by default is an open delivery
-decision, not yet run live. Marionette's first active source hook is
-taste-skill's finish gate on `Stop` (2026-11-17): it exits at once where no
-build is armed, and was run live on Claude Code, not on Codex. A catalog with
+decision, not yet run live. Marionette's first active source hook was
+taste-skill's finish gate on `Stop` (2026-11-17): it exited at once where no
+build was armed, and was run live on Claude Code, not on Codex. The owner
+removed taste-skill on 2026-11-19 ("la ritengo troppo prescrittiva e
+costrittiva"), and Marionette registers no hook since. A catalog with
 an active hook is refused by the runtime without its `delivery.json`: a test
 fixture that copies a package's capabilities copies that document too
 (`tests/routing_helpers.py`, `copy_delivery`).

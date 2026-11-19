@@ -1,24 +1,6 @@
 {
   "decisions": [
     {
-      "source": "taste-skill",
-      "content": "The whole skills/taste-skill/ folder (1,631 files): SKILL.md (house rules, sections 1 to 6), the 22 references, the 12 scripts, library/ and the kit under assets/ (system, layout with its dealer and checker, motion, ui, icons, diagrams, backgrounds, effects, components, objects, moments, scenes, photos with their credit files)",
-      "form": "capability",
-      "targets": [
-        "visual-direction"
-      ],
-      "reason": "Breadth: rules and tools for building a company website or landing page, one domain of a package that also does Office files, research and engineering. Timing: nothing acts before a task is classified. Function: the method is its kit and scripts as much as its text (SKILL.md \"4. The run\": the page starts from assets/starter.html, the hero, palette and moments are dealt by scripts, five checkers and the finish gate run in a browser), so the folder travels whole and the step follows that run. Fit: merged with landing-page-design into the one step that plans, deals, builds and checks the page (visual-direction, Sources; ROUTER.md harmonization record of 2026-11-10). Changed on 2026-11-17 (ADR-0026, ADR-0027): until then 11 files travelled and the step wrote the page by hand; a real session built a flat page that way and the owner rejected it. Cost: about 37 MB in each host's skill folder, six copies in a release. Images are declared in media_paths and their eight credit files in notice_paths; the licence each entry states was not checked against its page."
-    },
-    {
-      "source": "taste-skill",
-      "content": "The Stop command hook declared in SKILL.md, which runs gate.mjs (the finish gate) when the agent stops",
-      "form": "hook",
-      "targets": [
-        "visual-direction"
-      ],
-      "reason": "Timing: it must act at the moment the agent stops, which no on-demand step can do; it exists for the build that ends without a gate run, the case the owner met on 2026-11-17 (a page reported as passed with no automated check). Authority: none in text; it blocks a stop only while a build armed in the folder has fixable FAILs, within the gate's rounds, and the user ends it with gate.mjs --done. Breadth and cost: every stop of every session on Claude Code and Codex starts Python and Node once; with no build armed the registered command printed nothing, wrote nothing and returned in 0.5 to 0.6 s over four runs (owner's machine, 2026-11-17, Node 24; the script alone 0.24 s), which is the 'exits at once' of references/gate.md \"As a hook\", where the source itself gives this command for a host's settings and says it runs in every session of the project. With a build armed it runs the checks in headless Chrome (up to 9.5 minutes, the source's own budget, hence its 600-second timeout), makes no model call and writes .taste-skill/gate.json in the project. Function: the gate is also run by hand in step 6 of the capability; the hook is the part that holds when that run is skipped. Form changed (visual-direction, Sources, Changes for coexistence): the release registers the command with its own package path instead of the skill's POSIX line that searches the host's skill folders. Not active on Pi, OpenCode and Hermes: this factory registers source command hooks only on Claude Code and Codex. Run live on Claude Code on 2026-11-17, two sessions: it allowed a stop with no build and blocked one with 33 open FAILs (docs/verification/2026-11-17-taste-skill-whole-intake.md). Open: not run on Codex, which shows a plugin's hooks in /hooks for review first. Supersedes the 2026-11-10 decision that dropped the hook because gate.mjs was not selected."
-    },
-    {
       "source": "motion-design",
       "content": "skills/motion-design/SKILL.md, director/**, patterns/** and reference/** (personality, duration and easing tables, choreography, reduced motion); since the re-pin of 2026-11-17 also SKILL.md 'Rendered File Exports (Creator MCP)' and reference/export-and-render.md",
       "form": "capability",
@@ -55,28 +37,28 @@
     },
     {
       "source": "ai-design-skills",
-      "content": "skills/landing-page-design/SKILL.md: intake, conversion structure, proof, FAQ and output format",
+      "content": "skills/landing-page-design/SKILL.md: Part A (intake, page structure, layout selection, conversion rules, copy, build order, SEO and AEO, pitfalls), Part B (the visual system, B1 to B11), the output format and the quick checklist",
       "form": "capability",
       "targets": [
         "visual-direction"
       ],
-      "reason": "Breadth: landing pages only. Fit: its offer, proof and outline are the brief and copy stage of the website step, so it is merged into visual-direction as the ui.landing-strategy intent rather than kept as a parallel page builder (visual-direction, Sources; ROUTER.md record)."
+      "reason": "Breadth: landing pages, marketing sites and company website pages, one domain of a package that also does Office files, research and engineering. Timing: on demand; nothing in it must act before a task is classified. Authority: Part B calls itself non negotiable, so it is scoped to the pages this step builds and never session-wide. Fit: visual-direction is the step that plans and builds a website, with Part A as the ui.landing-strategy intent and Part B as the look of ui.visual-direction (visual-direction, Sources). Changed on 2026-11-19, owner decision: taste-skill, which until then owned the look in this step, is removed from the package; B1 to B7 and B11, A2's tagline line, A5's note on the B1 copy rules, the 'Visual' block of the checklist, B8's invented people, brands and sample numbers and B9's hover and active values had been dropped only because the two sources contradicted each other on a built page, and with one source left they apply as written (ADR-0017). Open doubt: Part B is itself a fixed system (four typefaces, one per site, a mandatory hero text gradient and a mandatory tagline reveal); the source lets the user's explicit prompt override each rule, and narrowing it further is the owner's decision, not harmonization's. Not verified: no page was built with the new body in a live host."
     },
     {
       "source": "ai-design-skills",
-      "content": "landing-page-design's visual system on a built page: Part B sections B1 to B7 and B11 (fixed font list, one-typeface rule, mandatory hero text gradient, universal Tailwind scale and the rest), the tagline line of A2, the B1 note of A5 and the 'Visual' checklist block; B8's invented people, brands and sample numbers and B9's hover and active values",
+      "content": "landing-page-design's frontmatter description and its 'Scope' as activation ('Apply to all web UI work: landing pages, marketing sites, components, dashboards, prototypes, and design reviews', 'Always consult it before'), and its 'Companion skill' pointer to redesign-existing-projects",
       "form": "dropped",
       "targets": [],
-      "reason": "Authority and fit: they would be a second visual system beside the palette and type dealt from the pinned taste-skill, which owns the look (visual-direction, Specifics 'One owner of the look'). The source's own rule that the user's explicit prompt wins supports scoping them out. Re-read of 2026-11-12 (ADR-0017): the two sources contradict each other on a built page (a font one names to use the other names never; scroll reveals against 'a fade-in on every section'; invented proof against 'No invented proof'), so taste-skill decides there and each part not applied is listed in visual-direction, Sources. B8 (content realism), B9 (states) and B10 (ship requirements) collide with nothing beyond the parts named here and are carried in the source's words."
+      "reason": "Routing that competes with the coordinator, which classifies by meaning; app screens, dashboards, prototypes and design reviews have their own owners here (aesthetic-direction, ui-prototype, design-review), so the visual system governs the pages visual-direction builds and later steps read it as recorded (visual-direction, Sources, Changes for coexistence). The companion skill is not a source of this package. Until 2026-11-19 this decision also dropped Part B's visual system on a built page, against taste-skill; that part is carried again (see the capability decision)."
     },
     {
       "source": "ai-design-skills",
       "content": "skills/figma-designer/SKILL.md: workflow, foundations, typography, colour, components, layout and evaluation",
       "form": "capability",
       "targets": [
-        "figma-design"
+        "canvas-design"
       ],
-      "reason": "Breadth: only tasks that edit a Figma file through the host's Figma integration. Timing: on demand; it starts from the file's own system. Fit: its own role, with visual-direction as a conditional prerequisite for a new landing page (figma-design, `needs` and Sources)."
+      "reason": "Breadth: only tasks that edit a design tool's file through the host's integration for that tool. Timing: on demand; it starts from the file's own system. Fit: its own role, with visual-direction as a conditional prerequisite for a new landing page (canvas-design, `needs` and Sources). Changed on 2026-11-19, owner decision ('rinominiamola in generico non figma'): the capability, until then figma-design, serves Figma, FigCraft or another canvas editor with variables, text styles, auto layout and components. Collision: a step no host can run, since the source's calls exist only in Figma's integration; the design rules, names and values are unchanged and a rule another editor cannot carry out is reported, not approximated. Not verified: the step was not run in FigCraft, whose features are taken from its README."
     },
     {
       "source": "ui-ux-pro-max",
@@ -92,7 +74,7 @@
       "content": "The source's 'REQUIRED for new pages' design-system search as a mandatory first step, the --motion GSAP snippets as instructions, premium assets, templates and the CLI installer",
       "form": "dropped",
       "targets": [],
-      "reason": "The mandatory search is the source's own routing and contradicts the pinned taste-skill, which deals palette and type itself; the GSAP snippets would be a second implementation authority beside the scroll-code step; assets, templates and the installer install or decorate the source itself (design-guidance, Sources 'Not adopted' and 'Harmonized by')."
+      "reason": "The mandatory search is the source's own routing and contradicts the source of the website step, which sets the look itself (taste-skill until the owner removed it on 2026-11-19; since then landing-page-design, whose Part B fixes the typeface list, one typeface per site, the type scale and the backgrounds); the GSAP snippets would be a second implementation authority beside the scroll-code step; assets, templates and the installer install or decorate the source itself (design-guidance, Sources 'Not adopted' and 'Harmonized by')."
     },
     {
       "source": "genoffice",
@@ -266,7 +248,7 @@
         "design-review",
         "html-deck"
       ],
-      "reason": "Domain rules. As write-time defaults they are the commit rules of aesthetic-direction; as detection patterns they are the generic-look and hierarchy passes of design-review; the per-medium type sizes are also in html-deck. Fit: for a website the dealt palette of visual-direction stays the authority, and design-review treats a recorded system as deliberate."
+      "reason": "Domain rules. As write-time defaults they are the commit rules of aesthetic-direction; as detection patterns they are the generic-look and hierarchy passes of design-review; the per-medium type sizes are also in html-deck. Fit: for a website the visual system of visual-direction stays the authority, and design-review treats a recorded system as deliberate."
     },
     {
       "source": "claude-design-system-prompt",
@@ -296,7 +278,7 @@
         "html-deck",
         "design-options"
       ],
-      "reason": "Rules for HTML design artifacts only; they would mislead an Office or Figma task. Carried where they act: real interactions and persistence in ui-prototype, scaling and persistence in html-deck, persisted tweak values in design-options."
+      "reason": "Rules for HTML design artifacts only; they would mislead an Office task or one in a design tool's file. Carried where they act: real interactions and persistence in ui-prototype, scaling and persistence in html-deck, persisted tweak values in design-options."
     },
     {
       "source": "claude-design-system-prompt",
@@ -359,7 +341,7 @@
       "targets": [
         "aesthetic-direction"
       ],
-      "reason": "A procedure loaded when a design with no brand needs a look. Fit: not merged into visual-direction (which deals palette and type for a website from the pinned taste-skill) nor into design-guidance (which recommends from packaged data): it proposes and commits with the user, for any artifact. Two owners of palette and type cannot share a plan, so the two are declared conflicting."
+      "reason": "A procedure loaded when a design with no brand needs a look. Fit: not merged into visual-direction (which fixes the look of a website: from taste-skill until its removal on 2026-11-19, from landing-page-design's visual system since) nor into design-guidance (which recommends from packaged data): it proposes and commits with the user, for any artifact. Two owners of palette and type cannot share a plan, so the two are declared conflicting."
     },
     {
       "source": "claude-design-system-prompt",
@@ -404,7 +386,7 @@
       "targets": [
         "design-system-extract"
       ],
-      "reason": "One role with two intents: the component inventory's first category is the tokens of the other skill, and chapter 13 treats both as one system. Distinct from design-guidance's persisted recommendation and from figma-design's foundations, which now reads the extracted tokens."
+      "reason": "One role with two intents: the component inventory's first category is the tokens of the other skill, and chapter 13 treats both as one system. Distinct from design-guidance's persisted recommendation and from canvas-design's foundations, which now reads the extracted tokens."
     },
     {
       "source": "claude-design-system-prompt",
@@ -693,7 +675,7 @@
       "targets": [
         "design-file-apply"
       ],
-      "reason": "A procedure used only when an interface is changed from the design file. It writes the product's interface code, which no other capability does from a recorded design (visual-direction plans and builds a website by taste-skill's method, ui-prototype a prototype, work-map a software change through spec and tickets). It never rewrites DESIGN.md: one owner of the file. Its ban on tests that the developer did not ask for stays where references/procedure.md puts it, under interface checks; the session policy's small test for new non-trivial logic is another kind of test and still holds (owner decision of 2026-11-17, a collision of two sources' rules)."
+      "reason": "A procedure used only when an interface is changed from the design file. It writes the product's interface code, which no other capability does from a recorded design (visual-direction plans and builds a website by its source's method, ui-prototype a prototype, work-map a software change through spec and tickets). It never rewrites DESIGN.md: one owner of the file. Its ban on tests that the developer did not ask for stays where references/procedure.md puts it, under interface checks; the session policy's small test for new non-trivial logic is another kind of test and still holds (owner decision of 2026-11-17, a collision of two sources' rules)."
     },
     {
       "source": "zero-slop-design",
@@ -753,33 +735,5 @@
     "intake_only_paths": [
       "custom-instructions/recap-adhd.md"
     ]
-  },
-  "hooks": [
-    {
-      "host": "claude-code",
-      "capability": "visual-direction",
-      "event": "Stop",
-      "matcher": "",
-      "run": [
-        "node",
-        "<package_root>/scripts/taste-skill/scripts/gate.mjs",
-        "--hook",
-        "claude"
-      ],
-      "timeout": 600
-    },
-    {
-      "host": "codex",
-      "capability": "visual-direction",
-      "event": "Stop",
-      "matcher": "",
-      "run": [
-        "node",
-        "<package_root>/scripts/taste-skill/scripts/gate.mjs",
-        "--hook",
-        "codex"
-      ],
-      "timeout": 600
-    }
-  ]
+  }
 }

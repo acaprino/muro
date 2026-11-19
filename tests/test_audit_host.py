@@ -53,7 +53,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     task = "Disegna in Figma la landing page di Lumo. Non abbiamo ancora una struttura dei contenuti."
     full = run(pkg, consumer, "plan", "--compact", "--task", task)
     # The full catalog grows with every source; the focused view is what a host skill asks for.
-    out = run(pkg, consumer, "plan", "--compact", "--focus", "visual-direction,design-guidance,figma-design", "--task", task)
+    out = run(pkg, consumer, "plan", "--compact", "--focus", "visual-direction,design-guidance,canvas-design", "--task", task)
     assert len(out.encode("utf-8")) < INLINE_LIMIT < 30000, len(out.encode("utf-8"))
     brief_all = run(pkg, consumer, "plan", "--compact", "--brief", "--task", task)
     assert len(brief_all.encode("utf-8")) < len(out.encode("utf-8")) < len(full.encode("utf-8"))
@@ -66,7 +66,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
     entries = {e["id"]: e for e in json.loads(full)["catalog"]}
     assert len(entries) == 37
-    in_focus = ("visual-direction", "design-guidance", "figma-design")
+    in_focus = ("visual-direction", "design-guidance", "canvas-design")
     full_part = {e["id"]: e for e in data["catalog"] if "id" in e}
     assert set(full_part) == set(in_focus)
     for name in in_focus:
@@ -100,18 +100,18 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
         for key in ("after", "conflicts", "hooks", "reads", "needs"):
             assert entry.get(key, ["x"]) != [], (entry["id"], key)
         assert entry.get("when") != "—"
-    assert entries["figma-design"]["needs"][0]["capability"] == "visual-direction"
+    assert entries["canvas-design"]["needs"][0]["capability"] == "visual-direction"
     assert entries["gsap-scrolltrigger"]["when"] == "stack:gsap"
     assert entries["css-scroll"]["conflicts"] == ["gsap-scrolltrigger"]
     assert not (consumer / ".marionette").exists()  # still writes nothing
 
     # The host writes the decision with its file tool, then calls plan on ONE line.
-    decision = response(data, ["visual-direction", "figma-design"])
+    decision = response(data, ["visual-direction", "canvas-design"])
     path = Path(data["classification_path"])
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(decision, ensure_ascii=False), encoding="utf-8")
     nxt = json.loads(run(pkg, consumer, "plan", "--task", task, "--classification", str(path)))
-    assert nxt == {"mode": "confirm", "task": task, "plan": ["visual-direction", "figma-design"]}
+    assert nxt == {"mode": "confirm", "task": task, "plan": ["visual-direction", "canvas-design"]}
     assert (consumer / ".marionette" / ".gitignore").read_text(encoding="utf-8").strip() == "*"
 
 
