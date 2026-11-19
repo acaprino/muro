@@ -159,7 +159,7 @@ Marionette is an example of how Muro works as a harmonizer. The factory absorbed
 
 These are 8 of the 25 [reviewed examples](examples/marionette/guide-examples.json) the guide shows. Marionette also carries a session policy made from **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**, plus [one instruction of its owner](examples/marionette/custom-instructions/recap-adhd.md): complete, focused work and replies that are easy to act on. The complete adapter loads it through the host's system or developer channel, before any skill is chosen. A code-change review, a whole-repository audit, a ledger of deliberate shortcuts and an explanation of the working method stay separate tasks you can ask for. See the [integration record](docs/verification/2026-11-12-marionette-ponytail-adhd.md).
 
-**Install it.** Download `marionette-<version>.zip` and its `.sha256` from the [releases](https://github.com/acaprino/muro/releases), tagged `marionette-v<version>`. Unzip it and follow `INSTALL.md` in the adapter folder of your harness. For Claude Code:
+**Install it.** Download `marionette-<version>.zip` and its `.sha256` from the [releases](https://github.com/acaprino/marionette/releases) of its own repository, tagged `marionette-v<version>` (0.2.0 to 0.4.0 are among [Muro's releases](https://github.com/acaprino/muro/releases)). Unzip it and follow `INSTALL.md` in the adapter folder of your harness. For Claude Code:
 
 ```sh
 claude plugin marketplace add <unzipped folder>/marionette/adapters/claude-code
@@ -345,7 +345,7 @@ node apps/desktop/tests/browser.mjs
 
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
 
-The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release; Marionette releases are published on request.
+The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release. Marionette is released on request: the `Release Marionette` workflow builds it and opens a pull request in [acaprino/marionette](https://github.com/acaprino/marionette), and merging that pull request publishes the release there.
 
 [Routing verification](docs/verification/2026-11-09-ai-owned-routing.md) · [Guide verification](docs/verification/2026-11-10-release-html-guide.md) · [Routing eval and development principles](docs/adr/ADR-0015-design-principles-from-first-real-use.md)
 
