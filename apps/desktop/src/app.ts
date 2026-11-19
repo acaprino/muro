@@ -3,10 +3,12 @@ import type { App, Actions } from './context.ts';
 import { frame, modules } from './views.ts';
 import { dlHead } from './sheets.ts';
 import { watchTheme } from './look.ts';
+import { serial } from './queue.ts';
 import { esc } from './ui.ts';
 
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
-export function mountApp(root:HTMLElement,request:Transport):()=>void {
+export function mountApp(root:HTMLElement,transport:Transport):()=>void {
+ const request=serial(transport,['discover']);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null};
  const dialog=document.createElement('dialog');dialog.tabIndex=-1;document.body.append(dialog);
  const toasts=document.createElement('div');toasts.id='toasts';toasts.setAttribute('role','status');toasts.setAttribute('aria-live','polite');document.body.append(toasts);
