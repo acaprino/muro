@@ -55,13 +55,14 @@ const saveRequest = (app: App, patch: Partial<Settings>) => {
   const { revision, settings } = app.state.snapshot!.registry;
   return app.request<Snapshot>('settings', { revision, settings: { ...settings, ...patch } });
 };
-/** Keeps the snapshot a save returned. Settings do not change what a sync would do, so the plan that was current stays current:
- * its revision follows the registry's (the service does the same with the recorded sync state) and `adopt`, which replans
- * only when the held plan is of another revision, asks for none. A plan that was already out of date stays out of date. */
+/** Keeps the snapshot a save returned. Settings do not change what a sync would do, so the plan that was current stays
+ * current: its revision follows the registry's (the service does the same with the recorded sync state), and `adopt` is
+ * told not to replan, so no save of a setting asks for a plan, not even the first of a session in which nothing was checked.
+ * A plan that was already out of date stays out of date, and counts as none. */
 function accept(app: App, saved: Snapshot): void {
   const { state } = app, held = state.plan;
   if (held && held.revision === state.snapshot!.registry.revision) state.plan = { ...held, revision: saved.registry.revision };
-  app.adopt(saved);
+  app.adopt(saved, { replan: false });
 }
 /** Saves `patch` unless it changes nothing. Afterwards the page is painted from what is stored, so a refused or skipped save puts the control back. */
 async function save(app: App, patch: Partial<Settings>): Promise<void> {

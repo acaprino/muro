@@ -50,9 +50,9 @@ export function mountApp(root:HTMLElement,request:Transport):()=>void {
   try{const value=await work();await after?.(value);}catch(e){state.error=message(e);}finally{state.busy=null;render();}
  }
  // The shell sends the jobs and the data folder only with `snapshot`: a snapshot a mutation returns keeps the ones already held.
- function adopt(s:Snapshot){
+ function adopt(s:Snapshot,options?:{replan?:boolean}){
   const before=state.snapshot;state.snapshot={...s,jobs:s.jobs??before?.jobs,data_dir:s.data_dir??before?.data_dir};
-  if(before&&before.registry.revision!==s.registry.revision&&state.plan?.revision!==s.registry.revision)void replan();
+  if(options?.replan!==false&&before&&before.registry.revision!==s.registry.revision&&state.plan?.revision!==s.registry.revision)void replan();
  }
  const reload=()=>run('Reading your registry…',()=>request<Snapshot>('snapshot'),adopt);
  function replan():Promise<void>{

@@ -14,8 +14,8 @@ export interface App {
   reload(): Promise<void>;
   /** Asks the service for a full plan and keeps it as `state.plan`. Calls that arrive meanwhile share one more plan, never one each. */
   replan(): Promise<void>;
-  /** Keeps a snapshot a request returned (it keeps the jobs and the data folder only `snapshot` carries). When the registry revision moved and the held plan is of another revision it replans once by itself, so no module calls `replan` after a registry mutation; it does after a change the revision does not show (a scan, an apply). */
-  adopt(snapshot: Snapshot): void;
+  /** Keeps a snapshot a request returned (it keeps the jobs and the data folder only `snapshot` carries). When the registry revision moved and the held plan is of another revision it replans once by itself, so no module calls `replan` after a registry mutation; it does after a change the revision does not show (a scan, an apply). `{ replan: false }` keeps the snapshot and asks for no plan: for a save that does not change what a sync would do (a setting). */
+  adopt(snapshot: Snapshot, options?: { replan?: boolean }): void;
   /** Looks for the harnesses installed on this computer: `state.discovered`. */
   discover(): Promise<void>;
   /** Opens `html` in the one dialog (a centred dialog or a sheet on the right); open already, it replaces the content and keeps the focus. The first heading becomes its name. Returns the element: wire a form's `onsubmit` on it. */

@@ -253,6 +253,19 @@ await test('a settings save keeps the last plan: no new plan, the strip stays, A
   assert.equal(await page.locator('section.strip strong').first().textContent(), 'Everything is in sync');
 });
 
+await test('the first settings save of a session, with nothing checked yet, asks for no plan', 'default', {}, async app => {
+  const { page } = app;
+  await openSettings(page);
+  const before = (await app.calls()).length;
+  await switchOf(page, TRAY).click();
+  await waitSwitch(page, TRAY, false);
+  assert.deepEqual((await app.calls()).slice(before).map(c => c.action), ['settings'], 'one settings request, no plan, no snapshot');
+  assert.equal((await calls(app, 'plan')).length, 0, 'no plan was asked for in this session');
+  await switchOf(page, AUTO).click();
+  await waitSwitch(page, AUTO, true);
+  assert.equal((await calls(app, 'plan')).length, 0, 'nor after the second save');
+});
+
 await test('Theme: Light is the root\'s data-theme and survives a reload', 'default', { colorScheme: 'dark' }, async app => {
   const { page } = app;
   await openSettings(page);
