@@ -1,4 +1,4 @@
-import type { Plugin, Snapshot, Target, Plan, InstalledPlugin } from './types.ts';
+import type { Plugin, Snapshot, Target, Plan, Operation, InstalledPlugin } from './types.ts';
 export interface PluginStatus { kind:string; label:string; tone:string }
 const status=(kind:string,label:string,tone:string):PluginStatus=>({kind,label,tone});
 /** What the snapshot holds about one plugin on one target; the plugin state and the cell read it the same way. */
@@ -66,6 +66,19 @@ export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {
   const operations=checked.operations.length,blockers=checked.blockers.length;
   return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,byKind};
 }
+export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'; operations:number; blockers:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
+/** What the strip leads with. A harness column that cannot be read (its inventory, or the instructions of one of its plugins; `count` tells which) never reads as in sync, so with nothing to apply it replaces "ok" and "blocked". */
+export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
+  const summary=syncSummary(snapshot,plan);
+  const unreadable=snapshot.registry.targets.filter(t=>t.enabled).map(target=>({target,state:harnessState(target,snapshot,plan)})).filter(x=>x.state.kind==='unknown').map(x=>({target:x.target,count:x.state.count}));
+  return {...summary,kind:unreadable.length&&(summary.kind==='ok'||summary.kind==='blocked')?'unreadable':summary.kind,unreadable};
+}
+/** Whether two plans ask for the same operations (harness, plugin, kind, versions), in any order. */
+export function sameOperations(a:Plan|null,b:Plan|null):boolean {
+  if(!a||!b||a.operations.length!==b.operations.length) return false;
+  const key=(o:Operation)=>JSON.stringify([o.target_id,o.plugin_id,o.name,o.kind,o.from_version,o.to_version]),left=a.operations.map(key).sort(),right=b.operations.map(key).sort();
+  return left.every((k,i)=>k===right[i]);
+}
 /** Installed on an enabled harness that was read completely, and not put there by Muro: `index` is its place in the inventory. */
 export function unlisted(snapshot:Snapshot):{target:Target;plugin:InstalledPlugin;index:number}[] {
   return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!u.plugin.managed):[];});
@@ -81,9 +94,8 @@ export function stamp(value:string|null,now=new Date()):string {
   const at=new Date(Number(value)*1000),day=(d:Date)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(),diff=Math.round((day(now)-day(at))/864e5),time=at.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
   return diff===0?`today ${time}`:diff===1?`yesterday ${time}`:diff===-1?`tomorrow ${time}`:`${at.toLocaleDateString('en-GB',{day:'numeric',month:'short'})} ${time}`;
 }
-export function summarize(snapshot:Snapshot) {const targets=snapshot.registry.targets.filter(t=>t.enabled);const complete=targets.every(t=>snapshot.inventory.some(i=>i.target_id===t.id&&i.complete));return {plugins:snapshot.registry.plugins.length,targets:targets.length,updates:snapshot.registry.plugins.filter(p=>pluginState(p,snapshot).kind==='update').length,external:complete?snapshot.inventory.filter(i=>targets.some(t=>t.id===i.target_id)).reduce((n,i)=>n+i.plugins.filter(p=>!p.managed).length,0):null};}
 /** `action` keeps the plugins with a cell still to act on (anything but in sync or not here); any other filter is a plugin state kind. */
 const needsAction=(p:Plugin,s:Snapshot,plan:Plan|null)=>s.registry.targets.some(t=>t.enabled&&!['ok','none'].includes(cellState(p,t,s,plan).kind));
 export function filterPlugins(plugins:Plugin[],query:string,filter:string,snapshot:Snapshot,plan:Plan|null=null):Plugin[] {return plugins.filter(p=>(p.name+' '+p.source).toLocaleLowerCase().includes(query.toLocaleLowerCase())&&(filter==='all'||(filter==='action'?needsAction(p,snapshot,plan):filter===pluginState(p,snapshot).kind)));}
 export const harnessNames:Record<string,string>={'claude-code':'Claude Code',codex:'Codex',opencode:'OpenCode',pi:'Pi',hermes:'Hermes',deepseek:'DeepSeek'};
-export const harnessInitials:Record<string,string>={'claude-code':'C',codex:'X',opencode:'O',pi:'P',hermes:'H',deepseek:'D'};
+export const harnessInitials:Record<string,string>={'claude-code':'CC',codex:'CX',opencode:'OC',pi:'PI',hermes:'HM',deepseek:'DS'};

@@ -12,7 +12,8 @@ export interface Job { id:string; plugin_id:string; harness:string; status:strin
 /** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan. */
 export interface SyncTimes { checked:string|null; synced:string|null }
 export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; targets:Record<string,SyncTimes> }
-export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[] }
+/** `left_out` is what an apply with `allow_blocked` reports: the blockers of its plan, left out of the sync. */
+export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[]; left_out?:string[] }
 export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }
 export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string }
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
@@ -21,4 +22,12 @@ export interface Autostart { supported:boolean; enabled:boolean; current:boolean
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;
 export type Page = 'sync'|'activity'|'settings';
-export interface ViewState {page:Page; snapshot:Snapshot|null; discovered:Discovered[]; discovering:boolean; plan:Plan|null; selected:string|null; query:string; filter:string; busy:string|null; error:string|null; discoveryError:string|null; maintenance:Maintenance|null}
+export type Filter = 'all'|'action';
+export type ActivityFilter = 'all'|'sync'|'ai'|'problems';
+/** An apply in progress: `index` operations are done of `total`, `name` lists the plugins it changes. */
+export interface Applying { index:number; total:number; name:string }
+/** The review sheet that is open: a plan, and the harness it was made for (null for the whole plan). A one-harness plan is never `plan` of the state. */
+export interface Review { plan:Plan; target_id:string|null }
+export interface SetupState { step:1|2|3; pick:Record<string,boolean>; keep:Record<string,boolean>; auto:boolean; autostart:boolean }
+/** `plan` is always the last full plan, the one the strip and every column read from; `autostart`, `afilter` and `setup` belong to Settings, Activity and the first run. */
+export interface ViewState {page:Page; snapshot:Snapshot|null; discovered:Discovered[]; discovering:boolean; plan:Plan|null; checking:boolean; applying:Applying|null; review:Review|null; query:string; filter:Filter; afilter:ActivityFilter; busy:string|null; error:string|null; checkErrors:CheckResult['errors']; discoveryError:string|null; maintenance:Maintenance|null; autostart:Autostart|null; setup:SetupState|null}

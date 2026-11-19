@@ -1,20 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pluginState, summarize, filterPlugins, cellState, harnessState, syncSummary, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
-import type { Snapshot, Plugin, Plan, Operation } from '../src/types.ts';
-import { frame } from '../src/views.ts';
+import { pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
+import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.ts';
+import { frame, modules } from '../src/views.ts';
 import { pluginForm } from '../src/forms.ts';
-import { when } from '../src/ui.ts';
-import { storedLook, storedTheme, resolveTheme } from '../src/look.ts';
+import { instructionDetails, reviewSheet } from '../src/sheets.ts';
+import { when, sw, seg, button } from '../src/ui.ts';
+import { storedTheme, resolveTheme } from '../src/look.ts';
 
 const plugin: Plugin = {id:'pkg',name:'Package',source:'owner/pkg',policy:'stable',pinned_version:'',targets:['target'],distributions:[{harness:'codex',path:'/artifact',version:'2'}]};
 function snapshot(): Snapshot {return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'target',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},inventory:[{target_id:'target',complete:true,supported:true,error:null,plugins:[{id:'pkg',name:'Package',version:'1',path:'/plugin',managed:true}]}],activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,targets:{}}};}
+const viewState=(snapshot:Snapshot|null,over:Partial<ViewState>={}):ViewState=>({page:'sync',snapshot,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,...over});
 test('version drift requires an update',()=>assert.equal(pluginState(plugin,snapshot()).kind,'update'));
 test('incomplete inventory is never marked missing or synchronized',()=>{const s=snapshot();s.inventory[0].complete=false;assert.equal(pluginState(plugin,s).kind,'unknown');});
 test('unconfigured and missing distributions have separate states',()=>{const s=snapshot();assert.equal(pluginState({...plugin,targets:[]},s).kind,'unassigned');assert.equal(pluginState({...plugin,distributions:[]},s).kind,'prepare');});
-test('summary counts actual external plugins and enabled targets',()=>{const s=snapshot();s.inventory[0].plugins.push({id:'other',name:'Other',version:'1',path:'/other',managed:false});assert.deepEqual(summarize(s),{plugins:1,targets:1,updates:1,external:1});});
 test('filter searches source as well as name without interpreting intent',()=>assert.equal(filterPlugins([plugin],'OWNER','all',snapshot()).length,1));
-test('external count stays unknown until all managed inventories are complete',()=>{const s=snapshot();s.inventory[0].complete=false;assert.equal(summarize(s).external,null);});
 
 test('changed custom instructions require regeneration even when versions match',()=>{
  const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'/instructions',files:['custom-instructions/recap.md'],digest:'new',stale_harnesses:['codex']}]};
@@ -37,13 +37,12 @@ test('staleness on an unused harness does not invalidate the assigned target',()
 
 test('instruction folder, files and errors render as escaped text with an explicit open action',()=>{
  const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'D:/<folder>',files:['custom-instructions/<script>.md'],digest:'',stale_harnesses:['codex'],error:'Cannot read <file>'}]};
- const html=frame({page:'registry',snapshot:s,discovered:[],discovering:false,plan:null,selected:'pkg',query:'',filter:'all',busy:null,error:null,discoveryError:null,maintenance:null});
+ const html=instructionDetails(plugin,viewState(s));
  assert.match(html,/D:\/\&lt;folder\&gt;/);
  assert.match(html,/custom-instructions\/\&lt;script\&gt;\.md/);
  assert.match(html,/Cannot read \&lt;file\&gt;/);
  assert.match(html,/data-action="open-custom-instructions"/);
  assert.match(html,/Adapt again for: Codex/);
- assert.match(html,/class="next-step"/);
  assert.doesNotMatch(html,/<script>/);
 });
 
@@ -54,33 +53,14 @@ test('plugin editor exposes a folder choice instead of a text policy',()=>{
  assert.doesNotMatch(html,/<textarea/);
 });
 
-test('Smooth is the default look and follows the system theme; Classic is always dark',()=>{
- assert.equal(storedLook(null),'smooth');assert.equal(storedLook('stale'),'smooth');assert.equal(storedLook('classic'),'classic');
- assert.equal(storedTheme(null),'system');assert.equal(storedTheme('light'),'light');
- assert.equal(resolveTheme('smooth','system',true),'light');assert.equal(resolveTheme('smooth','system',false),'dark');
- assert.equal(resolveTheme('smooth','dark',true),'dark');assert.equal(resolveTheme('classic','light',true),'dark');
-});
-
-test('settings offer both looks, hold maintenance, and the interface has five pages',()=>{
- const html=frame({page:'settings',snapshot:snapshot(),discovered:[],discovering:false,plan:null,selected:null,query:'',filter:'all',busy:null,error:null,discoveryError:null,maintenance:null});
- assert.match(html,/id="look-select"/);assert.match(html,/value="classic"/);assert.match(html,/id="theme-select"/);
- assert.match(html,/data-action="verify"/);assert.match(html,/data-action="cleanup"/);
- assert.equal(html.match(/data-page="[a-z]+" aria-label/g)?.length,5);
+test('the theme is System until one is chosen, and System follows the operating system',()=>{
+ assert.equal(storedTheme(null),'system');assert.equal(storedTheme('stale'),'system');assert.equal(storedTheme('light'),'light');assert.equal(storedTheme('dark'),'dark');
+ assert.equal(resolveTheme('system',true),'light');assert.equal(resolveTheme('system',false),'dark');
+ assert.equal(resolveTheme('dark',true),'dark');assert.equal(resolveTheme('light',false),'light');
 });
 
 test('epoch stamps read as dates, other time text is left alone',()=>{assert.match(when('1795077229'),/2026/);assert.equal(when('2026-11-15'),'2026-11-15');assert.equal(when(undefined),'');});
 
-test('a plugin whose instructions changed is told to adapt again, once',()=>{
- const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'/i',files:[],digest:'new',stale_harnesses:['codex']}]};
- const html=frame({page:'registry',snapshot:s,discovered:[],discovering:false,plan:null,selected:'pkg',query:'',filter:'all',busy:null,error:null,discoveryError:null,maintenance:null});
- assert.match(html,/Your custom instructions changed since the last adaptation\./);assert.equal(html.match(/data-action="adapt"/g)?.length,1);
-});
-test('first use shows the step to do now and disappears once a plugin is installed',()=>{
- const view=(s:Snapshot)=>frame({page:'registry',snapshot:s,discovered:[],discovering:false,plan:null,selected:null,query:'',filter:'all',busy:null,error:null,discoveryError:null,maintenance:null});
- const empty=snapshot();empty.registry.plugins=[];empty.registry.targets=[];
- assert.match(view(empty),/aria-current="step"><span class="step-n">1</);
- assert.doesNotMatch(view(snapshot()),/class="steps"/);
-});
 
 const op=(kind:string,from:string,to:string,plugin_id='pkg',target_id='target'):Operation=>({target_id,plugin_id,name:'Package',kind,from_version:from,to_version:to,reason:''});
 const plan=(operations:Operation[],revision=4,blockers:string[]=[]):Plan=>({id:'plan',revision,operations,blockers});
@@ -215,4 +195,111 @@ test('the action filter keeps the plugins with a cell that needs action; all kee
  const ids=(f:string,p:Plan|null=null)=>filterPlugins(s.registry.plugins,'',f,s,p).map(x=>x.id);
  assert.deepEqual(ids('action'),['pkg']);assert.deepEqual(ids('all'),['pkg','fine']);
  assert.deepEqual(ids('action',plan([op('reinstall','2','2','fine')])),['pkg','fine']);
+});
+
+test('syncHeadline: a harness that cannot be read keeps ok and blocked from showing, the changes still lead',()=>{
+ const s=snapshot();s.inventory[0].plugins[0].version='2';
+ assert.equal(syncHeadline(s,plan([])).kind,'ok');
+ s.inventory[0].complete=false;
+ const h=syncHeadline(s,plan([]));assert.equal(h.kind,'unreadable');assert.deepEqual(h.unreadable.map(u=>[u.target.id,u.count]),[['target',0]]);
+ assert.equal(syncHeadline(s,plan([],4,['Codex: no folder'])).kind,'unreadable');
+ assert.equal(syncHeadline(s,plan([op('update','1','2')])).kind,'changes');
+ assert.equal(syncHeadline(s,null).kind,'not-checked');
+ s.registry.targets[0].enabled=false;assert.deepEqual(syncHeadline(s,plan([])).unreadable,[]);assert.equal(syncHeadline(s,plan([])).kind,'no-harness');
+});
+test('syncHeadline: instructions that cannot be read also keep a harness from reading as in sync, with a count',()=>{
+ const s=snapshot();s.inventory[0].plugins[0].version='2';s.custom_instructions=[{plugin_id:'pkg',path:'/i',files:[],digest:'',stale_harnesses:[],error:'Unreadable Markdown'}];
+ const h=syncHeadline(s,plan([]));assert.equal(h.kind,'unreadable');assert.deepEqual(h.unreadable.map(u=>u.count),[1]);
+});
+test('syncHeadline keeps the counts of syncSummary',()=>{
+ const s=snapshot(),p=plan([op('install','','2','a'),op('remove','1','','')],4,['Codex / D: no build']);
+ const {unreadable,kind,...counts}=syncHeadline(s,p);assert.equal(kind,'changes');assert.deepEqual(unreadable,[]);assert.deepEqual(counts,{operations:2,blockers:1,byKind:{install:1,remove:1}});
+});
+test('sameOperations compares the operations of two plans in any order, and never equates a missing plan',()=>{
+ const a=plan([op('install','','2','a'),op('update','1','2','b')]),b=plan([op('update','1','2','b'),op('install','','2','a')],5);
+ assert.equal(sameOperations(a,b),true);assert.equal(sameOperations(a,plan([op('install','','2','a')])),false);
+ assert.equal(sameOperations(a,plan([op('install','','2','a'),op('update','1','3','b')])),false,'another version is another operation');
+ assert.equal(sameOperations(a,plan([op('install','','2','a'),op('remove','1','','b')])),false,'another kind is another operation');
+ assert.equal(sameOperations(null,null),false);assert.equal(sameOperations(a,null),false);assert.equal(sameOperations(plan([]),plan([])),true);
+});
+
+const stripOf=(html:string)=>html.match(/<section class="strip[\s\S]*?<\/section>/)?.[0]||'';
+const actionsOf=(html:string)=>html.match(/data-action="[a-z-]+"/g)?.map(a=>a.slice(13,-1));
+test('the frame is an app bar with three tabs and a state button, no sidebar; Sync is current',()=>{
+ const html=frame(viewState(snapshot()));
+ assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,4,'three tabs and the state button');
+ assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
+ assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="appbar">/);assert.match(html,/<main id="main"/);
+});
+test('the pages of Activity and Settings are a title and an empty state until Task 7 builds them',()=>{
+ for(const [page,title] of [['activity','Activity'],['settings','Settings']] as const){const html=frame(viewState(snapshot(),{page}));assert.match(html,new RegExp(`<h1>${title}</h1>`));assert.match(html,/class="card empty"/);assert.match(html,new RegExp(`data-id="${page}" aria-current="page"`));}
+});
+test('the strip says Not checked yet and offers only Check now before a check, and for a plan of another revision',()=>{
+ for(const held of [null,plan([op('update','1','2')],3)]){const strip=stripOf(frame(viewState(snapshot(),{plan:held})));assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(strip),['check']);}
+});
+test('the strip counts the held plan and offers Review and Apply all',()=>{
+ const strip=stripOf(frame(viewState(snapshot(),{plan:plan([op('update','1','2')],4,['Codex / D: no build'])})));
+ assert.match(strip,/1 change ready to apply/);assert.match(strip,/1 update · 1 item not ready yet/);
+ assert.deepEqual(actionsOf(strip),['check','review','apply-all']);assert.match(strip,/Apply all 1 change/);
+});
+test('the strip never says everything is in sync while a harness cannot be read',()=>{
+ const s=snapshot();s.inventory[0].plugins[0].version='2';
+ assert.match(stripOf(frame(viewState(s,{plan:plan([])}))),/Everything is in sync/);
+ s.inventory[0].complete=false;s.inventory[0].error='Folder not found';
+ const html=frame(viewState(s,{plan:plan([],4,['Codex: Folder not found'])})),strip=stripOf(html);
+ assert.doesNotMatch(html,/Everything is in sync/);assert.match(strip,/Codex cannot be read/);assert.deepEqual(actionsOf(strip),['check']);
+ assert.match(html,/A harness cannot be read/);
+});
+test('while an apply runs the strip says what it applies and only Check now is left, disabled',()=>{
+ const strip=stripOf(frame(viewState(snapshot(),{plan:plan([op('update','1','2')]),applying:{index:0,total:1,name:'Pack <b>'}})));
+ assert.match(strip,/Applying 1 change…/);assert.match(strip,/Pack &lt;b&gt;/);assert.doesNotMatch(strip,/data-action="(review|apply-all)"/);assert.match(strip,/data-action="check"[^>]*disabled/);
+});
+test('names, sources, harnesses, check errors and failures are escaped on the Sync page',()=>{
+ const s=snapshot();s.registry.plugins=[{...plugin,name:'<b>Evil</b>',source:'x"><i>y'}];s.registry.targets[0].name='<u>Harness</u>';
+ const html=frame(viewState(s,{error:'<img src=x>',checkErrors:[{plugin_id:'pkg',message:'<script>'}]}));
+ for(const raw of ['<b>Evil','<u>Harness','<img src=x>','<script>','"><i>'])assert.ok(!html.includes(raw),`${raw} is escaped`);
+ for(const text of ['&lt;b&gt;Evil','&lt;u&gt;Harness','&lt;img src=x&gt;','&lt;script&gt;'])assert.ok(html.includes(text),text);
+ assert.match(html,/1 source could not be checked/);assert.match(html,/Reload/);
+});
+test('a plugin row opens its dialog, a column header its harness, and each cell reads the held plan',()=>{
+ const html=frame(viewState(snapshot(),{plan:plan([op('update','1','2')])}));
+ assert.match(html,/data-action="open-plugin" data-id="pkg"/);assert.match(html,/data-action="edit-target" data-id="target"/);
+ assert.match(html,/Update 1 → 2/);assert.match(html,/data-action="review" data-id="target"[^>]*>[\s\S]*?Sync 1 change/);
+ assert.match(frame(viewState(snapshot(),{plan:plan([],4)})),/Update 1 → 2/,'without an operation the snapshot still says update');
+});
+test('a paused harness reads Paused in its column and in each of its cells',()=>{
+ const s=snapshot();s.registry.targets[0].enabled=false;
+ const html=frame(viewState(s,{plan:plan([])}));assert.equal(html.match(/>Paused</g)?.length,2);assert.match(stripOf(html),/No harness is managed/);
+});
+test('without a snapshot the frame is an empty state that offers Try again',()=>{
+ const html=frame(viewState(null,{error:'Service not answering'}));assert.match(html,/Registry not available/);assert.match(html,/Service not answering/);assert.match(html,/data-action="refresh"/);assert.doesNotMatch(html,/class="strip/);
+});
+
+test('reviewSheet lists the operations by harness, the blockers as left out, and the removals it will make',()=>{
+ const s=viewState(snapshot()),p=plan([op('install','','2','a'),op('update','1','2','b'),op('remove','1','','')],4,['Codex / D: no <build>']),html=reviewSheet(s,p,null);
+ assert.match(html,/<h2 id="dlg-title">Review changes<\/h2>/);assert.match(html,/Install[\s\S]*Update[\s\S]*Remove/);assert.match(html,/Not ready yet/);assert.match(html,/no &lt;build&gt;/);assert.match(html,/It is left out of this sync\./);
+ assert.match(html,/1 plugin will be uninstalled\./);assert.match(html,/data-action="apply"[^>]*>Apply 3 changes/);assert.doesNotMatch(html,/Apply 3 changes…/);
+ assert.match(reviewSheet(s,p,null,s.snapshot!.registry.targets[0]),/<h2 id="dlg-title">Sync Codex<\/h2>[\s\S]*Only the changes of this harness\./);
+});
+test('reviewSheet with nothing ready has no Apply, and an apply in progress locks the sheet',()=>{
+ const s=viewState(snapshot()),none=reviewSheet(s,plan([],4,['Codex: broken']),null);
+ assert.match(none,/No change is ready to apply\./);assert.match(none,/Not ready yet/);assert.doesNotMatch(none,/data-action="apply"/);assert.match(none,/>Close</);
+ const running=reviewSheet(s,plan([op('update','1','2','a'),op('install','','2','b')],4,['x']),{index:1});
+ assert.match(running,/Applying 2 changes…/);assert.match(running,/data-action="apply"[^>]*disabled/);assert.match(running,/data-close[^>]*disabled/);assert.doesNotMatch(running,/Not ready yet/);assert.equal(running.match(/class="spin"/g)?.length,1,'the first is done, the second runs');
+ assert.match(reviewSheet(viewState(snapshot(),{error:'Plan has blockers'}),plan([op('update','1','2')]),null),/role="alert">Plan has blockers/);
+});
+
+test('sw and seg carry what their change or click runs, and escape their text',()=>{
+ const on=sw(true,'Automatic <sync>','toggle','auto');
+ assert.match(on,/role="switch" aria-checked="true" aria-label="Automatic &lt;sync&gt;" data-action="toggle" data-id="auto"/);assert.match(sw(false,'x','toggle'),/aria-checked="false"/);
+ const group=seg('filter','action',[['all','All'],['action','Needs <action>']],'Filter plugins');
+ assert.match(group,/role="radiogroup" aria-label="Filter plugins"/);assert.match(group,/value="action" checked/);assert.doesNotMatch(group,/value="all" checked/);assert.match(group,/Needs &lt;action&gt;/);
+ assert.match(button('Go','run',{id:'a"b',sm:true,accent:true}),/class="btn accent sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="spin"/);
+});
+
+test('every action has one owner: no two page modules, and none of them the app, declare the same name',()=>{
+ const names=Object.values(modules).flatMap(m=>Object.keys(m.actions));
+ assert.equal(new Set(names).size,names.length,'a name is declared twice: '+names.filter((n,i)=>names.indexOf(n)!==i));
+ for(const reserved of ['page','refresh'])assert.ok(!names.includes(reserved),`${reserved} belongs to app.ts`);
+ for(const wanted of ['check','review','apply','apply-all','open-plugin','edit-target','add-plugin','add-target','manage-found','rescan'])assert.ok(names.includes(wanted),`${wanted} is declared`);
 });
