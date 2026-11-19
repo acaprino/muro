@@ -76,9 +76,18 @@ day.
 | `Release Marionette` 44544434518 on `9f45425`, version 0.4.1 | success: tag check, tests, validation, source checks, build, checkout of `acaprino/marionette` with the deploy key, push of `release/marionette-v0.4.1` (`83279ea`, "Marionette 0.4.1") |
 | `acaprino/marionette`, `Release pull request` on that push | success: opened acaprino/marionette#2 "Marionette 0.4.1" by `github-actions`, `release/marionette-v0.4.1` into `main`, 12,061 files (the build and its notes), mergeable, body = `docs/releases/marionette-v0.4.1.md` plus the Muro commit; `marionette/sources.json` in the branch at 0.4.1 |
 
-Not executed: the merge of #2 and so `release.yml` publishing a build (the
-owner's step); a second build of the same version refreshing an open pull
-request; Shinatama following `acaprino/marionette`.
+| merge of #2 (owner's choice: merged by this session), `27794a7` | `release.yml` 44569620649 success: release `marionette-v0.4.1` "Marionette 0.4.1", latest, not draft or prerelease, tag on `27794a7`; assets `marionette-0.4.1.zip` (197,029,183 bytes, GitHub digest `sha256:89a99723…67d04`) and `marionette-0.4.1.zip.sha256`, whose line matches the digest |
+| download of that zip | SHA-256 equal to the digest; 12,060 files, all under `marionette/`; adapters `claude-code`, `codex`, `hermes`, `opencode`, `pi`; `marionette/sources.json` at 0.4.1 |
+
+Shinatama still follows `acaprino/muro` (`REPOSITORY` in
+`crates/engine/src/marionette.rs`). Another session of the owner's thread was
+changing that file, uncommitted, for a seed of a pinned release
+(`scripts/marionette-pin.json`, naming `acaprino/muro` `marionette-v0.4.0`).
+On the owner's choice the switch was handed to that session through the
+thread's mukade room (event 30) instead of editing the same file.
+
+Not executed: a second build of the same version refreshing an open pull
+request; Shinatama syncing from `acaprino/marionette`.
 
 The push of `develop` from this machine needed `gh` as Git's credential
 helper: the harness home path breaks the credential manager.
