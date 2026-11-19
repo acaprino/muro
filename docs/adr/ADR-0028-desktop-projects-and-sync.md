@@ -71,6 +71,11 @@ dove fare cosa", "manca tutta questa parte di gestione progetti".
 8. **Background.** "muro deve avere autostart all'avvio di windows per tenere
    sync" and "chiusura a system tray icon".
 
+9. **Running in the background, Muro watches and enforces.** "muro in
+   background se avviato deve fare monitor dei plugin delle harness e
+   assicurarsi che siano aggiornati e sync con configurazione in muro del
+   catalogo".
+
 The mockup is the reference for layout, flows and wording. Its numbers for
 Marionette are read from `examples/marionette`.
 
@@ -94,6 +99,18 @@ Marionette are read from `examples/marionette`.
   folder is repaired at the next start. No new dependency.
 - **Closing the window** hides it unless the new setting `close_to_tray` is
   false, then it quits.
+- **The background worker always checks, and applies when automatic sync is
+  on.** At start and then at every interval it resolves the sources, reads
+  every harness and records the state, so the tray and the Sync page say the
+  truth also with automatic sync off. Switching "Start with Windows" on
+  switches automatic sync on with it.
+- **A blocked item no longer stops the rest.** Until now `apply` refused a
+  plan with any blocker, so one plugin without a build, or one harness that
+  cannot be read, left every other harness out of date for as long as it
+  lasted. A plan with blockers applies what is ready when the caller says so
+  (the background worker, and the review sheet after showing what is left
+  out). On a harness with a blocker nothing is uninstalled: a plugin of the
+  list whose build failed must not be removed as if it were outside the list.
 - **`.mp` container, history and records** are specified with plans 2 and 3.
   Until then a project folder is laid out as a package folder is today.
 
