@@ -260,3 +260,8 @@ dialog .actions [data-action="remove-target"]{margin-right:auto}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (forced-colors:active){nav button[aria-current="page"]{outline:1px solid Highlight}:focus-visible{outline:2px solid Highlight!important}}
+/* Task 8 */
+.setupcard .set{margin:0}
+.setupcard .set>.row:first-child{border-top:0}
+.pick label:has(input:disabled){cursor:default}
+.pick label:has(input:disabled) strong{color:var(--muted)}
