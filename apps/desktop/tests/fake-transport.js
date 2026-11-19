@@ -24,6 +24,7 @@ function scenarioData(scenario) {
   const package1 = () => plugin('p1', 'Package', ['t1'], [build('codex', '2')]);
   switch (scenario) {
     case 'changes': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '1')] }, found: [foundHarness('claude-code', 'Claude Code', { version: '2.1.4' })] };
+    case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
     case 'first-run': return { ...base, targets: [], installed: {}, found: [foundHarness('claude-code', 'Claude Code', { version: '2.1.4' }), foundHarness('codex', 'Codex')], byHarness: { 'claude-code': [installedPlugin('commit-helper', 'commit-helper', '2.1.0', false)] } };
@@ -50,6 +51,7 @@ export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
   const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } };
+  Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
   const log = (action, status, message) => activity.push({ id: 'a' + ++activityNumber + 'x', time: ago(0), action, status, message });

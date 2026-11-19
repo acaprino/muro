@@ -231,9 +231,6 @@ test('the frame is an app bar with three tabs and a state button, no sidebar; Sy
  assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
  assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="appbar">/);assert.match(html,/<main id="main"/);
 });
-test('the pages of Activity and Settings are a title and an empty state until Task 7 builds them',()=>{
- for(const [page,title] of [['activity','Activity'],['settings','Settings']] as const){const html=frame(viewState(snapshot(),{page}));assert.match(html,new RegExp(`<h1>${title}</h1>`));assert.match(html,/class="card empty"/);assert.match(html,new RegExp(`data-id="${page}" aria-current="page"`));}
-});
 test('the strip says Not checked yet and offers only Check now before a check, and for a plan of another revision',()=>{
  for(const held of [null,plan([op('update','1','2')],3)]){const strip=stripOf(frame(viewState(snapshot(),{plan:held})));assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(strip),['check']);}
 });
