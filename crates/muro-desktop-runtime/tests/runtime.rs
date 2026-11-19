@@ -1,4 +1,4 @@
-use muro_desktop_runtime::{autostart, discovery, jobs};
+use muro_desktop_runtime::{autostart, discovery, jobs, tray};
 use serde_json::{Value, json};
 use std::{
     fs,
@@ -394,4 +394,100 @@ fn sync_now_refuses_an_apply_that_is_not_a_boolean() {
     assert_eq!(error.to_string(), "apply must be a boolean");
     assert_eq!(plugins_in(&profile), 0);
     assert!(!registry.data().join("automation-status.json").exists());
+}
+
+/// A snapshot with the registry at `revision` and the sync state the last full check left.
+fn checked(revision: u64, sync: Value) -> Value {
+    json!({"registry":{"revision":revision,"settings":{"auto_sync":true}},"sync":sync})
+}
+
+/// The clock of a test: the epoch second itself, so a line shows which time it was given.
+fn seconds(epoch: u64) -> Option<String> {
+    Some(format!("t{epoch}"))
+}
+
+#[test]
+fn tray_state_line_reads_the_last_check_of_this_revision() {
+    let line = |sync: Value| tray::state_line(&checked(7, sync), seconds);
+    let sync = |pending: u64, blockers: u64| {
+        json!({"last_check":"1000","last_sync":null,"revision":7,"pending":pending,"blockers":blockers,"targets":{}})
+    };
+    assert_eq!(line(sync(0, 0)), "In sync · checked t1000");
+    assert_eq!(line(sync(1, 0)), "1 change waiting · checked t1000");
+    assert_eq!(line(sync(3, 0)), "3 changes waiting · checked t1000");
+    // Changes still read as waiting when a harness also has a blocker; with none to apply, a
+    // blocker is what needs a person.
+    assert_eq!(line(sync(3, 1)), "3 changes waiting · checked t1000");
+    assert_eq!(line(sync(0, 2)), "Needs attention · checked t1000");
+}
+
+#[test]
+fn tray_state_line_does_not_trust_a_check_of_another_revision() {
+    let never = json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"targets":{}});
+    assert_eq!(tray::state_line(&checked(7, never), seconds), "Not checked yet");
+    let old = json!({"last_check":"1000","revision":6,"pending":0,"blockers":0,"targets":{}});
+    assert_eq!(tray::state_line(&checked(7, old), seconds), "Not checked yet");
+    // A plan for one harness moves that harness's time only: the overall fields stay unset.
+    let one = json!({"last_check":null,"revision":null,"pending":null,"blockers":null,"targets":{"a":{"checked":"1000","synced":null}}});
+    assert_eq!(tray::state_line(&checked(7, one), seconds), "Not checked yet");
+    // A snapshot without the sync field, or a time that is not epoch seconds.
+    assert_eq!(tray::state_line(&json!({"registry":{"revision":7}}), seconds), "Not checked yet");
+    let odd = json!({"last_check":"yesterday","revision":7,"pending":0,"blockers":0,"targets":{}});
+    assert_eq!(tray::state_line(&checked(7, odd), seconds), "Not checked yet");
+}
+
+/// The tray reads what `sync_now` and the registry really leave in a snapshot: the check of
+/// this revision, then nothing once the registry changes.
+#[test]
+fn tray_state_line_follows_a_real_sync_and_a_registry_change() {
+    let registry = Registry::new();
+    registry.harness("oc", "{}");
+    let line = || {
+        let snapshot = muro_desktop_runtime::request(&registry.data(), "snapshot", json!({})).unwrap();
+        tray::state_line(&snapshot, seconds)
+    };
+    assert_eq!(line(), "Not checked yet");
+    registry.sync(json!({"apply":false}));
+    assert!(line().starts_with("In sync · checked t1"), "{}", line());
+    registry.plugin(&["oc"]);
+    assert_eq!(line(), "Not checked yet");
+    registry.sync(json!({"apply":false}));
+    assert!(line().starts_with("1 change waiting · checked t1"), "{}", line());
+    registry.sync(json!({}));
+    assert!(line().starts_with("In sync · checked t1"), "{}", line());
+}
+
+#[test]
+fn tray_state_line_says_no_time_when_the_clock_has_none() {
+    let sync = json!({"last_check":"1000","revision":7,"pending":0,"blockers":0,"targets":{}});
+    assert_eq!(tray::state_line(&checked(7, sync), |_| None), "In sync");
+}
+
+#[test]
+fn tray_pause_item_offers_the_opposite_of_the_setting() {
+    let with = |auto: Value| json!({"registry":{"settings":{"auto_sync":auto}}});
+    assert_eq!(tray::pause_label(&with(json!(true))), "Pause automatic sync");
+    assert_eq!(tray::pause_label(&with(json!(false))), "Resume automatic sync");
+    assert_eq!(tray::pause_label(&json!({"registry":{"settings":{}}})), "Resume automatic sync");
+}
+
+/// The local clock is the machine's, so the test cannot name an hour: it checks the shape, and
+/// that a minute later is a minute later (an epoch on a whole UTC hour sits at a quarter hour
+/// in every time zone there is).
+#[cfg(windows)]
+#[test]
+fn tray_local_clock_gives_zero_padded_hours_and_minutes() {
+    let hour = 1_750_000_000 - 1_750_000_000 % 3600; // a whole UTC hour in mid June 2025
+    let at = |epoch| tray::local_clock(epoch).unwrap();
+    let (now, later) = (at(hour), at(hour + 60));
+    let parts = |clock: &str| -> (u32, u32) {
+        let (h, m) = clock.split_once(':').unwrap();
+        assert_eq!((h.len(), m.len()), (2, 2), "{clock}");
+        (h.parse().unwrap(), m.parse().unwrap())
+    };
+    let (h, m) = parts(&now);
+    assert!(h < 24 && [0, 15, 30, 45].contains(&m), "{now}");
+    assert_eq!(parts(&later), (h, m + 1), "{now} then {later}");
+    // Three hours later is three hours later, midnight included (no daylight change in mid June).
+    assert_eq!(parts(&at(hour + 3 * 3600)).0, (h + 3) % 24);
 }

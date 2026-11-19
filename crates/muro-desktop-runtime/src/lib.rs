@@ -3,6 +3,7 @@ pub mod cli;
 pub mod discovery;
 pub mod jobs;
 mod process_tree;
+pub mod tray;
 
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
