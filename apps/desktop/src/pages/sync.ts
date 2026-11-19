@@ -1,14 +1,19 @@
-import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter } from '../types.ts';
+import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp } from '../model.ts';
+import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
-import { reviewSheet } from '../sheets.ts';
-import { pluginForm, targetForm, distributionRow, readPlugin, readTarget } from '../forms.ts';
+import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
+import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
 
 const POLICY:Record<string,string>={stable:'Latest release',pinned:'Pinned version',head:'Latest commit'};
 const CHANGE_WORDS:[string,string][]=[['install','install'],['update','update'],['reinstall','reinstall'],['activate','activation'],['remove','removal']];
 const targetOf=(state:ViewState,id:string|undefined)=>state.snapshot?.registry.targets.find(t=>t.id===id);
 const nameList=(names:string[])=>names.length>2?`${names[0]} and ${names.length-1} more`:names.join(' and ');
+const message=(e:unknown)=>String(e instanceof Error?e.message:e);
+const pluginOf=(state:ViewState,id:string|undefined)=>state.snapshot?.registry.plugins.find(p=>p.id===id);
+const samePath=(a:string,b:string)=>{const flat=(p:string)=>p.replace(/\\/g,'/').replace(/\/+$/,'').toLowerCase();return flat(a)===flat(b);};
+/** The harnesses the computer was searched for that can be offered: found, and not managed already (the same kind of harness in the same folder). */
+const foundHarnesses=(state:ViewState)=>state.discovered.filter(d=>d.available&&!state.snapshot!.registry.targets.some(t=>t.harness===d.harness&&!!d.config_root&&samePath(t.root,d.config_root)));
 
 // ---------- the view ----------
 /** The strip over the table: what the last check found, when, and the one next thing to do. */
@@ -18,7 +23,7 @@ function strip(state:ViewState):string {
  const unreadable=h.unreadable.length?`${esc(nameList(h.unreadable.map(u=>u.target.name)))} cannot be read`:'';
  if(a){tone='accent';ico=spin;title=`Applying ${plural(a.total,'change')}…`;text=esc(a.name);}
  else if(state.checking){ico=spin;title='Checking sources and harnesses…';text='Reading what is installed and looking for new versions.';}
- else if(h.kind==='no-harness'){const found=state.discovered.find(d=>d.available&&d.supported);tone='warn';ico=icon('alert');title='No harness is managed';text='Muro needs at least one harness to install plugins into.';extra=found?button(`Manage ${found.name}`,'manage-found',{id:found.harness,primary:true}):button('Add a harness','add-target',{primary:true});}
+ else if(h.kind==='no-harness'){const found=foundHarnesses(state).find(d=>d.supported);tone='warn';ico=icon('alert');title='No harness is managed';text='Muro needs at least one harness to install plugins into.';extra=found?button(`Manage ${found.name}`,'manage-found',{id:found.harness,primary:true}):button('Add a harness','add-target',{primary:true});}
  else if(h.kind==='not-checked'){lead=true;title='Not checked yet';text='Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.';}
  else if(h.kind==='changes'){const parts=CHANGE_WORDS.filter(([k])=>h.byKind[k]).map(([k,w])=>plural(h.byKind[k],w));tone='accent';title=`${plural(h.operations,'change')} ready to apply`;text=`${parts.join(', ')}${h.blockers?` · ${plural(h.blockers,'item')} not ready yet`:''}${unreadable?` · ${unreadable}`:''}. Nothing changes until you apply.`;extra=button('Review','review')+button(`Apply all ${plural(h.operations,'change')}`,'apply-all',{primary:true});}
  else if(h.kind==='unreadable'){lead=true;tone='warn';ico=icon('alert');title=unreadable;text=h.unreadable.some(u=>!u.count)?'Muro could not read what is installed there, so it cannot say whether it is in sync. Check the harness settings, then check again.':'The custom instructions of a plugin on it could not be read, so it cannot say whether it is in sync. Check the plugin, then check again.';}
@@ -63,9 +68,18 @@ function table(state:ViewState):string {
  const s=state.snapshot!;
  return `<div class="tools">${seg('filter',state.filter,[['all','All'],['action','Needs action']],'Filter plugins')}<label class="search">${icon('search')}<input id="search" type="text" placeholder="Search plugins" aria-label="Search plugins" value="${esc(state.query)}"><kbd>/</kbd></label></div><div class="card tablewrap"><table><thead><tr><th scope="col"><div class="hcol">Plugin</div><div class="hstate"><small>${plural(s.registry.plugins.length,'plugin')} in your list</small></div></th><th scope="col"><div class="hcol">Latest version</div><div class="hstate"><small>Checked ${esc(stamp(s.sync.last_check))}</small></div></th>${s.registry.targets.map(t=>`<th scope="col"><div class="hcol"><button type="button" class="hbtn" data-action="edit-target" data-id="${esc(t.id)}" title="Harness settings">${mark(t.harness)}${esc(t.name)}</button></div><div class="hstate">${hstate(state,t)}</div><small title="Last sync ${esc(stamp(s.sync.targets[t.id]?.synced??null))}">Checked ${esc(stamp(s.sync.targets[t.id]?.checked??null))}</small></th>`).join('')}</tr></thead><tbody id="rows">${rows(state)}</tbody></table></div>`;
 }
+/** Add harness: the harnesses found on this computer, then by hand and a new search. Open or closed is the DOM's, see `openMenu`. */
+function addHarnessMenu(state:ViewState):string {
+ const items=foundHarnesses(state).map(f=>f.supported?`<button type="button" role="menuitem" data-action="manage-found" data-id="${esc(f.harness)}">${mark(f.harness)}Manage ${esc(f.name)}</button>`:`<button type="button" role="menuitem" disabled>${mark(f.harness)}${esc(f.name)} · no plugin support yet</button>`).join('')||`<div class="lbl">${state.discovering?'Looking for harnesses…':'No other harness found on this computer'}</div>`;
+ return `<div class="menuwrap">${button('Add harness','menu',{icon:'plus',attrs:{'aria-haspopup':'menu','aria-expanded':'false'}})}<div class="menu" role="menu" hidden>${items}<hr><button type="button" role="menuitem" data-action="add-target">Add by hand…</button><button type="button" role="menuitem" data-action="rescan">Rescan this computer</button></div></div>`;
+}
+/** What is installed on a harness that Muro reads completely and that the list does not hold, and the one rule for all of it. What the rule does shows on each line before anything is applied. */
+function unlistedSection(state:ViewState):string {
+ const items=unlisted(state.snapshot!);if(!items.length)return '';
+ return `<div class="sec"><h2>Installed, not in your list</h2><span class="count">${items.length}</span><span class="grow"></span>${exclusiveSeg(state.snapshot!.registry.targets)}</div><ul class="card list">${items.map(({target:t,plugin:p})=>`<li>${mark(t.harness)}<div class="grow"><strong>${esc(p.name)}</strong><small>${esc(p.version)} · on ${esc(t.name)}</small></div>${t.exclusive?'<span class="tag bad">Removed at the next sync</span>':'<small>Left alone</small>'}${button('Add to my list','add-to-list',{id:t.id,attrs:{'data-native':p.id}})}</li>`).join('')}</ul>`;
+}
 export function view(state:ViewState):string {
- const add=button('Add plugin','add-plugin',{icon:'plus'});
- return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',button('Add harness','add-target',{icon:'plus'})+add)+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus',primary:true})));
+ return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus',primary:true})))+unlistedSection(state);
 }
 
 // ---------- check, review, apply ----------
@@ -105,46 +119,156 @@ async function applyAll(app:App){
  if(fresh.blockers.length||!fresh.operations.length||!sameOperations(shown,fresh))openReview(app,fresh,null);else await applyPlan(app,fresh,null,false);
 }
 
-// ---------- Interim (Task 5), until Task 6 replaces them: the plugin and harness forms as they were ----------
-async function saveForm(app:App,dialog:HTMLDialogElement,action:string,payload:Record<string,unknown>){
- const form=dialog.querySelector('form');if(!form||form.getAttribute('aria-busy')==='true')return;
+// ---------- the Add harness menu: open or closed lives in the DOM, so its listeners exist only while it is open ----------
+const menuOf=()=>document.querySelector<HTMLElement>('.menuwrap .menu');
+const choices=(menu:HTMLElement)=>[...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+/** Closes the menu (when it is open); `refocus` gives the keyboard back to its button. */
+function closeMenu(refocus=false):void {
+ for(const [type,fn] of [['click',away],['focusin',away],['keydown',keys]] as const)document.removeEventListener(type,fn as EventListener,true);
+ const menu=menuOf();if(!menu||menu.hidden)return;
+ const toggle=menu.previousElementSibling as HTMLElement|null;menu.hidden=true;toggle?.setAttribute('aria-expanded','false');if(refocus)toggle?.focus();
+}
+function away(e:Event):void {if(!(e.target instanceof Element&&e.target.closest('.menuwrap')))closeMenu();}
+function keys(e:KeyboardEvent):void {
+ const menu=menuOf();if(!menu||menu.hidden){closeMenu();return;}
+ if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeMenu(true);return;}
+ const list=choices(menu),at=list.indexOf(document.activeElement as HTMLButtonElement),last=list.length-1;
+ const to=e.key==='ArrowDown'?list[at<last?at+1:0]:e.key==='ArrowUp'?list[at>0?at-1:last]:e.key==='Home'?list[0]:e.key==='End'?list[last]:undefined;
+ if(to){e.preventDefault();to.focus();}
+}
+function openMenu(toggle:HTMLElement,menu:HTMLElement):void {
+ menu.hidden=false;toggle.setAttribute('aria-expanded','true');choices(menu)[0]?.focus();
+ for(const [type,fn] of [['click',away],['focusin',away],['keydown',keys]] as const)document.addEventListener(type,fn as EventListener,true);
+}
+
+// ---------- the plugin dialog, the harness sheet and what they do ----------
+/** Runs a request that a control of the open dialog started. A failure shows in the dialog's own error line (the page behind a modal cannot be seen), and a second click while it runs is ignored. From the page it is an ordinary `app.run`. */
+async function attempt<T>(app:App,el:HTMLElement,label:string,work:()=>Promise<T>,after:(value:T)=>void|Promise<void>):Promise<void> {
+ const dialog=el.closest('dialog');
+ if(!dialog)return app.run(label,work,after);
+ if(app.state.busy||el.hasAttribute('aria-busy'))return;
+ const slot=dialog.querySelector<HTMLElement>('#form-error');if(slot)slot.textContent='';
+ el.setAttribute('aria-busy','true');
+ try{await after(await work());}catch(e){if(slot)slot.textContent=message(e);}finally{el.removeAttribute('aria-busy');}
+}
+/** Saves what a dialog's form holds. It keeps the form, with its values, and says why when the save is refused; on success it closes and the registry the service returned is the app's. */
+async function submit(app:App,dialog:HTMLDialogElement,form:HTMLFormElement,action:string,payload:Record<string,unknown>,done:string):Promise<void> {
+ if(form.getAttribute('aria-busy')==='true')return;
  const buttons=()=>form.querySelectorAll<HTMLButtonElement>('button'),error=dialog.querySelector('#form-error');
  form.setAttribute('aria-busy','true');buttons().forEach(b=>b.disabled=true);if(error)error.textContent='';
- try{app.adopt(await app.request<Snapshot>(action,{...payload,revision:app.state.snapshot!.registry.revision}));app.closeDialog();app.notify('Saved','good');}
- catch(e){if(error)error.textContent=String(e instanceof Error?e.message:e);}
+ try{const saved=await app.request<Snapshot>(action,{...payload,revision:app.state.snapshot!.registry.revision});app.adopt(saved);app.closeDialog();app.notify(done,'good');}
+ catch(e){if(error)error.textContent=message(e);}
  finally{form.removeAttribute('aria-busy');buttons().forEach(b=>b.disabled=false);}
 }
-function editPlugin(app:App,plugin?:Plugin){
- const dialog=app.openDialog(`<div class="dl">${pluginForm(app.state.snapshot!,plugin)}</div>`),form=dialog.querySelector('form')!;
- // A field the browser refuses inside closed Advanced would block Save with nothing to see.
- form.addEventListener('invalid',e=>(e.target as Element).closest('details')?.setAttribute('open',''),true);
- form.addEventListener('click',e=>{const b=(e.target as Element).closest('[data-remove-distribution]');if(b){e.preventDefault();b.closest('.distribution-row')?.remove();}});
- form.onsubmit=e=>{e.preventDefault();try{void saveForm(app,dialog,'save_plugin',{plugin:readPlugin(form,plugin)});}catch(error){dialog.querySelector('#form-error')!.textContent=String(error instanceof Error?error.message:error);}};
+function editPlugin(app:App,plugin?:Plugin):void {
+ const dialog=app.openDialog(pluginDialog(app.state,plugin)),form=dialog.querySelector<HTMLFormElement>('#plugin-form')!;
+ form.dataset.initial=signature(form);
+ form.onsubmit=e=>{e.preventDefault();const next=readPlugin(form,plugin);if(showErrors(form,pluginErrors(next)))void submit(app,dialog,form,'save_plugin',{plugin:next},'Saved.');};
 }
-function editTarget(app:App,target?:Target,found?:Discovered){
- const dialog=app.openDialog(`<div class="dl">${targetForm(target,found)}</div>`),form=dialog.querySelector('form')!;
- form.onsubmit=e=>{e.preventDefault();void saveForm(app,dialog,'save_target',{target:readTarget(form,target)});};
+function editTarget(app:App,target?:Target,found?:Discovered):void {
+ const dialog=app.openDialog(harnessSheet(app.state,target,found),'sheet'),form=dialog.querySelector<HTMLFormElement>('#target-form')!;
+ form.onsubmit=e=>{e.preventDefault();const next=readTarget(form,target);if(showErrors(form,targetErrors(next)))void submit(app,dialog,form,'save_target',{target:next},`${next.name} saved.`);};
+}
+/** The actions under More work on the saved plugin: with changes in the form that are not saved, they say so rather than drop them. */
+function unsaved(el:HTMLElement):boolean {
+ const form=el.closest<HTMLFormElement>('form');if(!form||form.dataset.initial===undefined||form.dataset.initial===signature(form))return false;
+ const slot=form.querySelector('#form-error');if(slot)slot.textContent='Save your changes first: this acts on the saved plugin.';return true;
+}
+/** Check for updates: the service reads the source again. */
+async function resolvePlugin(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
+ const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
+ await attempt(app,el,'Checking the source…',()=>app.request<Snapshot>('resolve',{id:p.id}),v=>{
+  const version=v.registry.plugins.find(x=>x.id===p.id)?.upstream_version,found=!!version&&version!==p.upstream_version;
+  app.adopt(v);app.closeDialog();app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`,found?'good':undefined);
+ });
+}
+/** Plan a reinstall: the plan the service makes for it opens in the review sheet, and is applied from there. It is never the plan the strip and the columns read. */
+async function reinstall(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
+ const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
+ await attempt(app,el,'Comparing with what is installed…',()=>app.request<Plan>('plan',{reinstall:p.id}),plan=>openReview(app,plan,null));
+}
+/** Adapt with AI: which harness and how much budget; the run itself goes on in Activity. */
+function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
+ const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
+ const dialog=app.openDialog(adaptDialog(app.state,p)),form=dialog.querySelector<HTMLFormElement>('#adapt-form')!;
+ form.onsubmit=e=>{
+  e.preventDefault();const data=new FormData(form),budget=Number(data.get('budget')),harness=String(data.get('harness'));
+  if(!showErrors(form,Number.isFinite(budget)&&budget>0?{}:{budget:'Enter a budget above zero.'}))return;
+  app.closeDialog();
+  void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:app.state.snapshot!.registry.settings.agent,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
+ };
+}
+/** Paints the instructions section of the open plugin dialog again, keeping it open and, when the control that was used lives in it, the keyboard where it was. */
+function repaintNotes(app:App,id:string,from:HTMLElement,status=''):void {
+ const notes=document.querySelector<HTMLElement>('dialog[open] .notes'),p=pluginOf(app.state,id);if(!notes||!p)return;
+ const page=document.createElement('template');page.innerHTML=instructionDetails(p,app.state);
+ const fresh=page.content.firstElementChild as HTMLElement,back=notes.contains(from)?from.dataset.action:'';
+ if(notes.querySelector('details')?.hasAttribute('open'))fresh.querySelector('details')?.setAttribute('open','');
+ const slot=fresh.querySelector('#notes-status');if(slot)slot.textContent=status;
+ notes.replaceWith(fresh);if(back)fresh.querySelector<HTMLElement>(`[data-action="${back}"]`)?.focus();
+}
+/** Paints "Installed here" of the open harness sheet again, after something in it was added to the list. */
+function repaintInstalled(app:App,id:string):void {
+ const t=targetOf(app.state,id),section=document.querySelector<HTMLElement>('dialog[open] #installed-here');if(!t||!section)return;
+ const page=document.createElement('template');page.innerHTML=installedHere(app.state,t);
+ const fresh=page.content.firstElementChild as HTMLElement,dialog=section.closest('dialog')!;
+ section.replaceWith(fresh);if(!dialog.contains(document.activeElement)||document.activeElement===dialog)fresh.focus();
+}
+/** Add to my list: an installed plugin becomes a plugin of the list, as `listedPlugin` says. One with no folder to point at has no source yet, so the plugin dialog opens for the person to give one. */
+async function addToList(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
+ const t=targetOf(app.state,d.id),p=app.state.snapshot?.inventory.find(i=>i.target_id===d.id)?.plugins.find(x=>x.id===d.native);if(!t||!p)return;
+ if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]});return;}
+ await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',{plugin:listedPlugin(p,t),revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`,'good');repaintInstalled(app,t.id);});
+}
+/** The one rule for plugins outside the list, for every harness: one `save_target` after the other, each with the revision the one before returned. A harness that has it already is not saved again. It stops at the first one that fails, says how many were saved, and the ones saved stay saved. */
+async function setExclusive(app:App,mode:'keep'|'remove'):Promise<void> {
+ const wanted=mode==='remove',targets=app.state.snapshot!.registry.targets.filter(t=>t.exclusive!==wanted);if(!targets.length)return;
+ await app.run('Saving…',async()=>{
+  let revision=app.state.snapshot!.registry.revision,last:Snapshot|undefined,saved=0;
+  for(const t of targets){
+   try{last=await app.request<Snapshot>('save_target',{target:{...t,exclusive:wanted},revision});revision=last.registry.revision;saved++;}
+   catch(e){if(last)app.adopt(last);throw new Error(`${saved?`${plural(saved,'harness','harnesses')} saved. `:''}${t.name} was not saved: ${message(e)}`);}
+  }
+  return last!;
+ },v=>{app.adopt(v);app.notify(wanted?'Saved. Plugins outside your list are uninstalled at the next sync.':'Saved. Plugins outside your list are left alone.','good');});
 }
 
 export const actions:Actions={
  check,review,apply:app=>{const r=app.state.review;return r?applyPlan(app,r.plan,targetOf(app.state,r.target_id??undefined)??null,true):undefined;},'apply-all':applyAll,
  'clear-filter':app=>{app.state.query='';app.state.filter='all';app.render();},
- 'open-plugin':(app,d)=>{const p=app.state.snapshot?.registry.plugins.find(p=>p.id===d.id);if(p)editPlugin(app,p);},
+ menu:(_app,_d,el)=>{const menu=el.nextElementSibling;if(!(menu instanceof HTMLElement))return;if(menu.hidden)openMenu(el,menu);else closeMenu(true);},
+ 'open-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)editPlugin(app,p);},
  'add-plugin':app=>editPlugin(app),
- 'add-target':app=>editTarget(app),
+ 'add-target':app=>{closeMenu(true);editTarget(app);},
  'edit-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)editTarget(app,t);},
- 'manage-found':(app,d)=>editTarget(app,undefined,app.state.discovered.find(f=>f.harness===d.id)),
- 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm('Remove harness',`Muro stops managing ${t.name}. Plugins already installed there stay.`,'Remove',()=>void app.run('Updating harnesses…',()=>app.request<Snapshot>('remove_target',{id:t.id,revision:app.state.snapshot!.registry.revision}),v=>app.adopt(v)),true);},
- 'add-distribution':(_app,_d,el)=>el.closest('dialog')?.querySelector('#distributions')?.insertAdjacentHTML('beforeend',distributionRow()),
- rescan:async app=>{await app.run('Reading installed plugins…',()=>app.request<Snapshot>('scan'),v=>app.adopt(v));await app.replan();await app.discover();},
+ 'manage-found':(app,d)=>{closeMenu(true);editTarget(app,undefined,foundHarnesses(app.state).find(f=>f.harness===d.id));},
+ 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm(`Stop managing ${t.name}?`,'Its plugins stay installed. Muro only stops syncing it.','Stop managing',()=>void app.run('Updating harnesses…',()=>app.request<Snapshot>('remove_target',{id:t.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`Muro no longer manages ${t.name}.`);}),true);},
+ 'remove-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)app.confirm(`Remove ${p.name} from your list?`,'It stays installed where it is, unless plugins outside your list are always uninstalled.','Remove',()=>void app.run('Updating your list…',()=>app.request<Snapshot>('remove_plugin',{id:p.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} removed from your list.`);}),true);},
+ 'add-distribution':(_app,_d,el)=>{const rows=el.closest('form')?.querySelector('#distributions');rows?.insertAdjacentHTML('beforeend',distributionRow());rows?.lastElementChild?.querySelector<HTMLElement>('select')?.focus();},
+ 'remove-distribution':(_app,_d,el)=>{const row=el.closest('.distribution-row'),next=(row?.nextElementSibling??row?.previousElementSibling)?.querySelector<HTMLElement>('select'),add=el.closest('form')?.querySelector<HTMLElement>('[data-action=add-distribution]');row?.remove();(next??add)?.focus();},
+ 'resolve-plugin':resolvePlugin,'reinstall-plugin':reinstall,'adapt-plugin':adapt,
+ 'open-custom-instructions':(app,d,el)=>attempt(app,el,'Opening the instructions folder…',async()=>{await app.request('open_custom_instructions',{id:d.id});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);repaintNotes(app,d.id!,el,'Folder opened. Edit the Markdown files, reload them, then adapt the plugin again.');}),
+ 'reload-instructions':(app,d,el)=>attempt(app,el,'Reading the instructions again…',()=>app.request<Snapshot>('snapshot'),v=>{app.adopt(v);repaintNotes(app,d.id!,el);}),
+ 'add-to-list':addToList,
+ 'set-exclusive':(app,d)=>d.id==='keep'||d.id==='remove'?setExclusive(app,d.id):undefined,
+ rescan:async app=>{closeMenu(true);await app.run('Reading installed plugins…',()=>app.request<Snapshot>('scan'),v=>app.adopt(v));await app.replan();await app.discover();},
 };
 export function input(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
- if(el.id!=='search')return false;
- // Only the rows are painted again: a full render would take the caret out of the box.
- app.state.query=el.value;const body=document.getElementById('rows');if(body)body.innerHTML=rows(app.state);return true;
+ if(el.id==='search'){
+  // Only the rows are painted again: a full render would take the caret out of the box.
+  app.state.query=el.value;const body=document.getElementById('rows');if(body)body.innerHTML=rows(app.state);return true;
+ }
+ if(!el.closest('dialog'))return false;
+ clearError(el);
+ // A new plugin is named after its source until a name is typed.
+ const form=el.closest<HTMLFormElement>('#plugin-form');
+ if(form&&el.name==='name')form.dataset.named='1';
+ else if(form&&el.name==='source'&&!form.dataset.named){const name=form.querySelector<HTMLInputElement>('[name=name]');if(name){name.value=lastPart(el.value);clearError(name);}}
+ return false;
 }
 export function change(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
  if(el.name==='filter'&&el.closest('.tools')){app.state.filter=el.value as Filter;app.render();return true;}
  if(el.name==='policy'&&el.closest('dialog')){const pinned=el.closest('dialog')!.querySelector<HTMLElement>('#pinned-field');if(pinned)pinned.hidden=el.value!=='pinned';return true;}
+ if(el.name==='excl'){void setExclusive(app,el.value==='remove'?'remove':'keep');return true;}
  return false;
 }

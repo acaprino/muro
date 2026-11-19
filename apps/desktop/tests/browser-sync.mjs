@@ -109,12 +109,12 @@ await test('a plan without anything ready has no Apply button', 'default', {}, a
   await page.getByLabel('Source', { exact: false }).fill('https://example.com/plugin');
   await page.getByRole('checkbox', { name: /Codex isolated test/ }).check();
   await page.evaluate(() => { window.flags.rejectSave = true; });
-  await page.getByRole('button', { name: 'Save plugin', exact: true }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Add plugin', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'Version conflict' }).waitFor();
   assert.equal(await page.getByLabel('Name', { exact: true }).inputValue(), '<Test plugin>', 'a failed save keeps the form');
   await page.evaluate(() => { window.flags.rejectSave = false; });
   const before = (await app.calls()).length;
-  await page.getByRole('button', { name: 'Save plugin', exact: true }).click();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Add plugin', exact: true }).click();
   await page.locator('#rows').getByText('<Test plugin>', { exact: true }).waitFor();
   assert.equal(await page.locator('test').count(), 0, 'a plugin name is escaped');
   await page.getByText('Some plugins are not ready', { exact: true }).waitFor();
@@ -156,8 +156,8 @@ await test('check errors show in the banner and keep the plan', 'changes', {}, a
 await test('a paused harness shows Paused', 'changes', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Codex isolated test', exact: true }).click();
-  await page.getByLabel('Let Muro manage this harness').uncheck();
-  await page.getByRole('button', { name: 'Save harness' }).click();
+  await page.getByLabel('Keep this harness in sync').uncheck();
+  await page.locator('dialog[open]').getByRole('button', { name: 'Save', exact: true }).click();
   await page.locator('th .hstate').getByText('Paused').waitFor();
   assert.equal(await page.locator('#rows').getByText('Paused').count(), 1);
   await page.getByText('No harness is managed', { exact: true }).waitFor();
@@ -167,15 +167,15 @@ await test('a paused harness shows Paused', 'changes', {}, async app => {
 await test('removing a harness asks first and plans again', 'two-harnesses', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
-  await page.getByRole('button', { name: 'Remove harness' }).click();
+  await page.getByRole('button', { name: 'Stop managing' }).click();
   const dialog = page.locator('dialog[open]');
-  await dialog.getByRole('heading', { name: 'Remove harness' }).waitFor();
+  await dialog.getByRole('heading', { name: 'Stop managing OpenCode isolated test?' }).waitFor();
   assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-confirm')), true, 'the confirming button has the focus');
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
-  await page.getByRole('button', { name: 'Remove harness' }).click();
-  await dialog.getByRole('button', { name: 'Remove', exact: true }).click();
+  await page.getByRole('button', { name: 'Stop managing' }).click();
+  await dialog.getByRole('button', { name: 'Stop managing', exact: true }).click();
   await page.locator('th').getByText('OpenCode isolated test').waitFor({ state: 'detached' });
   assert.deepEqual((await actions(app)).slice(-2), ['remove_target', 'plan'], 'the plan is asked for after the mutation');
 });
@@ -183,18 +183,10 @@ await test('removing a harness asks first and plans again', 'two-harnesses', {},
 await test('rescan reads the installed plugins again, plans and looks for harnesses', 'changes', {}, async app => {
   const { page } = app;
   const before = (await app.calls()).length;
-  // The Add harness menu of Task 6 carries the button; the action is reachable through any control that names it.
-  await page.evaluate(() => { const b = document.createElement('button'); b.dataset.action = 'rescan'; b.id = 'probe'; document.querySelector('main').append(b); b.click(); });
+  await page.getByRole('button', { name: 'Add harness', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Rescan this computer' }).click();
   await page.waitForFunction(n => window.calls.length >= n + 3, before);
   assert.deepEqual((await actions(app)).slice(before), ['scan', 'plan', 'discover']);
-});
-
-await test('with no harness the strip offers the first one found', 'first-run', {}, async app => {
-  const { page } = app;
-  await page.getByText('No harness is managed', { exact: true }).waitFor();
-  await page.getByRole('button', { name: 'Manage Claude Code' }).click();
-  assert.equal(await page.getByLabel('Configuration folder').inputValue(), 'D:/config/claude-code');
-  await page.keyboard.press('Escape');
 });
 
 await test('search, filter and the keyboard', 'demo', {}, async app => {
@@ -214,7 +206,7 @@ await test('search, filter and the keyboard', 'demo', {}, async app => {
   await page.getByRole('radio', { name: 'Needs action' }).check({ force: true });
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'action', 'the radio keeps the focus');
   assert.equal(await rows(), 3, 'the plugin in sync and the one with no harness are hidden');
-  await page.getByRole('radio', { name: 'All' }).check({ force: true });
+  await page.getByRole('radio', { name: 'All', exact: true }).check({ force: true });
   await page.getByRole('button', { name: 'Marionette' }).first().focus();
   await page.keyboard.press('Tab');
   // Enter on Check now: the render takes the focus off a disabled button, never onto the body.

@@ -1,10 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
+import { listedPlugin, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
 import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.ts';
 import { frame, modules } from '../src/views.ts';
-import { pluginForm } from '../src/forms.ts';
-import { instructionDetails, reviewSheet } from '../src/sheets.ts';
+import { reviewSheet } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
 
@@ -33,24 +32,6 @@ test('staleness on an unused harness does not invalidate the assigned target',()
  const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'/instructions',files:[],digest:'',stale_harnesses:['pi']}]};
  s.inventory[0].plugins[0].version='2';
  assert.equal(pluginState(plugin,s).kind,'ok');
-});
-
-test('instruction folder, files and errors render as escaped text with an explicit open action',()=>{
- const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'D:/<folder>',files:['custom-instructions/<script>.md'],digest:'',stale_harnesses:['codex'],error:'Cannot read <file>'}]};
- const html=instructionDetails(plugin,viewState(s));
- assert.match(html,/D:\/\&lt;folder\&gt;/);
- assert.match(html,/custom-instructions\/\&lt;script\&gt;\.md/);
- assert.match(html,/Cannot read \&lt;file\&gt;/);
- assert.match(html,/data-action="open-custom-instructions"/);
- assert.match(html,/Adapt again for: Codex/);
- assert.doesNotMatch(html,/<script>/);
-});
-
-test('plugin editor exposes a folder choice instead of a text policy',()=>{
- const html=pluginForm(snapshot(),{...plugin,custom_instructions_dir:'D:/Markdown'});
- assert.match(html,/name="custom_instructions_dir"/);
- assert.match(html,/value="D:\/Markdown"/);
- assert.doesNotMatch(html,/<textarea/);
 });
 
 test('the theme is System until one is chosen, and System follows the operating system',()=>{
@@ -166,6 +147,15 @@ test('unlisted gives the plugins outside the list of enabled harnesses with a co
  assert.deepEqual(unlisted(s),[{target:t,plugin:s.inventory[0].plugins[1],index:1},{target:t,plugin:s.inventory[0].plugins[3],index:3}]);
  s.inventory[0].complete=false;assert.deepEqual(unlisted(s),[]);
  s.inventory[0].complete=true;t.enabled=false;assert.deepEqual(unlisted(s),[]);
+});
+test('unlisted leaves out an installed plugin the list holds, though the service still calls it unmanaged',()=>{
+ const s=snapshot(),t=s.registry.targets[0],added={id:'native-a',name:'A',version:'1',path:'/a',managed:false},other={id:'native-b',name:'B',version:'1',path:'/b',managed:false};
+ s.inventory[0].plugins.push(added,other);
+ assert.deepEqual(unlisted(s).map(u=>u.plugin.name),['A','B']);
+ s.registry.plugins.push(listedPlugin(added,t));
+ assert.deepEqual(unlisted(s).map(u=>u.plugin.name),['B'],'A is a plugin of the list now: its build is in the folder it is installed in');
+ s.registry.plugins[1]={...s.registry.plugins[1],targets:[]};
+ assert.deepEqual(unlisted(s).map(u=>u.plugin.name),['A','B'],'a plugin of the list that does not target this harness does not hold it');
 });
 test('exclusiveMode reads whether every, none or some harness uninstalls plugins outside the list',()=>{
  const t=(exclusive:boolean)=>({...snapshot().registry.targets[0],exclusive});

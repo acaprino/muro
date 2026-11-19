@@ -79,9 +79,9 @@ export function sameOperations(a:Plan|null,b:Plan|null):boolean {
   const key=(o:Operation)=>JSON.stringify([o.target_id,o.plugin_id,o.name,o.kind,o.from_version,o.to_version]),left=a.operations.map(key).sort(),right=b.operations.map(key).sort();
   return left.every((k,i)=>k===right[i]);
 }
-/** Installed on an enabled harness that was read completely, and not put there by Muro: `index` is its place in the inventory. */
+/** Installed on an enabled harness that was read completely, and that the list does not hold (`inList`: not put there by Muro, and not added to the list since): `index` is its place in the inventory. */
 export function unlisted(snapshot:Snapshot):{target:Target;plugin:InstalledPlugin;index:number}[] {
-  return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!u.plugin.managed):[];});
+  return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!inList(snapshot,target,u.plugin)):[];});
 }
 export const exclusiveMode=(targets:Target[]):'keep'|'remove'|'mixed'=>targets.length&&targets.every(t=>t.exclusive)?'remove':targets.some(t=>t.exclusive)?'mixed':'keep';
 const INTERVALS:[number,string][]=[[15,'Every 15 minutes'],[30,'Every 30 minutes'],[60,'Every hour'],[180,'Every 3 hours'],[720,'Every 12 hours'],[1440,'Once a day']];
