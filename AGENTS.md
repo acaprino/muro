@@ -486,7 +486,8 @@ verification records belong in docs/verification/. Never write new docs/superpow
   artcraft-web).
   The version goes up by a patch, or by a minor or major step when the pull request has the label
   `release:minor` or `release:major`; `build-release.bat` builds on Windows; the tag `muro-v<version>` and the GitHub
-  Release (`release\` zipped, its programs, its installers) are published, and `main` is merged back into
+  Release (the installer of `release\installer\` and one portable zip with all of `release\` in a folder; no loose
+  program) are published, and `main` is merged back into
   `develop`. Nothing is published when the build fails.
 - Never change the version or create release tags by hand: the workflow does it (`.github/release.json` lists
   the version files, `.github/scripts/release.mjs` writes them).

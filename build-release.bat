@@ -14,6 +14,8 @@ rem Ethel: only the PROJECT parts (the settings below and the subroutines at the
 rem   1. tools, version, npm dependencies in NPM_DIR (npm ci only when node_modules is missing, or --ci)
 rem   2. build                                                          PROJECT :build
 rem   3. .\release made from nothing: the programs and their files      PROJECT :assemble
+rem      then release\installer\<App>-<version>-setup.exe from it (.github\scripts\installer.iss,
+rem      Inno Setup 6; without it a build here goes on with no installer, in CI it is an error)
 rem   4. install: .\release is copied over D:\Software\Muro, made if missing. What only the
 rem      install holds (data, mukade-data, webview ...) stays as it is; nothing is backed up.
 rem      release\installer\, where there is one, holds installers to hand out: it is not installed.
@@ -76,7 +78,8 @@ rem lookup can name an rc.exe that is not there, and only RC_<target> or RC come
 rem RC_x86_64_pc_windows_msvc is already set, point it at the rc.exe of the newest SDK that has one.
 if not defined RC_x86_64_pc_windows_msvc call :find_rc
 set "VERSION=?"
-for /f "usebackq delims=" %%V in (`node -p "require('./%NPM_DIR:\=/%/package.json').version"`) do set "VERSION=%%V"
+rem The version of the release system: its first version file (.github\release.json).
+for /f "usebackq delims=" %%V in (`node .github\scripts\release.mjs current`) do set "VERSION=%%V"
 set "COMMIT=?"
 for /f "usebackq delims=" %%C in (`git rev-parse --short HEAD`) do set "COMMIT=%%C"
 set "DIRTY="
@@ -110,6 +113,8 @@ if exist "%RELEASE%\" goto :release_busy
 call :assemble
 if errorlevel 1 goto :fail
 if not exist "%RELEASE%\%APP_EXE%" goto :release_missing
+call :installer
+if errorlevel 1 goto :fail
 
 rem --- 4. Install --------------------------------------------------------------------------------
 echo.
@@ -151,6 +156,22 @@ goto :install_wait
 :install_copy
 robocopy "%RELEASE%" "%INSTALL%" /E /XD "%RELEASE%\installer" /R:10 /W:2 /NFL /NDL /NJH /NP
 if errorlevel 8 (echo [ERROR] copy into %INSTALL% failed: a file may still be in use. & goto :sub_fail)
+exit /b 0
+
+:installer
+rem release\installer\<App>-<version>-setup.exe from release\ (.github\scripts\installer.iss, Inno Setup 6). Without
+rem Inno Setup a build on this machine goes on with no installer; in CI it is an error: the release hands it out.
+set "ISCC="
+for /f "delims=" %%I in ('where ISCC.exe 2^>nul') do if not defined ISCC set "ISCC=%%I"
+for %%I in ("%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" "%ProgramFiles%\Inno Setup 6\ISCC.exe" "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe") do if not defined ISCC if exist "%%~I" set "ISCC=%%~I"
+if defined ISCC goto :installer_build
+if defined CI (echo [ERROR] Inno Setup 6 ^(ISCC.exe^) not found: the release needs its installer. & goto :sub_fail)
+echo     installer skipped: Inno Setup 6 not found ^(winget install JRSoftware.InnoSetup^)
+exit /b 0
+:installer_build
+"%ISCC%" /Q "/DApp=%APP%" "/DVersion=%VERSION%" "/DExe=%APP_EXE%" "/DSource=%RELEASE%" "/O%RELEASE%\installer" "%ROOT%.github\scripts\installer.iss"
+if errorlevel 1 (echo [ERROR] the installer was not built. & goto :sub_fail)
+for %%F in ("%RELEASE%\installer\*") do echo     installer\%%~nxF  %%~zF bytes
 exit /b 0
 
 :find_rc
