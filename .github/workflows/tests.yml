@@ -34,3 +34,28 @@ jobs:
           python muro_build.py --manifest "$MANIFEST" --validate
           python muro_build.py --manifest "$MANIFEST" --check-sources
           python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
+
+  # The desktop app: the job above builds none of it. Windows, because the app is
+  # Windows-first and its start-with-Windows tests write the per-user Run key.
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: desktop-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Rust tests
+        run: cargo test -p muro-registry -p muro-desktop-runtime
+      - name: Frontend unit tests
+        if: always()
+        run: |
+          npm ci
+          npm test
