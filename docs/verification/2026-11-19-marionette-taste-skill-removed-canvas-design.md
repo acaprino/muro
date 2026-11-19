@@ -62,7 +62,9 @@ tag upstream); the pin is unchanged.
   `test_open_paper_skills_intake`, `test_policy_original_wording`, `test_ponytail_intake`,
   `test_source_coverage`, `test_superpowers_intake`, `test_text_humanizer_intake` and
   `test_tokeneconomizer_intake`. `test_live_host_fixes` was edited in this change and has not run since.
-- The full suite was not run: it runs in the `Tests` workflow on a pushed branch, and nothing was pushed.
+- The full suite, in the `Tests` workflow on `develop` at `9c08521` (run 44614646279): 725 passed, 16
+  skipped in 141 s, then source validation, source checks and a build. It includes the tests that never
+  ran locally, `test_capabilities_read_originals` and `test_live_host_fixes` among them.
 
 ## Routing eval
 
@@ -86,7 +88,8 @@ The previous decisions file in the eval folder was kept, renamed beside it.
   layout, component sets with variants, prototype transitions, an MCP server (`figcraft-cli mcp`). Whether
   it covers every rule of the source (a variable bound to a gradient stop, a custom bezier on a transition,
   opacity stored in a variable) is not known.
-- No install on a host, no commit, no push, no release. The package version is still 0.4.1.
+- No install on a host. Committed and pushed on the owner's request the same evening; the package version
+  goes to 0.5.0 with the release notes in `docs/releases/marionette-v0.5.0.md`.
 
 ## Open for the owner
 
