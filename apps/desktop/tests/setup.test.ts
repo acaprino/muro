@@ -336,6 +336,24 @@ it('a rejected settings save stays on step 3 with the switches as they were, and
   assert.equal(state.setup, null);
 });
 
+it('a plugin the service refuses is named in the message, and unticking it lets Finish go through', async () => {
+  const { app, state, fake, actions } = await session();
+  setup.change!(app, input('pick', 'claude-code'));
+  await act(app, 'setup-next'); await act(app, 'setup-next');
+  fake.flags.rejectSave = true; fake.calls.length = 0;
+  await act(app, 'setup-finish');
+  assert.equal(held(state)?.step, 3);
+  assert.equal(held(state)?.err, 'commit-helper on Claude Code was not added: Version conflict: reload registry');
+  assert.deepEqual(actions(), ['save_plugin'], 'it stopped at the plugin; nothing else was saved');
+  await act(app, 'setup-back');
+  setup.change!(app, input('keep', `${state.snapshot!.registry.targets[0].id}:native-commit-helper`, false));
+  await act(app, 'setup-next');
+  fake.calls.length = 0;
+  await act(app, 'setup-finish');
+  assert.deepEqual(actions(), ['settings', 'set_autostart']);
+  assert.equal(state.setup, null);
+});
+
 it('Back from step 3 and a reload keep the person where they were', async () => {
   const { app, state } = await session();
   setup.change!(app, input('pick', 'codex'));

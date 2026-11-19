@@ -129,10 +129,14 @@ const chooseKept = (app: App, s: Held) => go(app, 'Reading what this computer su
   s.canAutostart ??= (await app.request<Autostart>('autostart')).supported;
   s.step = 3;
 });
-/** Finish: the plugins kept join the list (one that is there already is skipped, so a retry adds nothing twice), then the settings, then Start with Windows. */
+/** Finish: the plugins kept join the list (one that is there already is skipped, so a retry adds nothing twice), then the settings, then Start with Windows.
+ * A plugin the service refuses is named in the message, so the person knows which one to untick on step 2. */
 const finish = (app: App, s: Held) => go(app, 'Setting up Muro…', async () => {
   const revision = () => app.state.snapshot!.registry.revision;
-  for (const item of installed(app.state, s).items) if (kept(s, item)) app.adopt(await app.request<Snapshot>('save_plugin', { revision: revision(), plugin: listedPlugin(item.plugin, item.target) }));
+  for (const item of installed(app.state, s).items) if (kept(s, item)) {
+    try { app.adopt(await app.request<Snapshot>('save_plugin', { revision: revision(), plugin: listedPlugin(item.plugin, item.target) })); }
+    catch (e) { throw new Error(`${item.plugin.name} on ${item.target.name} was not added: ${message(e)}`); }
+  }
   app.adopt(await app.request<Snapshot>('settings', { revision: revision(), settings: { ...app.state.snapshot!.registry.settings, auto_sync: s.auto } }));
   s.canAutostart ??= (await app.request<Autostart>('autostart')).supported;
   if (s.canAutostart) await app.request<Autostart>('set_autostart', { enabled: s.autostart });
