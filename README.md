@@ -2,80 +2,187 @@
   <img src="docs/assets/branding/muro-logo.png" alt="Muro" width="800">
 </h1>
 
-<p align="center"><strong>A factory for AI-routed skill packages</strong></p>
+<p align="center"><strong>One plugin list for all your coding agents</strong></p>
+
+<p align="center">Harness manager · Plugin sync · Plugin updater · Skill harmonizer</p>
 
 <p align="center">
-  <a href="#quickstart">Quickstart</a> ·
+  <a href="#what-muro-does">Features</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#usage-examples">Usage</a> ·
+  <a href="#marionette-muro-as-a-harmonizer">Marionette</a> ·
   <a href="#supported-harnesses">Harnesses</a> ·
-  <a href="#marionette">Marionette</a> ·
   <a href="#build-your-own-package">Build a package</a> ·
-  <a href="#ecosystem">Ecosystem</a> ·
   <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
-Bring the agent skills and plugins you already use into **one package with its own catalog, coordinator, and release**. Ship that package to Claude Code, Codex, OpenCode, Pi, or Hermes Agent. [Marionette](examples/marionette/ROUTER.md) is the example package you can build from this repo.
+Muro is a Windows desktop app that looks after the coding agents on your computer: Claude Code, Codex, OpenCode, Pi and Hermes Agent. You keep one list of the plugins you want and the harnesses each one goes on. Muro installs them, removes what you no longer want and keeps everything up to date. When a plugin has no build for one of your harnesses, Muro can rebuild it for that harness with AI.
 
-- **Compose skills into workflows.** The host AI reads the selected sources, resolves overlaps, and uses the request and project context to choose a single capability or an ordered plan.
-- **Keep decisions inspectable.** Every source is pinned, every route has a reason, and multi-step runs record their outputs and checks as they go.
-- **Explore a release offline.** Open its standalone `GUIDE.html` to trace example paths, inspect capabilities and dependencies, and see which source revisions shipped.
+The same engine is a harmonizer. Muro's factory absorbs pinned skills and plugins from several sources into one package with its own catalog, coordinator and release for every harness. [Marionette](#marionette-muro-as-a-harmonizer) is the package this repository builds as an example.
 
-## Quickstart
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/plugins-dark.png">
+  <img src="docs/assets/screenshots/plugins-light.png" alt="Muro's Plugins page: five plugins with their version, harnesses and status. Marionette is selected and its detail says a newer version is ready to install.">
+</picture>
 
-### Desktop registry (Windows development build)
+<sub>Screenshots use demo data. This one follows your GitHub theme: Muro's default look, Smooth, has a dark and a light theme.</sub>
 
-The native Tauri desktop application manages a global desired plugin registry, explicit harness instances, versioned distributions, sync plans, reinstall and maintenance. Its interface follows the [approved mockup](docs/mockups/muro-registry.html). The portable folder includes `Muro.exe`, the `muroctl.exe` backend, `mukade.exe`, Git, curl and private Python. The UI calls the same CLI tools available to terminal users. Its registry and WebView profile stay in the portable folder's `data/` directory. No plugin is installed merely by opening the app.
+## What Muro does
 
-No portable release is published yet: build the folder with the steps in [desktop setup](docs/desktop.md#run-from-source), then open `Muro.exe` from it. From PowerShell, `./tools/muroctl.exe request snapshot` reads its registry; `./tools/muroctl.exe request plan` prepares a sync plan. See [CLI reference and usage examples](docs/desktop-cli.md), [example request files](examples/desktop/README.md), and [desktop setup and behavior](docs/desktop.md); the design record is [ADR-0023](docs/adr/ADR-0023-global-desktop-registry.md). This implementation is separate from the standard-library Python factory and has not been published as a release.
+### Harness manager
 
-From the repository root, run these commands with **Python 3.10+** and **Git**. Building needs network access to verify the pinned sources.
+Muro finds the coding agents installed on this computer and manages the ones you pick. For each harness it knows where the plugin configuration lives, which program runs it and what is installed.
 
-```sh
-python muro_build.py --manifest examples/marionette/sources.json --validate
-python muro_build.py --manifest examples/marionette/sources.json --build
+- **Found on this computer** lists every agent detected through [Mukade](https://github.com/acaprino/mukade). **Manage with Muro** adds one; **Add harness** covers one it did not find.
+- **Installed plugins** shows what a harness has, including plugins outside your list. **Add to my list** imports one.
+- For each harness you can pause management, or turn on **exclusive sync** so that plugins outside your list are uninstalled there.
+
+<img src="docs/assets/screenshots/harnesses.png" alt="Harnesses page: Claude Code, Codex and OpenCode managed by Muro; Pi, Hermes Agent and DeepSeek found on this computer." width="880">
+
+### Plugin sync
+
+Your list says which plugin goes on which harness. **Sync** compares it with what is actually installed and lists every change (install, update, remove) with its reason, before anything happens.
+
+- Nothing changes until you press **Apply changes**. Muro first checks that your list, the inventories and the prepared builds are still the ones it compared.
+- A check right after a sync finds nothing to do.
+- **Automatic sync** (Settings) runs the same check on an interval while Muro is open, also from the notification area, and applies it without asking: removals on exclusive harnesses included. It stops only on a blocker.
+
+<img src="docs/assets/screenshots/sync.png" alt="Sync page: three changes. Marionette is updated from 0.3.0 to 0.4.0 on Claude Code, test-runner is installed on OpenCode, and old-snippets, which is not in the list, is removed from Claude Code." width="880">
+
+### Plugin updater
+
+Every plugin follows an update policy: latest stable release, a pinned version or the latest commit. **Check for updates** reads the plugin's source, records the upstream version and revision, and takes the native build the source publishes for each harness. Sync then installs the new version.
+
+- The plugin's detail says what to do next, for example *A newer version is ready to install* with **Review in Sync**.
+- **Plan a reinstall**, under **More actions**, puts back the last verified build, not whatever the source holds today.
+- **Settings → Maintenance** verifies the stored builds and deletes the ones nothing uses.
+
+### AI adaptation
+
+A plugin with no build for one of its harnesses shows **Needs preparing**. **Adapt with AI** has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+
+<img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
+
+### Two looks
+
+Smooth is the default, with a dark and a light theme that follow your system. Classic, Muro's original look, is one choice away in **Settings → Appearance**. Muro remembers both choices.
+
+<img src="docs/assets/screenshots/classic.png" alt="The Plugins page in the Classic look: dark, square corners, capitals in the table header." width="880">
+
+## Install
+
+Download Muro from the [releases](https://github.com/acaprino/muro/releases), tagged `muro-v<version>`:
+
+- `Muro-<version>-setup.exe` installs Muro.
+- `Muro-<version>-windows-x64.zip` is the portable folder: unzip it and open `Muro.exe`. Your list stays in `data/` beside it, so move the whole folder, not just the program.
+
+Muro runs on Windows with the WebView2 runtime. It brings its own Git, curl, Python and factory. The coding agents and their accounts are yours: Muro installs none of them. Opening the app installs no plugin either; only a sync you apply does, or automatic sync once you turn it on.
+
+To build Muro from source, see [desktop setup](docs/desktop.md#run-from-source).
+
+## First steps
+
+<img src="docs/assets/screenshots/first-use.png" alt="First use: the Plugins page shows three steps. Add a harness is done, Add a plugin is the current step with its button, Sync comes next." width="880">
+
+1. **Add a harness.** On **Harnesses**, press **Manage with Muro** on a harness Muro found, or **Add harness**. Its configuration folder is where the harness keeps its settings: for OpenCode the folder of `opencode.json`, for Pi the folder of `settings.json`.
+2. **Add a plugin.** On **Plugins**, press **Add plugin**, give its source (a repository, a marketplace entry or a folder) and tick the harnesses it goes on. Then press **Check for updates** in its detail.
+3. **Sync.** On **Sync**, press **Check for changes**, read the list, then **Apply changes**.
+
+The Plugins page shows these three steps, with the button for the next one, until your first plugin is installed.
+
+## Usage examples
+
+### One plugin on every harness
+
+1. **Add plugin**, tick Claude Code, Codex and OpenCode under **Install on**, then **Save plugin**.
+2. In the plugin's detail, **Check for updates**: Muro records the upstream version and the native build for each harness.
+3. **Sync** → **Check for changes** → **Apply changes**.
+
+### Keep everything up to date
+
+- **Check for updates** in a plugin's detail looks for a newer version under its update policy.
+- On **Plugins**, the **Update available** filter shows what is behind; **Sync** lists every update and **Apply changes** installs them.
+- Or turn on **Settings → Sync → Automatic sync** and choose how often it runs. Each run checks every plugin for updates and applies the changes.
+
+### A plugin on a harness it was not made for
+
+In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, it shows **Needs preparing**.
+
+1. In its detail, press **Adapt with AI**. The harness without a build is preselected; set the maximum budget.
+2. Follow the job in **Activity**. When it succeeds, the new build appears in the plugin's detail.
+3. **Sync** installs it.
+
+Adaptation runs Claude Code, chosen under **Settings → AI adaptation**, and has a real inference cost.
+
+### Remove what you did not choose
+
+On a harness, open **Settings** and tick **Exclusive sync: uninstall plugins that are not in my list**. The next check in **Sync** lists the removals; nothing is uninstalled until you apply. To keep one of those plugins, open **Installed plugins** on that harness and press **Add to my list**.
+
+### Your own instructions for a plugin
+
+In the plugin's detail, open **Custom instructions** → **Open folder** and write Markdown notes there. Press **Reload files**, then **Adapt with AI** again for each harness listed under *Instructions changed*. The AI decides whether each note becomes session guidance, a capability or a hook, and records why. See [custom instructions](docs/custom-instructions.md).
+
+### From the command line
+
+Everything the app does is a request to `muroctl`, in the `tools` folder of the portable app:
+
+```powershell
+.\tools\muroctl.exe request snapshot     # your list, what is installed, the activity
+.\tools\muroctl.exe request scan         # read the plugins of every harness again
+.\tools\muroctl.exe request plan         # the changes a sync would make
+.\tools\muroctl.exe request apply --input .\apply.json   # {"plan_id": "<the id plan returned>"}
+.\tools\mukade.exe harnesses             # the coding agents found on this computer
 ```
 
-The same operations are subcommands of one CLI: `python -m muro validate --manifest examples/marionette/sources.json`, or install the `muro` command with `pip install -e .` from this checkout (editable; the factory's prompts sit beside the package). `muro --help` lists every command, including two the flag interface does not have: `review` prepares a host-AI re-examination of the package's recorded decisions against its pinned sources, and `baseline` reports, read-only, which source pins are behind their upstream ([ADR-0021](docs/adr/ADR-0021-factory-cli-executable.md)).
+[Desktop CLI reference](docs/desktop-cli.md) · [Example requests](examples/desktop/README.md) · [The desktop app in detail](docs/desktop.md) · [Design record](docs/adr/ADR-0023-global-desktop-registry.md)
 
-The full command reference — every command, parameter, exit code and worked example — is [docs/cli.md](docs/cli.md).
+### Marionette: Muro as a harmonizer
 
-The factory can also run its AI-owned steps itself ([ADR-0022](docs/adr/ADR-0022-agentic-cli-mcp-and-absorb.md)): `muro mcp` serves the operations to an MCP host (add it to Claude Code or Codex and the host AI drives intake, harmonization and review through its own tools), `muro agent` runs the same steps through an OpenAI-compatible endpoint (API key from an environment variable, never an argument), and `muro absorb <repo-url> <dir> --harness <h> --home <path>` takes one skill from a repository link to an installed plugin in one command — scaffold (`muro init`), intake, harmonization, build, then `muro install`, which executes the built adapter's own INSTALL.md against the harness home you name.
+Marionette is an example of how Muro works as a harmonizer. The factory absorbed 17 pinned sources, skills and plugins for web and product design, motion, Office files, explainers, research papers, engineering method and prose, into **one package**: 37 capabilities, one coordinator and a release for every supported harness. Overlapping skills were merged and their conflicts resolved, and each capability states what it produces and which checks prove it. At run time the host AI classifies each request by meaning, Python validates the plan, and the steps run one capability at a time, each handing its outputs to the next. Marionette stands in for the 63 skills it absorbed: they are not installed beside it.
 
-Open `examples/marionette/dist/marionette/GUIDE.html` and choose an example from **Percorsi** (Paths). If you already have a build there, pass `--out <fresh-directory>` to stage the next release elsewhere.
+<img src="docs/assets/screenshots/marionette-guide.png" alt="Marionette's offline guide with one example path selected: a landing page with scroll animations goes through Visual Direction, Motion Principles and GSAP ScrollTrigger Implementation, with the outputs each step hands to the next." width="880">
 
-To try the package in Claude Code, load the generated adapter from the repository root.
+<sub>`GUIDE.html`, the offline guide in every Marionette release, with one example path selected.</sub>
+
+| You ask | Marionette runs |
+| --- | --- |
+| Design a new landing page, define its scroll animations and implement them in our GSAP project | Visual direction → Motion principles → GSAP ScrollTrigger |
+| Design our new product's landing page in Figma; we have no content outline yet | Visual direction → Figma design |
+| Convert this Word document to PDF without changing its content | Office files |
+| A clickable prototype of our new app's onboarding, with no brand yet, checked before delivery | Aesthetic direction → UI prototype → Design review |
+| Find the original paper on a method and explain it so that I really understand it | Paper search → HTML explanation |
+| Review only my uncommitted changes, without editing files | Engineering review |
+| My idea for a shared rate limiter: a brief, the design document, then the plan and its execution | Concept brief → Design document → Implementation plan → Plan execution |
+| Make this email to a client sound natural, adding nothing | Text humanize |
+
+These are 8 of the 25 [reviewed examples](examples/marionette/guide-examples.json) the guide shows. Marionette also carries a session policy made from **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**, plus [one instruction of its owner](examples/marionette/custom-instructions/recap-adhd.md): complete, focused work and replies that are easy to act on. The complete adapter loads it through the host's system or developer channel, before any skill is chosen. A code-change review, a whole-repository audit, a ledger of deliberate shortcuts and an explanation of the working method stay separate tasks you can ask for. See the [integration record](docs/verification/2026-11-12-marionette-ponytail-adhd.md).
+
+**Install it.** Download `marionette-<version>.zip` and its `.sha256` from the [releases](https://github.com/acaprino/muro/releases), tagged `marionette-v<version>`. Unzip it and follow `INSTALL.md` in the adapter folder of your harness. For Claude Code:
 
 ```sh
-claude --plugin-dir examples/marionette/dist/marionette/adapters/claude-code
+claude plugin marketplace add <unzipped folder>/marionette/adapters/claude-code
+claude plugin install marionette@marionette
 ```
 
-Run `/marionette:marionette` and ask *“Explain how this repository builds a release as interactive HTML.”* For another host, open the `INSTALL.md` in its adapter directory.
+Then ask in plain words, or run `/marionette:marionette`. To build Marionette from this checkout, see [Build your own package](#build-your-own-package).
 
-<details>
-<summary>Inspect what the harness receives</summary>
-
-```sh
-python examples/marionette/dist/marionette/muro.py plan --task "Explain how this repository builds a release as interactive HTML" --project .
-```
-
-`classification-required` returns the task context, catalog, and instructions the host AI uses to choose a route. With a valid selection, the launcher returns either a single step or a plan to confirm.
-
-</details>
+[Browse the catalog](examples/marionette/ROUTER.md) · [Read the capabilities](examples/marionette/capabilities/) · [See the source manifest](examples/marionette/sources.json) · [Delivery decisions](examples/marionette/delivery.json)
 
 ## Supported harnesses
 
-Each row corresponds to a native adapter in the generated release. Its `INSTALL.md` covers the host API, installation, and activation limits.
+| Harness | Desktop app | Package adapter | Native session instructions | Declared source command hooks |
+| --- | --- | --- | --- | --- |
+| <img src="docs/assets/branding/harnesses/claude-code.svg" width="24" alt=""> **[Claude Code](https://code.claude.com/docs/en/plugins/mods/reference)** | Yes | `adapters/claude-code/` | `prompt.compose` system section | Supported |
+| <img src="docs/assets/branding/harnesses/codex.svg" width="24" alt=""> **[Codex](https://developers.openai.com/codex/hooks/)** | Yes | `adapters/codex/` | Developer context on session and subagent start | Supported |
+| <img src="docs/assets/branding/harnesses/opencode.svg" width="24" alt=""> **[OpenCode](https://opencode.ai/)** | Yes | `adapters/opencode/` | System parts via the V2 package plugin API | — |
+| <img src="docs/assets/branding/harnesses/pi.svg" width="24" alt=""> **[Pi](https://pi.dev/)** | Yes | `adapters/pi/` | Named system section via a package extension | — |
+| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | Yes | `adapters/hermes/` | Registered system prompt section up to 4,000 characters; a longer policy goes whole through `pre_llm_call` | — |
 
-| Harness | Adapter directory | Native session instructions | Declared source command hooks |
-| --- | --- | --- | --- |
-| <img src="docs/assets/branding/harnesses/claude-code.svg" width="24" alt=""> **[Claude Code](https://code.claude.com/docs/en/plugins/mods/reference)** | `adapters/claude-code/` | `prompt.compose` system section | Supported |
-| <img src="docs/assets/branding/harnesses/codex.svg" width="24" alt=""> **[Codex](https://developers.openai.com/codex/hooks/)** | `adapters/codex/` | Developer context on session and subagent start | Supported |
-| <img src="docs/assets/branding/harnesses/opencode.svg" width="24" alt=""> **[OpenCode](https://opencode.ai/)** | `adapters/opencode/` | System parts via the V2 package plugin API | — |
-| <img src="docs/assets/branding/harnesses/pi.svg" width="24" alt=""> **[Pi](https://pi.dev/)** | `adapters/pi/` | Named system section via a package extension | — |
-| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | `adapters/hermes/` | Registered system prompt section up to 4,000 characters; a longer policy goes whole through `pre_llm_call` | — |
+The desktop app also finds DeepSeek, which has no plugin adapter yet. Each package adapter is a native adapter in the generated release; its `INSTALL.md` covers the host API, installation and activation limits.
 
-Installing the **complete adapter** lets the harness load the session instructions and active hooks declared in `delivery.json`, subject to the host's permissions and trust settings. For on-demand capabilities, the standalone `skills/<command>/` directory includes its launcher, catalog, prompts, helpers, notices, and offline guide. Keep the directory intact and install any discovery entries alongside it.
+Installing the **complete adapter** lets the harness load the session instructions and active hooks declared in `delivery.json`, subject to the host's permissions and trust settings. For on-demand capabilities, the standalone `skills/<command>/` directory includes its launcher, catalog, prompts, helpers, notices and offline guide. Keep the directory intact and install any discovery entries alongside it.
 
 Each adapter's `INSTALL.md` ends with the host's own install command. The Claude Code and Codex adapters are their own marketplace (`claude plugin marketplace add <adapter>`, `codex plugin marketplace add <adapter>`); Pi uses `pi install <adapter>`; OpenCode lists the adapter under `plugins` in `opencode.json`. On Claude Code, Pi and OpenCode the declared session instructions are active with no further step. Codex runs a plugin's hooks only after you trust them once in `/hooks`. See the [live activation runs](docs/verification/2026-11-12-policy-active-by-default-live.md).
 
@@ -83,25 +190,7 @@ Marionette completed a two-step workflow in live runs on **Claude Code, Codex, O
 
 [Harness logo sources](docs/assets/branding/harnesses/README.md)
 
-## Marionette
-
-Marionette shows what the factory produces from sources covering product design, motion, Office files, research, explainers, and engineering workflows. These routes come from its [authored guide examples](examples/marionette/guide-examples.json).
-
-| Example request | Route |
-| --- | --- |
-| Convert this Word document to PDF | Office file operations |
-| Design a new landing page in Figma. We still need a content outline | Visual direction → Figma design |
-| Design a landing page and implement the scroll animations in our GSAP project | Visual direction → Motion specification → GSAP implementation |
-| Find the original paper on a method and explain it to me | Literature search → HTML explanation page |
-| Explain a mechanism in this codebase as interactive HTML | Interactive explainer with claim verification |
-
-Marionette also embeds **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**. Their synthesized session policy promotes complete, focused work and clear communication. It loads through the native system/developer channel when the complete adapter is installed, before any skill is selected. Concise conversation preserves the requested detail, artifact quality and verification.
-
-Ask for a code-change review, a whole-repository audit, a deliberate-shortcut ledger, or an explanation of the working method and published benchmark. These remain distinct, discoverable tasks. The original plugins’ mode controls, status UI and telemetry are outside this curated integration. See the [integration and verification record](docs/verification/2026-11-12-marionette-ponytail-adhd.md) and [delivery decisions](examples/marionette/delivery.json).
-
-[Browse the catalog](examples/marionette/ROUTER.md) · [Read the capabilities](examples/marionette/capabilities/) · [See the source manifest](examples/marionette/sources.json)
-
-## How Muro works
+## How the harmonizer works
 
 | Phase | What happens |
 | --- | --- |
@@ -129,6 +218,42 @@ Capabilities hand outputs over through their `## Output handoff` sections using 
 </details>
 
 ## Build your own package
+
+The factory needs **Python 3.10+** and **Git**. Building verifies the pinned sources, so it needs network access. From the repository root, build Marionette:
+
+```sh
+python muro_build.py --manifest examples/marionette/sources.json --validate
+python muro_build.py --manifest examples/marionette/sources.json --build
+```
+
+The release lands in `examples/marionette/dist/marionette/`; when a build is already there, pass `--out <fresh-directory>`. Open its `GUIDE.html` and choose an example under **Percorsi** (Paths), or load it in Claude Code for one session:
+
+```sh
+claude --plugin-dir examples/marionette/dist/marionette/adapters/claude-code
+```
+
+Run `/marionette:marionette` and ask *“Explain how this repository builds a release as interactive HTML.”* For another host, open the `INSTALL.md` in its adapter directory.
+
+<details>
+<summary>Inspect what the harness receives</summary>
+
+```sh
+python examples/marionette/dist/marionette/muro.py plan --task "Explain how this repository builds a release as interactive HTML" --project .
+```
+
+`classification-required` returns the task context, catalog, and instructions the host AI uses to choose a route. With a valid selection, the launcher returns either a single step or a plan to confirm.
+
+</details>
+
+### The factory command line
+
+The same operations are subcommands of one CLI: `python -m muro validate --manifest examples/marionette/sources.json`, or install the `muro` command with `pip install -e .` from this checkout (editable; the factory's prompts sit beside the package). `muro --help` lists every command, including two the flag interface does not have: `review` prepares a host-AI re-examination of the package's recorded decisions against its pinned sources, and `baseline` reports, read-only, which source pins are behind their upstream ([ADR-0021](docs/adr/ADR-0021-factory-cli-executable.md)).
+
+The factory can also run its AI-owned steps itself ([ADR-0022](docs/adr/ADR-0022-agentic-cli-mcp-and-absorb.md)): `muro mcp` serves the operations to an MCP host (add it to Claude Code or Codex and the host AI drives intake, harmonization and review through its own tools), `muro agent` runs the same steps through an OpenAI-compatible endpoint (API key from an environment variable, never an argument), and `muro absorb <repo-url> <dir> --harness <h> --home <path>` takes one skill from a repository link to an installed plugin in one command: scaffold (`muro init`), intake, harmonization, build, then `muro install`, which executes the built adapter's own INSTALL.md against the harness home you name.
+
+The full command reference, with every command, parameter, exit code and worked example, is [docs/cli.md](docs/cli.md).
+
+### A package of your own
 
 Start with Marionette's layout and give the new package its own identity and source selection. Each package can supply its own prompts or runtime, with Muro's factory defaults available out of the box.
 
@@ -202,20 +327,25 @@ Upstream code stays inert during intake and build. If a selected capability need
 | Project | What it does |
 | --- | --- |
 | **[Shinatama](https://github.com/acaprino/shinatama)** | Run multiple coding-agent harnesses in tiled terminals from a local-first desktop workspace. |
-| **[Mukade](https://github.com/acaprino/mukade)** | Browse, export, and move coding-agent sessions between harnesses with a CLI, terminal UI, and Rust library. |
+| **[Mukade](https://github.com/acaprino/mukade)** | Browse, export, and move coding-agent sessions between harnesses with a CLI, terminal UI, and Rust library. Muro uses it to find harnesses. |
 
 ## Contributing
 
-See [AGENTS.md](AGENTS.md) for repository conventions and verification commands. [Architecture decisions](docs/adr/README.md), the [functional requirements](docs/frd/README.md), and [verification records](docs/verification/) explain how the factory and portable adapters fit together.
+See [AGENTS.md](AGENTS.md) for repository conventions. [Architecture decisions](docs/adr/README.md), the [functional requirements](docs/frd/README.md), and [verification records](docs/verification/) explain how the desktop app, the factory and the adapters fit together.
 
-Install `pytest` for the development suite.
+The full suite runs in GitHub Actions, in the `Tests` workflow, on every push and pull request. Locally, run the tests of what you changed:
 
 ```sh
-python -m pytest -q
+python -m pytest -q tests/test_<area>.py
 python muro_build.py --manifest examples/marionette/sources.json --validate
+cargo test -p muro-registry -p muro-desktop-runtime
+npm test
+node apps/desktop/tests/browser.mjs
 ```
 
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
+
+The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release; Marionette releases are published on request.
 
 [Routing verification](docs/verification/2026-11-09-ai-owned-routing.md) · [Guide verification](docs/verification/2026-11-10-release-html-guide.md) · [Routing eval and development principles](docs/adr/ADR-0015-design-principles-from-first-real-use.md)
 

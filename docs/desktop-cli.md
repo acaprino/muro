@@ -2,6 +2,8 @@
 
 The Windows desktop calls the bundled native `muroctl.exe` service. The same executable is available for scripts and diagnostics. Harness discovery and executable resolution run through the bundled `mukade.exe`, built against the pinned upstream Mukade revision. Registry changes and native plugin operations share the same implementation in the UI and CLI.
 
+The [request actions](#request-actions) cover the app's three jobs. Harness manager: `discover`, `save_target`, `remove_target` and `scan`. Plugin sync: `plan` and `apply`. Plugin updater: `resolve`, `plan` with `reinstall`, and `maintenance`. `adapt` starts an AI adaptation for a harness without a native build.
+
 ## Portable layout
 
 ```text

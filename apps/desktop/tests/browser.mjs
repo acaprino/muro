@@ -19,6 +19,7 @@ try {
  await page.goto('http://127.0.0.1:'+port+'/tests/harness.html');
  await page.getByRole('list',{name:'Getting started'}).waitFor();
  assert.equal(await root('look'),'smooth','Smooth is the default look');
+ await page.getByText('1 found',{exact:true}).waitFor();
  assert.equal(await page.locator('.steps li[aria-current=step] strong').textContent(),'Add a plugin','First use points at the step to do now');
  assert.equal(await root('theme'),'dark','Smooth follows a dark system');
  await page.screenshot({path:shots+'/smooth-dark-first-use.png'});

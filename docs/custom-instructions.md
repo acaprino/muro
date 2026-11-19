@@ -94,9 +94,10 @@ for Codex, the host's `/hooks` trust review still applies. See the adapter's
 
 ## Desktop and direct registry CLI
 
-The desktop uses the same Markdown-folder model. Open the plugin's custom
-instructions folder, add or edit files, and prepare a new AI adaptation before
-syncing the generated distribution. The folder remains separate from replaceable
+The desktop uses the same Markdown-folder model. In the plugin's detail, open
+**Custom instructions** → **Open folder**, add or edit files, press **Reload
+files**, then **Adapt with AI** for each harness listed under *Instructions
+changed* before syncing the generated distribution. The folder remains separate from replaceable
 upstream snapshots. A native distribution without your instructions is not a
 current customized build. See [desktop usage](desktop.md) and
 [CLI payloads](desktop-cli.md) for the concrete controls and commands.
