@@ -73,6 +73,12 @@ day.
 | `Release Marionette` 44543595616 on `c65b7ea`, version 0.4.0 | failed in 1 s at "Refuse a tag that already exists": `marionette-v0.4.0 already exists in acaprino/muro; bump the version instead` |
 | `Tests` 44543554542 on `c65b7ea` | 733 passed, 16 skipped (2 min 43 s); `--validate`, `--check-sources` and the build pass |
 | local, 0.4.1 | `--validate`: `OK: capabilities and ROUTER.md valid`; `--check-sources`: `OK: all sources and plugin identity valid` (2 min) |
+| `Release Marionette` 44544434518 on `9f45425`, version 0.4.1 | success: tag check, tests, validation, source checks, build, checkout of `acaprino/marionette` with the deploy key, push of `release/marionette-v0.4.1` (`83279ea`, "Marionette 0.4.1") |
+| `acaprino/marionette`, `Release pull request` on that push | success: opened acaprino/marionette#2 "Marionette 0.4.1" by `github-actions`, `release/marionette-v0.4.1` into `main`, 12,061 files (the build and its notes), mergeable, body = `docs/releases/marionette-v0.4.1.md` plus the Muro commit; `marionette/sources.json` in the branch at 0.4.1 |
+
+Not executed: the merge of #2 and so `release.yml` publishing a build (the
+owner's step); a second build of the same version refreshing an open pull
+request; Shinatama following `acaprino/marionette`.
 
 The push of `develop` from this machine needed `gh` as Git's credential
 helper: the harness home path breaks the credential manager.
