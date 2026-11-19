@@ -20,7 +20,7 @@ To prepare a complete portable folder by hand, use fresh output paths:
 ```powershell
 python scripts/desktop_tools.py --out .scratch/portable-tools
 Copy-Item target/debug/muroctl.exe,target/debug/mukade.exe .scratch/portable-tools/
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/acaprino/mukade/f189a705b12692ffe92a63de52a161681be75fd8/LICENSE -OutFile .scratch/portable-tools/Mukade-LICENSE.txt
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/acaprino/mukade/8bd16369a47465417cee62521d03d65a0c5867e8/LICENSE -OutFile .scratch/portable-tools/Mukade-LICENSE.txt
 python scripts/desktop_package.py --exe target/debug/muro-desktop.exe --resources apps/desktop/src-tauri/resources --tools .scratch/portable-tools --mukade-license .scratch/portable-tools/Mukade-LICENSE.txt --out .scratch/Muro-portable
 ```
 
