@@ -1,8 +1,15 @@
-use muro_desktop_runtime::{autostart, discovery, jobs, tray};
+use muro_desktop_runtime::{autostart, discovery, jobs, single_instance, sync_gate::SyncGate, tray};
 use serde_json::{Value, json};
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc,
+    },
+    thread,
+    time::Duration,
 };
 
 #[test]
@@ -147,21 +154,139 @@ fn autostart_round_trip_under_a_test_value_name() {
     assert_eq!(autostart::set(&value.0, exe, false).unwrap(), off);
 }
 
+/// A file that exists, for a Run value to name.
+#[cfg(windows)]
+fn existing_executable() -> PathBuf {
+    std::env::current_exe().unwrap()
+}
+
 #[cfg(windows)]
 #[test]
-fn repair_rewrites_a_value_that_names_another_executable() {
+fn repair_rewrites_a_value_whose_executable_is_gone() {
     let value = RunValue::new();
-    let a = Path::new(r"C:\Muro Old\a.exe");
-    let b = Path::new(r"C:\Muro New\b.exe");
-    autostart::repair(&value.0, b).unwrap();
-    assert_eq!(autostart::state(&value.0, b).unwrap()["enabled"], false);
-    autostart::set(&value.0, a, true).unwrap();
+    let gone = Path::new(r"C:\Muro Old\a.exe");
+    let here = existing_executable();
+    assert!(!gone.exists());
+    autostart::repair(&value.0, &here).unwrap();
+    assert_eq!(autostart::state(&value.0, &here).unwrap()["enabled"], false);
+    autostart::set(&value.0, gone, true).unwrap();
     let stale = json!({"supported":true,"enabled":true,"current":false});
-    assert_eq!(autostart::state(&value.0, b).unwrap(), stale);
-    autostart::repair(&value.0, b).unwrap();
+    assert_eq!(autostart::state(&value.0, &here).unwrap(), stale);
+    autostart::repair(&value.0, &here).unwrap();
     let repaired = json!({"supported":true,"enabled":true,"current":true});
-    assert_eq!(autostart::state(&value.0, b).unwrap(), repaired);
-    assert_eq!(autostart::state(&value.0, a).unwrap()["current"], false);
+    assert_eq!(autostart::state(&value.0, &here).unwrap(), repaired);
+    assert_eq!(autostart::state(&value.0, gone).unwrap()["current"], false);
+}
+
+/// A value that names a folder starts nothing either.
+#[cfg(windows)]
+#[test]
+fn repair_rewrites_a_value_that_names_a_folder() {
+    let value = RunValue::new();
+    let folder = tempfile::tempdir().unwrap();
+    let here = existing_executable();
+    autostart::set(&value.0, folder.path(), true).unwrap();
+    autostart::repair(&value.0, &here).unwrap();
+    assert_eq!(autostart::state(&value.0, &here).unwrap()["current"], true);
+}
+
+/// reg.exe prints a value in the console code page, so a path outside ASCII read from its output
+/// would look gone and the value would be taken over.
+#[cfg(windows)]
+#[test]
+fn repair_reads_a_path_outside_ascii_as_it_was_written() {
+    let value = RunValue::new();
+    let folder = tempfile::tempdir().unwrap();
+    let installed = folder.path().join("Müller José").join("Muro.exe");
+    fs::create_dir_all(installed.parent().unwrap()).unwrap();
+    fs::write(&installed, b"").unwrap();
+    autostart::set(&value.0, &installed, true).unwrap();
+    autostart::repair(&value.0, &existing_executable()).unwrap();
+    assert_eq!(autostart::state(&value.0, &installed).unwrap()["current"], true);
+}
+
+/// Writes a Run value the way another program would: reg.exe, with the type chosen.
+#[cfg(windows)]
+fn write_run_value(name: &str, kind: &str, data: &str) {
+    let key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+    let added = std::process::Command::new("reg.exe")
+        .args(["add", key, "/v", name, "/t", kind, "/d", data, "/f"])
+        .output()
+        .unwrap();
+    assert!(added.status.success(), "{kind} {data}");
+}
+
+/// Only the command Muro writes names an executable with no doubt. A value in another shape
+/// is somebody else's: it stays, whatever it points at.
+#[cfg(windows)]
+#[test]
+fn repair_leaves_a_value_it_cannot_read_as_a_command_of_its_own() {
+    let value = RunValue::new();
+    let here = existing_executable();
+    for data in [r"C:\Muro Old\a.exe --background", r#""C:\Muro Old\a.exe"#, r#""" --background"#] {
+        write_run_value(&value.0, "REG_SZ", data);
+        autostart::repair(&value.0, &here).unwrap();
+        let state = autostart::state(&value.0, &here).unwrap();
+        assert_eq!(state["enabled"], true, "{data}");
+        assert_eq!(state["current"], false, "{data}");
+    }
+}
+
+/// A value of type REG_EXPAND_SZ is what Windows starts after it expands the variables in it:
+/// repair reads it that way, for the executable that exists as for the one that is gone.
+#[cfg(windows)]
+#[test]
+fn repair_reads_a_value_with_variables_as_windows_starts_it() {
+    let value = RunValue::new();
+    let here = existing_executable();
+    let installed = r#""%SystemRoot%\System32\reg.exe" --background"#;
+    write_run_value(&value.0, "REG_EXPAND_SZ", installed);
+    autostart::repair(&value.0, &here).unwrap();
+    assert_eq!(autostart::state(&value.0, &here).unwrap()["current"], false);
+    write_run_value(&value.0, "REG_EXPAND_SZ", r#""%SystemRoot%\Muro Old\a.exe" --background"#);
+    autostart::repair(&value.0, &here).unwrap();
+    assert_eq!(autostart::state(&value.0, &here).unwrap()["current"], true);
+}
+
+/// `named_executable` is the reverse of `command`: the path Muro wrote comes back as it was.
+#[test]
+fn the_executable_a_run_value_names_is_the_one_command_wrote() {
+    for exe in [
+        r"C:\Program Files\Muro\Muro.exe",
+        r"C:\Users\Müller José\Muro\Muro.exe",
+        r"D:\muro.exe",
+    ] {
+        let command = autostart::command(Path::new(exe));
+        assert_eq!(autostart::named_executable(&command), Some(PathBuf::from(exe)));
+    }
+    assert_eq!(
+        autostart::named_executable(r#""C:\Muro\Muro.exe""#),
+        Some(PathBuf::from(r"C:\Muro\Muro.exe"))
+    );
+    for other in [
+        "",
+        "muro --background",
+        r"C:\Muro\Muro.exe --background",
+        r#""C:\Muro\Muro.exe"#,
+        r#"" --background"#,
+    ] {
+        assert_eq!(autostart::named_executable(other), None, "{other}");
+    }
+}
+
+/// The owner's installed Muro starts with Windows; a development build or a portable copy that
+/// starts later must not take the value over.
+#[cfg(windows)]
+#[test]
+fn repair_leaves_a_value_that_names_another_existing_executable() {
+    let value = RunValue::new();
+    let installed = existing_executable();
+    let development = Path::new(r"C:\Muro Development\muro-desktop.exe");
+    autostart::set(&value.0, &installed, true).unwrap();
+    let before = autostart::state(&value.0, &installed).unwrap();
+    autostart::repair(&value.0, development).unwrap();
+    assert_eq!(autostart::state(&value.0, &installed).unwrap(), before);
+    assert_eq!(autostart::state(&value.0, development).unwrap()["current"], false);
 }
 
 /// reg.exe prints a value in the console code page, so a path outside ASCII would never read
@@ -490,4 +615,218 @@ fn tray_local_clock_gives_zero_padded_hours_and_minutes() {
     assert_eq!(parts(&later), (h, m + 1), "{now} then {later}");
     // Three hours later is three hours later, midnight included (no daylight change in mid June).
     assert_eq!(parts(&at(hour + 3 * 3600)).0, (h + 3) % 24);
+}
+
+/// What Windows takes in the name of an event of the user's own session: `Local\` and then
+/// no backslash, and at most MAX_PATH characters.
+fn is_a_name_windows_takes(name: &str) -> bool {
+    name.strip_prefix(r"Local\").is_some_and(|rest| {
+        !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+    }) && name.len() < 260
+}
+
+#[test]
+fn the_signal_name_follows_the_data_directory_and_only_it() {
+    let one = single_instance::name(Path::new(r"C:\Muro\data"));
+    assert_eq!(one, single_instance::name(Path::new(r"C:\Muro\data")));
+    assert_ne!(one, single_instance::name(Path::new(r"C:\Muro\portable\data")));
+    assert_ne!(one, single_instance::name(Path::new(r"C:\Muro\data2")));
+    assert!(is_a_name_windows_takes(&one), "{one}");
+}
+
+/// The path is the user's or an environment variable's: whatever it holds, the name stays one
+/// Windows takes, and it is a hash of the path, never the path.
+#[test]
+fn the_signal_name_takes_no_character_from_the_path() {
+    let hostile = [
+        r"C:\Muro\da\ta".to_string(),
+        "C:\\Muro\\\"data\"*?<>|\r\n\t".to_string(),
+        r"\\?\GLOBALROOT\Device\x".to_string(),
+        r"Local\Muro-1".to_string(),
+        "Müller José 日本語 🙂".to_string(),
+        "a".repeat(5000),
+        String::new(),
+    ];
+    let mut names = std::collections::HashSet::new();
+    for path in &hostile {
+        let name = single_instance::name(Path::new(path));
+        assert!(is_a_name_windows_takes(&name), "{path:?} -> {name}");
+        assert!(names.insert(name), "{path:?} shares its name");
+    }
+}
+
+/// A running Muro and a new one must agree on the name even if they were not built together, so
+/// the hash is pinned: `c:\muro\data` hashed with FNV-1a 64 by another program.
+#[cfg(windows)]
+#[test]
+fn the_signal_name_is_stable_and_ignores_how_a_windows_path_is_spelled() {
+    assert_eq!(
+        single_instance::name(Path::new(r"C:\Muro\data")),
+        r"Local\MuroShow-cc033abbd7c81f5b"
+    );
+    for spelling in [r"c:\muro\DATA", r"C:\Muro\data\", "C:/Muro/data", r"\\?\C:\Muro\data", r"C:\Muro\x\..\data"] {
+        assert_eq!(
+            single_instance::name(Path::new(spelling)),
+            r"Local\MuroShow-cc033abbd7c81f5b",
+            "{spelling}"
+        );
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_second_process_reaches_the_first_through_the_signal_of_the_same_directory() {
+    use single_instance::Signal;
+    let id = uuid::Uuid::new_v4();
+    let data = PathBuf::from(format!(r"C:\Muro Signal Test\{id}\data"));
+    let other = PathBuf::from(format!(r"C:\Muro Signal Test\{id}\other"));
+    let short = Some(Duration::from_millis(100));
+    let (first, created) = Signal::open(&data).unwrap();
+    assert!(created);
+    assert!(!first.wait(short).unwrap(), "raised by nobody");
+    let (second, created) = Signal::open(&data).unwrap();
+    assert!(!created, "the same directory has one signal");
+    // Raised before anyone waits: it is kept for the first instance, which may still be starting.
+    second.raise().unwrap();
+    assert!(first.wait(Some(Duration::from_secs(5))).unwrap());
+    assert!(!first.wait(short).unwrap(), "one raise is one show");
+    // Another directory is another Muro.
+    let (independent, created) = Signal::open(&other).unwrap();
+    assert!(created);
+    second.raise().unwrap();
+    assert!(!independent.wait(short).unwrap());
+    assert!(first.wait(Some(Duration::from_secs(5))).unwrap());
+    // The signal goes with the last handle: the next Muro is the first again.
+    drop((first, second));
+    let (again, created) = Signal::open(&data).unwrap();
+    assert!(created);
+    drop((again, independent));
+}
+
+#[cfg(windows)]
+#[test]
+fn a_waiting_thread_wakes_when_another_handle_raises_the_signal() {
+    use single_instance::Signal;
+    let data = PathBuf::from(format!(r"C:\Muro Signal Test\{}", uuid::Uuid::new_v4()));
+    let (first, _) = Signal::open(&data).unwrap();
+    let waiter = thread::spawn(move || first.wait(Some(Duration::from_secs(10))).unwrap());
+    thread::sleep(Duration::from_millis(200));
+    Signal::open(&data).unwrap().0.raise().unwrap();
+    assert!(waiter.join().unwrap());
+}
+
+/// A sync that starts and then waits until the test lets it end.
+fn held_sync(gate: &Arc<SyncGate>) -> (mpsc::Sender<()>, thread::JoinHandle<Option<u8>>) {
+    let (release, released) = mpsc::channel::<()>();
+    let (started, has_started) = mpsc::channel::<()>();
+    let gate = gate.clone();
+    let sync = thread::spawn(move || {
+        gate.run(|| {
+            started.send(()).unwrap();
+            let _ = released.recv();
+            7
+        })
+    });
+    has_started.recv_timeout(Duration::from_secs(5)).unwrap();
+    (release, sync)
+}
+
+#[test]
+fn syncs_run_one_at_a_time() {
+    let gate = Arc::new(SyncGate::new());
+    let active = Arc::new(AtomicUsize::new(0));
+    let most = Arc::new(AtomicUsize::new(0));
+    let runs: Vec<_> = (0..4)
+        .map(|_| {
+            let (gate, active, most) = (gate.clone(), active.clone(), most.clone());
+            thread::spawn(move || {
+                gate.run(|| {
+                    let now = active.fetch_add(1, Ordering::SeqCst) + 1;
+                    most.fetch_max(now, Ordering::SeqCst);
+                    thread::sleep(Duration::from_millis(30));
+                    active.fetch_sub(1, Ordering::SeqCst);
+                })
+            })
+        })
+        .collect();
+    for run in runs {
+        assert_eq!(run.join().unwrap(), Some(()));
+    }
+    assert_eq!(most.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn quit_waits_for_the_sync_in_progress_and_then_lets_no_other_start() {
+    let gate = Arc::new(SyncGate::new());
+    let (release, sync) = held_sync(&gate);
+    // A sync that was already waiting its turn behind the one in progress.
+    let queued = {
+        let gate = gate.clone();
+        thread::spawn(move || gate.run(|| panic!("a queued sync started during quit")))
+    };
+    thread::sleep(Duration::from_millis(200));
+    let waiting = Arc::new(AtomicBool::new(false));
+    let quit = {
+        let (gate, waiting) = (gate.clone(), waiting.clone());
+        thread::spawn(move || gate.quit(Duration::from_secs(30), || waiting.store(true, Ordering::SeqCst)))
+    };
+    let end = std::time::Instant::now() + Duration::from_secs(5);
+    while !waiting.load(Ordering::SeqCst) && std::time::Instant::now() < end {
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(waiting.load(Ordering::SeqCst), "the tray was not told a sync is being finished");
+    thread::sleep(Duration::from_millis(200));
+    assert!(!quit.is_finished(), "quit did not wait for the sync");
+    assert!(gate.is_quitting());
+    // The queued sync and the next one do not start, and say so: neither waits for the end of
+    // the sync in progress only to start another that quit would wait for in turn.
+    let next = {
+        let gate = gate.clone();
+        thread::spawn(move || gate.run(|| panic!("a sync started during quit")))
+    };
+    let end = std::time::Instant::now() + Duration::from_secs(5);
+    while !(queued.is_finished() && next.is_finished()) && std::time::Instant::now() < end {
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(queued.is_finished() && next.is_finished(), "a sync is waiting behind quit");
+    assert_eq!(queued.join().unwrap(), None);
+    assert_eq!(next.join().unwrap(), None);
+    release.send(()).unwrap();
+    assert_eq!(sync.join().unwrap(), Some(7), "the sync in progress ended whole");
+    assert!(quit.join().unwrap(), "quit saw the sync end");
+}
+
+#[test]
+fn quit_gives_up_waiting_after_its_limit() {
+    let gate = Arc::new(SyncGate::new());
+    let (release, sync) = held_sync(&gate);
+    let told = AtomicUsize::new(0);
+    let started = std::time::Instant::now();
+    let ended = gate.quit(Duration::from_millis(300), || {
+        told.fetch_add(1, Ordering::SeqCst);
+    });
+    assert!(!ended, "the sync was still running");
+    assert!(started.elapsed() >= Duration::from_millis(300));
+    assert_eq!(told.load(Ordering::SeqCst), 1);
+    release.send(()).unwrap();
+    assert_eq!(sync.join().unwrap(), Some(7));
+}
+
+#[test]
+fn quit_with_no_sync_in_progress_does_not_wait_or_tell_the_tray() {
+    let gate = SyncGate::new();
+    assert!(!gate.is_quitting());
+    let started = std::time::Instant::now();
+    assert!(gate.quit(Duration::from_secs(60), || panic!("no sync to finish")));
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(gate.is_quitting());
+}
+
+#[test]
+fn a_sync_that_panics_does_not_hold_the_gate() {
+    let gate = SyncGate::new();
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| gate.run(|| panic!("sync failed"))));
+    assert!(panicked.is_err());
+    assert_eq!(gate.run(|| 3), Some(3));
+    assert!(gate.quit(Duration::from_secs(5), || panic!("no sync to finish")));
 }

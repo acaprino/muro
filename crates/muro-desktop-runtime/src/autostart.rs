@@ -1,9 +1,10 @@
 //! Start with Windows: a value of the per-user Run key that starts Muro in the background at
-//! sign-in. The key is read and written with `reg.exe`, never through a shell.
+//! sign-in. The key is read and written with `reg.exe`, never through a shell; only the text of
+//! a value, which `repair` needs to find the executable it names, is read through the registry API.
 
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The Run value that starts `exe` in the background; the path is always quoted.
 pub fn command(exe: &Path) -> String {
@@ -46,14 +47,50 @@ pub fn set(name: &str, exe: &Path, enabled: bool) -> Result<Value> {
     }
 }
 
-/// Points an enabled Run value that names another executable at `exe`; a disabled one stays
-/// disabled.
+/// The executable a Run value names, when the value is a command in the form `command` writes:
+/// a quoted path and then whatever follows it. Any other form names nothing with no doubt (an
+/// unquoted path may hold spaces, so where it ends is a guess).
+pub fn named_executable(command: &str) -> Option<PathBuf> {
+    let (path, _) = command.strip_prefix('"')?.split_once('"')?;
+    (!path.is_empty()).then(|| PathBuf::from(path))
+}
+
+/// Points the Run value `name` at `exe` when it is enabled and the executable it names is gone
+/// (Muro was moved or removed, so Windows would start nothing at sign-in). A value that names
+/// another executable that still exists is another copy's, and stays: while a development build
+/// or a portable copy runs, the installed Muro remains the one that starts with Windows. So
+/// does a value that is not a command Muro could have written, whatever it points at, and a
+/// disabled value, which stays disabled.
 pub fn repair(name: &str, exe: &Path) -> Result<()> {
     let state = state(name, exe)?;
-    if state["enabled"] == true && state["current"] == false {
+    if state["enabled"] == true && state["current"] == false && names_a_missing_executable(name)? {
         set(name, exe, true)?;
     }
     Ok(())
+}
+
+/// Whether the Run value `name` is a command that names an executable no longer on disk. Only a
+/// path that is not there (or is a folder) counts as gone: a drive that cannot be reached at the
+/// moment, or a file the user may not read, says nothing about the file.
+fn names_a_missing_executable(name: &str) -> Result<bool> {
+    #[cfg(windows)]
+    {
+        let Some(command) = run_key::read(name)? else {
+            return Ok(false);
+        };
+        let Some(executable) = named_executable(&command) else {
+            return Ok(false);
+        };
+        Ok(match std::fs::metadata(&executable) {
+            Ok(entry) => !entry.is_file(),
+            Err(error) => error.kind() == std::io::ErrorKind::NotFound,
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = name;
+        Ok(false)
+    }
 }
 
 /// A value name reg.exe cannot take for a switch or a key path.
@@ -70,7 +107,7 @@ fn value_name(name: &str) -> Result<()> {
 
 #[cfg(windows)]
 mod run_key {
-    use anyhow::{Context, Result, anyhow, ensure};
+    use anyhow::{Context, Result, anyhow, bail, ensure};
     use std::path::Path;
     use std::process::{Command, Output, Stdio};
 
@@ -134,6 +171,54 @@ mod run_key {
             fields.next().is_some_and(|n| n.eq_ignore_ascii_case(name))
                 && fields.next() == Some("REG_SZ")
         }))
+    }
+
+    /// The string value `name` exactly as stored (REG_EXPAND_SZ with its variables expanded, as
+    /// Windows starts it), or `None` when there is no such value or it is not a string. Read
+    /// through the registry API, which gives UTF-16: the output of reg.exe is in the console
+    /// code page, and a path outside it would read as another path.
+    pub fn read(name: &str) -> Result<Option<String>> {
+        use windows_sys::Win32::Foundation::{
+            ERROR_FILE_NOT_FOUND, ERROR_MORE_DATA, ERROR_SUCCESS, ERROR_UNSUPPORTED_TYPE,
+        };
+        use windows_sys::Win32::System::Registry::{
+            HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW,
+        };
+        let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<u16>>();
+        let subkey = wide(KEY.trim_start_matches(r"HKCU\"));
+        let value = wide(name);
+        // Room for a usual path; when it is not enough the call says how much it needs.
+        let mut buffer = vec![0u16; 512];
+        loop {
+            let mut bytes = u32::try_from(buffer.len() * 2)?;
+            let status = unsafe {
+                RegGetValueW(
+                    HKEY_CURRENT_USER,
+                    subkey.as_ptr(),
+                    value.as_ptr(),
+                    RRF_RT_REG_SZ,
+                    std::ptr::null_mut(),
+                    buffer.as_mut_ptr().cast(),
+                    &mut bytes,
+                )
+            };
+            match status {
+                ERROR_SUCCESS => {
+                    // The size counts the terminator that the call writes.
+                    let text = &buffer[..(bytes as usize / 2).min(buffer.len())];
+                    let end = text
+                        .iter()
+                        .position(|&unit| unit == 0)
+                        .unwrap_or(text.len());
+                    return String::from_utf16(&text[..end])
+                        .map(Some)
+                        .context("The Run value is not valid Unicode");
+                }
+                ERROR_MORE_DATA => buffer.resize((bytes as usize).div_ceil(2) + 1, 0),
+                ERROR_FILE_NOT_FOUND | ERROR_UNSUPPORTED_TYPE => return Ok(None),
+                error => bail!("Cannot read the Run value (error {error})"),
+            }
+        }
     }
 
     pub fn write(name: &str, exe: &Path) -> Result<()> {

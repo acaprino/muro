@@ -1,14 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use anyhow::Context;
+#[cfg(windows)]
+use muro_desktop_runtime::single_instance;
 use muro_desktop_runtime::{
     autostart,
     cli::{self, Client},
+    sync_gate::SyncGate,
     tray,
 };
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex, PoisonError},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tauri::{
@@ -21,6 +24,8 @@ use tauri::{
 /// may go unread when nothing it depends on has changed.
 const POLL: Duration = Duration::from_secs(5);
 const TRAY_REFRESH: Duration = Duration::from_secs(30);
+/// How long Quit waits for a sync in progress before it ends Muro anyway.
+const QUIT_WAIT: Duration = Duration::from_secs(60);
 
 /// The backend the window talks to, and what the shell itself answers.
 #[derive(Clone)]
@@ -29,6 +34,8 @@ struct Backend {
     executable: PathBuf,
     /// The name of the per-user Run value that starts Muro with Windows.
     autostart: String,
+    /// Every `sync_now` goes through it, whoever asks: one at a time, and Quit waits for it.
+    gate: Arc<SyncGate>,
 }
 
 impl Backend {
@@ -43,6 +50,10 @@ impl Backend {
                     .context("enabled must be a boolean")?;
                 autostart::set(&self.autostart, &self.executable, enabled)
             }
+            "sync_now" => self
+                .gate
+                .run(|| self.client.request(action, payload))
+                .context("Muro is closing")?,
             _ => self.client.request(action, payload),
         }
     }
@@ -74,27 +85,28 @@ fn close_to_tray(client: &Client) -> bool {
         .unwrap_or(true)
 }
 
-/// The tray's two lines that change, and the syncs behind them. One sync runs at a time: the
-/// registry refuses a second writer.
+/// The tray's two lines that change, and the syncs behind them.
 #[derive(Clone)]
 struct Background {
-    client: Client,
+    backend: Backend,
     state: MenuItem<tauri::Wry>,
     pause: MenuItem<tauri::Wry>,
-    running: Arc<Mutex<()>>,
 }
 
 impl Background {
     /// One `sync_now`. The runtime records its outcome, failures included, for the Activity page.
     fn sync(&self, apply: bool) {
-        let _alone = self.running.lock().unwrap_or_else(PoisonError::into_inner);
-        let _ = self.client.request("sync_now", json!({"apply":apply}));
+        let _ = self.backend.request("sync_now", json!({"apply":apply}));
         self.refresh();
     }
 
-    /// Sets the state line and the pause item from the registry as it is now.
+    /// Sets the state line and the pause item from the registry as it is now. Once Muro is
+    /// quitting the line says what it waits for, and nothing else writes it.
     fn refresh(&self) {
-        if let Ok(snapshot) = self.client.request("snapshot", json!({})) {
+        if let Ok(snapshot) = self.backend.client.request("snapshot", json!({})) {
+            if self.backend.gate.is_quitting() {
+                return;
+            }
             let _ = self
                 .state
                 .set_text(tray::state_line(&snapshot, tray::local_clock));
@@ -104,15 +116,29 @@ impl Background {
 
     /// Flips `auto_sync` in the saved settings; the registry checks the revision.
     fn toggle_pause(&self) -> anyhow::Result<()> {
-        let registry = self.client.request("registry", json!({}))?;
+        let registry = self.backend.client.request("registry", json!({}))?;
         let mut settings = registry["settings"].clone();
         settings["auto_sync"] = json!(settings["auto_sync"] != true);
-        self.client.request(
+        self.backend.client.request(
             "settings",
             json!({"revision":registry["revision"],"settings":settings}),
         )?;
         self.refresh();
         Ok(())
+    }
+
+    /// Ends Muro without cutting a sync off: none starts from now on, the one in progress ends
+    /// (for `QUIT_WAIT` at most) while the state line says so, and then the process exits. The
+    /// one way out of Muro: Quit in the tray and a close with `close_to_tray` off both come
+    /// here. It waits on a thread of its own, never on the one that asked.
+    fn quit(&self, app: &tauri::AppHandle) {
+        let (work, app) = (self.clone(), app.clone());
+        std::thread::spawn(move || {
+            work.backend.gate.quit(QUIT_WAIT, || {
+                let _ = work.state.set_text(tray::FINISHING);
+            });
+            app.exit(0);
+        });
     }
 
     /// At start and then at every interval, always: a sync that applies when `auto_sync` is on,
@@ -124,7 +150,7 @@ impl Background {
         let mut refreshed = Instant::now();
         let mut revision = Value::Null;
         loop {
-            if let Ok(registry) = self.client.request("registry", json!({})) {
+            if let Ok(registry) = self.backend.client.request("registry", json!({})) {
                 let settings = &registry["settings"];
                 let interval = Duration::from_secs(
                     settings["interval_minutes"]
@@ -203,6 +229,28 @@ fn main() {
         }
         return;
     }
+    // Started with Windows: Muro waits in the notification area, without a window.
+    let background = args.iter().skip(1).any(|arg| arg == "--background");
+    // One Muro for each data directory, claimed before anything touches that directory. A Muro
+    // started while another runs asks it to show its window, unless it was started in the
+    // background, and ends: there is no second backend and nothing to report.
+    #[cfg(windows)]
+    let signal = match single_instance::Signal::open(&data) {
+        Ok((signal, true)) => Some(signal),
+        Ok((signal, false)) => {
+            let raised = if background { Ok(()) } else { signal.raise() };
+            if let Err(error) = raised {
+                eprintln!("Show the running Muro: {error:#}");
+            }
+            return;
+        }
+        // Without the signal Muro still runs, as it did before: a second one is then refused
+        // by the backend's own lock on the data directory.
+        Err(error) => {
+            eprintln!("Single instance: {error:#}");
+            None
+        }
+    };
     #[cfg(windows)]
     {
         let profile = data.join("webview");
@@ -212,8 +260,6 @@ fn main() {
             std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", profile);
         }
     }
-    // Started with Windows: Muro waits in the notification area, without a window.
-    let background = args.iter().skip(1).any(|arg| arg == "--background");
     tauri::Builder::default()
         .setup(move |app| {
             std::fs::create_dir_all(&data)?;
@@ -221,16 +267,17 @@ fn main() {
             // Handshake surfaces startup failures before showing an apparently connected UI.
             client.request("registry", json!({}))?;
             let backend = Backend {
-                client: client.clone(),
+                client,
                 executable,
                 autostart: autostart_name(),
+                gate: Arc::new(SyncGate::new()),
             };
-            // A Run value that names another copy of Muro starts that copy: it is no reason to
-            // stop this one.
+            // A Run value whose executable is gone is pointed at this copy; one that names a
+            // copy that exists is that copy's, and a failure is no reason to stop this one.
             if let Err(error) = autostart::repair(&backend.autostart, &backend.executable) {
                 eprintln!("Start with Windows: {error:#}");
             }
-            app.manage(backend);
+            app.manage(backend.clone());
             let state = MenuItem::with_id(app, "state", "Not checked yet", false, None::<&str>)?;
             let show = MenuItem::with_id(app, "show", "Open Muro", true, None::<&str>)?;
             let sync = MenuItem::with_id(app, "sync", "Sync now", true, None::<&str>)?;
@@ -240,11 +287,11 @@ fn main() {
             let line = PredefinedMenuItem::separator(app)?;
             let menu = Menu::with_items(app, &[&state, &show, &sync, &pause, &line, &quit])?;
             let work = Background {
-                client,
+                backend,
                 state,
                 pause,
-                running: Arc::new(Mutex::new(())),
             };
+            app.manage(work.clone());
             let for_menu = work.clone();
             let mut tray = TrayIconBuilder::new()
                 .tooltip("Muro")
@@ -264,13 +311,32 @@ fn main() {
                             }
                         });
                     }
-                    "quit" => app.exit(0),
+                    "quit" => for_menu.quit(app),
                     _ => {}
                 });
             if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+            // Each raise of the signal is a Muro that the user started again, asking this one
+            // to show its window. One that comes while this Muro is still starting waits here.
+            #[cfg(windows)]
+            if let Some(signal) = signal {
+                let (app, gate) = (app.handle().clone(), work.backend.gate.clone());
+                std::thread::spawn(move || {
+                    loop {
+                        match signal.wait(None) {
+                            // A Muro that is quitting does not open a window to close it again.
+                            Ok(_) if gate.is_quitting() => {}
+                            Ok(_) => show_window(&app),
+                            Err(error) => {
+                                eprintln!("Single instance: {error:#}");
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
             std::thread::spawn(move || work.run());
             if !background {
                 show_window(app.handle());
@@ -280,12 +346,17 @@ fn main() {
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
                 // Before the backend is up there is nothing to keep running.
-                let Some(backend) = window.try_state::<Backend>() else {
+                let (Some(backend), Some(work)) = (
+                    window.try_state::<Backend>(),
+                    window.try_state::<Background>(),
+                ) else {
                     return;
                 };
-                if close_to_tray(&backend.client) {
-                    api.prevent_close();
-                    let _ = window.hide();
+                // The window always goes away; whether Muro stays is the setting.
+                api.prevent_close();
+                let _ = window.hide();
+                if !close_to_tray(&backend.client) {
+                    work.quit(window.app_handle());
                 }
             }
         })

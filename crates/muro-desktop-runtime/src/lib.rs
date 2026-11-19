@@ -3,6 +3,8 @@ pub mod cli;
 pub mod discovery;
 pub mod jobs;
 mod process_tree;
+pub mod single_instance;
+pub mod sync_gate;
 pub mod tray;
 
 use anyhow::{Context, Result};

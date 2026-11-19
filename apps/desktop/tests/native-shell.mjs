@@ -1,5 +1,5 @@
 // The native shell, on the real executable: start with Windows, close to the tray, start in the
-// background, and the background worker. It talks to the shell's `request` command from the
+// background, the background worker, and one running Muro for each data directory. It talks to the shell's `request` command from the
 // page (window.__TAURI_INTERNALS__.invoke), not through the interface, and it asks the window
 // to close the way the operating system does: WM_CLOSE posted to it. Whether the window is shown is
 // read from user32 (IsWindowVisible): document.visibilityState stays 'visible' in WebView2 when
@@ -110,15 +110,19 @@ const exited = async (app, ms) => {
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
 const automation = () => json(join(data, 'automation-status.json'));
 
-const port = Number(process.env.MURO_CDP_PORT || 9228), endpoint = `http://127.0.0.1:${port}`;
-try { await fetch(endpoint + '/json/version'); throw Error(`CDP port ${port} is already in use`); } catch (e) { if (e.message.includes('already in use')) throw e; }
+const port = Number(process.env.MURO_CDP_PORT || 9228);
+// A second Muro, on another data directory, needs a debugging port of its own.
+for (const cdp of [port, port + 1]) {
+  try { await fetch(`http://127.0.0.1:${cdp}/json/version`); throw Error(`CDP port ${cdp} is already in use`); } catch (e) { if (e.message.includes('already in use')) throw e; }
+}
 
 const running = new Set();
 /** Starts the executable with `args` and reaches its page over CDP. The window is not hidden by the
  *  operating system's start-up flags: whether it shows is the shell's own doing. */
-async function launch(...args) {
+async function launch(args = [], { dataDir = data, cdpPort = port } = {}) {
+  const endpoint = `http://127.0.0.1:${cdpPort}`;
   const app = spawn(executable, args, {
-    env: { ...process.env, MURO_DATA_DIR: data, MURO_AUTOSTART_NAME: valueName, WEBVIEW2_USER_DATA_FOLDER: join(root, 'webview'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` },
+    env: { ...process.env, MURO_DATA_DIR: dataDir, MURO_AUTOSTART_NAME: valueName, WEBVIEW2_USER_DATA_FOLDER: join(root, 'webview'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${cdpPort}` },
     stdio: 'pipe', windowsHide: false,
   });
   running.add(app);
@@ -146,6 +150,33 @@ async function launch(...args) {
 }
 /** Posts WM_CLOSE and returns whether the process ended within `ms`. */
 const closeWindow = async (run, ms) => { windowOf(run.app, 'close'); return exited(run.app, ms); };
+
+/** Starts the executable again, as a user does with a Muro already running, and gives it `ms` to end
+ *  on its own: whether it did, its exit code, how long it took and what it printed. */
+async function startAgain(args = [], dataDir = data, ms = 5000) {
+  const began = Date.now();
+  const app = spawn(executable, args, {
+    env: { ...process.env, MURO_DATA_DIR: dataDir, MURO_AUTOSTART_NAME: valueName },
+    stdio: 'pipe', windowsHide: false,
+  });
+  running.add(app);
+  let output = '';
+  app.stdout.on('data', b => output += b); app.stderr.on('data', b => output += b);
+  const ended = await exited(app, ms);
+  const took = Date.now() - began;
+  if (!ended) app.kill();
+  running.delete(app);
+  return { ended, code: app.exitCode, took, output };
+}
+
+/** How many backends (muroctl) serve `dir` right now, whoever started them. */
+const backends = dir => {
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `@(Get-CimInstance Win32_Process -Filter "Name='muroctl.exe'" | Where-Object { $_.CommandLine.Contains($env:MURO_PROBE) }).Count`],
+    { encoding: 'utf8', env: { ...process.env, MURO_PROBE: dir } });
+  assert.equal(result.status, 0, result.stderr);
+  return Number(result.stdout.trim());
+};
 
 const results = [];
 try {
@@ -179,10 +210,59 @@ try {
   await first.save('save_plugin', 'plugin', { id: 'example', name: 'Example', source: artifact, policy: 'pinned', pinned_version: '1.0.0', targets: ['oc'], distributions: [{ harness: 'opencode', path: artifact, version: '1.0.0' }] });
   const plugins = async () => ((await json(join(profile, 'opencode.json'))).plugins ?? []).length;
 
+  // 4b. Whoever asks for it, a sync_now goes through the shell's gate and runs after the one in
+  // progress. Alone, the registry refuses the second writer with "Registry is busy". The worker's own
+  // reads can take that lock for a moment too, so a round with a refusal is tried again: without the
+  // gate every round has one.
+  const raw = () => first.page.evaluate(() => window.__TAURI_INTERNALS__.invoke('request', { action: 'sync_now', payload: { apply: false } }));
+  let refused = [];
+  for (let round = 0; round < 3; round++) {
+    refused = (await Promise.allSettled([raw(), raw(), raw()])).filter(r => r.status === 'rejected').map(r => String(r.reason));
+    if (refused.length === 0) break;
+  }
+  assert.deepEqual(refused, [], 'simultaneous sync_now calls were not run one after the other');
+  results.push('simultaneous sync_now requests run one after the other');
+
   // 5. Closing the window: with close_to_tray the process stays and the window is hidden.
   assert.equal(await closeWindow(first, 1000), false, 'closed with close_to_tray on');
   const hidden = windowOf(first.app, 'look');
   assert.deepEqual([hidden.found, hidden.visible], [true, false]);
+
+  // 5b. One Muro for each data directory. Started again while it waits in the tray, Muro shows the
+  // window of the one that runs; the new process ends by itself, with no error and no second backend.
+  assert.equal(backends(data), 1);
+  const again = await startAgain();
+  assert.deepEqual([again.ended, again.code, again.output], [true, 0, ''], `second start: ${JSON.stringify(again)}`);
+  assert.ok(again.took < 5000, `second start took ${again.took} ms`);
+  await until('first window shown by the second start', () => windowOf(first.app, 'look').visible, 5000);
+  assert.equal(backends(data), 1, 'a second backend was started');
+  results.push('a second start for the same data directory ends with 0 and shows the window that runs');
+
+  // Started with Windows (--background) while Muro runs: it ends and shows nothing.
+  assert.equal(await closeWindow(first, 1000), false, 'closed with close_to_tray on');
+  assert.equal(windowOf(first.app, 'look').visible, false);
+  const quiet = await startAgain(['--background']);
+  assert.deepEqual([quiet.ended, quiet.code, quiet.output], [true, 0, ''], `second start with --background: ${JSON.stringify(quiet)}`);
+  const stillHidden = windowOf(first.app, 'look', 1500);
+  assert.deepEqual([stillHidden.found, stillHidden.visible], [true, false], 'a window was shown by --background');
+  assert.equal(backends(data), 1);
+  results.push('a second start with --background ends with 0 and shows nothing');
+
+  // Another data directory is another Muro: its own backend and window, the first one untouched.
+  const otherData = join(root, 'other-data');
+  const other = await launch([], { dataDir: otherData, cdpPort: port + 1 });
+  await until('window of the other data directory', () => windowOf(other.app, 'look').visible);
+  assert.equal((await other.call('snapshot')).data_dir, otherData);
+  assert.equal(backends(otherData), 1);
+  assert.equal(backends(data), 1);
+  assert.equal(first.app.exitCode, null);
+  assert.equal(windowOf(first.app, 'look').visible, false, 'the other Muro woke the first one');
+  await other.settings({ close_to_tray: false });
+  assert.equal(await closeWindow(other, 3000), true, 'the other Muro did not end');
+  await other.browser.close().catch(() => {});
+  running.delete(other.app);
+  results.push('another data directory starts its own backend and window');
+
   await first.settings({ close_to_tray: false });
   assert.equal(await closeWindow(first, 3000), true, 'still running after close with close_to_tray off');
   await first.browser.close().catch(() => {});
@@ -191,7 +271,7 @@ try {
 
   // 6. --background: no window. The value that names another copy of Muro is repaired at start.
   spawnSync(reg, ['add', runKey, '/v', valueName, '/t', 'REG_SZ', '/d', '"C:\\Muro Old\\Muro.exe" --background', '/f']);
-  const second = await launch('--background');
+  const second = await launch(['--background']);
   assert.ok(sameText(runValue(), command), `Run value not repaired: ${runValue()}`);
   // The worker has run once the status shows what it found: by then setup is over.
   const waiting = await until('background check', async () => { const s = await automation(); return s.message === '1 change waiting' && s; });
@@ -206,15 +286,20 @@ try {
   assert.equal(await closeWindow(second, 3000), true);
   await second.browser.close().catch(() => {});
   running.delete(second.app);
-  const third = await launch('--background');
+  // A value that names another Muro that is still there is left to it: a development build or a
+  // portable copy that starts does not become the one that starts with Windows.
+  const installed = `"${process.execPath}" --background`;
+  spawnSync(reg, ['add', runKey, '/v', valueName, '/t', 'REG_SZ', '/d', installed, '/f']);
+  const third = await launch(['--background']);
   const applied = await until('automatic sync', async () => { const s = await automation(); return s.action === 'Automatic sync' && s; });
   assert.deepEqual([applied.status, applied.message], ['complete', '1 change applied']);
   assert.equal(await plugins(), 1);
+  assert.ok(sameText(runValue(), installed), `a value of another existing executable was taken over: ${runValue()}`);
   assert.equal(await closeWindow(third, 3000), true);
   await third.browser.close().catch(() => {});
   running.delete(third.app);
-  results.push('worker applies at start when auto_sync is on');
-  console.log(JSON.stringify({ status: 'pass', test: 'native shell: autostart, close to tray, background start, worker', checks: results, data_dir: root }));
+  results.push('worker applies at start when auto_sync is on; a value naming another existing executable is left alone');
+  console.log(JSON.stringify({ status: 'pass', test: 'native shell: autostart, close to tray, background start, worker, one running Muro', checks: results, data_dir: root }));
 } catch (e) {
   throw e;
 } finally {

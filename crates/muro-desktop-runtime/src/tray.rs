@@ -30,6 +30,9 @@ pub fn state_line(snapshot: &Value, clock: impl Fn(u64) -> Option<String>) -> St
     }
 }
 
+/// The state line while Muro waits for a sync to end before it quits.
+pub const FINISHING: &str = "Finishing the sync…";
+
 /// The menu item that turns automatic sync off, or back on when it is off.
 pub fn pause_label(snapshot: &Value) -> &'static str {
     if snapshot["registry"]["settings"]["auto_sync"] == true {
