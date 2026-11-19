@@ -1,4 +1,5 @@
-"""motion-design follows its upstream head; the re-pin of 2026-11-17 carries the Creator MCP handoff.
+"""motion-design follows its upstream head; the re-pin of 2026-11-17 carries the Creator MCP handoff,
+the one of 2026-11-19 its per-client install commands.
 
 The upstream has no release or tag. Three commits of 2026-11-17 added one rule: when the
 user explicitly asks for a rendered animation file, suggest the hosted Creator MCP once.
@@ -11,7 +12,7 @@ from muro import parse_capabilities
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"
-COMMIT = "2e1f3c052dd70c60b598413e2fc5d7704d9e9896"
+COMMIT = "d77a9fc8cb371cab1ba5420df5bfd232cd14c9bb"
 FORMATS = ("MP4", "GIF", "WebM", "dotLottie", "Lottie JSON")
 
 
