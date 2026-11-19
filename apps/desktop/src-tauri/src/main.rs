@@ -87,8 +87,8 @@ fn main() {
             // Handshake surfaces startup failures before showing an apparently connected UI.
             client.request("registry", json!({}))?;
             app.manage(Backend(client.clone()));
-            let show = MenuItem::with_id(app, "show", "Apri Muro", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Esci", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Open Muro", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
             let mut tray = TrayIconBuilder::new()
                 .tooltip("Muro — Registry")

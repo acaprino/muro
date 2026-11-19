@@ -1,1 +1,1 @@
-{"main":{"identifier":"main","description":"Muro main window","local":true,"windows":["main"],"permissions":["core:default"]}}
+{"main":{"identifier":"main","description":"Muro main window","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-set-theme"]}}

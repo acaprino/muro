@@ -15,5 +15,5 @@ export interface Operation { target_id:string; plugin_id:string; name:string; ki
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;
-export type Page = 'registry'|'harness'|'sync'|'activity'|'maintenance'|'settings';
+export type Page = 'registry'|'harness'|'sync'|'activity'|'settings';
 export interface ViewState {page:Page; snapshot:Snapshot|null; discovered:Discovered[]; discovering:boolean; plan:Plan|null; selected:string|null; query:string; filter:string; busy:string|null; error:string|null; discoveryError:string|null; maintenance:Maintenance|null}
