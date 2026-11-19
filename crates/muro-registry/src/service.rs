@@ -650,25 +650,6 @@ fn plan(
     )
 }
 fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Result<Value> {
-    let mut target_locks = vec![];
-    for target in reg["targets"]
-        .as_array()
-        .context("targets")?
-        .iter()
-        .filter(|t| t["enabled"] == true)
-    {
-        let lock_path = Path::new(str_field(target, "root")?).join(".muro-plugin-writer.lock");
-        ensure!(!lock_path.is_symlink(), "Linked target lock is not allowed");
-        let lock = fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(lock_path)?;
-        lock.try_lock_exclusive()
-            .context("Another Muro instance is updating this target")?;
-        target_locks.push(lock);
-    }
     let pid = str_field(payload, "plan_id")?;
     id(pid)?;
     // With `allow_blocked` the operations that are ready run and the blockers are reported
@@ -688,6 +669,31 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         allow_blocked || left_out.is_empty(),
         "Plan has blockers; resolve them before applying"
     );
+    let ops = plan["operations"].as_array().context("operations")?;
+    // Only the harnesses this plan changes are locked, and only their configuration is
+    // preserved: a harness whose folder was deleted is a blocker of the plan, never a stop
+    // for the others.
+    let changed: Vec<&Value> = reg["targets"]
+        .as_array()
+        .context("targets")?
+        .iter()
+        .filter(|t| ops.iter().any(|o| o["target_id"] == t["id"]))
+        .collect();
+    let mut target_locks = vec![];
+    for target in &changed {
+        let lock_path = Path::new(str_field(target, "root")?).join(".muro-plugin-writer.lock");
+        ensure!(!lock_path.is_symlink(), "Linked target lock is not allowed");
+        let lock = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(lock_path)
+            .with_context(|| format!("Cannot lock target {}", target["name"]))?;
+        lock.try_lock_exclusive()
+            .context("Another Muro instance is updating this target")?;
+        target_locks.push(lock);
+    }
     ensure!(plan["custom_instructions_hash"] == hash(&instructions::bindings(root, reg)?),
             "custom-instructions changed since plan; calculate a new plan");
     let invs = inventories(root, reg, receipts, true)?;
@@ -695,7 +701,6 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         hash(&invs) == str_field(&plan, "inventory_hash")?,
         "Installed inventory changed; calculate a new plan"
     );
-    let ops = plan["operations"].as_array().context("operations")?;
     for op in ops.iter().filter(|o| o["kind"] != "remove") {
         let a = &op["artifact"];
         let plugin = reg["plugins"].as_array().context("plugins")?.iter()
@@ -708,12 +713,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         );
     }
     // Preserve only affected configuration files, never credentials or session stores.
-    for target in reg["targets"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|t| ops.iter().any(|o| o["target_id"] == t["id"]))
-    {
+    for target in &changed {
         if let Ok(config) = native::config(target) {
             if config.exists() {
                 write(

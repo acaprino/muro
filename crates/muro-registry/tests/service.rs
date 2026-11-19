@@ -714,6 +714,32 @@ mod blockers {
         assert_eq!(plan["blockers"], json!([]), "{plan}");
         assert_eq!(removals(&plan), vec![json!("outside-plugin@1.0.0")]);
     }
+
+    /// A managed harness whose folder was deleted is a blocker of every plan; `apply` locks
+    /// only the harnesses its plan changes, so the others still sync.
+    #[test]
+    fn a_harness_whose_folder_is_gone_does_not_stop_the_others() {
+        let (t, r, p, a) = fixture();
+        let gone = t.path().join("gone-profile");
+        fs::create_dir_all(&gone).unwrap();
+        target(&r, &p);
+        target_as(&r, &gone, "gone", true);
+        plugin(&r, &a);
+        fs::remove_dir_all(&gone).unwrap();
+        let plan = request(&r, "plan", json!({})).unwrap();
+        let ops = plan["operations"].as_array().unwrap();
+        assert_eq!(ops.len(), 1, "{plan}");
+        assert_eq!(ops[0]["target_id"], "oc");
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
+        let applied = apply_allowing_blockers(&r, &plan);
+        assert_eq!(applied["left_out"], plan["blockers"]);
+        let ids: Vec<_> = installed(&r)
+            .iter()
+            .map(|i| i["registry_id"].clone())
+            .collect();
+        assert_eq!(ids, vec![json!("example")]);
+        assert!(!gone.exists());
+    }
 }
 
 #[test]
