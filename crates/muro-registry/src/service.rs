@@ -129,6 +129,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             let only = only_target(&payload)?;
             // Refuse an unknown or disabled target before resolving anything.
             planned_targets(&registry, only)?;
+            let before = registry["plugins"].clone();
             let mut errors = vec![];
             for index in 0..registry["plugins"].as_array().context("plugins")?.len() {
                 let plugin = registry["plugins"][index].clone();
@@ -139,7 +140,13 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                     }
                 }
             }
-            save_registry(data_dir, &mut registry)?;
+            // A check that found nothing new keeps the revision, or every interval of the
+            // background worker would make open forms and held plans stale.
+            if without_check_times(&registry["plugins"]) == without_check_times(&before) {
+                registry["plugins"] = before;
+            } else {
+                save_registry(data_dir, &mut registry)?;
+            }
             let plan = check_plan(data_dir, &registry, &receipts, None, only)?;
             if errors.is_empty() {
                 log(
@@ -230,6 +237,16 @@ fn receipt_for<'a>(receipts: &'a Value, target_id: &str, plugin_id: &str) -> Opt
         .as_object()?
         .values()
         .find(|r| r["target_id"] == target_id && r["plugin_id"] == plugin_id)
+}
+/// Plugin entries as a check compares them: the time of the check itself is not a change.
+fn without_check_times(plugins: &Value) -> Value {
+    let mut plugins = plugins.clone();
+    for plugin in plugins.as_array_mut().into_iter().flatten() {
+        if let Some(entry) = plugin.as_object_mut() {
+            entry.remove("last_checked");
+        }
+    }
+    plugins
 }
 fn save_registry(root: &Path, reg: &mut Value) -> Result<()> {
     reg["revision"] = json!(reg["revision"].as_u64().context("revision")? + 1);
@@ -554,6 +571,7 @@ fn plan(
             continue;
         }
         let installed = inv["plugins"].as_array().context("inventory plugins")?;
+        let blocked_before = blockers.len();
         let mut desired_native = vec![];
         for plugin in reg["plugins"]
             .as_array()
@@ -579,6 +597,10 @@ fn plan(
                     Ok(a) => a,
                     Err(e) => {
                         blockers.push(format!("{} / {}: {e:#}", target["name"], plugin["name"]));
+                        // A listed plugin whose build fails is still wanted: its copy stays.
+                        if let Some(old) = previous {
+                            desired_native.push(old["id"].clone());
+                        }
                         continue;
                     }
                 };
@@ -610,7 +632,9 @@ fn plan(
                 ops.push(json!({"target_id":tid,"plugin_id":pid,"name":plugin["name"],"kind":kind,"from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],"reason":if kind=="install"{"Missing desired distribution"}else{"Reconcile desired artifact"},"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())}));
             }
         }
-        if target["exclusive"] == true {
+        // A plan with blockers can be applied in part, so a harness that has one gets no
+        // removal until a plan finds it clear.
+        if target["exclusive"] == true && blockers.len() == blocked_before {
             for old in installed {
                 if !desired_native.contains(&old["id"]) {
                     ops.push(json!({"target_id":tid,"plugin_id":old["registry_id"].as_str().unwrap_or(""),"name":old["name"],"kind":"remove","from_version":old["version"],"to_version":"","reason":"Not in desired registry for this target","native_id":old["id"]}));
@@ -647,14 +671,21 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
     }
     let pid = str_field(payload, "plan_id")?;
     id(pid)?;
+    // With `allow_blocked` the operations that are ready run and the blockers are reported
+    // as left out; `plan` gives a harness with a blocker no removal.
+    let allow_blocked = match &payload["allow_blocked"] {
+        Value::Null => false,
+        v => v.as_bool().context("allow_blocked must be a boolean")?,
+    };
     let path = root.join("plans").join(format!("{pid}.json"));
     let plan = read(&path)?;
     ensure!(
         plan["revision"] == reg["revision"],
         "Registry revision changed; calculate a new plan"
     );
+    let left_out = plan["blockers"].as_array().context("blockers")?;
     ensure!(
-        plan["blockers"].as_array().context("blockers")?.is_empty(),
+        allow_blocked || left_out.is_empty(),
         "Plan has blockers; resolve them before applying"
     );
     ensure!(plan["custom_instructions_hash"] == hash(&instructions::bindings(root, reg)?),
@@ -838,7 +869,11 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
     synced.sort_unstable();
     synced.dedup();
     sync_status::record_sync(root, &synced, ops.len())?;
-    snapshot(root, reg, receipts, false)
+    let mut result = snapshot(root, reg, receipts, false)?;
+    if allow_blocked {
+        result["left_out"] = json!(left_out);
+    }
+    Ok(result)
 }
 fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<Value> {
     let kind = str_field(p, "kind")?;

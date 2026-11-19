@@ -342,6 +342,22 @@ fn is_epoch_seconds(v: &Value) -> bool {
     v.as_str()
         .is_some_and(|s| s.len() == 10 && s.chars().all(|c| c.is_ascii_digit()))
 }
+/// Moves the recorded check times back to an old time and returns it, so a check that runs
+/// within the same second still shows as a new time.
+fn age_checks(root: &Path) -> Value {
+    let mut aged = snapshot(root)["sync"].clone();
+    let old = json!("1000000000");
+    aged["last_check"] = old.clone();
+    for times in aged["targets"].as_object_mut().unwrap().values_mut() {
+        times["checked"] = old.clone();
+    }
+    fs::write(
+        root.join("sync-status.json"),
+        serde_json::to_vec(&aged).unwrap(),
+    )
+    .unwrap();
+    old
+}
 
 #[test]
 fn snapshot_carries_an_empty_sync_state_before_any_check() {
@@ -430,17 +446,9 @@ fn plan_for_one_target_leaves_the_others_out() {
 fn plan_for_one_target_records_only_that_targets_check() {
     let (t, r, p, a) = fixture();
     two_targets(t.path(), &r, &p, &a);
-    // Age the recorded full check, so a new time shows within the same second.
-    let mut aged = snapshot(&r)["sync"].clone();
-    let old = json!("1000000000");
-    aged["last_check"] = old.clone();
-    aged["targets"]["oc"]["checked"] = old.clone();
-    aged["targets"]["other"]["checked"] = old.clone();
-    fs::write(
-        r.join("sync-status.json"),
-        serde_json::to_vec(&aged).unwrap(),
-    )
-    .unwrap();
+    let old = age_checks(&r);
+    let aged = snapshot(&r)["sync"].clone();
+    assert_eq!(aged["targets"]["other"]["checked"], old);
     let plan = request(&r, "plan", json!({"target_id":"other"})).unwrap();
     assert_eq!(plan["operations"].as_array().unwrap().len(), 1);
     let sync = snapshot(&r)["sync"].clone();
@@ -511,6 +519,201 @@ fn check_reports_a_source_that_cannot_be_resolved_and_still_plans() {
     assert_eq!(plugins[1]["upstream_version"], "local");
     assert!(plugins[0]["upstream_revision"].is_null());
     request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+}
+
+#[test]
+fn check_with_nothing_new_keeps_the_registry_revision() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let first = request(&r, "check", json!({})).unwrap();
+    let revision = first["snapshot"]["registry"]["revision"].clone();
+    let on_disk = fs::read(r.join("registry.json")).unwrap();
+    let old = age_checks(&r);
+    let second = request(&r, "check", json!({})).unwrap();
+    assert_eq!(second["errors"], json!([]));
+    assert_eq!(second["snapshot"]["registry"]["revision"], revision);
+    assert_eq!(fs::read(r.join("registry.json")).unwrap(), on_disk);
+    assert_eq!(second["snapshot"]["registry"], snapshot(&r)["registry"]);
+    let sync = &second["snapshot"]["sync"];
+    assert!(is_epoch_seconds(&sync["last_check"]), "{sync}");
+    assert_ne!(sync["last_check"], old);
+    assert_eq!(sync["targets"]["oc"]["checked"], sync["last_check"]);
+    assert_eq!(sync["revision"], revision);
+    // The plan an open interface holds from the first check is still current.
+    request(&r, "apply", json!({"plan_id":first["plan"]["id"]})).unwrap();
+}
+
+#[test]
+fn check_that_resolves_a_new_revision_raises_the_registry_revision() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let before = snapshot(&r)["registry"]["revision"].as_u64().unwrap();
+    let first = request(&r, "check", json!({})).unwrap();
+    assert_eq!(first["snapshot"]["registry"]["revision"], before + 1);
+    let resolved = first["snapshot"]["registry"]["plugins"][0]["upstream_revision"].clone();
+    assert!(resolved.is_string(), "{first}");
+    fs::write(a.join("index.js"), "export default () => ({ v: 2 })").unwrap();
+    let second = request(&r, "check", json!({})).unwrap();
+    let registry = &second["snapshot"]["registry"];
+    assert_eq!(registry["revision"], before + 2);
+    assert_ne!(registry["plugins"][0]["upstream_revision"], resolved);
+    assert_eq!(snapshot(&r)["registry"], *registry);
+    assert_eq!(second["plan"]["revision"], registry["revision"]);
+}
+
+/// Plans with blockers: `apply` installs what is ready only when the caller allows it, and a
+/// plan never removes anything on a harness that has a blocker. The module name is what
+/// `cargo test -p muro-registry --test service blocker` finds.
+mod blockers {
+    use super::*;
+
+    /// A second build folder whose package name differs from the fixture's, so its native id
+    /// does too.
+    fn second_artifact(temp: &Path) -> std::path::PathBuf {
+        let dir = temp.join("second-artifact");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("package.json"),
+            r#"{"name":"second","version":"1.0.0","type":"module","main":"index.js"}"#,
+        )
+        .unwrap();
+        fs::write(dir.join("index.js"), "export default async () => ({})").unwrap();
+        dir
+    }
+    /// The fixture target with the example plugin listed and the other one ready to install,
+    /// and the plan for it: one install, one blocker.
+    fn one_ready_one_blocked(temp: &Path, r: &Path, p: &Path, a: &Path) -> Value {
+        let second = second_artifact(temp);
+        target(r, p);
+        plugin(r, a);
+        plugin_as(r, &second, "second", &["oc"]);
+        fs::remove_dir_all(&second).unwrap();
+        let plan = request(r, "plan", json!({})).unwrap();
+        let ops = plan["operations"].as_array().unwrap();
+        assert_eq!(ops.len(), 1, "{plan}");
+        assert_eq!(ops[0]["kind"], "install");
+        assert_eq!(ops[0]["plugin_id"], "example");
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
+        plan
+    }
+    /// The fixture's exclusive target with the example plugin installed.
+    fn installed_example(r: &Path, p: &Path, a: &Path) {
+        target(r, p);
+        assert_eq!(snapshot(r)["registry"]["targets"][0]["exclusive"], true);
+        plugin(r, a);
+        let plan = request(r, "plan", json!({})).unwrap();
+        request(r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    }
+    fn installed(r: &Path) -> Vec<Value> {
+        snapshot(r)["inventory"][0]["plugins"]
+            .as_array()
+            .unwrap()
+            .clone()
+    }
+    fn apply_allowing_blockers(r: &Path, plan: &Value) -> Value {
+        let payload = json!({"plan_id":plan["id"],"allow_blocked":true});
+        request(r, "apply", payload).unwrap()
+    }
+    fn removals(plan: &Value) -> Vec<Value> {
+        plan["operations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|o| o["kind"] == "remove")
+            .map(|o| o["native_id"].clone())
+            .collect()
+    }
+
+    #[test]
+    fn a_plan_with_blockers_is_still_refused_by_default() {
+        let (t, r, p, a) = fixture();
+        let plan = one_ready_one_blocked(t.path(), &r, &p, &a);
+        for payload in [
+            json!({"plan_id":plan["id"]}),
+            json!({"plan_id":plan["id"],"allow_blocked":false}),
+        ] {
+            assert_eq!(
+                request(&r, "apply", payload).unwrap_err().to_string(),
+                "Plan has blockers; resolve them before applying"
+            );
+        }
+        let payload = json!({"plan_id":plan["id"],"allow_blocked":"yes"});
+        assert!(
+            request(&r, "apply", payload)
+                .unwrap_err()
+                .to_string()
+                .contains("allow_blocked must be a boolean")
+        );
+        assert!(!p.join("opencode.json").exists());
+        let sync = &snapshot(&r)["sync"];
+        assert!(sync["last_sync"].is_null());
+        assert_eq!(sync["pending"], 1);
+    }
+
+    #[test]
+    fn a_plan_with_blockers_applies_what_is_ready_when_allowed() {
+        let (t, r, p, a) = fixture();
+        let plan = one_ready_one_blocked(t.path(), &r, &p, &a);
+        let applied = apply_allowing_blockers(&r, &plan);
+        assert_eq!(applied["left_out"].as_array().unwrap().len(), 1);
+        assert_eq!(applied["left_out"], plan["blockers"]);
+        let ids: Vec<_> = installed(&r)
+            .iter()
+            .map(|i| i["registry_id"].clone())
+            .collect();
+        assert_eq!(ids, vec![json!("example")]);
+        assert_eq!(applied["sync"]["pending"], 0);
+        assert_eq!(applied["sync"]["blockers"], 1);
+        let sync = &applied["sync"];
+        assert!(is_epoch_seconds(&sync["targets"]["oc"]["synced"]), "{sync}");
+        assert_eq!(snapshot(&r)["sync"], *sync);
+        let next = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(next["operations"], json!([]));
+        assert_eq!(next["blockers"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_blocked_plugin_is_never_removed_by_exclusive_sync() {
+        let (_t, r, p, a) = fixture();
+        installed_example(&r, &p, &a);
+        let config = fs::read(p.join("opencode.json")).unwrap();
+        fs::rename(&a, a.with_extension("moved")).unwrap();
+        let plan = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
+        assert_eq!(removals(&plan), Vec::<Value>::new(), "{plan}");
+        apply_allowing_blockers(&r, &plan);
+        assert_eq!(fs::read(p.join("opencode.json")).unwrap(), config);
+        let installed = installed(&r);
+        assert_eq!(installed.len(), 1);
+        assert_eq!(installed[0]["registry_id"], "example");
+    }
+
+    #[test]
+    fn a_harness_with_a_blocker_gets_no_removal() {
+        let (_t, r, p, a) = fixture();
+        installed_example(&r, &p, &a);
+        let path = p.join("opencode.json");
+        let mut config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        config["plugins"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!("outside-plugin@1.0.0"));
+        fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
+        let moved = a.with_extension("moved");
+        fs::rename(&a, &moved).unwrap();
+        let plan = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
+        assert_eq!(removals(&plan), Vec::<Value>::new(), "{plan}");
+        apply_allowing_blockers(&r, &plan);
+        let kept = fs::read_to_string(&path).unwrap();
+        assert!(kept.contains("outside-plugin@1.0.0"), "{kept}");
+        fs::rename(&moved, &a).unwrap();
+        let plan = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(plan["blockers"], json!([]), "{plan}");
+        assert_eq!(removals(&plan), vec![json!("outside-plugin@1.0.0")]);
+    }
 }
 
 #[test]

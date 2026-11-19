@@ -46,7 +46,8 @@ pub fn record_check(root: &Path, plan: &Value, checked: &[&str], full: bool) -> 
 }
 
 /// Records an applied plan: the targets it changed are synced, and the operations it applied
-/// are no longer pending.
+/// are no longer pending. `blockers` stays as the check counted it: an apply that left
+/// blockers out did not resolve them.
 pub fn record_sync(root: &Path, synced: &[&str], applied: usize) -> Result<()> {
     let mut state = load(root)?;
     let time = event("sync", "complete", "")["time"].clone();
