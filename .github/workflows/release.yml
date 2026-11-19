@@ -1,7 +1,7 @@
 name: Release
 
-# A release at every merge of develop into main. The same workflow is in Shinatama, Mukade, Xiox, Muro, Ethel,
-# Qamille and artcraft-web; what is project-specific is in .github/release.json, the version logic in
+# A release at every merge of develop into main. The same workflow is in Shinatama, Mukade, Xiox, Muro, Ethel
+# and artcraft-web; what is project-specific is in .github/release.json, the version logic in
 # .github/scripts/release.mjs.
 #   1. the merged pull request's label chooses the step: release:major, release:minor, otherwise patch;
 #   2. the next version is written in every version file (and the project's Cargo.lock entries);

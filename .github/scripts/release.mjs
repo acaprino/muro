@@ -1,4 +1,4 @@
-// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel, Qamille and artcraft-web: the same file in each, run by
+// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel and artcraft-web: the same file in each, run by
 // .github/workflows/release.yml at every merge of develop into main. What is project-specific is in .github/release.json:
 //   app        the name of the release and of its zip
 //   tagPrefix  the tag is <tagPrefix><version> (v0.1.2)

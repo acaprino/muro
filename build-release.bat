@@ -9,8 +9,8 @@ rem   build-release.bat --target <dir>    install folder (default D:\Software\Mu
 rem   build-release.bat --ci              npm ci even when node_modules is already there
 rem   build-release.bat --jobs N          parallel Rust compilations (CARGO_BUILD_JOBS)
 rem
-rem The same script, with the same steps and options, is in Shinatama, Mukade, Xiox, Muro, Ethel and
-rem Qamille: only the PROJECT parts (the settings below and the subroutines at the end) differ.
+rem The same script, with the same steps and options, is in Shinatama, Mukade, Xiox, Muro and
+rem Ethel: only the PROJECT parts (the settings below and the subroutines at the end) differ.
 rem   1. tools, version, npm dependencies in NPM_DIR (npm ci only when node_modules is missing, or --ci)
 rem   2. build                                                          PROJECT :build
 rem   3. .\release made from nothing: the programs and their files      PROJECT :assemble
