@@ -24,7 +24,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/acaprino/mukade/8bd1636
 python scripts/desktop_package.py --exe target/debug/muro-desktop.exe --resources apps/desktop/src-tauri/resources --tools .scratch/portable-tools --mukade-license .scratch/portable-tools/Mukade-LICENSE.txt --out .scratch/Muro-portable
 ```
 
-The tools script verifies the official Git and curl archive hashes, retaining licenses and runtime files. The Mukade license command fetches the license from the exact revision pinned in `crates/muro-desktop-runtime/Cargo.toml`; update both together when repinning Mukade. `--mukade-license` is required and the packager copies that file to `LICENSES/Mukade-MIT.txt`. The package includes the application, CLI executables, private resources, documentation, examples and SHA-256 manifest. It requires Windows WebView2; managed AI harnesses remain their own installed applications. Move the whole folder, not just `Muro.exe`.
+The tools script verifies the official Git and curl archive hashes, retaining licenses and runtime files. The Mukade license command fetches the license from the exact revision pinned in `crates/muro-desktop-runtime/Cargo.toml`; update both together when repinning Mukade. `--mukade-license` is required and the packager copies that file to `LICENSES/Mukade-LICENSE.txt`. The package includes the application, CLI executables, private resources, documentation, examples and SHA-256 manifest. It requires Windows WebView2; managed AI harnesses remain their own installed applications. Move the whole folder, not just `Muro.exe`.
 
 ## Registry workflow
 

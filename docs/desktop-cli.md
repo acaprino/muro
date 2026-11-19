@@ -11,7 +11,7 @@ SHA256.json
 README.md
 docs/desktop.md, docs/desktop-cli.md
 examples/desktop/
-LICENSES/Mukade-MIT.txt
+LICENSES/Mukade-LICENSE.txt
 tools/
   muroctl.exe
   mukade.exe
