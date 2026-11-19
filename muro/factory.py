@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .sources import _blob, _git, _matches, inspect_source, source_repository
+from .coverage import source_coverage
+from .sources import _covers, file_sizes, inspect_source, read_blobs, source_repository, tree_entries
 from .custom_instructions import collect as collect_custom, context as custom_context, snapshot as snapshot_custom
 
 
@@ -105,21 +106,14 @@ def _fresh_workbench(directory: Path, generated: set[str]) -> None:
     directory.mkdir(parents=True)
 
 
-def _selected(repo: Path, commit: str, patterns: list[str]) -> dict[str, bytes]:
-    entries = []
-    for item in _git(repo, "ls-tree", "-r", "-z", commit).split(b"\0"):
-        if not item:
-            continue
-        metadata, name = item.split(b"\t", 1)
-        mode, kind, _ = metadata.decode("ascii").split()
-        if kind == "blob" and mode in {"100644", "100755"}:
-            entries.append(name.decode("utf-8"))
-    result: dict[str, bytes] = {}
+def _selected(repo: Path, commit: str, patterns: list[str],
+              tree: dict[str, tuple[str, int]] | None = None) -> dict[str, bytes]:
+    tree = tree_entries(repo, commit) if tree is None else tree
+    entries = [name for name, (mode, _size) in tree.items() if mode in {"100644", "100755"}]
+    names: dict[str, None] = {}
     for pattern in patterns:
-        names = [name for name in entries if _matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/")]
-        for name in names:
-            result[name] = _blob(repo, commit, name)
-    return result
+        names.update(dict.fromkeys(name for name in entries if _covers(name, pattern)))
+    return read_blobs(repo, commit, list(names))
 
 
 def prepare_intake(src: dict[str, Any], project_root: Path, output_dir: Path) -> Path:
@@ -130,21 +124,26 @@ def prepare_intake(src: dict[str, Any], project_root: Path, output_dir: Path) ->
     template = template_path.read_text(encoding="utf-8")
     if not template.strip():
         raise ValueError("Intake AI prompt is empty")
-    prompt = f"{template}\n\n## Source-specific goal\n{src['intake']['goal']}\n\n{_INTAKE_PROTOCOL}\n\nRead ./source.json for the pinned revision and approved scope. Source files are under ./files/.\n"
+    prompt = (f"{template}\n\n## Source-specific goal\n{src['intake']['goal']}\n\n{_INTAKE_PROTOCOL}\n\n"
+              "Read ./source.json for the pinned revision and approved scope. Source files are under ./files/. "
+              "./coverage.json lists what the pinned source holds outside that scope and which of it the selected files name.\n")
     prompt += _delivery_rules(project_root)
     custom_files = collect_custom(project_root)
     prompt += _catalog_context(project_root, custom_files)
     inspect_source(src, project_root)
     output_dir = output_dir / src["id"]
     with source_repository(src, project_root) as repo:
-        files = _selected(repo, src["commit"], src["selected_paths"])
-    _fresh_workbench(output_dir, {"PROMPT.md", "source.json", "files", "custom-instructions"})
+        tree = tree_entries(repo, src["commit"])
+        files = _selected(repo, src["commit"], src["selected_paths"], tree)
+    coverage = source_coverage(files, file_sizes(tree))
+    _fresh_workbench(output_dir, {"PROMPT.md", "source.json", "coverage.json", "files", "custom-instructions"})
     snapshot_custom(custom_files, output_dir)
     for relative, content in files.items():
         target = output_dir / "files" / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
     (output_dir / "source.json").write_text(json.dumps(src, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output_dir / "coverage.json").write_text(json.dumps(coverage, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     (output_dir / "PROMPT.md").write_text(prompt, encoding="utf-8")
     return output_dir
 
@@ -175,7 +174,7 @@ def copy_source_helpers(src: dict[str, Any], project_root: Path, dist: Path) -> 
         selected = _selected(repo, src["commit"], src["selected_paths"])
     intake_only = src.get("intake_only_paths", [])
     evidence = [name for name in selected
-                if any(_matches(name, pattern) or name.startswith(pattern.rstrip("/") + "/") for pattern in intake_only)]
+                if any(_covers(name, pattern) for pattern in intake_only)]
     for name in evidence:
         del selected[name]
 
@@ -208,9 +207,12 @@ def copy_source_helpers(src: dict[str, Any], project_root: Path, dist: Path) -> 
             raise ValueError(f"Helper is not UTF-8: {name}") from exc
         source = re.sub(r"/\*[\s\S]*?\*/", "", source)
         source = "\n".join(line for line in source.splitlines() if not line.lstrip().startswith("//"))
-        patterns = [r"from\s+['\"](\.[^'\"]+)['\"]",
+        # A dependency is what the module itself loads: an import or re-export statement, a dynamic
+        # import or require, a URL on the module's own address. The same words quoted in a string, or a
+        # URL on a base known only at run time, name no file of the package (taste-skill, 2026-11-17).
+        patterns = [r"(?:^|[;}\n])\s*(?:import|export)\b[^;'\"]*?\bfrom\s*['\"](\.[^'\"]+)['\"]",
                     r"(?:import|require)\s*\(\s*['\"](\.[^'\"]+)['\"]",
-                    r"new URL\s*\(\s*['\"](\.[^'\"]+)['\"]"]
+                    r"new URL\s*\(\s*['\"](\.[^'\"]+)['\"]\s*,\s*import\.meta\.url"]
         for pattern in patterns:
             for dependency in re.findall(pattern, source):
                 # `new URL('./', import.meta.url)` is a module base directory,

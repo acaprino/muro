@@ -12,7 +12,7 @@ from pathlib import Path
 
 from muro import build_release
 from muro.runtime import Coordinator
-from routing_helpers import copy_prompts, response
+from routing_helpers import copy_delivery, copy_prompts, response
 
 ROOT = Path(__file__).resolve().parent.parent
 MARIONETTE = ROOT / "examples" / "marionette"
@@ -30,6 +30,7 @@ def packaged_marionette(tmp_path):
     for name in ("ROUTER.md", "sources.json", "entries.json"):
         shutil.copy2(MARIONETTE / name, pkg / name)
     copy_prompts(pkg)
+    copy_delivery(pkg)
     shutil.copytree(ROOT / "muro", pkg / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (pkg / "muro.py").write_text(
         "from pathlib import Path\nimport sys\npackage = Path(__file__).resolve().parent\n"
@@ -64,7 +65,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     assert len(data["instructions"]) < 800 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
     assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
     entries = {e["id"]: e for e in json.loads(full)["catalog"]}
-    assert len(entries) == 41
+    assert len(entries) == 37
     in_focus = ("visual-direction", "design-guidance", "figma-design")
     full_part = {e["id"]: e for e in data["catalog"] if "id" in e}
     assert set(full_part) == set(in_focus)

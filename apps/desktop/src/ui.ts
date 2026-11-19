@@ -3,6 +3,8 @@ export const icon=(name:string)=>`<svg aria-hidden="true" viewBox="0 0 24 24"><p
 export const esc=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export const badge=(label:string,tone='')=>`<span class="badge ${tone}">${esc(label)}</span>`;
 export const button=(label:string,action:string,options:{primary?:boolean;danger?:boolean;icon?:string;id?:string;disabled?:boolean}={})=>`<button class="btn ${options.primary?'primary':''} ${options.danger?'danger':''}" data-action="${action}" ${options.id?`data-id="${esc(options.id)}"`:''} ${options.disabled?'disabled':''}>${options.icon?icon(options.icon):''}${esc(label)}</button>`;
-export const head=(title:string,sub:string,action='')=>`<div class="breadcrumb">Workspace <span>/</span> ${esc(title)}</div><div class="header"><div><h1>${esc(title)}</h1><p>${esc(sub)}</p></div>${action}</div>`;
+export const head=(title:string,sub:string,action='')=>`<div class="header"><div><h1>${esc(title)}</h1><p>${esc(sub)}</p></div>${action}</div>`;
 export const empty=(title:string,description:string,action='')=>`<div class="empty"><span class="accent">${icon('box')}</span><h2>${esc(title)}</h2><p>${esc(description)}</p>${action}</div>`;
 export const field=(label:string,name:string,value='',options:{required?:boolean;type?:string;hint?:string;readonly?:boolean}={})=>`<label>${esc(label)}<input name="${name}" value="${esc(value)}" type="${options.type||'text'}" ${options.required?'required':''} ${options.readonly?'readonly':''}>${options.hint?`<small>${esc(options.hint)}</small>`:''}</label>`;
+/** The service stamps some events in epoch seconds: shown as a date, anything else as it came. */
+export const when=(value:unknown)=>{const s=String(value??'');return /^\d{10}(\d{3})?$/.test(s)?new Date(Number(s)*(s.length===10?1000:1)).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):s;};

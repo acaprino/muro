@@ -36,7 +36,7 @@ Return `shortcut_ledger` as a JSON string containing the ledger, counts, scan co
 
 ## Specifics
 
-- This is not session-handoff's current task narrative, a duplicated task map or TokenEconomizer's cost ledger. Another capability may consume it only when the user requests that next action.
+- This is not a handoff note's current task narrative, a duplicated task map or TokenEconomizer's cost ledger. Another capability may consume it only when the user requests that next action.
 - Git is useful for ignore-aware search and blame, not a fixed stack constraint; the source gives no Git installation procedure. If history is unavailable, leave the owner out and say so.
 
 ## Checks

@@ -11,7 +11,7 @@ import pytest
 
 from muro import parse_capabilities, parse_router
 from muro.runtime import Coordinator
-from routing_helpers import decision
+from routing_helpers import copy_delivery, decision
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
@@ -30,6 +30,7 @@ def coordinator(tmp_path):
     for directory in ("capabilities", "prompts"):
         shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
     shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
+    copy_delivery(package)
     return Coordinator(package, tmp_path / "consumer")
 
 
@@ -64,7 +65,9 @@ def test_explainer_capabilities_match_the_router_and_stay_passive():
         assert cap.role == role and router[name].role == role
         assert [intent["id"] for intent in cap.intents] == intents == router[name].intents_list()
         assert all(intent["description"].strip() and intent["excludes"] for intent in cap.intents)
-        assert cap.when == "—" and cap.after == [] and cap.conflicts == [] and cap.hooks == []
+        assert cap.when == "—" and cap.after == [] and cap.hooks == []
+        # One explanation has one owner: authoring and html-explanation never share a plan (2026-11-18).
+        assert cap.conflicts == (["html-explanation"] if name == "interactive-explainer" else [])
         assert any(tool["name"] == "file-access" and tool["required"] for tool in cap.tools)
         for tool in cap.tools:
             if tool["name"] == "web-research":

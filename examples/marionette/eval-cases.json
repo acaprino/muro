@@ -41,7 +41,7 @@
         "status": "no_match",
         "capabilities": []
       },
-      "why": "Text wanted in the conversation is excluded by the Office and explainer intents."
+      "why": "A three-line summary wanted in the chat is not a rich explanation, an Office file or an explainer."
     },
     {
       "id": "hover-timing",
@@ -179,62 +179,6 @@
       }
     },
     {
-      "id": "add-paper-to-wiki",
-      "task": "Aggiungi il paper arXiv 2401.00001 al mio paper wiki e collegalo ai topic giusti.",
-      "stack_tokens": [],
-      "expect": {
-        "status": "selected",
-        "capabilities": [
-          "paper-wiki"
-        ]
-      },
-      "why": "The wiki step fetches the paper itself; a separate search step is not needed for a known id."
-    },
-    {
-      "id": "method-diagram",
-      "task": "Dal testo della sezione Metodo che ti incollo, fammi la figura della pipeline per il paper, modificabile in draw.io.",
-      "stack_tokens": [],
-      "expect": {
-        "status": "selected",
-        "capabilities": [
-          "paper-figure"
-        ]
-      }
-    },
-    {
-      "id": "eval-below-baseline",
-      "task": "Il mio modello in validazione va peggio della baseline e non capisco perché: aiutami a capire dove guardare.",
-      "stack_tokens": [],
-      "expect": {
-        "status": "selected",
-        "capabilities": [
-          "research-practice"
-        ]
-      }
-    },
-    {
-      "id": "pitch-to-advisor",
-      "task": "Devo convincere il mio advisor a darmi un mese su questo risultato preliminare: preparami il messaggio senza esagerare.",
-      "stack_tokens": [],
-      "expect": {
-        "status": "selected",
-        "capabilities": [
-          "research-pitch"
-        ]
-      }
-    },
-    {
-      "id": "write-handoff",
-      "task": "Per oggi mi fermo: scrivi l'handoff così domani una sessione nuova riprende da dove siamo.",
-      "stack_tokens": [],
-      "expect": {
-        "status": "selected",
-        "capabilities": [
-          "session-handoff"
-        ]
-      }
-    },
-    {
       "id": "paper-explainer-not-wiki",
       "task": "Fammi una spiegazione HTML interattiva di questo paper che ti allego in PDF, con figure che posso manipolare.",
       "stack_tokens": [],
@@ -244,7 +188,44 @@
           "interactive-explainer"
         ]
       },
-      "why": "An interactive explainer of a supplied paper is explainer work, not a wiki note or a search."
+      "why": "Figures the reader manipulates, asked for as an interactive explainer, are interactive-explainer's work, not the explanation page or a search."
+    },
+    {
+      "id": "explain-paper-no-html-word",
+      "task": "Spiegami questo paper che ti allego: voglio capirlo davvero.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "html-explanation"
+        ]
+      },
+      "why": "The source answers a request to understand a paper with its HTML page even when HTML is not asked for."
+    },
+    {
+      "id": "explain-concept-as-html",
+      "task": "Spiegami in HTML come funziona il consenso Raft, partendo dalle basi.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "html-explanation"
+        ]
+      },
+      "why": "An explanation of a concept as a page: no interactive explainer or operable figures are asked for."
+    },
+    {
+      "id": "find-paper-then-explain",
+      "task": "Trova il paper originale di Raft e spiegamelo.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "paper-search",
+          "html-explanation"
+        ]
+      },
+      "why": "Finding the paper is a literature search; the explanation reads what it fetched."
     },
     {
       "id": "dashboard-chart-not-paper-plot",
@@ -256,7 +237,7 @@
           "work-map"
         ]
       },
-      "why": "A chart in an app is a software change; paper-figure excludes dashboards."
+      "why": "A chart in an app is a software change, not research or explainer work."
     },
     {
       "id": "economizer-status",

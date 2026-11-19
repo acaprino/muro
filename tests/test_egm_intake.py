@@ -168,7 +168,8 @@ def test_delivery_registers_nothing_and_accounts_for_every_part():
     mine = [item for item in document["decisions"] if item["source"] == SOURCE]
     assert {item["form"] for item in mine} == {"capability", "dropped"}
     assert {target for item in mine for target in item["targets"]} == set(PROCEDURES)
-    assert validate_delivery({"decisions": mine}, list(catalog().values()), {SOURCE}) == []
+    # Checked against its own capabilities: the catalog also holds another source's active hook.
+    assert validate_delivery({"decisions": mine}, [catalog()[name] for name in PROCEDURES], {SOURCE}) == []
     content = "\n".join(item["content"] for item in mine)
     for name in SKILLS:
         assert f"skills/{name}/SKILL.md" in content, name

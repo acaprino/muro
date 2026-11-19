@@ -10,7 +10,7 @@ import pytest
 
 from muro import parse_capabilities, parse_router, validate_capabilities_and_router
 from muro.runtime import Coordinator
-from routing_helpers import copy_prompts, decision
+from routing_helpers import copy_delivery, copy_prompts, decision
 
 ROOT = Path(__file__).resolve().parent.parent
 PACKAGE = ROOT / "examples" / "marionette"
@@ -23,6 +23,7 @@ def coordinator(tmp_path):
     shutil.copytree(PACKAGE / "capabilities", package / "capabilities")
     shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
     copy_prompts(package)
+    copy_delivery(package)
     return Coordinator(package, tmp_path / "consumer")
 
 

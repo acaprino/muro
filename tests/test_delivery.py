@@ -15,7 +15,8 @@ import sys
 import pytest
 
 from muro import build_release, parse_capabilities
-from muro.delivery import ALWAYS_ON_PER_SOURCE, always_on_limit, validate_delivery
+from muro.delivery import (ALWAYS_ON_PER_SOURCE, always_on_limit, claude_code_hooks, codex_hooks,
+                           validate_delivery)
 from muro.factory import harmonize_prompt, prepare_intake
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -311,3 +312,23 @@ def test_the_guide_shows_the_recorded_decisions(portable_project, tmp_path):
     release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
     guide = (release / "GUIDE.html").read_text(encoding="utf-8")
     assert TEXT in guide and "One task-specific procedure." in guide
+
+
+def test_a_wiring_may_carry_the_timeout_the_source_declares_for_its_hook():
+    # taste-skill declares `timeout: 600` on its Stop hook: its finish gate runs two headless browsers (ADR-0026).
+    document = hooked(event="Stop", timeout=600)
+    assert errors_for(document, [Cap("x", [ACTIVE])]) == []
+    [group] = claude_code_hooks(document, "muro", "Muro")["hooks"]["Stop"]
+    assert group["hooks"][0]["timeout"] == 600
+    codex = dict(document, hooks=[dict(document["hooks"][0], host="codex")])
+    [group] = codex_hooks(codex, "muro", "Muro")["hooks"]["Stop"]
+    assert group["hooks"][0]["timeout"] == 600
+    # Without the field nothing is written and the host's own default applies, as before.
+    [group] = claude_code_hooks(hooked(event="Stop"), "muro", "Muro")["hooks"]["Stop"]
+    assert "timeout" not in group["hooks"][0]
+
+
+@pytest.mark.parametrize("value", [0, -5, "600", 1.5, True, None])
+def test_a_hook_timeout_is_a_positive_number_of_whole_seconds(value):
+    errors = errors_for(hooked(timeout=value), [Cap("x", [ACTIVE])])
+    assert any("timeout" in error for error in errors), errors

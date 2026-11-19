@@ -119,7 +119,8 @@ def test_delivery_registers_nothing_and_accounts_for_every_part():
     mine = [item for item in document["decisions"] if item["source"] == SOURCE]
     assert {item["form"] for item in mine} == {"capability", "dropped"}
     assert {target for item in mine for target in item["targets"]} == {CAPABILITY}
-    assert validate_delivery({"decisions": mine}, list(catalog().values()), {SOURCE}) == []
+    # Checked against its own capabilities: the catalog also holds another source's active hook.
+    assert validate_delivery({"decisions": mine}, [catalog()[CAPABILITY]], {SOURCE}) == []
     content = "\n".join(item["content"] for item in mine)
     for part in ("skills/humanize/SKILL.md", "agents/text-humanizer.md", "rules.md", "italiano.md",
                  "pattern-catalog.md", "upstream-license.txt", "/text-humanizer:humanize", "README.md"):
@@ -157,7 +158,6 @@ def test_explicit_ai_fixtures_select_the_humanizer_as_one_direct_step(coordinato
 
 @pytest.mark.parametrize("task, capability", [
     ("Check this article claim by claim against its sources; do not rewrite it.", "explainer-fact-check"),
-    ("Review my pitch for claims the evidence does not support.", "research-pitch"),
 ])
 def test_explicit_negation_fixtures_preserve_existing_owners(coordinator, task, capability):
     answer = decision(coordinator, task, [capability])

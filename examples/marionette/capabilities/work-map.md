@@ -1,7 +1,7 @@
 ---
 id: work-map
 role: coordinator
-tools: [{"name":"file-access","purpose":"Read the repository, its glossary and ADRs, implement authorized source and test changes, and write local spec and ticket files.","required":true},{"name":"shell","purpose":"Run the project's tests and checks for each built slice.","required":false}]
+tools: [{"name":"file-access","purpose":"Read the repository, its glossary and ADRs, implement authorized source and test changes, and write local spec and ticket files.","required":true},{"name":"shell","purpose":"Run the project's tests and checks for each built slice.","required":false},{"name":"subagent","purpose":"Run a research item as a background agent with a fresh context, as the source's research skill asks.","required":false}]
 hooks: []
 conflicts: []
 intents: [{"id":"engineering.work-coordination","description":"Implement clear software changes directly; otherwise agree scope, resolve decisions, write a spec and build reviewed vertical slices with evidence.","excludes":["Not a fallback for unknown, ambiguous or non-engineering requests.","Do not add planning ceremony to a task that fits one direct step.","Designing a page, a Figma file, motion, Office files or an explainer is the work of those capabilities, not engineering coordination."]}]
@@ -55,7 +55,8 @@ Return `task_map` (the route chosen and, for a charted map, its index), `spec` (
 ## Specifics
 
 - Muro's plan confirmation authorizes running this step; it does not replace the user's decisions inside it (destination, test seams, slice breakdown, HITL items). Reuse decisions and authorization already given; ask only for an unresolved choice.
-- Do the work the source gives to its grilling, domain-modeling, research, prototype and implement skills inline; they are not in this package.
+- A research item follows the source's `research` skill (`<package_root>/scripts/wayfinder/skills/engineering/research/SKILL.source.md`): a background agent with a fresh context, primary sources and not a secondary write-up of them, one Markdown file that cites each claim's source, saved where the repository already keeps such notes. A host without subagents does the same work in the session.
+- Do the work the source gives to its grilling, domain-modeling, prototype and implement skills inline: those skills are not selected (Sources).
 - The source does not recommend local markdown, because material stored in the repo tends to persist by accident: tell the user which `.scratch/` files were written.
 - The method has no fixed runtime dependency; assess and install what the authorized implementation needs under the package's runtime rule, preserving any required engine.
 
@@ -71,7 +72,7 @@ Return `task_map` (the route chosen and, for a charted map, its index), `spec` (
 ## Sources
 
 - AI intent mapping: wayfinder, to-spec and to-tickets → engineering.work-coordination, from the wayfinder SKILL.md (map, tickets, charting, working the map), the wayfinder guide (trigger, FAQ, "It's working if"), the to-spec process and template and the to-tickets slicing, quiz and local-ticket sections.
-- Source: wayfinder (mattpocock/skills@d1478fcb, release v1.3.2) — `skills/engineering/wayfinder/SKILL.md`, `docs/engineering/wayfinder.md`, `skills/engineering/to-spec/SKILL.md`, `skills/engineering/to-tickets/SKILL.md`, packaged under `<package_root>/scripts/wayfinder/` (each `SKILL.md` as `SKILL.source.md`).
+- Source: wayfinder (mattpocock/skills@d1478fcb, release v1.3.2) — `skills/engineering/wayfinder/SKILL.md`, `docs/engineering/wayfinder.md`, `skills/engineering/to-spec/SKILL.md`, `skills/engineering/to-tickets/SKILL.md` and, since 2026-11-17, `skills/engineering/research/SKILL.md` (the skill wayfinder gives its research items to; ADR-0026), packaged under `<package_root>/scripts/wayfinder/` (each `SKILL.md` as `SKILL.source.md`).
 - Muro extension: step 6 (build and review) comes from this source's intake goal ("extend it through build and review without remote trackers"); the source itself plans and hands off.
 - Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) - `skills/ponytail/SKILL.md`, packaged as `<package_root>/scripts/ponytail/SKILL.source.md`. Its `## Before you write` and `## The smallest complete change` are also carried, in the same words, in the package's permanent policy.
 - AI harmonization (2026-11-12): Ponytail enriches the existing implementation owner without another writer, output or prerequisite. Wayfinder keeps destination/spec/slices and meaningful user gates. A requested engineering-review report remains independent of per-slice acceptance review. Second pass the same day: the body is an entry prompt in the package's words with pointers to the sections a step needs.
@@ -80,7 +81,8 @@ Return `task_map` (the route chosen and, for a charted map, its index), `spec` (
   - "tell the user to run `/setup-matt-pocock-skills`" is not followed: that setup skill is not selected.
   - Research findings are not put on a pushed `research/<name>` branch: the intake goal keeps the work local, so they stay local with a pointer from the item.
   - to-spec's publishing to the tracker with the `ready-for-agent` label and to-tickets' real-tracker form are not applied (same collision); the "Local files" form is followed as written.
-  - "Call the Skill tool" for grilling, domain-modeling, research and prototype, and the guide's hand-offs to other skills of the source, are done inline: those skills are not selected and routing between a source's own skills competes with the coordinator.
+  - "Call the Skill tool" for grilling, domain-modeling and prototype, and the guide's hand-offs to other skills of the source, are done inline: those skills are not selected and routing between a source's own skills competes with the coordinator. The `research` skill is selected: this step starts its background agent itself, not through the Skill tool, and a host without subagents does the research in the session (a step that host cannot run).
+  - Open intake question (2026-11-17): the grilling, domain-modeling, prototype and implement skills of the same repository are named by wayfinder only by skill name, were never read, and stay unselected. Whether the package absorbs them is a decision on this source's selection.
   - `disable-model-invocation: true` and every slash form are not carried: the coordinator classifies by meaning.
   - "Stop and ask the user how they'd like to proceed" (no fog) is asked only when the request has not already answered it: the confirmed plan and a request for the change itself say how to proceed.
   - The source "hands off and does not continue into code"; step 6 continues to the build, by the intake goal, always in a step separate from the map.

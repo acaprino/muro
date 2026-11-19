@@ -167,7 +167,9 @@ reason that the hook is not active there. A hook left `manual` or
 Arguments are literal data, not shell syntax: use the executable and script
 explicitly, not a shell command string. Windows `.cmd`/`.bat` targets are
 rejected because Windows reinterprets their arguments; use the underlying
-executable instead. Host permissions and trust still govern activation.
+executable instead. When the source declares a timeout for its hook, carry it
+as `timeout` (whole seconds) in the wiring; without it the host's default
+applies. Host permissions and trust still govern activation.
 
 ## Output
 
@@ -183,12 +185,13 @@ Write `delivery.json` in the package directory:
   "always_on": "<the session text, only with an always-on decision>",
   "hooks": [
     {"host": "<host>", "capability": "<capability id>", "event": "<host event>",
-     "matcher": "", "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"]}
+     "matcher": "", "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"],
+     "timeout": 600}
   ]
 }
 ```
 
 Every source has at least one decision. `capability` and `hook` name their target
 capabilities; `always-on` and `dropped` name none. Omit `always_on` and `hooks`
-when no decision uses them. Reasons cite source paths or sections, like
+when no decision uses them, and `timeout` when the source declares none. Reasons cite source paths or sections, like
 `## Sources` does.

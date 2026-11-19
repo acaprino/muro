@@ -1,4 +1,4 @@
-// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel, Qemille and artcraft-web: the same file in each, run by
+// The release system shared by Shinatama, Mukade, Xiox, Muro, Ethel and artcraft-web: the same file in each, run by
 // .github/workflows/release.yml at every merge of develop into main. What is project-specific is in .github/release.json:
 //   app        the name of the release and of its zip
 //   tagPrefix  the tag is <tagPrefix><version> (v0.1.2)
@@ -9,7 +9,8 @@
 //   prepare    commands run before the build on a fresh checkout (dependencies the build does not install)
 //   build      the build (default: build-release.bat --no-install --ci), which fills release/
 //   runner     the GitHub runner (default: windows-latest)
-//   assets     zip (default: release/ zipped, plus its .exe and release/installer/) or files (release/'s files)
+//   assets     zip (default: release/installer/'s installers and one zip with all of release/ in a folder named
+//              after the app; no program loose beside them) or files (release/'s files)
 // Usage:
 //   node .github/scripts/release.mjs current                   the current version
 //   node .github/scripts/release.mjs next <patch|minor|major>  the version after it

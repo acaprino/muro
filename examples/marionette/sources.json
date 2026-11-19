@@ -3,9 +3,9 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; making and fact-checking HTML explainers; humanizing prose; paper search, wiki, figures, planning and pitching research; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
       "taste-skill",
       "design-taste-frontend",
@@ -18,13 +18,8 @@
       "creating-explainers",
       "explaining-codebases",
       "fact-checking-explainers",
+      "explain-anything-html",
       "paper-search",
-      "paper-wiki-manager",
-      "drawio-paper",
-      "codex-paper-figure-skill",
-      "research-bible",
-      "sell-research-honestly",
-      "session-handoff",
       "tokeneconomizer",
       "discovery-questions",
       "frontend-aesthetic-direction",
@@ -111,34 +106,47 @@
       "license": "MIT",
       "copyright": "Copyright (c) 2026 Leonxlnx",
       "selected_paths": [
-        "skills/taste-skill/SKILL.md",
-        "skills/taste-skill/references/system.md",
-        "skills/taste-skill/references/sections.md",
-        "skills/taste-skill/references/layout-v4.md",
-        "skills/taste-skill/references/motion.md",
-        "skills/taste-skill/references/copy.md",
-        "skills/taste-skill/library/type.json",
-        "skills/taste-skill/library/palettes.json",
-        "skills/taste-skill/assets/effects/fx.js",
-        "skills/taste-skill/scripts/start.mjs",
-        "skills/taste-skill/scripts/shoot.mjs"
+        "skills/taste-skill/**"
       ],
-      "excluded_paths": [
-        "skills/taste-skill/scripts/assets.mjs",
-        "skills/taste-skill/scripts/photos.mjs",
-        "skills/taste-skill/library/**/*.png",
-        "skills/taste-skill/assets/**/*.png",
-        "skills/taste-skill/examples/**"
+      "excluded_paths": [],
+      "media_paths": [
+        "skills/taste-skill/*.jpg",
+        "skills/taste-skill/*.png",
+        "skills/taste-skill/*.webp"
+      ],
+      "notice_paths": [
+        "skills/taste-skill/assets/photos/photos.json",
+        "skills/taste-skill/assets/layout/img/credits.json",
+        "skills/taste-skill/assets/moments/_demo/credits.json",
+        "skills/taste-skill/assets/scenes/_demo/credits.json",
+        "skills/taste-skill/assets/objects/photo-kit/photos.json",
+        "skills/taste-skill/assets/components/fx-photo/meta.json",
+        "skills/taste-skill/assets/ui/icons/icons-credits.json",
+        "skills/taste-skill/assets/icons/demo/icons-credits.json"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            "install.sh"
+          ],
+          "reason": "The upstream installer that links the skill into a host's skills folder. references/gate.md and scripts/moments.mjs name it only to say where an installed copy lives. A capability never installs the skill itself: the release's adapters do (ADR-0007)."
+        },
+        {
+          "paths": [
+            "README.md"
+          ],
+          "reason": "The repository's presentation page. assets/icons/demo.html names it in a link of the icon demo; no step of the method reads it."
+        }
       ],
       "runtime_deps": [],
       "intake": {
-        "goal": "Extract art direction, layout, typography, palette and anti-slop checks; do not download photos, fonts or other external assets."
+        "goal": "Intake of 2026-11-17, owner correction after a real session built a flat page by hand (\"marionette ha tutto!\"): absorb taste-skill whole, with every file its method uses at run time: the kit under assets/, the hero and moment dealers, the photograph and icon tools, the automated checks and the finish gate, every reference, and the images with their credits. The generated plugin does what the source does (ADR-0015, ADR-0026, ADR-0027)."
       }
     },
     {
       "id": "motion-design",
       "repo_url": "https://github.com/LottieFiles/motion-design-skill",
-      "commit": "f9a8a041b85185ee4881b3471d3415e939aac772",
+      "commit": "2e1f3c052dd70c60b598413e2fc5d7704d9e9896",
       "pin": "head",
       "license": "MIT",
       "copyright": "Copyright (c) 2025 LottieFiles",
@@ -200,7 +208,8 @@
         "skills/engineering/wayfinder/SKILL.md",
         "docs/engineering/wayfinder.md",
         "skills/engineering/to-tickets/SKILL.md",
-        "skills/engineering/to-spec/SKILL.md"
+        "skills/engineering/to-spec/SKILL.md",
+        "skills/engineering/research/SKILL.md"
       ],
       "excluded_paths": [
         "skills/**/scripts/**",
@@ -208,6 +217,21 @@
         "package-lock.json",
         "package.json",
         "examples/**"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            "AGENTS.md",
+            "CLAUDE.md"
+          ],
+          "reason": "The repository's own agent instruction files. docs/engineering/wayfinder.md names files of those names in the user's project, where the source's tracker setup writes a section; that setup is not carried (work-map, Sources)."
+        },
+        {
+          "paths": [
+            "skills/engineering/research/agents/**"
+          ],
+          "reason": "Interface metadata of the research skill for a host's skill list (agents/openai.yaml). The package registers no absorbed original as a skill."
+        }
       ],
       "runtime_deps": [],
       "intake": {
@@ -268,6 +292,22 @@
         "src/ui-ux-pro-max/scripts/tests/**",
         "src/ui-ux-pro-max/templates/**",
         ".github/**"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".claude/skills/design-system/**"
+          ],
+          "reason": "Another skill of the repository (design tokens and slides), not a source of this package. The selected SKILL.md names design-system/<project-slug>/, the folder its search writes in the user's project, not this skill."
+        },
+        {
+          "paths": [
+            ".claude/skills/ui-ux-pro-max/data/app-interface.csv",
+            ".claude/skills/ui-ux-pro-max/data/ux-guidelines.csv",
+            ".claude/skills/ui-ux-pro-max/scripts/search.py"
+          ],
+          "reason": "Second copies, in the installed layout, of three files the package takes from src/ui-ux-pro-max/ (the same Git blobs at the pin). The capability runs search.py and reads the data from the packaged src copy."
+        }
       ],
       "runtime_deps": [
         {
@@ -363,89 +403,28 @@
       "selected_paths": [
         "skills/paper-search/SKILL.md",
         "skills/paper-search/scripts/paper_search.py",
-        "skills/paper-wiki-manager/SKILL.md",
-        "skills/paper-wiki-manager/assets/**",
-        "skills/paper-wiki-manager/references/**",
-        "skills/paper-wiki-manager/scripts/create_paper_body_profile.py",
-        "skills/paper-wiki-manager/scripts/generate_viz.py",
-        "skills/paper-wiki-manager/scripts/set_status.py",
-        "skills/paper-wiki-manager/scripts/validate_paper_wiki.py",
-        "skills/paper-wiki-manager/scripts/static/**",
-        "skills/paper-wiki-manager/scripts/templates/**",
-        "skills/paper-wiki-manager/scripts/vendor/README.md",
-        "skills/drawio-paper/SKILL.md",
-        "skills/drawio-paper/neurips2025_diagram_style_guide.md",
-        "skills/drawio-paper/neurips2025_plot_style_guide.md",
-        "skills/drawio-paper/scripts/extract_bench.py",
-        "skills/codex-paper-figure-skill/SKILL.md",
-        "skills/research-bible/SKILL.md",
-        "skills/sell-research-honestly/SKILL.md",
-        "skills/sell-research-honestly/references/**",
-        "skills/session-handoff/SKILL.md",
-        "skills/session-handoff/references/**"
+        "skills/explain-anything-html/SKILL.md"
       ],
       "excluded_paths": [
-        "collected-skills/**",
-        "skills/research-bible/references/**",
-        "skills/paper-wiki-manager/scripts/vendor/cytoscape.min.js",
-        "skills/paper-wiki-manager/scripts/vendor/layout-base.js",
-        "skills/paper-wiki-manager/scripts/vendor/cose-base.js",
-        "skills/paper-wiki-manager/scripts/vendor/cytoscape-fcose.js",
-        "skills/paper-wiki-manager/scripts/vendor/marked.min.js",
-        "skills/paper-wiki-manager/scripts/test_set_status.py",
-        "skills/paper-wiki-manager/scripts/test_validate_paper_wiki.py",
-        "skills/paper-search/scripts/test_paper_search.py",
-        "skills/drawio-paper/evals/**",
-        "skills/paper-wiki-manager/agents/**",
-        "skills/codex-paper-figure-skill/agents/**",
-        "skills/research-bible/agents/**",
-        "skills/sell-research-honestly/agents/**",
-        "skills/discover-academic-skills/**",
-        "skills/explain-anything-html/**",
-        "skills/explain-paper-html/**",
-        "skills/filetree-simple/**",
-        "skills/human-cognition-cache/**",
-        "skills/karpathy-coding-rules/**",
-        "skills/map-then-territory/**",
-        "skills/okf-repo-organizer/**",
-        "skills/project-dispatch/**",
-        "skills/research-project-manager/**",
-        "skills/skill-organizer/**",
-        "skills/task-file-builder/**",
-        "skills/uv-env/**",
-        "skills/writing-great-prompt/**",
-        "scripts/**",
-        "assets/**"
+        "collected-skills/**"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".gitignore"
+          ],
+          "reason": "A coincidence of name: paper_search.py names the .gitignore of the user's project, where the keys file is listed, not the repository's own."
+        }
       ],
       "runtime_deps": [
         {
           "name": "uv, or Python 3.11+ (standard library; optional truststore)",
           "license": "External runtime, not bundled by Muro; installed at runtime from astral.sh when missing and wanted",
           "bundled": false
-        },
-        {
-          "name": "cytoscape 3.28.1, layout-base 2.0.1, cose-base 2.2.0, cytoscape-fcose 2.2.0, marked 12.0.0",
-          "license": "MIT (third-party viewer libraries, not bundled by Muro; fetched at runtime from the jsDelivr npm mirror)",
-          "bundled": false
-        },
-        {
-          "name": "PaperBananaBench reference dataset",
-          "license": "Apache-2.0 (about 266 MB, not bundled by Muro; downloaded at runtime from Hugging Face)",
-          "bundled": false
-        },
-        {
-          "name": "matplotlib, numpy, pillow",
-          "license": "Their own open-source licences (target environment packages, not bundled by Muro)",
-          "bundled": false
-        },
-        {
-          "name": "draw.io desktop command line",
-          "license": "Apache-2.0 (external application, not bundled by Muro)",
-          "bundled": false
         }
       ],
       "intake": {
-        "goal": "Classify every outcome of the author's own research skills that stand on their own: literature search and paper reading with per-source switches, the OKF paper wiki with its viewer and validator, publication diagrams and plots (the two figure skills as one method), research-practice guidance, honest research communication, and the cross-session HANDOFF.md. Keep the scripts, references and style guides as packaged helpers. Leave out collected-skills (other authors' work), the third-party essays under research-bible/references, the vendored viewer libraries (fetched at runtime), and the skills that operate the author's own Research OS or repeat a need another source already serves."
+        "goal": "Owner decision of 2026-11-18: from this source take explain-anything-html and paper search, and nothing else. Classify every outcome of the two skills: the rich single-file HTML explanation of a paper, post, article, documentation or hard concept, which the source starts on any request to explain or understand even when HTML is not asked for, and literature search and paper reading with per-source switches. Keep the search script as a packaged helper. Every other skill of the repository stays out, including the wiki, figure, research-guidance, pitch and handoff skills absorbed on 2026-11-11, and collected-skills (other authors' work)."
       }
     },
     {
@@ -483,6 +462,44 @@
         "docs/assets/**",
         "docs/ARCHITECTURE.md",
         "CLAUDE.md"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".claude-plugin/marketplace.json",
+            "plugin/.claude-plugin/**",
+            "plugin/.codex-plugin/**",
+            "plugin/.github/**",
+            "plugin/package.json",
+            "package.json",
+            "plugin/slash-commands/**",
+            "plugin/codex-skills/**",
+            "plugin/pi/**",
+            "plugin/scripts/te",
+            "plugin/scripts/te-hook",
+            "plugin/lib/**"
+          ],
+          "reason": "What registers and starts the original plugin on a host: manifests and the marketplace file, slash commands and Codex skills as files, the Pi extension, the POSIX te and te-hook launchers and the plugin's link to the package. They would register the original beside the coordinator and run its hooks twice; the commands' behaviour is steps 1 to 3 of token-economy, which calls the Python bootstrap directly (delivery.json; token-economy, Sources, which also records what is lost with the launcher). Activating the hooks by default, and the Pi extension with it, is an open delivery decision."
+        },
+        {
+          "paths": [
+            "pyproject.toml",
+            "scripts/build_plugin.py",
+            "tests/**",
+            "experiments/**"
+          ],
+          "reason": "Packaging, the build of the upstream plugin, the source's own tests and its benchmark experiments. Selected files name them as marker file names, in comments or as a build command for the original; no step of token-economy runs them."
+        },
+        {
+          "paths": [
+            ".gitignore",
+            "CLAUDE.md",
+            "README.md",
+            "docs/ARCHITECTURE.md",
+            "docs/assets/**"
+          ],
+          "reason": "The repository's presentation, its architecture note with its figures and its own agent instructions. plugin/probe.py writes a .gitignore in a probe folder and a tool catalogue quotes the name CLAUDE.md; docs/PLUGIN.md, which is selected, links the README. The capability opens none of them."
+        }
       ],
       "runtime_deps": [
         {
@@ -566,6 +583,21 @@
         "benchmarks/arms/**",
         ".agents/plugins/**"
       ],
+      "omissions": [
+        {
+          "paths": [
+            ".gitignore"
+          ],
+          "reason": "A coincidence of name: ponytail-debt names the .gitignore files of the user's project."
+        },
+        {
+          "paths": [
+            "benchmarks/agentic/README.md",
+            "benchmarks/agentic/complete.py"
+          ],
+          "reason": "The harness and the judge script that produced the benchmark. The package cites the published result file (engineering-guidance opens it for the figures) and does not rerun the benchmark."
+        }
+      ],
       "runtime_deps": [],
       "intake": {
         "goal": "Integrate Ponytail's six canonical working/review/audit/debt/help/benchmark methods into multidomain Marionette. Owner rule of 2026-11-12: the source's own rules file is carried in its own words as permanent policy, active by default and scoped to code work; its wording changes only where coexistence with another source or the catalog requires it, each change recorded in delivery.json. The intake also enriches the existing engineering implementation owner, merges change review and repository audit into one report-only responsibility with distinct intents, preserves requested shortcut ledgers and honest method/benchmark explanations. Published benchmark results are reference evidence, never measured Marionette or repository savings. The on-demand skills are packaged and read in their own words (ADR-0017). For the whole source slash routing, plugin installation, session/default mode persistence and optional band/statusline/dashboard/import/export/webhook infrastructure are inspected but deliberately outside this curated source selection: they are the original plugin product, not necessary to deliver the selected methods. Lite/full/ultra meanings may be explained as explicit task preferences without promising an absent global toggle. No upstream code or hooks run during intake/build; no telemetry or original native registration is adopted."
@@ -610,6 +642,17 @@
         "kimi.plugin.json",
         "logo.png",
         ".gitignore"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".github/readme/**",
+            "AGENTS.md",
+            "INSTALL.md",
+            "logo.png"
+          ],
+          "reason": "Named only by README.md, which is read at intake and not packaged: translations of the README, the installation of the source itself and its logo. The package carries the communication policy, not the original's install paths (delivery.json)."
+        }
       ],
       "runtime_deps": [],
       "intake": {
@@ -674,6 +717,54 @@
         ".plugin/**",
         "com.github.copilot/**",
         "assets/**"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".agents/plugins/marketplace.json",
+            ".claude-plugin/icon.png",
+            ".claude-plugin/marketplace.json",
+            ".codex-plugin/plugin.json",
+            "plugin.json",
+            "assets/icon.svg",
+            "docs/assets/**",
+            "skills/*/assets/icon.svg",
+            "skills/*/agents/openai.yaml"
+          ],
+          "reason": "Manifests, marketplace files, icons and per-skill interface metadata that package and register the source plugin itself on a host. They compete with the coordinator's routing or install another plugin (delivery.json). The reviewer definitions the skills name as agents/<file>.md are the root agents/ folder, which is selected."
+        },
+        {
+          "paths": [
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            ".gitignore",
+            "AGENTS.md",
+            "TESTING.md",
+            "pyproject.toml",
+            "scripts/pack_plugin.py",
+            "tests/unit/**",
+            "skills/*/TEST.md",
+            "skills/*/test_scenarios.yaml",
+            "docs/releases.md",
+            "docs/verification/**"
+          ],
+          "reason": "Source development, QA and release tooling: none is an end-user procedure (delivery.json). The per-host docs name them as how to test or pack the original."
+        },
+        {
+          "paths": [
+            "docs/designs/**"
+          ],
+          "reason": "The project's own design records. The skills name docs/designs/ as the folder where the user's project keeps its design documents, not these files."
+        },
+        {
+          "paths": [
+            "docs/copilot.md",
+            "docs/cursor.md",
+            "docs/muse.md",
+            "docs/opencode.md",
+            "docs/directory.md"
+          ],
+          "reason": "Pages on installing and listing the source plugin on other hosts, linked from docs/harnesses.md. A capability never installs the original; this package's own adapters deliver it. Not read beyond the lines that link them."
+        }
       ],
       "runtime_deps": [],
       "intake": {
@@ -742,6 +833,42 @@
         "tests/**",
         "docs/**",
         "assets/**"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            ".gitignore",
+            "AGENTS.md",
+            "GEMINI.md",
+            "package.json"
+          ],
+          "reason": "Coincidences of name: the selected skills name files of the user's project (the workspace's .gitignore, the user's instruction files, a project's package.json), not the repository's own."
+        },
+        {
+          "paths": [
+            ".opencode/INSTALL.md",
+            "docs/README.kimi.md",
+            "docs/README.opencode.md",
+            ".version-bump.json",
+            "scripts/bump-version.sh",
+            "tests/**",
+            "skills/writing-skills/SKILL.md"
+          ],
+          "reason": "Named only by README.md, which is read at intake and not packaged: installing the source on other hosts, its release tooling, its own tests and a skill outside this intake (owner direction of 2026-11-14: the planning chain; delivery.json)."
+        },
+        {
+          "paths": [
+            "hooks/run-hook.cmd"
+          ],
+          "reason": "The launcher of the upstream SessionStart hook, which injects the using-superpowers text. That activation layer competes with the coordinator and is dropped (delivery.json); hooks.json is read at intake only."
+        },
+        {
+          "paths": [
+            "skills/brainstorming/builder-check-prompt.md",
+            "skills/brainstorming/visual-companion.md"
+          ],
+          "reason": "Parts of the brainstorming skill, whose SKILL.md is read at intake only to place the boundary of writing-plans. In this package the idea-to-brief stage is concept-brief's, from EGM; a second owner of that stage is not carried (delivery.json)."
+        }
       ],
       "runtime_deps": [],
       "intake": {
@@ -818,6 +945,36 @@
         ".codex-plugin/**",
         ".claude-plugin/marketplace.json"
       ],
+      "omissions": [
+        {
+          "paths": [
+            "AGENTS.md"
+          ],
+          "reason": "A coincidence of name: the docs name AGENTS.md as one of the instruction files a harness reads in the user's project."
+        },
+        {
+          "paths": [
+            "docs/language-review.md"
+          ],
+          "reason": "The project's record of its own wording review, linked from README.md. No step reads it."
+        },
+        {
+          "paths": [
+            "package.json",
+            "package-lock.json",
+            "packages/zsd-lint/src/index.mjs",
+            "scripts/build.mjs",
+            "src/**"
+          ],
+          "reason": "The sources and build files of the prebuilt tool. The package carries the bundle tools/zsd.mjs that the skills run; tools/build-info.json lists the hashes of what it was built from."
+        },
+        {
+          "paths": [
+            "skills/*/agents/openai.yaml"
+          ],
+          "reason": "Per-skill interface metadata for a host's skill list. The package registers no absorbed original as a skill."
+        }
+      ],
       "runtime_deps": [],
       "intake": {
         "goal": "Intake of 2026-11-17, owner decision after review. Absorb zero-slop-design whole: the fourteen skills that record a developer's design selections in a DESIGN.md file, apply them, compare an interface with them, export their tokens and enforce them in source code and continuous integration, with the bundled tool tools/zsd.mjs and the references, specification and template the skills open packaged unchanged. Everything is on demand: the source ships no hook and nothing here is session-wide. Compare with the catalog's look-producing and look-consuming capabilities and resolve competing design authority. Owner decisions of 2026-11-17: (1) a DESIGN.md of the project that is not a starter or a reference counts, minus its unresolved and proposed entries, as the user's explicit instruction for visual-direction; a step that builds never rewrites DESIGN.md, it asks and the change belongs to the capability that owns the file; (2) the source's ban on adding or doing tests stays in every one of its steps for interface checks, Ponytail's small test or self-check holds for new non-trivial logic, and TDD stays inside plan-execution; (3) pin the tag v0.2.1 and ship LICENSE and THIRD_PARTY_NOTICES.md beside the bundle. Keep the bundle inert during intake: it is read and hashed, not run. Leave out the upstream manifests and per-host agent files, the tool's sources and build scripts, the example exports and the language review record; the README, catalogue, template guide, format research and Claude manifest are read as evidence."
@@ -856,6 +1013,14 @@
         "evals/**",
         ".claude-plugin/marketplace.json",
         ".gitignore"
+      ],
+      "omissions": [
+        {
+          "paths": [
+            "evals/**"
+          ],
+          "reason": "The source's own evaluation cases and their grader, described in README.md. The capability humanizes text and does not run the source's evals."
+        }
       ],
       "runtime_deps": [],
       "intake": {

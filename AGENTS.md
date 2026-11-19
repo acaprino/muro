@@ -59,6 +59,27 @@ content, a tool's purpose may say that data leaves, and the host's permissions
 and the user's instructions stay authoritative; intake, harmonization and
 capability bodies never add a restriction the source does not state.
 
+Owner correction of 2026-11-17 ("marionette ha tutto!", "fai in modo che non
+accada mai più questa perdita di tempo"): a source is absorbed with every file
+its method uses at run time: its kit, its scripts, its checks, its gate, its
+images. A capability that tells the host a part of its source is "not packaged"
+and has it work by hand is a failed intake, not a disclosed limit, and a check
+never passes because an omission was disclosed. The intake completes the file
+selection from the evidence the factory prepares; the source check and the
+build refuse a named file that is neither selected nor explained (ADR-0026).
+Binary media is not refused for being binary (ADR-0027).
+
+Owner question of 2026-11-18 ("controlla come viene usata la skill explain
+anything html"): it was not used. The intake of 2026-11-11 had left it out of
+its source, unread, as "served by explain-this", which starts on other requests
+and makes another page. A skill is read before it is left out as a duplicate,
+and the comparison goes in its `dropped` decision; only the owner narrows a
+source without that reading (`prompts/intake.md`, ADR-0026 amendment). Absorbing
+it was not enough either: a rule of the always-on policy ("Explain fully")
+answered the same request in the chat. A text that acts in every session can
+own a request that a capability also answers: harmonization names the one owner
+there, in a marked line, and a live session checks it.
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: the example is `examples/marionette/`
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin
@@ -108,6 +129,27 @@ installation, publication or replacement of existing dist output without request
   code a source bundles in a prebuilt file, which the gate cannot see inside.
   They must ship; the aggregated `NOTICE.md` points at each one. Declared at
   intake, never guessed from a file name (ADR-0025).
+- `muro/coverage.py` and `coverage.json` in the intake workbench: what the pinned
+  commit holds outside `selected_paths` (`left_out`) and which of those files
+  and folders the selected files name (`referenced`). Owner correction of
+  2026-11-17, after Marionette built a flat page by hand because taste-skill
+  travelled as 11 files of 1,631 ("marionette ha tutto!", "ma è un problema di
+  muro allora"): a source is absorbed with every file its method uses at run
+  time. The intake AI completes `selected_paths` from that evidence and has the
+  intake prepared again. A capability never tells the host that part of its
+  source is "not packaged", and no check passes because an omission was
+  disclosed. Python resolves paths and counts; it never decides what is needed
+  (ADR-0026). The gate: `check-sources` and `build` refuse an unselected file
+  that a selected file names unless the source's `omissions` (`{paths, reason}`,
+  AI-authored) explains it; `intake` and `init` do not gate, because the
+  workbench is where the AI learns what is missing. Owner, same day, on being
+  told the gate refused taste-skill's images by extension ("ma come può averle
+  taste skill allora se non si potrebbero usare?", "fai in modo che non accada
+  mai più questa perdita di tempo"): binary media travels when the intake
+  declares it in `media_paths` after reading how the source licenses it, with
+  third-party credits in `notice_paths`. The refusal by extension alone and the
+  exclusion of a source's own downloader tools (ADR-0002) no longer hold
+  (ADR-0027).
 - `prompts/intake.md`: AI reads selected source skills, classifies all their
   supported outcomes and extracts capabilities with source-to-intent provenance.
   `prompts/harmonizer.md`: AI normalizes intent meanings, merges overlapping roles
@@ -186,7 +228,8 @@ installation, publication or replacement of existing dist output without request
   lines; at most 6000 characters for each source with an `always-on` decision,
   owner rule of 2026-11-12: the limit is proportional to the intakes that go
   into it) and `hooks`
-  wirings `{host, capability, event, matcher, run}`. Both preparations append the
+  wirings `{host, capability, event, matcher, run}`, with an optional `timeout`
+  in whole seconds when the source declares one for its hook. Both preparations append the
   prompt. `muro/delivery.py` checks shape, references, a decision for every
   source and that each form has something behind it, then emits only what the
   document declares; it never chooses a form (ADR-0016). A validated always-on
@@ -240,7 +283,12 @@ After a policy upgrade, Hermes needs a new session because resumed sessions may
 retain their persisted prompt. Do not claim refresh from registration alone.
 TokenEconomizer's hooks are still `host-approved` and registered on the user's
 request by its capability: activating them by default is an open delivery
-decision, not yet run live.
+decision, not yet run live. Marionette's first active source hook is
+taste-skill's finish gate on `Stop` (2026-11-17): it exits at once where no
+build is armed, and was run live on Claude Code, not on Codex. A catalog with
+an active hook is refused by the runtime without its `delivery.json`: a test
+fixture that copies a package's capabilities copies that document too
+(`tests/routing_helpers.py`, `copy_delivery`).
 
 Owner decision of 2026-11-09 ("il plugin/skill dovrebbero installarli se
 necessario"): a capability installs a runtime dependency it needs and finds
@@ -384,7 +432,11 @@ Look for published releases first. Pin the newest non-draft, non-prerelease tag
 with `pin: release`; only an upstream with no release or tag gets `pin: head`.
 Before moving a pin, diff the selected paths, `LICENSE` and `NOTICE` between the
 old and new commit and check that no capability relies on what changed or
-disappeared. Write the pin and its release into each capability's `## Sources`
+disappeared. Prepare the intake and read its `coverage.json`: select every file
+the method uses at run time, declare binary media in `media_paths` with its
+credit files in `notice_paths`, and explain in `omissions` each named file that
+stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
+ADR-0027). Write the pin and its release into each capability's `## Sources`
 line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
 each part of the source became and why, and review the earlier decisions. Record the release, the diff
 summary, the commands and their results in `docs/verification/`. A release
@@ -430,11 +482,12 @@ verification records belong in docs/verification/. Never write new docs/superpow
 - Work always on `develop`, or on a short branch from `develop` that is merged back into `develop` and then
   deleted. Never merge or push into `main`, and leave no other branch, locally or on GitHub.
 - A release is the pull request `develop` → `main`, opened and merged by the owner: every merge into `main`
-  is a release (`.github/workflows/release.yml`, the same in Shinatama, Mukade, Xiox, Muro, Ethel, Qemille and
+  is a release (`.github/workflows/release.yml`, the same in Shinatama, Mukade, Xiox, Muro, Ethel and
   artcraft-web).
   The version goes up by a patch, or by a minor or major step when the pull request has the label
   `release:minor` or `release:major`; `build-release.bat` builds on Windows; the tag `muro-v<version>` and the GitHub
-  Release (`release\` zipped, its programs, its installers) are published, and `main` is merged back into
+  Release (the installer of `release\installer\` and one portable zip with all of `release\` in a folder; no loose
+  program) are published, and `main` is merged back into
   `develop`. Nothing is published when the build fails.
 - Never change the version or create release tags by hand: the workflow does it (`.github/release.json` lists
   the version files, `.github/scripts/release.mjs` writes them).

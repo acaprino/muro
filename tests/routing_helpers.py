@@ -8,6 +8,20 @@ INTENTS = 'intents: [{"id":"testing.verify","description":"Verify the requested 
 ROUTER_HEADER = "| id | role | when | after | outputs | intents |\n|---|---|---|---|---|---|\n"
 
 
+def copy_delivery(package, source=ROOT / "examples" / "marionette"):
+    """What a copied catalog needs beside capabilities and router once it declares an active hook.
+
+    The runtime refuses such a catalog without its delivery document (ADR-0016), and the document
+    binds the owner Markdown and names the sources. A fixture with no manifest of its own gets the
+    source ids only, so it keeps the default plugin identity.
+    """
+    shutil.copy2(source / "delivery.json", package / "delivery.json")
+    shutil.copytree(source / "custom-instructions", package / "custom-instructions", dirs_exist_ok=True)
+    if not (package / "sources.json").exists():
+        ids = [{"id": item["id"]} for item in json.loads((source / "sources.json").read_text(encoding="utf-8"))["sources"]]
+        (package / "sources.json").write_text(json.dumps({"sources": ids}), encoding="utf-8")
+
+
 def copy_prompts(project):
     shutil.copytree(ROOT / "prompts", project / "prompts", dirs_exist_ok=True)
     # Generic documentation fixture: an explicitly unsupported task needs no

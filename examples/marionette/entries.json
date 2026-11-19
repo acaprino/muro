@@ -55,7 +55,7 @@
     },
     {
       "name": "marionette-motion",
-      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
+      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
       "capabilities": [
         "motion-principles",
         "gsap-scrolltrigger",
@@ -80,12 +80,14 @@
     },
     {
       "name": "marionette-explainer",
-      "description": "Use when turning a paper, article, transcript, topic or one mechanism of a codebase into a self-contained interactive HTML explainer with figures the reader can operate, or when fact-checking an existing explainer or article claim by claim against its sources or code. Not for an explanation wanted in the chat.",
+      "description": "Use when the user asks to explain, break down or deeply understand a research paper, blog post, article, documentation or hard concept: the answer is a rich single-file HTML page with background, intuition, walkthrough and a quiz, even when HTML is not asked for. Also when turning a paper, article, transcript, topic or one mechanism of a codebase into an interactive HTML explainer with figures the reader can operate, or when fact-checking an existing explainer or article claim by claim against its sources or code. Not for a quick answer or a short summary wanted in the chat.",
       "capabilities": [
+        "html-explanation",
         "interactive-explainer",
         "explainer-fact-check"
       ],
       "absorbs": [
+        "explain-anything-html",
         "creating-explainers",
         "explaining-codebases",
         "fact-checking-explainers"
@@ -93,41 +95,22 @@
     },
     {
       "name": "marionette-engineering",
-      "description": "Use when implementing a software change, fixing a bug, or coordinating a larger change: agreeing the destination, resolving open decisions, writing a spec, slicing vertical tickets, then building and reviewing with test evidence; or when recording, preparing or resuming a HANDOFF.md across sessions. A clear small change is implemented directly. Not for a report-only code review or a shortcut inventory.",
+      "description": "Use when implementing a software change, fixing a bug, or coordinating a larger change: agreeing the destination, resolving open decisions, writing a spec, slicing vertical tickets, then building and reviewing with test evidence. A clear small change is implemented directly. Not for a report-only code review or a shortcut inventory.",
       "capabilities": [
-        "work-map",
-        "session-handoff"
+        "work-map"
       ],
       "absorbs": [
-        "ponytail",
-        "session-handoff"
+        "ponytail"
       ]
     },
     {
       "name": "marionette-papers",
-      "description": "Use when finding research papers, related work or prior art, reading a paper from its arXiv id, DOI or PubMed id, adding papers to a paper wiki with topic and concept pages and validating it, or making a publication-quality paper figure: an editable draw.io method or architecture diagram, or a matplotlib plot from results data. Not for a web search on a non-academic subject or a chart for a dashboard.",
+      "description": "Use when finding research papers, related work, prior art or the code for a method across scholarly sources, or reading a paper from its arXiv id, DOI, OpenAlex id or PubMed id. Not for a web search on a non-academic subject.",
       "capabilities": [
-        "paper-search",
-        "paper-wiki",
-        "paper-figure"
+        "paper-search"
       ],
       "absorbs": [
-        "paper-search",
-        "paper-wiki-manager",
-        "drawio-paper",
-        "codex-paper-figure-skill"
-      ]
-    },
-    {
-      "name": "marionette-research",
-      "description": "Use when planning ML or AI research (choosing a problem, a research plan, an experiment loop, a reading plan, a research log), debugging a training run or an evaluation that misbehaves, or pitching and positioning research for an advisor, reviewer, collaborator or talk audience without overclaiming, including checking a pitch for claims the evidence does not support.",
-      "capabilities": [
-        "research-practice",
-        "research-pitch"
-      ],
-      "absorbs": [
-        "research-bible",
-        "sell-research-honestly"
+        "paper-search"
       ]
     },
     {

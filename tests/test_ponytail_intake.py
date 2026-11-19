@@ -124,8 +124,10 @@ def test_delivery_separates_permanent_guidance_requested_procedures_and_omission
     assert {target for item in mine for target in item["targets"]} == {*PROCEDURES, "work-map"}
     # The text and its budget are shared with the other contributing sources, so their decisions count too.
     shared = [item for item in document["decisions"] if item["form"] == "always-on" and item["source"] != SOURCE]
+    # Checked against its own capabilities: the catalog also holds another source's active hook.
     assert validate_delivery({"decisions": mine + shared, "always_on": document["always_on"]},
-                             list(catalog().values()), {SOURCE, *(item["source"] for item in shared)}) == []
+                             [catalog()[name] for name in (*PROCEDURES, "work-map")],
+                             {SOURCE, *(item["source"] for item in shared)}) == []
     for name in SKILLS:
         assert any(f"skills/{name}/SKILL.md" in item["content"] for item in mine), name
     assert any(CORE in item["content"] for item in mine)
