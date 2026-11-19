@@ -64,3 +64,15 @@ day.
   `pull-request.yml` makes, run from a directory outside any Git checkout,
   then merged (`b945151`) and its branch deleted. The merge ran `release.yml`
   on `main`: "No build on main: nothing to publish", success.
+
+## Live runs
+
+| Run | Result |
+| --- | --- |
+| `Release Marionette` 44543455110, dispatched before the push reached `develop` | ran the previous workflow at `bb53f02`; failed at its own tag check, as that version does |
+| `Release Marionette` 44543595616 on `c65b7ea`, version 0.4.0 | failed in 1 s at "Refuse a tag that already exists": `marionette-v0.4.0 already exists in acaprino/muro; bump the version instead` |
+| `Tests` 44543554542 on `c65b7ea` | 733 passed, 16 skipped (2 min 43 s); `--validate`, `--check-sources` and the build pass |
+| local, 0.4.1 | `--validate`: `OK: capabilities and ROUTER.md valid`; `--check-sources`: `OK: all sources and plugin identity valid` (2 min) |
+
+The push of `develop` from this machine needed `gh` as Git's credential
+helper: the harness home path breaks the credential manager.
