@@ -45,6 +45,19 @@ pub fn record_check(root: &Path, plan: &Value, checked: &[&str], full: bool) -> 
     write(&root.join(FILE), &state)
 }
 
+/// The registry revision moved from `from` to `to` by a change that does not alter what a sync
+/// would do (a setting): the last full plan describes the registry as well as before, so its
+/// recorded revision follows. It does nothing when the recorded revision is not `from` (no plan
+/// yet, or the plan was already out of date for another change) and then writes no file.
+pub fn carry_revision(root: &Path, from: u64, to: u64) -> Result<()> {
+    let mut state = load(root)?;
+    if state["revision"].as_u64() != Some(from) {
+        return Ok(());
+    }
+    state["revision"] = json!(to);
+    write(&root.join(FILE), &state)
+}
+
 /// Records an applied plan: the targets it changed are synced, and the operations it applied
 /// are no longer pending. `blockers` stays as the check counted it: an apply that left
 /// blockers out did not resolve them.

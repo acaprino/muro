@@ -778,6 +778,88 @@ fn close_to_tray_defaults_to_true_and_must_be_boolean() {
     assert_eq!(snapshot(&r)["registry"]["settings"]["close_to_tray"], false);
 }
 
+/// Saves `settings` with one field changed, at the revision of the snapshot, and returns the snapshot the service answers.
+fn save_setting(root: &Path, field: &str, value: Value) -> Value {
+    let s = snapshot(root);
+    let mut settings = s["registry"]["settings"].clone();
+    settings[field] = value;
+    request(
+        root,
+        "settings",
+        json!({"revision":s["registry"]["revision"],"settings":settings}),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_settings_save_keeps_the_last_plan_current() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    request(&r, "plan", json!({})).unwrap();
+    let before = snapshot(&r);
+    assert_eq!(before["sync"]["revision"], before["registry"]["revision"]);
+    assert_eq!(before["sync"]["pending"], 1);
+
+    let saved = save_setting(&r, "auto_sync", json!(true));
+    assert_eq!(saved["registry"]["settings"]["auto_sync"], true);
+    assert_eq!(
+        saved["registry"]["revision"].as_u64(),
+        Some(before["registry"]["revision"].as_u64().unwrap() + 1)
+    );
+    // Settings do not change what a sync would do: the plan stays the current one.
+    assert_eq!(saved["sync"]["revision"], saved["registry"]["revision"]);
+    assert_eq!(saved["sync"]["pending"], before["sync"]["pending"]);
+    assert_eq!(saved["sync"]["blockers"], before["sync"]["blockers"]);
+    assert_eq!(saved["sync"]["last_check"], before["sync"]["last_check"]);
+    assert_eq!(saved["sync"]["targets"], before["sync"]["targets"]);
+    assert_eq!(snapshot(&r)["sync"], saved["sync"]);
+
+    // And it keeps doing so for the next save.
+    let again = save_setting(&r, "close_to_tray", json!(false));
+    assert_eq!(again["sync"]["revision"], again["registry"]["revision"]);
+}
+
+#[test]
+fn a_change_to_what_a_sync_does_still_makes_the_plan_stale() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    request(&r, "plan", json!({})).unwrap();
+    let before = snapshot(&r);
+    let other = _t.path().join("other-profile");
+    fs::create_dir_all(&other).unwrap();
+    target_as(&r, &other, "other", true);
+    let s = snapshot(&r);
+    assert_ne!(s["sync"]["revision"], s["registry"]["revision"]);
+    assert_eq!(s["sync"]["revision"], before["sync"]["revision"]);
+}
+
+#[test]
+fn a_settings_save_does_not_make_a_stale_plan_current() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    request(&r, "plan", json!({})).unwrap();
+    let planned = snapshot(&r)["sync"]["revision"].clone();
+    let other = _t.path().join("other-profile");
+    fs::create_dir_all(&other).unwrap();
+    target_as(&r, &other, "other", true);
+    let saved = save_setting(&r, "auto_sync", json!(true));
+    assert_eq!(saved["sync"]["revision"], planned);
+    assert_ne!(saved["sync"]["revision"], saved["registry"]["revision"]);
+}
+
+#[test]
+fn a_settings_save_before_any_check_records_nothing() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let saved = save_setting(&r, "auto_sync", json!(true));
+    assert!(saved["sync"]["revision"].is_null());
+    assert!(!r.join("sync-status.json").exists());
+}
+
 #[test]
 #[ignore = "runs an installed native Hermes in an isolated temporary home"]
 fn hermes_native_round_trip() {

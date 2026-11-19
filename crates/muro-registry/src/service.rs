@@ -114,7 +114,14 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 }
                 _ => unreachable!(),
             }
+            let from = registry["revision"].as_u64().context("revision")?;
             save_registry(data_dir, &mut registry)?;
+            if action == "settings" {
+                // Settings do not change what a sync would do: the last plan stays current, so a
+                // switch does not cost a new inventory scan and the shell does not read "not checked".
+                let to = registry["revision"].as_u64().context("revision")?;
+                sync_status::carry_revision(data_dir, from, to)?;
+            }
             log(data_dir, action, "complete", "Registry configuration saved")?;
             snapshot(data_dir, &registry, &receipts, false)
         }
