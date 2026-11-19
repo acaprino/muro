@@ -1,5 +1,7 @@
 # The `muro` command line
 
+Muro has two parts. The desktop app is the harness manager, plugin sync and updater ([desktop app](desktop.md), [its CLI](desktop-cli.md)). The factory is the harmonizer: it absorbs pinned skills and plugins into one package with a catalog, a coordinator and a release for every harness, as it does for Marionette. This page is about the factory.
+
 One CLI drives the factory. It runs as `muro` (after an editable install), as
 `python -m muro`, or through the legacy flag interface (`python muro_build.py
 --validate …`), which keeps working unchanged and is frozen: new operations

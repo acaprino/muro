@@ -66,6 +66,7 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
   look. Landing's font list, hero gradient and Tailwind scale are scoped out;
   the user's explicit instruction wins over source bans and is recorded; a brand alone does not (its colours go through `brand`). 2026-11-17 (ADR-0026, ADR-0027): taste-skill travels whole (1,631 files; until then 11, and the page was written by hand); its Stop hook, the finish gate, is active on Claude Code and Codex.
 - 2026-11-17, same pass: work-map follows wayfinder's own `research` skill for a research item (selected; the other sibling skills stay inline). motion-design re-pinned to head 2e1f3c05: a request for a rendered animation file is handed to Creator MCP by the source's rules, inside motion-principles; no new role, output or edge.
+- 2026-11-19: motion-design re-pinned to head d77a9fc8; `reference/export-and-render.md` now gives install commands per client and a per-client handoff. No role, output, edge or delivery decision changes.
 - design-guidance (ui-ux-pro-max) is split out: guidance for any interface,
   app screens included; beside a dealt palette its results are candidates.
 - figma-design keeps a recorded pairing and palette as the user's choice. Its

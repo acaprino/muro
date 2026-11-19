@@ -1,4 +1,12 @@
-# Muro desktop registry
+# Muro desktop: harness manager, plugin sync and updater
+
+The desktop app has three jobs, each with its page:
+
+- **Harness manager** (Harnesses): finds the coding agents on this computer through Mukade, manages the ones you pick (configuration folder, executable, paused or managed, exclusive sync) and reads what each one has installed, including plugins outside your list, which **Add to my list** imports.
+- **Plugin sync** (Sync): compares your plugin list with every managed harness and applies the install, update and remove operations you approve, or applies them on an interval with automatic sync.
+- **Plugin updater** (Plugins): **Check for updates** resolves a plugin's source under its update policy (latest stable release, pinned version or latest commit) and records the upstream version and native builds; Sync then installs them. Reinstall uses the last verified build, and Settings → Maintenance verifies and cleans the stored builds.
+
+When a plugin has no build for one of its harnesses, **Adapt with AI** rebuilds it with the factory, the harmonizer that also produces packages such as Marionette. The README shows each page with demo data.
 
 Windows-first native portable Tauri application. The Rust registry and desktop runtime live in `crates/`; the UI and native shell live in `apps/desktop/`. The Python factory remains independent and standard-library-only. The GUI communicates with bundled `tools/muroctl.exe` over correlated NDJSON; that backend invokes bundled `tools/mukade.exe` for discovery and executable resolution. Both tools can also be called directly. See [CLI reference](desktop-cli.md).
 
@@ -24,7 +32,7 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/acaprino/mukade/8bd1636
 python scripts/desktop_package.py --exe target/debug/muro-desktop.exe --resources apps/desktop/src-tauri/resources --tools .scratch/portable-tools --mukade-license .scratch/portable-tools/Mukade-LICENSE.txt --out .scratch/Muro-portable
 ```
 
-The tools script verifies the official Git and curl archive hashes, retaining licenses and runtime files. The Mukade license command fetches the license from the exact revision pinned in `crates/muro-desktop-runtime/Cargo.toml`; update both together when repinning Mukade. `--mukade-license` is required and the packager copies that file to `LICENSES/Mukade-MIT.txt`. The package includes the application, CLI executables, private resources, documentation, examples and SHA-256 manifest. It requires Windows WebView2; managed AI harnesses remain their own installed applications. Move the whole folder, not just `Muro.exe`.
+The tools script verifies the official Git and curl archive hashes, retaining licenses and runtime files. The Mukade license command fetches the license from the exact revision pinned in `crates/muro-desktop-runtime/Cargo.toml`; update both together when repinning Mukade. `--mukade-license` is required and the packager copies that file to `LICENSES/Mukade-LICENSE.txt`. The package includes the application, CLI executables, private resources, documentation, examples and SHA-256 manifest. It requires Windows WebView2; managed AI harnesses remain their own installed applications. Move the whole folder, not just `Muro.exe`.
 
 ## Registry workflow
 
@@ -72,6 +80,7 @@ AI work-directory and read-only-factory instructions are agent rules, not an OS 
 cargo test -p muro-registry -p muro-desktop-runtime
 npm test
 node apps/desktop/tests/browser.mjs   # MURO_UI_PORT=<port> when 1422 is taken
+node apps/desktop/tests/screenshots.mjs   # the README screenshots, from demo data
 node apps/desktop/tests/native.mjs
 python -m pytest -q
 python muro_build.py --manifest examples/marionette/sources.json --validate

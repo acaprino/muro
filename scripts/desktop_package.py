@@ -33,7 +33,7 @@ def main():
         shutil.copy2(repo / relative, destination)
     shutil.copytree(repo / "examples/desktop", args.out / "examples/desktop")
     (args.out / "LICENSES").mkdir()
-    shutil.copy2(args.mukade_license, args.out / "LICENSES/Mukade-MIT.txt")
+    shutil.copy2(args.mukade_license, args.out / "LICENSES/Mukade-LICENSE.txt")
     hashes = {str(p.relative_to(args.out)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest()
               for p in sorted(args.out.rglob("*")) if p.is_file()}
     (args.out / "SHA256.json").write_text(json.dumps(hashes, indent=2), encoding="utf-8")
