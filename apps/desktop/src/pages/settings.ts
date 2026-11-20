@@ -1,5 +1,5 @@
 import type { ViewState, Snapshot, Settings, AiSettings, AiEngine, AiHarness, Autostart, Maintenance } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import type { Theme } from '../look.ts';
 import { intervalOptions } from '../model.ts';
 import { esc, head, icon, sw, seg, button } from '../ui.ts';
@@ -208,7 +208,7 @@ export const actions: Actions = {
   'maintenance-cleanup': app => app.confirm('Clean up unused builds?', 'Only stored builds that nothing uses are deleted.', 'Clean up', () => void maintain(app, 'cleanup', 'Cleaning up…'), true),
 };
 
-export function change(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function change(app: App, el: TextBox): boolean {
   const setting = el.dataset.setting;
   if (!setting) return false;
   const value = el.value;
@@ -268,7 +268,7 @@ export function change(app: App, el: HTMLInputElement | HTMLSelectElement): bool
 }
 
 /** Typing in a field of the AI section that holds a refusal takes the refusal away. The page is not painted: a paint would put the stored text back in the box that holds the caret. */
-export function input(_app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function input(_app: App, el: TextBox): boolean {
   const field = el.dataset.setting;
   if (!field || learned.refused?.field !== field) return false;
   learned.refused = null;

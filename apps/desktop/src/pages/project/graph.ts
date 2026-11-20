@@ -1,5 +1,5 @@
 import type { ViewState, ProjectInfo } from '../../types.ts';
-import type { App, Actions } from '../../context.ts';
+import type { App, Actions, TextBox } from '../../context.ts';
 import { esc, plural, tag, button, empty } from '../../ui.ts';
 import { dlHead } from '../../sheets.ts';
 import { harnessNames } from '../../model.ts';
@@ -15,7 +15,7 @@ import { drawGraph } from './graph-draw.ts';
  *   capability sheet from any step, and the Harmonize step's links to capabilities use it.
  * - `SimState`, `newSim()`, `restoreSim(raw)`: the simulation the page keeps in `state.project.sim` and in the session. `restoreSim` takes what
  *   a reload brings back (anything) and returns a valid state, never one that is running.
- * - `input(app, el)`, `keydown(app, e)`: the request's box; they return true when they handled the event; pages/projects.ts forwards them.
+ * - `input(app, el)`: the request's box (a text area); it returns true when it handled the event; pages/projects.ts forwards it.
  *
  * What the simulator shows is one of three things, and the page decides none of them: a documented example (its own decision, resolved by the factory, no call), the
  * AI's decision for a free-text request (`simulate`, validated by the factory with the runtime's rules), or the reason there is none. Nothing is matched by words. */
@@ -122,11 +122,9 @@ function sheet(info: ProjectInfo, c: Cap): string {
 const held = (app: App): ProjectInfo | null => { const pv = app.state.project, pr = app.state.projects; return pv && pr.infoId === pv.id ? pr.info : null; };
 /** The request's box, from any control of the step. */
 const boxOf = (el: HTMLElement): HTMLTextAreaElement | null => el.closest?.('.two')?.querySelector<HTMLTextAreaElement>('textarea') ?? null;
-/** What was typed and no event told us (the app does not hand a text area's `input` to a page): read from the box when the person acts, so the paint that follows never
- * puts the old text back. */
-function keep(sim: SimState, el: HTMLElement): void { const v = boxOf(el)?.value; if (typeof v === 'string') sim.task = v; }
-/** A change of the box: the text is kept, and a refusal that was about the old text goes. */
-function typed(sim: SimState, box: HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement): void {
+/** A change of the box: the text is kept, and a refusal that was about the old text goes. The app hands the box's `input` events to `input` below (a typed letter, a paste, a
+ * cut, a drop), so `sim.task` is always what the box holds and the paint that follows never puts old text back. */
+function typed(sim: SimState, box: TextBox): void {
   sim.task = box.value;
   if (sim.error) { sim.error = ''; box.removeAttribute?.('aria-invalid'); box.closest?.('.two')?.querySelector('#err-simtask')?.replaceChildren(); }
 }
@@ -146,7 +144,6 @@ async function simulate(app: App, _d: DOMStringMap, el: HTMLElement): Promise<vo
   const pv = app.state.project;
   if (!pv || pv.sim.run !== null) return;
   const sim = pv.sim;
-  keep(sim, el);
   const task = sim.task.trim();
   if (!task) { sim.error = 'Write a request first.'; boxOf(el)?.focus(); app.render(); return; }
   const mine = newRun();
@@ -171,10 +168,9 @@ export const actions: Actions = {
     app.notify('Stopped waiting for the answer.');
     app.render();
   },
-  'graph-example': (app, d, el) => {
+  'graph-example': (app, d) => {
     const pv = app.state.project, info = held(app), i = /^\d+$/.test(d.id ?? '') ? Number(d.id) : -1;
     if (!pv || !info || i < 0 || i >= (Array.isArray(info.graph?.examples) ? info.graph.examples.length : 0)) return;
-    keep(pv.sim, el);
     // Looking at an example instead is the end of waiting for the AI.
     stopWaiting(app, pv.sim);
     Object.assign(pv.sim, { example: pv.sim.example === i ? null : i, result: null });
@@ -183,14 +179,11 @@ export const actions: Actions = {
   'graph-clear': (app, _d, el) => {
     const sim = app.state.project?.sim;
     if (!sim) return;
-    keep(sim, el);
     Object.assign(sim, { example: null, result: null });
     boxOf(el)?.focus();
     app.render();
   },
-  'open-capability': (app, d, el) => {
-    const sim = app.state.project?.sim;
-    if (sim) keep(sim, el);
+  'open-capability': (app, d) => {
     if (!d.id) return;
     const info = held(app), c = info && capsOf(info).find(x => x.id === d.id);
     if (!info || !c) { app.notify('That capability is not in this project\'s graph.', 'bad'); return; }
@@ -198,16 +191,9 @@ export const actions: Actions = {
   },
 };
 
-export function input(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function input(app: App, el: TextBox): boolean {
   const sim = app.state.project?.sim;
   if (!sim || el.name !== 'simtask') return false;
   typed(sim, el);
   return true;
-}
-/** The key of a letter reaches the page before the box has it: the text is read once the key has done its work. (A shortcut with Ctrl never gets here, and a paste is read at the
- * next action; `input` is the exact way, once the app hands it a text area's events.) */
-export function keydown(app: App, e: KeyboardEvent): boolean {
-  const box = e.target as HTMLTextAreaElement | null, sim = app.state.project?.sim;
-  if (sim && box?.name === 'simtask') setTimeout(() => { if (app.state.project?.sim === sim) typed(sim, box); });
-  return false;
 }

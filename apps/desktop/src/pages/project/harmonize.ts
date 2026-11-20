@@ -1,5 +1,5 @@
 import type { ViewState, ProjectInfo, ProjectDecision, ProjectRecord, ProjectRun, ProjectViewKind, DecisionForm } from '../../types.ts';
-import type { App, Actions } from '../../context.ts';
+import type { App, Actions, TextBox } from '../../context.ts';
 import { harnessNames } from '../../model.ts';
 import { dlHead } from '../../sheets.ts';
 import { esc, tag, seg, button, empty, icon, when } from '../../ui.ts';
@@ -107,7 +107,7 @@ function openPrompt(app: App, d: DOMStringMap): void {
 export const actions: Actions = { 'harmonize-prompt': openPrompt };
 
 /** A view, an input or a form was chosen. */
-export function change(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function change(app: App, el: TextBox): boolean {
   const pv = app.state.project;
   if (!pv) return false;
   if (el.name === 'hview' && (VIEWS as readonly string[]).includes(el.value)) pv.view = el.value as ProjectViewKind;

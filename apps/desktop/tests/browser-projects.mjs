@@ -746,6 +746,20 @@ await test('What was typed and the last answer survive leaving the step and a re
   assert.equal(await page.locator('[aria-busy=true]').count(), 0, 'a request in progress is never brought back');
 });
 
+await test('A paste into the request box is kept like typing: it survives a change of step and back, and is the request sent', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await requestBox(page).fill('Write a letter as a Word file');   // `fill` sends the `input` event and no key: what a paste does
+  await tab(page, 'Install').click();
+  await tab(page, 'Graph').click();
+  assert.equal(await requestBox(page).inputValue(), 'Write a letter as a Word file', 'the paste is not lost by the paint a step change makes');
+  const held = await page.evaluate(() => JSON.parse(sessionStorage.getItem('muro.project')).sim.task);
+  assert.equal(held, 'Write a letter as a Word file', 'the page holds it, not only the box');
+  await simulateButton(page).click();
+  await page.locator('.simres', { hasText: '2 steps' }).waitFor();
+  assert.equal((await simulations(app))[0].payload.task, 'Write a letter as a Word file');
+});
+
 await test('The simulator at 760px: one column, the graph card scrolls inside itself, no sideways scroll, every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
   const { page } = app;
   await app.flags({ bigGraph: true });

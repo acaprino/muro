@@ -1,5 +1,5 @@
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
@@ -265,7 +265,7 @@ export const actions:Actions={
  'set-exclusive':(app,d)=>d.id==='keep'||d.id==='remove'?setExclusive(app,d.id):undefined,
  rescan:async app=>{closeMenu(true);await app.run('Reading installed plugins…',()=>app.request<Snapshot>('scan'),v=>app.adopt(v));await app.replan();await app.discover();},
 };
-export function input(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
+export function input(app:App,el:TextBox):boolean {
  if(el.id==='search'){
   // Only the rows are painted again: a full render would take the caret out of the box.
   app.state.query=el.value;const body=document.getElementById('rows');if(body)body.innerHTML=rows(app.state);return true;
@@ -278,7 +278,7 @@ export function input(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
  else if(form&&el.name==='source'&&!form.dataset.named){const name=form.querySelector<HTMLInputElement>('[name=name]');if(name){name.value=lastPart(el.value);clearError(name);}}
  return false;
 }
-export function change(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
+export function change(app:App,el:TextBox):boolean {
  if(el.name==='filter'&&el.closest('.tools')){app.state.filter=el.value as Filter;app.render();return true;}
  if(el.name==='policy'&&el.closest('dialog')){const pinned=el.closest('dialog')!.querySelector<HTMLElement>('#pinned-field');if(pinned)pinned.hidden=el.value!=='pinned';return true;}
  if(el.name==='excl'){void setExclusive(app,el.value==='remove'?'remove':'keep');return true;}

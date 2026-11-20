@@ -1,5 +1,9 @@
 import type { Transport } from './types.ts';
 
+/** What the page sends beside the queue (see `serial`): the one list `mountApp` uses. `discover` runs Mukade; `simulate` lasts as long as the AI takes and holds no registry lock,
+ * and `cancel_simulation` must reach the service while it runs: behind the queue, a simulation would freeze every other action of the window and Cancel would wait for the run it stops. */
+export const ALONE: readonly string[] = ['discover', 'simulate', 'cancel_simulation'];
+
 /** The page's requests wait for each other, in the order they were made. The service takes its registry lock without waiting
  * and refuses a second request that arrives meanwhile ("Registry is busy"), and the page sends such a pair by itself: `adopt`
  * plans in the background after a save while the step that saved goes on with its next request. An action in `alone` does not

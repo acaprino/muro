@@ -1,5 +1,5 @@
 import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import { cellState } from '../model.ts';
 import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
 import { STEPS, fresh } from './project/state.ts';
@@ -14,9 +14,8 @@ import * as graph from './project/graph.ts';
 interface Step {
   view(state: ViewState, info: ProjectInfo): string;
   actions: Actions;
-  input?(app: App, el: HTMLInputElement | HTMLSelectElement): boolean;
-  change?(app: App, el: HTMLInputElement | HTMLSelectElement): boolean;
-  keydown?(app: App, e: KeyboardEvent): boolean;
+  input?(app: App, el: TextBox): boolean;
+  change?(app: App, el: TextBox): boolean;
 }
 const steps: Record<ProjectStep, Step> = { inputs, harmonize, graph, install };
 const message = (e: unknown) => String(e instanceof Error ? e.message : e);
@@ -155,17 +154,15 @@ export function keydown(app: App, e: KeyboardEvent): boolean {
   const pv = app.state.project;
   if (app.state.page !== 'projects' || !pv || e.ctrlKey || e.metaKey || e.altKey) return false;
   const tab = e.target instanceof Element ? e.target.closest<HTMLElement>('[role=tab][data-action=step]') : null;
-  if (tab) {
-    const next = nextStep(tab.dataset.id as ProjectStep, e.key);
-    if (!next) return false;
-    e.preventDefault(); tab.parentElement?.querySelector<HTMLElement>(`[data-id="${next}"]`)?.focus(); pv.step = next; app.render();
-    return true;
-  }
-  return Object.values(steps).some(s => s.keydown?.(app, e));
+  if (!tab) return false;
+  const next = nextStep(tab.dataset.id as ProjectStep, e.key);
+  if (!next) return false;
+  e.preventDefault(); tab.parentElement?.querySelector<HTMLElement>(`[data-id="${next}"]`)?.focus(); pv.step = next; app.render();
+  return true;
 }
-export function input(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function input(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));
 }
-export function change(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function change(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.change?.(app, el));
 }

@@ -1,5 +1,5 @@
 import type { ViewState, Snapshot, Job, ActivityFilter } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import { harnessNames } from '../model.ts';
 import { esc, head, empty, seg, button, spin, tag, when, elapsed } from '../ui.ts';
 
@@ -73,7 +73,7 @@ export const actions: Actions = {
   /** The job is stopped by the shell; the snapshot then carries its new state. */
   'cancel-job': (app, data) => data.id ? app.run('Cancelling…', async () => { await app.request('cancel_job', { id: data.id }); return app.request<Snapshot>('snapshot'); }, v => app.adopt(v)) : undefined,
 };
-export function change(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+export function change(app: App, el: TextBox): boolean {
   if (el.name !== 'afilter') return false;
   if (FILTERS.some(([id]) => id === el.value)) app.state.afilter = el.value as ActivityFilter;
   app.render();

@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Snapshot, ViewState, ProjectInfo } from '../src/types.ts';
 import type { App } from '../src/context.ts';
+import { textBoxOf } from '../src/context.ts';
 import * as graph from '../src/pages/project/graph.ts';
 import * as projects from '../src/pages/projects.ts';
 import { blankProjects, fresh, recall, remember } from '../src/pages/project/state.ts';
@@ -693,37 +694,43 @@ it('the page forwards the box\'s typing to this step', async () => {
   assert.equal(s.sim().task, 'Write a letter');
   assert.equal(projects.input(s.app, { name: 'other', value: 'x' } as any), false);
 });
-it('a key typed in the box is read once it has done its work; the event is never claimed, and another box or a closed project is left alone', async () => {
-  const s = await session(), box = { name: 'simtask', value: 'W' }, later = () => new Promise(done => setTimeout(done, 5));
-  assert.equal(graph.keydown(s.app, { target: box } as any), false);
-  assert.equal(s.sim().task, '', 'at the key the box does not have it yet');
-  box.value = 'Wr';
-  await later();
-  assert.equal(s.sim().task, 'Wr');
-  graph.keydown(s.app, { target: { name: 'dsrc', value: 'zzz' } } as any);
-  graph.keydown(s.app, { target: null } as any);
-  await later();
-  assert.equal(s.sim().task, 'Wr');
-  const left = s.sim();
-  graph.keydown(s.app, { target: box } as any);
-  s.state.project = { ...fresh('marionette'), step: 'graph' };
-  box.value = 'Write';
-  await later();
-  assert.equal(left.task, 'Wr', 'a project that was left is not written to');
-  assert.equal(s.sim().task, '');
+// The page hands a page module the controls it hears: a text box, a choice and a text area (the request box is one). A node test has no DOM: three stand-in classes are the globals while it runs.
+class StandInInput { name = ''; value = ''; }
+class StandInSelect { name = ''; value = ''; }
+class StandInTextArea { name = ''; value = ''; }
+class StandInButton { name = ''; value = ''; }
+const withStandIns = <T>(body: () => T): T => {
+  const g = globalThis as any, before = { i: g.HTMLInputElement, s: g.HTMLSelectElement, t: g.HTMLTextAreaElement };
+  Object.assign(g, { HTMLInputElement: StandInInput, HTMLSelectElement: StandInSelect, HTMLTextAreaElement: StandInTextArea });
+  try { return body(); } finally { Object.assign(g, { HTMLInputElement: before.i, HTMLSelectElement: before.s, HTMLTextAreaElement: before.t }); }
+};
+it('an event of a text box, a choice or a text area is heard by the page modules, and any other control or none is not', () => {
+  withStandIns(() => {
+    for (const control of [new StandInInput(), new StandInSelect(), new StandInTextArea()]) assert.equal(textBoxOf(control as unknown as EventTarget), control, control.constructor.name);
+    assert.equal(textBoxOf(new StandInButton() as unknown as EventTarget), null);
+    assert.equal(textBoxOf(null), null);
+  });
 });
-it('what is typed and not yet kept is read from the box when the person acts, so a paint never loses it', async () => {
-  const s = await session();
-  const box = { value: 'typed, then pasted' }, el = { closest: (sel: string) => sel === '.two' ? { querySelector: (q: string) => q === 'textarea' ? box : null } : null };
-  s.sim().task = 'typed';
-  await s.act('graph-example', { id: '0' }, el);
-  assert.equal(s.sim().task, 'typed, then pasted');
-  box.value = 'and more';
-  await s.act('graph-simulate', {}, el);
-  assert.equal(s.fake.calls.find(c => c.action === 'simulate')?.payload.task, 'and more');
-  box.value = 'after';
-  await s.act('open-capability', { id: 'design-taste' }, el);
-  assert.equal(s.sim().task, 'after');
+it('text pasted into the request box reaches the step, survives a change of step and back, and is the request that is sent', async () => {
+  const s = await session(), area = new StandInTextArea();
+  area.name = 'simtask';
+  area.value = 'Write a letter as a Word file';
+  withStandIns(() => {
+    const box = textBoxOf(area as unknown as EventTarget);
+    assert.ok(box, 'the text area is one the page hears');
+    assert.equal(projects.input(s.app, box), true);
+  });
+  assert.equal(s.sim().task, 'Write a letter as a Word file');
+  await projects.actions.step(s.app, { id: 'inputs' } as DOMStringMap, {} as HTMLElement);
+  await projects.actions.step(s.app, { id: 'graph' } as DOMStringMap, {} as HTMLElement);
+  assert.equal(s.state.project!.step, 'graph');
+  assert.match(s.view(), /<textarea name="simtask"[^>]*>Write a letter as a Word file<\/textarea>/);
+  await s.act('graph-simulate');
+  assert.equal(s.fake.calls.find(c => c.action === 'simulate')?.payload.task, 'Write a letter as a Word file');
+});
+it('the step hears no key of its own: the text is always what the input events brought', () => {
+  assert.equal('keydown' in graph, false);
+  assert.equal('keydown' in projects && typeof projects.keydown === 'function', true, 'the page keeps the tablist\'s keys');
 });
 
 // ---------- the capability sheet ----------

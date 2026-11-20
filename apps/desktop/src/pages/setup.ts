@@ -1,5 +1,5 @@
 import type { ViewState, SetupState, Snapshot, Target, Discovered, InstalledPlugin, Autostart } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import { inList, listing, intervalOptions } from '../model.ts';
 import { esc, mark, sw, button, empty, spin } from '../ui.ts';
 
@@ -157,7 +157,7 @@ export const actions: Actions = {
 };
 
 /** A tick of step 1 or 2. Nothing else on the page is this module's. */
-export const change = (app: App, el: HTMLInputElement | HTMLSelectElement): boolean => {
+export const change = (app: App, el: TextBox): boolean => {
   if (el.name !== 'pick' && el.name !== 'keep') return false;
   const s = begin(app.state);
   (el.name === 'pick' ? s.pick : s.keep)[el.value] = (el as HTMLInputElement).checked;

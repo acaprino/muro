@@ -1,18 +1,21 @@
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
 import type { App, Actions } from './context.ts';
+import { textBoxOf } from './context.ts';
 import { frame, modules } from './views.ts';
 import { dlHead } from './sheets.ts';
 import { watchTheme } from './look.ts';
-import { serial } from './queue.ts';
+import { serial, ALONE } from './queue.ts';
 import { esc } from './ui.ts';
 import { blankProjects, recall, remember } from './pages/project/state.ts';
 
 /** How often the open window reads the registry again while it has the focus: the background worker and the tray change it behind the window's back. */
 export const REFRESH_MS=30_000;
+/** A control whose caret a paint puts back: a text box or a text area (a choice has none). */
+const holdsCaret=(el:Element|null):el is HTMLInputElement|HTMLTextAreaElement=>el instanceof HTMLInputElement||el instanceof HTMLTextAreaElement;
 
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
 export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
- const request=serial(transport,['discover']);
+ const request=serial(transport,ALONE);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
  const dialog=document.createElement('dialog');dialog.tabIndex=-1;document.body.append(dialog);
  const toasts=document.createElement('div');toasts.id='toasts';toasts.setAttribute('role','status');toasts.setAttribute('aria-live','polite');document.body.append(toasts);
@@ -35,7 +38,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   if(!dialog.open){
    const key=keyOf(active,root);
    if(sticky)sticky=false;
-   else if(key&&key!=='#main'){want=key;sel=active instanceof HTMLInputElement&&active.selectionStart!==null?[active.selectionStart,active.selectionEnd??active.selectionStart]:null;}
+   else if(key&&key!=='#main'){want=key;sel=holdsCaret(active)&&active.selectionStart!==null?[active.selectionStart,active.selectionEnd??active.selectionStart]:null;}
    else if(key!=='#main')want='';
   }
   const opened=[...root.querySelectorAll('details[open][id]')].map(d=>d.id),top=root.querySelector('#main')?.scrollTop||0,across=root.querySelector('.tablewrap')?.scrollLeft||0;
@@ -48,7 +51,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
    // A control that became disabled cannot hold the focus: the page takes it, and gives it back at the next render.
    const el=root.querySelector<HTMLElement>(want),usable=el&&!(el as HTMLButtonElement).disabled?el:null;
    (usable||main)?.focus({preventScroll:true});
-   if(usable&&sel&&usable instanceof HTMLInputElement)try{usable.setSelectionRange(sel[0],sel[1]);}catch{/* a box that holds no caret */}
+   if(usable&&sel&&holdsCaret(usable))try{usable.setSelectionRange(sel[0],sel[1]);}catch{/* a box that holds no caret */}
   }
  }
  async function run<T>(label:string,work:()=>Promise<T>,after?:(value:T)=>void|Promise<void>):Promise<void>{
@@ -100,7 +103,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   const fn=el.dataset.action?actions[el.dataset.action]:undefined;if(!fn)return;
   e.preventDefault();void Promise.resolve().then(()=>fn(app,el.dataset,el)).catch(fail);
  };
- const route=(hook:'input'|'change')=>(e:Event)=>{const el=e.target;if(!(el instanceof HTMLInputElement||el instanceof HTMLSelectElement))return;for(const m of Object.values(modules))if(m[hook]?.(app,el))return;};
+ const route=(hook:'input'|'change')=>(e:Event)=>{const el=textBoxOf(e.target);if(!el)return;for(const m of Object.values(modules))if(m[hook]?.(app,el))return;};
  const keys=(e:KeyboardEvent)=>{for(const m of Object.values(modules))if(m.keydown?.(app,e))return;};
  root.addEventListener('click',click);root.addEventListener('input',route('input'));root.addEventListener('change',route('change'));root.addEventListener('keydown',keys);
  dialog.addEventListener('click',e=>{if(e.target===dialog&&!state.applying)closeDialog();else click(e);});
