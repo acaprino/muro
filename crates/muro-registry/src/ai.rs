@@ -11,8 +11,8 @@ pub const KEY_REFUSED: &str = "The key setting must name an environment variable
 pub const ENGINES: [&str; 2] = ["harness", "api"];
 pub const HARNESSES: [&str; 2] = ["claude-code", "codex"];
 const KEYS: [&str; 6] = ["engine", "harness", "budget_usd", "api_base", "model", "api_key_env"];
-/// The longest name accepted for the key's variable: the same limit as `muro/agent.py`.
-const NAME_LIMIT: usize = 128;
+/// The longest name accepted for the key's variable: the same limit as `muro/agent.py` and the settings page.
+const NAME_LIMIT: usize = 64;
 
 pub fn defaults() -> Value {
     json!({"engine":"harness","harness":"claude-code","budget_usd":0.5,
@@ -29,12 +29,15 @@ pub fn validate_budget(budget: f64) -> Result<()> {
     Ok(())
 }
 
-/// `[A-Za-z_][A-Za-z0-9_]*`, the shape of an environment variable's name, and nothing more.
+/// `^[A-Z_][A-Z0-9_]{0,63}$`: an environment variable's name in capitals, and nothing more. The same rule
+/// in `muro/agent.py` and in the settings page. A looser one (`[A-Za-z_][A-Za-z0-9_]*`) read as a name the
+/// keys of providers that carry no hyphen (`gsk_...`, `hf_...`, plain letters and digits), and a name is
+/// repeated in messages and shown on the page.
 pub fn validate_key_env(name: &str) -> Result<()> {
     let mut chars = name.chars();
     let valid = name.len() <= NAME_LIMIT
-        && chars.next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
+        && chars.next().is_some_and(|c| c.is_ascii_uppercase() || c == '_')
+        && chars.all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_');
     ensure!(valid, KEY_REFUSED);
     Ok(())
 }

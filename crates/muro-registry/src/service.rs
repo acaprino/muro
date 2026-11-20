@@ -42,7 +42,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             instructions::info(data_dir, plugin, payload["create"] == true)
         }
         "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings"
-        | "save_projects" => {
+        | "save_projects" | "remove_project" => {
             revision(&registry, &payload)?;
             // The receipt written for an adopted installation, until the registry is saved.
             let mut adopted = None;
@@ -141,6 +141,11 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 }
                 "save_projects" => {
                     registry["projects"] = projects::validate_list(&payload["projects"])?;
+                }
+                "remove_project" => {
+                    let key = str_field(&payload, "id")?;
+                    id(key)?;
+                    registry["projects"] = projects::remove(&registry["projects"], key)?;
                 }
                 _ => unreachable!(),
             }

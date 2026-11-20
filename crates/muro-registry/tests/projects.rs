@@ -83,6 +83,51 @@ fn a_list_of_projects_is_refused_unless_every_project_is_an_id_and_an_absolute_m
     }
 }
 
+fn remove_project(root: &Path, id: &str) -> anyhow::Result<Value> {
+    request(root, "remove_project", json!({"revision":registry(root)["revision"],"id":id}))
+}
+
+#[test]
+fn a_project_is_removed_from_the_list_and_only_from_the_list() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let (file, other) = (root.join("notes.mp"), root.join("other.mp"));
+    fs::write(&file, b"a project").unwrap();
+    save_projects(root, json!([{"id":"marionette","path":absolute("marionette.mp")},{"id":"notes","path":file},{"id":"other","path":other}])).unwrap();
+    let removed = remove_project(root, "notes").unwrap();
+    assert_eq!(removed["registry"]["projects"], json!([{"id":"marionette","path":absolute("marionette.mp")},{"id":"other","path":other}]));
+    assert_eq!(registry(root)["projects"], removed["registry"]["projects"]);
+    assert_eq!(fs::read(&file).unwrap(), b"a project", "the file is the person's: it stays");
+    assert_eq!(registry(root)["revision"], 2, "one save for the list, one for the removal");
+    // an id the list does not hold, a stale revision and an id that is no id change nothing
+    let unlisted = remove_project(root, "notes").unwrap_err();
+    assert!(format!("{unlisted:#}").contains("not in your list"), "{unlisted:#}");
+    let stale = request(root, "remove_project", json!({"revision":0,"id":"other"})).unwrap_err();
+    assert!(format!("{stale:#}").contains("revision"), "{stale:#}");
+    for bad in [json!({"id":"../other"}), json!({"id":""}), json!({"id":7}), json!({})] {
+        let mut payload = bad.clone();
+        payload["revision"] = registry(root)["revision"].clone();
+        assert!(request(root, "remove_project", payload).is_err(), "{bad}");
+    }
+    assert_eq!(registry(root)["projects"].as_array().unwrap().len(), 2);
+    assert_eq!(registry(root)["revision"], 2);
+}
+
+#[test]
+fn the_default_project_cannot_be_removed_from_the_list() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let list = json!([{"id":projects::DEFAULT_ID,"path":absolute("marionette.mp")},{"id":"notes","path":absolute("notes.mp")}]);
+    save_projects(root, list.clone()).unwrap();
+    let before = registry(root);
+    let refused = remove_project(root, "marionette").unwrap_err();
+    assert_eq!(format!("{refused:#}"), "The default project stays in the list");
+    assert_eq!(projects::DEFAULT_ID, "marionette");
+    assert_eq!(registry(root), before, "nothing was saved, not even the revision");
+    assert!(projects::remove(&list, "marionette").is_err());
+    assert_eq!(projects::remove(&list, "notes").unwrap(), json!([{"id":"marionette","path":absolute("marionette.mp")}]));
+}
+
 #[test]
 fn an_older_registry_without_projects_reads_with_an_empty_list() {
     let temp = tempfile::tempdir().unwrap();
@@ -202,9 +247,14 @@ fn ai_settings_that_are_not_valid_are_refused_and_change_nothing() {
     }
     assert_eq!(registry(root), before, "nothing was saved");
     // and what is allowed, on this machine and over https
-    for base in ["https://api.example.com/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080/v1",
-                 "http://[::1]:8080/v1", "http://LOCALHOST/v1"] {
+    // The scheme is compared without regard to case, as the factory compares it (`muro/agent.py`).
+    for base in ["https://api.example.com/v1", "HTTPS://api.example.com/v1", "Https://API.example.com/v1",
+                 "http://localhost:11434/v1", "HTTP://localhost:11434/v1", "http://127.0.0.1:8080/v1",
+                 "http://[::1]:8080/v1", "http://LOCALHOST/v1", "HTTP://LOCALHOST/v1"] {
         save_settings(root, |s| s["ai"] = json!({"engine":"api","api_base":base})).unwrap_or_else(|e| panic!("{base}: {e:#}"));
+    }
+    for base in ["HTTP://example.com/v1", "Http://example.com/v1", "HTTP://localhost.evil.example/v1", "FTP://example.com/v1"] {
+        assert!(save_settings(root, |s| s["ai"] = json!({"engine":"api","api_base":base})).is_err(), "{base}");
     }
     // an empty address is only a setting that is not used: allowed while the engine is the harness
     save_settings(root, |s| s["ai"] = json!({"engine":"harness","api_base":""})).unwrap();
@@ -215,17 +265,26 @@ fn ai_settings_that_are_not_valid_are_refused_and_change_nothing() {
 fn the_key_setting_names_a_variable_and_never_holds_a_key() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    for name in ["MY_KEY", "_x", "MURO_API_KEY", "k1"] {
+    for name in ["MY_KEY", "_X1", "MURO_API_KEY", "OPENAI_API_KEY", "K1", &"A".repeat(64)] {
         save_settings(root, |s| s["ai"] = json!({"api_key_env":name})).unwrap_or_else(|e| panic!("{name}: {e:#}"));
         assert_eq!(registry(root)["settings"]["ai"]["api_key_env"], name);
     }
     let value = "sk-live-0123456789abcdef";
-    for pasted in [value, "has space", "1abc", "a=b", "", &"A".repeat(129)] {
+    // Real keys of providers whose keys carry no hyphen read as a name under a looser rule: they are not names.
+    let mixed = "Zk3dQp9RtLm2NvXw8YbHc5JfGs7AaE1uOi4TyP6e";
+    for pasted in [value, "has space", "1abc", "a=b", "", &"A".repeat(65), "gsk_abc123", "hf_xyz", mixed, "key2", "a",
+                   "MixedCase_Key", "abcdef0123456789", "\u{0130}STANBUL", "KEY\n"] {
         let error = save_settings(root, |s| s["ai"] = json!({"api_key_env":pasted})).unwrap_err();
         assert_eq!(format!("{error:#}"), "The key setting must name an environment variable, not hold a key", "{pasted}");
         assert_eq!(format!("{error:#}"), ai::KEY_REFUSED);
     }
-    assert_eq!(registry(root)["settings"]["ai"]["api_key_env"], "k1", "the refused values were not saved");
+    assert_eq!(registry(root)["settings"]["ai"]["api_key_env"], "A".repeat(64), "the refused values were not saved");
+    assert!(ai::validate_key_env("_X1").is_ok());
+    for key in ["gsk_abc123", "hf_xyz", mixed] {
+        let error = format!("{:#}", ai::validate_key_env(key).unwrap_err());
+        assert_eq!(error, ai::KEY_REFUSED);
+        assert!(!error.contains(key), "{key}: the value is never echoed");
+    }
     // nothing the registry wrote holds a key, and the refused text is nowhere on disk
     for entry in fs::read_dir(root).unwrap() {
         let path = entry.unwrap().path();
