@@ -772,6 +772,111 @@ fn a_waiting_thread_wakes_when_another_handle_raises_the_signal() {
     assert!(waiter.join().unwrap());
 }
 
+/// A data directory no other test, and no Muro, uses.
+#[cfg(windows)]
+fn signal_test_dir(which: &str) -> PathBuf {
+    PathBuf::from(format!(
+        r"C:\Muro Signal Test\{}\{which}",
+        uuid::Uuid::new_v4()
+    ))
+}
+
+/// What `launch` decided, and the signal when this launch is the first Muro.
+#[cfg(windows)]
+fn launched(
+    data: &Path,
+    background: bool,
+    wait: Duration,
+) -> (&'static str, Option<single_instance::Signal>) {
+    match single_instance::launch(data, background, wait).unwrap() {
+        single_instance::Launch::First(signal) => ("first", Some(signal)),
+        single_instance::Launch::Running(raised) => {
+            raised.unwrap();
+            ("running", None)
+        }
+        single_instance::Launch::Closing => ("closing", None),
+    }
+}
+
+/// A Muro of `data` that is quitting and ends after `delay`: it holds the signal and the mark
+/// until then, and reports whether a raise was waiting for it when it ended.
+#[cfg(windows)]
+fn quits_after(data: &Path, delay: Duration) -> thread::JoinHandle<bool> {
+    let (first, _) = single_instance::Signal::open(data).unwrap();
+    let quitting = single_instance::Quitting::mark(data).unwrap();
+    thread::spawn(move || {
+        thread::sleep(delay);
+        let raised = first.wait(Some(Duration::ZERO)).unwrap();
+        drop((first, quitting));
+        raised
+    })
+}
+
+#[cfg(windows)]
+#[test]
+fn a_launch_with_no_muro_running_is_the_first_and_owns_the_signal() {
+    let data = signal_test_dir("data");
+    let (kind, signal) = launched(&data, false, Duration::from_secs(5));
+    assert_eq!(kind, "first");
+    // The next launch finds the signal this one owns, and asks for its window.
+    assert_eq!(launched(&data, false, Duration::from_secs(5)).0, "running");
+    assert!(
+        signal
+            .unwrap()
+            .wait(Some(Duration::from_secs(5)))
+            .unwrap()
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn a_launch_beside_a_running_muro_asks_for_its_window_unless_it_is_a_background_one() {
+    use single_instance::{Quitting, Signal};
+    let (data, other) = (signal_test_dir("data"), signal_test_dir("other"));
+    let short = Some(Duration::from_millis(100));
+    let (first, _) = Signal::open(&data).unwrap();
+    // A Muro that quits in another directory is no reason to wait.
+    let _elsewhere = Quitting::mark(&other).unwrap();
+    let started = std::time::Instant::now();
+    assert_eq!(launched(&data, true, Duration::from_secs(5)).0, "running");
+    assert!(!first.wait(short).unwrap(), "a background launch asks for no window");
+    assert_eq!(launched(&data, false, Duration::from_secs(5)).0, "running");
+    assert!(first.wait(short).unwrap());
+    assert!(started.elapsed() < Duration::from_secs(3), "nothing was waited for");
+}
+
+/// The Muro that quits answers no raise, so a launch meanwhile used to show nothing and end:
+/// it waits for that Muro to end instead, and becomes the first.
+#[cfg(windows)]
+#[test]
+fn a_launch_while_the_muro_quits_waits_for_it_to_end_and_takes_its_place() {
+    for background in [false, true] {
+        let data = signal_test_dir("data");
+        let quitter = quits_after(&data, Duration::from_millis(400));
+        let started = std::time::Instant::now();
+        let (kind, signal) = launched(&data, background, Duration::from_secs(10));
+        assert_eq!(kind, "first", "background {background}");
+        assert!(started.elapsed() >= Duration::from_millis(300), "it did not wait");
+        assert!(started.elapsed() < Duration::from_secs(5), "it waited too long");
+        assert!(!quitter.join().unwrap(), "a Muro that quits is not asked for a window");
+        // It holds the signal now: the next launch finds it.
+        assert_eq!(launched(&data, false, Duration::from_secs(5)).0, "running");
+        assert!(signal.unwrap().wait(Some(Duration::from_secs(5))).unwrap());
+    }
+}
+
+#[cfg(windows)]
+#[test]
+fn a_launch_gives_up_on_a_muro_that_keeps_quitting() {
+    let data = signal_test_dir("data");
+    let quitter = quits_after(&data, Duration::from_millis(2500));
+    let started = std::time::Instant::now();
+    assert_eq!(launched(&data, false, Duration::from_millis(400)).0, "closing");
+    assert!(started.elapsed() >= Duration::from_millis(400));
+    assert!(started.elapsed() < Duration::from_millis(2000), "it waited past its limit");
+    assert!(!quitter.join().unwrap(), "it asked nothing of the Muro that quits");
+}
+
 /// A sync that starts and then waits until the test lets it end.
 fn held_sync(gate: &Arc<SyncGate>) -> (mpsc::Sender<()>, thread::JoinHandle<Option<u8>>) {
     let (release, released) = mpsc::channel::<()>();

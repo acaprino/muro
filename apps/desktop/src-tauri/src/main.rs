@@ -29,6 +29,9 @@ const POLL: Duration = Duration::from_secs(5);
 const TRAY_REFRESH: Duration = Duration::from_secs(30);
 /// How long Quit waits for a sync in progress before it ends Muro anyway.
 const QUIT_WAIT: Duration = Duration::from_secs(60);
+/// How long a Muro started while another one quits waits for it to end, and then takes its place.
+#[cfg(windows)]
+const LAUNCH_WAIT: Duration = Duration::from_secs(5);
 /// How long a request of the window waits for the sync in progress, and then for another
 /// writer: the registry takes its lock without waiting and refuses a second request, so the
 /// waiting is done here, once, for every page.
@@ -44,6 +47,9 @@ const WITHOUT_THE_LOCK: [&str; 2] = ["discover", "status"];
 struct Backend {
     client: Client,
     executable: PathBuf,
+    /// The data directory this Muro runs on: what its one-running-Muro signal is named after.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    data: PathBuf,
     /// The name of the per-user Run value that starts Muro with Windows.
     autostart: String,
     /// Every `sync_now` and every `apply` goes through it, whoever asks: one at a time, and Quit
@@ -184,6 +190,11 @@ impl Background {
     fn quit(&self, app: &tauri::AppHandle) {
         let (work, app) = (self.clone(), app.clone());
         std::thread::spawn(move || {
+            // A Muro that starts from now on finds this mark and waits for this one to end,
+            // since a Muro that quits answers no one asking for its window.
+            #[cfg(windows)]
+            let _quitting = single_instance::Quitting::mark(&work.backend.data)
+                .inspect_err(|error| eprintln!("Single instance: {error:#}"));
             work.backend.gate.quit(QUIT_WAIT, || {
                 let _ = work.state.set_text(tray::FINISHING);
             });
@@ -289,15 +300,19 @@ fn main() {
     let background = args.iter().skip(1).any(|arg| arg == "--background");
     // One Muro for each data directory, claimed before anything touches that directory. A Muro
     // started while another runs asks it to show its window, unless it was started in the
-    // background, and ends: there is no second backend and nothing to report.
+    // background, and ends: there is no second backend and nothing to report. One started while
+    // another quits waits for it to end and takes its place.
     #[cfg(windows)]
-    let signal = match single_instance::Signal::open(&data) {
-        Ok((signal, true)) => Some(signal),
-        Ok((signal, false)) => {
-            let raised = if background { Ok(()) } else { signal.raise() };
+    let signal = match single_instance::launch(&data, background, LAUNCH_WAIT) {
+        Ok(single_instance::Launch::First(signal)) => Some(signal),
+        Ok(single_instance::Launch::Running(raised)) => {
             if let Err(error) = raised {
                 eprintln!("Show the running Muro: {error:#}");
             }
+            return;
+        }
+        Ok(single_instance::Launch::Closing) => {
+            eprintln!("Muro is still closing; start it again in a moment");
             return;
         }
         // Without the signal Muro still runs, as it did before: a second one is then refused
@@ -328,6 +343,7 @@ fn main() {
             let backend = Backend {
                 client,
                 executable,
+                data: data.clone(),
                 autostart: autostart_name(),
                 gate: Arc::new(SyncGate::new()),
                 close_to_tray: Arc::new(AtomicBool::new(true)),

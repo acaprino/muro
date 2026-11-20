@@ -5,6 +5,10 @@
 //! The name comes from the data directory, so a portable copy and a development build, which
 //! use other directories, stay independent. The signal is an event of the user's own session:
 //! it goes with the last process that holds it, so a crashed Muro leaves nothing behind.
+//!
+//! A Muro that is quitting waits for its sync to end and answers no one, so it marks itself with
+//! a second event; a Muro that starts meanwhile waits for it to end and takes its place, rather
+//! than raising a signal nobody answers and ending with nothing shown.
 
 use std::path::Path;
 
@@ -15,6 +19,15 @@ use std::path::Path;
 /// asks it to show its window may be different builds: `std`'s hashers promise nothing across
 /// releases.
 pub fn name(data: &Path) -> String {
+    format!(r"Local\MuroShow-{}", digest(data))
+}
+
+/// The name of the mark that the Muro of `data` is quitting: the same directory, the same hash.
+pub fn quitting_name(data: &Path) -> String {
+    format!(r"Local\MuroQuit-{}", digest(data))
+}
+
+fn digest(data: &Path) -> String {
     // Without touching the disk: the directory may not exist yet. `absolute` settles `/`, `..`
     // and a relative path; Windows paths do not tell capitals apart, and `\\?\` is the same
     // path spelled for long names.
@@ -27,22 +40,28 @@ pub fn name(data: &Path) -> String {
         .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
             (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
         });
-    format!(r"Local\MuroShow-{hash:016x}")
+    format!("{hash:016x}")
 }
 
 #[cfg(windows)]
-pub use windows::Signal;
+pub use windows::{Launch, Quitting, Signal, launch};
 
 #[cfg(windows)]
 mod windows {
     use anyhow::{Result, bail, ensure};
-    use std::{path::Path, time::Duration};
+    use std::{
+        path::Path,
+        time::{Duration, Instant},
+    };
     use windows_sys::Win32::Foundation::{
         CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
     use windows_sys::Win32::System::Threading::{
-        CreateEventW, INFINITE, SetEvent, WaitForSingleObject,
+        CreateEventW, EVENT_MODIFY_STATE, INFINITE, OpenEventW, SetEvent, WaitForSingleObject,
     };
+
+    /// How often a launch that waits for a Muro to end looks again.
+    const STEP: Duration = Duration::from_millis(100);
 
     /// A handle to the signal of one data directory. Raising it and waiting on it work from any
     /// thread; the signal closes with the last handle to it.
@@ -104,6 +123,87 @@ mod windows {
     impl Drop for Signal {
         fn drop(&mut self) {
             unsafe { CloseHandle(self.handle as _) };
+        }
+    }
+
+    /// The mark that the Muro of one data directory is quitting, held for as long as it lives
+    /// and gone with it. A Muro that quits answers no raise of the signal, so one that starts
+    /// meanwhile finds this mark and waits for it to be gone instead of trusting the raise.
+    pub struct Quitting {
+        handle: usize,
+    }
+
+    impl Quitting {
+        pub fn mark(data: &Path) -> Result<Self> {
+            let name: Vec<u16> = super::quitting_name(data)
+                .encode_utf16()
+                .chain([0])
+                .collect();
+            let handle = unsafe { CreateEventW(std::ptr::null(), 1, 0, name.as_ptr()) };
+            ensure!(
+                !handle.is_null(),
+                "Cannot mark the Muro as quitting (error {})",
+                unsafe { GetLastError() }
+            );
+            Ok(Self {
+                handle: handle as usize,
+            })
+        }
+
+        /// Whether a Muro of `data` is quitting right now.
+        fn exists(data: &Path) -> bool {
+            let name: Vec<u16> = super::quitting_name(data)
+                .encode_utf16()
+                .chain([0])
+                .collect();
+            let handle = unsafe { OpenEventW(EVENT_MODIFY_STATE, 0, name.as_ptr()) };
+            if handle.is_null() {
+                return false;
+            }
+            unsafe { CloseHandle(handle) };
+            true
+        }
+    }
+
+    impl Drop for Quitting {
+        fn drop(&mut self) {
+            unsafe { CloseHandle(self.handle as _) };
+        }
+    }
+
+    /// What a Muro that starts finds for its data directory.
+    pub enum Launch {
+        /// No Muro of this directory runs, or the one that did has ended: this one is the first
+        /// and owns the signal.
+        First(Signal),
+        /// One runs. It was asked to show its window, unless this launch is a background one;
+        /// the result is whether the asking worked.
+        Running(Result<()>),
+        /// One was quitting and was still there when the wait ran out: nothing can start.
+        Closing,
+    }
+
+    /// Decides what a starting Muro does. A Muro that runs is asked to show its window, and this
+    /// one ends. A Muro that is quitting answers no one, so this one waits for it to end, for
+    /// `wait` at most, and takes its place; it holds none of the Muro's objects meanwhile, or
+    /// they would never go. A `background` launch asks for no window.
+    pub fn launch(data: &Path, background: bool, wait: Duration) -> Result<Launch> {
+        let deadline = Instant::now() + wait;
+        loop {
+            let (signal, first) = Signal::open(data)?;
+            if first {
+                return Ok(Launch::First(signal));
+            }
+            if !Quitting::exists(data) {
+                let raised = if background { Ok(()) } else { signal.raise() };
+                return Ok(Launch::Running(raised));
+            }
+            drop(signal);
+            let left = deadline.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Ok(Launch::Closing);
+            }
+            std::thread::sleep(STEP.min(left));
         }
     }
 }
