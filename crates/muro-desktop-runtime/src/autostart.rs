@@ -1,6 +1,6 @@
 //! Start with Windows: a value of the per-user Run key that starts Muro in the background at
-//! sign-in. The key is read and written with `reg.exe`, never through a shell; only the text of
-//! a value, which `repair` needs to find the executable it names, is read through the registry API.
+//! sign-in. The key is written with `reg.exe`, never through a shell, and a value is read by its
+//! name: whether it exists with `reg.exe`, its text through the registry API.
 
 use anyhow::{Result, ensure};
 use serde_json::{Value, json};
@@ -110,6 +110,13 @@ mod run_key {
     use anyhow::{Context, Result, anyhow, bail, ensure};
     use std::path::Path;
     use std::process::{Command, Output, Stdio};
+    use windows_sys::Win32::Foundation::{
+        ERROR_FILE_NOT_FOUND, ERROR_MORE_DATA, ERROR_SUCCESS, ERROR_UNSUPPORTED_TYPE,
+    };
+    use windows_sys::Win32::System::Registry::{
+        HKEY_CURRENT_USER, REG_ROUTINE_FLAGS, REG_SZ, REG_VALUE_TYPE, RRF_NOEXPAND,
+        RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ, RegGetValueW,
+    };
 
     const KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 
@@ -157,20 +164,14 @@ mod run_key {
         found(&reg(&["query", KEY, "/v", name])?, "read the Run key")
     }
 
-    /// Whether the string value `name` is exactly `data`. reg.exe prints data in the console
-    /// code page, so a path outside ASCII never reads back as written: reg.exe compares it
-    /// itself (exact, case-sensitive, data only), and only the ASCII value name and type of
-    /// each match are read from its output.
+    /// Whether the value `name` is a REG_SZ that is exactly `data` (case-sensitive). Read by its
+    /// name, like `read`: a search through the whole key (`reg query /f`) passes over a value that
+    /// is there while another program adds or deletes a value of the key, and reg.exe prints data
+    /// in the console code page, where a path outside it reads as another path.
     pub fn holds(name: &str, data: &str) -> Result<bool> {
-        let output = reg(&["query", KEY, "/f", data, "/d", "/c", "/e"])?;
-        if !found(&output, "search the Run key")? {
-            return Ok(false);
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).lines().any(|line| {
-            let mut fields = line.trim_start().splitn(3, "    ");
-            fields.next().is_some_and(|n| n.eq_ignore_ascii_case(name))
-                && fields.next() == Some("REG_SZ")
-        }))
+        // Both string types, not expanded, so that the type read is the one stored.
+        let flags = RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ | RRF_NOEXPAND;
+        Ok(matches!(get(name, flags)?, Some((REG_SZ, text)) if text == data))
     }
 
     /// The string value `name` exactly as stored (REG_EXPAND_SZ with its variables expanded, as
@@ -178,26 +179,27 @@ mod run_key {
     /// through the registry API, which gives UTF-16: the output of reg.exe is in the console
     /// code page, and a path outside it would read as another path.
     pub fn read(name: &str) -> Result<Option<String>> {
-        use windows_sys::Win32::Foundation::{
-            ERROR_FILE_NOT_FOUND, ERROR_MORE_DATA, ERROR_SUCCESS, ERROR_UNSUPPORTED_TYPE,
-        };
-        use windows_sys::Win32::System::Registry::{
-            HKEY_CURRENT_USER, RRF_RT_REG_SZ, RegGetValueW,
-        };
+        Ok(get(name, RRF_RT_REG_SZ)?.map(|(_, text)| text))
+    }
+
+    /// The value `name` read by its name with `flags`, and the type it was read as, or `None`
+    /// when there is no such value or it is of a type `flags` does not take.
+    fn get(name: &str, flags: REG_ROUTINE_FLAGS) -> Result<Option<(REG_VALUE_TYPE, String)>> {
         let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<u16>>();
         let subkey = wide(KEY.trim_start_matches(r"HKCU\"));
         let value = wide(name);
         // Room for a usual path; when it is not enough the call says how much it needs.
         let mut buffer = vec![0u16; 512];
         loop {
+            let mut kind: REG_VALUE_TYPE = 0;
             let mut bytes = u32::try_from(buffer.len() * 2)?;
             let status = unsafe {
                 RegGetValueW(
                     HKEY_CURRENT_USER,
                     subkey.as_ptr(),
                     value.as_ptr(),
-                    RRF_RT_REG_SZ,
-                    std::ptr::null_mut(),
+                    flags,
+                    &mut kind,
                     buffer.as_mut_ptr().cast(),
                     &mut bytes,
                 )
@@ -211,7 +213,7 @@ mod run_key {
                         .position(|&unit| unit == 0)
                         .unwrap_or(text.len());
                     return String::from_utf16(&text[..end])
-                        .map(Some)
+                        .map(|text| Some((kind, text)))
                         .context("The Run value is not valid Unicode");
                 }
                 ERROR_MORE_DATA => buffer.resize((bytes as usize).div_ceil(2) + 1, 0),
