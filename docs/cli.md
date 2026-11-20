@@ -199,11 +199,13 @@ muro install /tmp/stage/marionette/adapters/claude-code \
 Serves the factory as an MCP stdio server (newline-delimited JSON-RPC 2.0).
 Tools: `validate`, `check_sources`, `build`, `baseline`, `prepare_intake`,
 `prepare_harmonize`, `prepare_review`, `eval_prepare`, `eval_score`,
-`init_package`, `install_adapter`. Every tool takes an optional `manifest`
-argument overriding the server default. The `prepare_*` tools stage
-`PROMPT.md` and evidence on disk; the host AI reads them, does the judgment,
-writes the artifacts with its own file tools (under the host's own
-permissions), then calls `validate`.
+`init_package`, `install_adapter`, `simulate_prepare`, `simulate_check`. Every
+tool takes an optional `manifest` argument overriding the server default. The
+`prepare_*` tools stage `PROMPT.md` and evidence on disk; the host AI reads
+them, does the judgment, writes the artifacts with its own file tools (under
+the host's own permissions), then calls `validate`. The two `simulate_*` tools
+take a `project` (a `.mp`) instead of a manifest and return JSON: see
+[`muro project simulate`](#muro-project-simulate--simulate-prepare--simulate-check).
 
 Register it in Claude Code:
 
@@ -331,6 +333,74 @@ muro project pack --manifest examples/marionette/sources.json --out marionette.m
 muro project info marionette.mp
 ```
 
+### `muro project simulate` / `simulate-prepare` / `simulate-check`
+
+```sh
+muro project simulate <FILE.mp | --manifest PKG/sources.json> --task T [--stack TOKEN]... --model M [--api-base URL] [--api-key-env VAR] [--cache DIR]
+muro project simulate-prepare <FILE.mp | --manifest PKG/sources.json> --task T [--stack TOKEN]... [--cache DIR]
+muro project simulate-check <FILE.mp | --manifest PKG/sources.json> --context FILE --answer FILE [--cache DIR]
+```
+
+The simulator answers one question: which capabilities would this request activate, and in what order? The
+decision is the AI's ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 10). Python prepares what a
+classifier reads and validates its answer with the runtime's own rules; it never matches words in the request, never
+repairs an answer and never completes one. There are two ways to reach the AI, and both end in the same check:
+
+- a coding agent on the computer, through the MCP tools `simulate_prepare` and `simulate_check` of `muro mcp`
+  (the same results as the two subcommands below): it asks for the material, classifies with the prompt it got, and
+  sends its answer back to be checked;
+- an OpenAI-compatible endpoint, through `simulate`, as `muro agent` reaches one.
+
+The package is a `.mp` file (unpacked once per SHA-256 of its content into `--cache`, as `info` does) or a
+`--manifest` (default `./sources.json` when neither is named); naming both is refused. A package needs no
+`eval-cases.json` to be simulated.
+
+`simulate-prepare` prints `{"context": {"task", "stack_tokens", "catalog_digest"}, "prompt": "..."}`. The
+`context` is what the AI's answer must copy exactly. The `prompt` is built by the function that builds the prompt of
+an eval case (`muro eval prepare`): the permanent session policy, the one context, the compact catalog and the
+classification rules, after a short instruction to answer with one JSON object. For Marionette it is about 80,000
+characters. `--stack` tokens (`stack:*`, repeatable) are inputs: with no project to look at, nothing is detected.
+
+`simulate-check` takes that context and the AI's answer (two JSON files) and prints one of:
+
+```json
+{"valid": true, "status": "selected", "reason": "...", "questions": [],
+ "steps": [{"step_id": "x", "capability": "x", "intent": null, "reason": null, "added_as_prerequisite": true},
+           {"step_id": "y", "capability": "y", "intent": "testing.verify", "reason": "...", "added_as_prerequisite": false}]}
+{"valid": false, "errors": ["Unknown capability in AI classification: ghost"]}
+```
+
+`status` is `selected`, `no_match` or `needs_clarification` (the last two are valid answers with no steps; the
+questions are the AI's). The steps come only from a validated decision, in the order the runtime plans them
+(`routing.resolve_selection`), with the `after` prerequisites it adds marked `added_as_prerequisite`: nobody chose
+an intent or a reason for those, so both are `null`. An answer that is invalid is never shown as steps: an unknown
+capability or intent, a context that is not the one prepared for this catalog (a changed catalog needs a new
+`simulate-prepare`), a missing `needs` judgment, a constraint the context lacks, two owners of one output.
+
+`simulate` does both in one command: it prepares, sends the prompt as one user message to `<api-base>/chat/completions`
+with the model named, takes the first JSON object of the answer (a code fence or a sentence around it is fine) and
+checks it. It prints the same result with `"engine": "api"` and `"model"`. An answer with no JSON object at all is an
+invalid answer (`valid` false). Cost: one request carrying the whole prompt; nothing is retried.
+
+- `--model` (required), `--api-base` (default `https://api.openai.com/v1`; plain `http` is refused except on
+  localhost) and `--api-key-env` (default: `MURO_API_KEY`, then `OPENAI_API_KEY`) are those of `muro agent`.
+- The key comes only from that environment variable. It is never an argument, a file, output or part of a message,
+  not even one an endpoint echoes back.
+- Exit `0` whenever a result was printed, valid or not: an invalid decision is what the simulation found, so read
+  `valid`. Exit `1` with the reason on stderr when it could not run: no package, a request or stack the runtime
+  refuses, an unreadable file, no key, an endpoint that cannot be reached or answers with an error.
+
+```sh
+export MURO_API_KEY=…
+muro project simulate marionette.mp --task "Convert the Word document to PDF" --model gpt-5.2
+muro project simulate-prepare marionette.mp --task "Landing page with scroll animations" --stack stack:gsap > prepared.json
+# the host AI classifies with the prompt in prepared.json, saves that file's context as context.json and its answer as answer.json
+muro project simulate-check marionette.mp --context context.json --answer answer.json
+```
+
+The mechanics are covered by tests against fixtures and a scripted endpoint; no claim is made about any model's
+classification of a request.
+
 ## Legacy flag mapping
 
 | Legacy (`muro_build.py`) | Subcommand |
@@ -369,7 +439,7 @@ harmonize, validate, build, install.
 
 - API keys only from environment variables; never arguments, never logged,
   never stored.
-- `muro agent` refuses plain `http` endpoints off localhost.
+- `muro agent` and `muro project simulate` refuse plain `http` endpoints off localhost.
 - Model answers can only land on the allowlisted package paths; path
   traversal is rejected before any write.
 - A `.mp` from elsewhere is untrusted input: `unpack` refuses traversal, absolute paths, drive letters and links

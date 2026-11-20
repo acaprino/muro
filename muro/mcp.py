@@ -27,6 +27,7 @@ def _tool(name: str, description: str, properties: dict[str, Any], required: lis
 
 
 _MANIFEST = {"manifest": {"type": "string", "description": "Path to the package's sources.json"}}
+_PROJECT = {"project": {"type": "string", "description": "Path to a .mp project file, instead of a manifest"}, **_MANIFEST}
 
 
 def tool_definitions() -> list[dict[str, Any]]:
@@ -45,6 +46,20 @@ def tool_definitions() -> list[dict[str, Any]]:
         _tool("eval_prepare", "Stage the routing eval prompt and cases, without the expectations.", _MANIFEST, []),
         _tool("eval_score", "Score eval decisions (a JSON file you wrote) against eval-cases.json.",
               {**_MANIFEST, "decisions": {"type": "string"}}, ["decisions"]),
+        _tool("simulate_prepare",
+              "Prepare the simulation of one request against a project's catalog. Returns {context, prompt}: "
+              "classify the request yourself with the prompt (the decision is yours; Python never classifies), "
+              "then call simulate_check with your answer. Name a .mp `project` or a `manifest`.",
+              {**_PROJECT, "task": {"type": "string", "description": "The request to simulate"},
+               "stack": {"type": "array", "items": {"type": "string"},
+                         "description": "stack:* constraint tokens the request carries"}},
+              ["task"]),
+        _tool("simulate_check",
+              "Validate your classification of a simulated request with the runtime's own rules. Returns the "
+              "ordered steps, or why the answer is invalid (nothing is repaired). Pass the context "
+              "simulate_prepare returned and your answer, a JSON object.",
+              {**_PROJECT, "context": {"type": "object"}, "answer": {"type": "object"}},
+              ["context", "answer"]),
         _tool("init_package",
               "Scaffold a new single-source package from a repository link: resolves the pin "
               "(newest non-prerelease tag, or --head), verifies the license gate, writes sources.json. "
@@ -97,6 +112,13 @@ def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path) -> t
         return with_manifest(lambda _m, _p, root: cli._run_eval(root, True, None))
     if name == "eval_score":
         return with_manifest(lambda _m, _p, root: cli._run_eval(root, False, Path(arguments["decisions"])))
+    if name in ("simulate_prepare", "simulate_check"):
+        mp = Path(arguments["project"]) if arguments.get("project") else None
+        # A project file replaces the server's default manifest; naming both is refused.
+        where = (mp, Path(arguments["manifest"]) if arguments.get("manifest") else (None if mp else default_manifest), None)
+        if name == "simulate_prepare":
+            return _captured(lambda: cli._run_simulate_prepare(*where, arguments.get("task"), arguments.get("stack") or []))
+        return _captured(lambda: cli._run_simulate_check(*where, arguments.get("context"), arguments.get("answer")))
     if name == "init_package":
         def init_body() -> int:
             from .scaffold import scaffold_package
