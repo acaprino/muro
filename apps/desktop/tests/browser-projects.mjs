@@ -573,7 +573,7 @@ await test('Simulate: an empty request is refused in place, the note names the e
   assert.doesNotMatch(text, /Documented example/);
   assert.equal(await card.getAttribute('role'), 'status');
   assert.deepEqual(await page.locator('.gnum').allTextContents(), ['2', '1'], 'in the order of the decision (the graph lists office-docs first)');
-  assert.deepEqual((await simulations(app)).map(c => c.payload), [{ id: 'marionette', task: 'Write a letter as a Word file' }]);
+  assert.deepEqual((await simulations(app)).map(({ payload: { run, ...rest } }) => [rest, /^[A-Za-z0-9_-]{1,64}$/.test(run)]), [[{ id: 'marionette', task: 'Write a letter as a Word file' }, true]], 'the request names its run, so that it can be stopped');
   assert.equal(await activeAttr(page, 'data-action'), 'graph-simulate', 'the keyboard is still on the button');
   assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 0);
   await page.screenshot({ path: shots + '/project-graph-simulation.png' });
@@ -599,6 +599,10 @@ await test('Simulate: Cancel stops waiting, and the answer that comes later is n
   await page.waitForTimeout(1500);
   assert.equal(await page.locator('.simres').count(), 0, 'nobody is waiting for it');
   assert.equal(await litNodes(page).count(), 0);
+  // The runtime is told to stop that run. (The app's one-at-a-time queue sends it after the request it stops, until `simulate` and `cancel_simulation` are requests that wait for nobody.)
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'cancel_simulation'));
+  const calls = await app.calls();
+  assert.equal(calls.find(c => c.action === 'cancel_simulation').payload.run, calls.find(c => c.action === 'simulate').payload.run, 'the run it asks to stop is the one it started');
   await app.flags({ simulateDelay: 0 });
   await simulateButton(page).click();
   await page.locator('.simres', { hasText: '2 steps' }).waitFor();

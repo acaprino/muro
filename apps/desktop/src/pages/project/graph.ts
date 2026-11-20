@@ -24,8 +24,8 @@ export interface SimState {
   task: string;
   /** The documented example shown (an index into `info.graph.examples`), or null. */
   example: number | null;
-  /** The free-text request being waited for, or null: only this page's own count, never kept in the session. */
-  run: number | null;
+  /** The name of the free-text request being waited for, or null. It is the name the runtime knows the run by (so it can be stopped); never kept in the session. */
+  run: string | null;
   /** What the box says is wrong (an empty request); never kept. */
   error: string;
   /** The last free-text outcome. */
@@ -130,7 +130,16 @@ function typed(sim: SimState, box: HTMLTextAreaElement | HTMLInputElement | HTML
   sim.task = box.value;
   if (sim.error) { sim.error = ''; box.removeAttribute?.('aria-invalid'); box.closest?.('.two')?.querySelector('#err-simtask')?.replaceChildren(); }
 }
-let runs = 0;
+/** A name for a run, as the runtime lets one be named (letters, digits, `-` and `_`, 64 at most): unique, so a run left over from an earlier page is never taken for this one. */
+const newRun = (): string => globalThis.crypto?.randomUUID?.() ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+/** The end of waiting for the answer to a free-text request, which is also the end of the request: the runtime is told to stop the AI's process. A runtime that cannot say so
+ * (an older one, a run that has just ended) is not an error of the page, which has stopped waiting either way. */
+function stopWaiting(app: App, sim: SimState): void {
+  const run = sim.run;
+  if (run === null) return;
+  sim.run = null;
+  app.request('cancel_simulation', { run }).catch(() => { /* nothing is waiting for it */ });
+}
 /** A free-text request. It does not take the app's one-at-a-time lock (which would disable every button, Cancel too, for as long as an AI takes): the page waits for it
  * by itself. The answer is shown only when it is still the one waited for: cancelled, replaced by another request, or left with the project, it is dropped. */
 async function simulate(app: App, _d: DOMStringMap, el: HTMLElement): Promise<void> {
@@ -140,12 +149,12 @@ async function simulate(app: App, _d: DOMStringMap, el: HTMLElement): Promise<vo
   keep(sim, el);
   const task = sim.task.trim();
   if (!task) { sim.error = 'Write a request first.'; boxOf(el)?.focus(); app.render(); return; }
-  const mine = ++runs;
+  const mine = newRun();
   Object.assign(sim, { run: mine, error: '', example: null, result: null });
   tell();
   app.render();
   let outcome: Outcome;
-  try { outcome = readAnswer(await app.request<unknown>('simulate', { id: pv.id, task }), task); }
+  try { outcome = readAnswer(await app.request<unknown>('simulate', { id: pv.id, task, run: mine }), task); }
   catch (e) { outcome = { kind: 'failed', asked: task, message: String(e instanceof Error ? e.message : e) }; }
   if (app.state.project?.sim !== sim || sim.run !== mine) return;
   sim.run = null; sim.result = outcome;
@@ -154,11 +163,10 @@ async function simulate(app: App, _d: DOMStringMap, el: HTMLElement): Promise<vo
 
 export const actions: Actions = {
   'graph-simulate': simulate,
-  /** The runtime has no way to stop the AI yet: the page stops waiting, and what comes later is dropped. */
   'graph-cancel': (app, _d, el) => {
     const sim = app.state.project?.sim;
     if (!sim || sim.run === null) return;
-    sim.run = null;
+    stopWaiting(app, sim);
     el.closest?.('.two')?.querySelector<HTMLElement>('[data-action="graph-simulate"]')?.focus();
     app.notify('Stopped waiting for the answer.');
     app.render();
@@ -168,7 +176,8 @@ export const actions: Actions = {
     if (!pv || !info || i < 0 || i >= (Array.isArray(info.graph?.examples) ? info.graph.examples.length : 0)) return;
     keep(pv.sim, el);
     // Looking at an example instead is the end of waiting for the AI.
-    Object.assign(pv.sim, { run: null, example: pv.sim.example === i ? null : i, result: null });
+    stopWaiting(app, pv.sim);
+    Object.assign(pv.sim, { example: pv.sim.example === i ? null : i, result: null });
     app.render();
   },
   'graph-clear': (app, _d, el) => {

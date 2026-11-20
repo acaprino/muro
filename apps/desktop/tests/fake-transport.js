@@ -15,6 +15,7 @@
 //             simulate           what `simulate` answers: 'selected' (a prerequisite and a chosen step), 'no_match', 'clarify' (needs_clarification, with its questions) or
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
+//                                `simulate` needs the `run` the page names; `cancel_simulation {run}` ends a delayed one ("The simulation was cancelled") and refuses one that is not running.
 //             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name (set it before opening the project)
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
@@ -200,9 +201,12 @@ export function createTransport(scenario = 'default') {
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
-  async function simulate({ id, task }) {
+  // The page names each run (`run`, as the runtime lets it: letters, digits, - and _, 64 at most) so it can ask for it to be stopped: `cancel_simulation {run}`.
+  const running = new Map();
+  async function simulate({ id, task, run }) {
     projectOf(id);
-    if (flags.simulateDelay) await new Promise(done => setTimeout(done, flags.simulateDelay));
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(run ?? '')) throw new Error('Invalid run ID');
+    if (flags.simulateDelay) await new Promise((done, stop) => { const timer = setTimeout(done, flags.simulateDelay); running.set(run, () => { clearTimeout(timer); stop(new Error('The simulation was cancelled')); }); }).finally(() => running.delete(run));
     if (flags.simulateError) throw new Error(flags.simulateError);
     const ai = reg.settings.ai ?? { engine: 'harness', harness: reg.settings.agent }, api = ai.engine === 'api';
     const who = { engine: api ? 'api' : 'harness', ...(api ? { model: ai.model } : { harness: ai.harness }), cost_usd: api ? null : 0.1234, duration_ms: 4200 };
@@ -264,6 +268,12 @@ export function createTransport(scenario = 'default') {
       }
       case 'install_project': return installProject(payload);
       case 'simulate': return simulate(payload);
+      case 'cancel_simulation': {
+        const stop = running.get(payload.run);
+        if (!stop) throw new Error('That simulation is not running');
+        stop();
+        return { status: 'cancelling' };
+      }
       case 'pick_file': { unknownShellAction(action); return { path: flags.pickPath }; }
       case 'open_folder': { unknownShellAction(action); return { opened: true }; }
       case 'save_plugin': {

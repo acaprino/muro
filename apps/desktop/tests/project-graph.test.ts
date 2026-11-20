@@ -355,7 +355,7 @@ it('an example the project no longer has is not shown', () => {
   assert.doesNotMatch(show(opened({ example: -1 })), /simres/);
 });
 it('while a request runs the button says which engine is asked, cannot be used again, and can be cancelled', () => {
-  const asking = (settings: Record<string, unknown>) => show(opened({ run: 1, task: 'Write a letter' }, info(), snapshot(settings)));
+  const asking = (settings: Record<string, unknown>) => show(opened({ run: 'r1', task: 'Write a letter' }, info(), snapshot(settings)));
   const html = asking({ ai: ai() });
   assert.match(html, /<button type="button" class="btn" data-action="graph-simulate" aria-busy="true" aria-disabled="true"><i class="spin" aria-hidden="true"><\/i><span>Asking Claude Code…<\/span><\/button>/);
   assert.match(html, /<button type="button" class="btn" data-action="graph-cancel"><span>Cancel<\/span><\/button>/);
@@ -495,7 +495,10 @@ it('a request is sent to the runtime for this project, trimmed, and its answer i
   s.sim().task = '  Write a letter as a Word file \n';
   s.sim().example = 0;
   await s.act('graph-simulate');
-  assert.deepEqual(s.fake.calls, [{ action: 'simulate', payload: { id: 'marionette', task: 'Write a letter as a Word file' } }]);
+  assert.deepEqual(s.calls(), ['simulate']);
+  const { run, ...asked } = s.fake.calls[0].payload;
+  assert.deepEqual(asked, { id: 'marionette', task: 'Write a letter as a Word file' });
+  assert.equal(typeof run, 'string', 'the page names the run, so that it can be stopped');
   const result = s.sim().result as Extract<Outcome, { kind: 'decision' }>;
   assert.equal(result.kind, 'decision');
   assert.deepEqual(result.steps.map(x => [x.capability, x.added_as_prerequisite]), [['office-pdf', true], ['office-docs', false]]);
@@ -560,13 +563,49 @@ it('cancelling when nothing runs does nothing', async () => {
   await s.act('graph-cancel');
   assert.equal(s.renders(), 0);
   assert.deepEqual(s.toasts, []);
+  assert.deepEqual(s.calls(), []);
 });
-it('choosing an example while a request runs stops waiting for it', async () => {
-  const wait = deferred<unknown>();
-  const s = await session({ wrap: r => (a, p) => a === 'simulate' ? wait.promise : r(a, p) });
+it('a request names its run, in the form the runtime accepts, and no two runs share a name', async () => {
+  const sent: string[] = [];
+  const s = await session({ wrap: r => (a, p) => { if (a === 'simulate') sent.push(p.run); return r(a, p); } });
+  s.sim().task = 'Write a letter';
+  await s.act('graph-simulate');
+  await s.act('graph-simulate');
+  assert.equal(sent.length, 2);
+  for (const run of sent) assert.match(run, /^[A-Za-z0-9_-]{1,64}$/);
+  assert.notEqual(sent[0], sent[1]);
+});
+it('cancelling asks the runtime to stop that very run, and a runtime that cannot is no error of the page', async () => {
+  const wait = deferred<unknown>(), seen: [string, string][] = [];
+  const s = await session({ wrap: r => (a, p) => { seen.push([a, p?.run]); if (a === 'simulate') return wait.promise; if (a === 'cancel_simulation') return Promise.reject(new Error('Unknown registry action: cancel_simulation')); return r(a, p); } });
+  s.sim().task = 'Write a letter';
+  const run = s.act('graph-simulate');
+  await s.act('graph-cancel');
+  await new Promise(done => setTimeout(done, 0));
+  assert.deepEqual(seen.map(x => x[0]), ['simulate', 'cancel_simulation']);
+  assert.equal(seen[1][1], seen[0][1], 'the run it asks to stop is the run it started');
+  assert.equal(s.state.error, null, 'a refusal to stop is not shown: the page has stopped waiting either way');
+  assert.deepEqual(s.toasts, ['Stopped waiting for the answer.']);
+  wait.resolve({ ...valid });
+  await run;
+  assert.equal(s.sim().result, null);
+});
+it('the fake service ends a delayed run that is cancelled, and refuses a run that is not running or has no name', async () => {
+  const fake = createTransport('projects');
+  fake.flags.simulateDelay = 5000;
+  const run = fake.request('simulate', { id: 'marionette', task: 'x', run: 'r-1' });
+  assert.deepEqual(await fake.request('cancel_simulation', { run: 'r-1' }), { status: 'cancelling' });
+  await assert.rejects(run, /was cancelled/);
+  await assert.rejects(fake.request('cancel_simulation', { run: 'r-1' }), /not running/);
+  await assert.rejects(fake.request('simulate', { id: 'marionette', task: 'x' }), /Invalid run ID/);
+});
+it('choosing an example while a request runs stops waiting for it, and tells the runtime', async () => {
+  const wait = deferred<unknown>(), asked: string[] = [];
+  const s = await session({ wrap: r => (a, p) => { asked.push(a); return a === 'simulate' ? wait.promise : r(a, p); } });
   s.sim().task = 'Write a letter';
   const run = s.act('graph-simulate');
   await s.act('graph-example', { id: '1' });
+  assert.deepEqual(asked, ['simulate', 'cancel_simulation']);
   assert.deepEqual([s.sim().run, s.sim().example], [null, 1]);
   wait.resolve({ ...valid });
   await run;
@@ -747,7 +786,7 @@ it('a capability is not opened from information that belongs to another project'
 
 // ---------- what the session keeps ----------
 it('a simulation the session kept comes back valid: the request, the example and the last result, never a run or a refusal', () => {
-  const kept = { task: 'Write a letter', example: 1, run: 7, error: 'Write a request first.', result: JSON.parse(JSON.stringify(decision())) };
+  const kept = { task: 'Write a letter', example: 1, run: 'r7', error: 'Write a request first.', result: JSON.parse(JSON.stringify(decision())) };
   assert.deepEqual(graph.restoreSim(kept), { task: 'Write a letter', example: 1, run: null, error: '', result: decision() });
   assert.deepEqual(graph.restoreSim(graph.newSim()), graph.newSim());
   assert.deepEqual(graph.newSim(), { task: '', example: null, run: null, error: '', result: null });
@@ -766,7 +805,7 @@ it('what a reload brings back that is not a simulation is an empty one', () => {
 });
 it('the project the session keeps carries its simulation through a reload, and a run in progress does not', () => {
   const held = { ...fresh('marionette'), step: 'graph' as const };
-  held.sim = { task: 'Write a letter', example: null, run: 4, error: '', result: decision() };
+  held.sim = { task: 'Write a letter', example: null, run: 'r4', error: '', result: decision() };
   remember(held);
   const back = recall()!;
   assert.deepEqual(back.sim, { task: 'Write a letter', example: null, run: null, error: '', result: decision() });
