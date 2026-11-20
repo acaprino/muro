@@ -1,7 +1,7 @@
 import type { ViewState, Snapshot, Job, ActivityFilter } from '../types.ts';
 import type { App, Actions } from '../context.ts';
 import { harnessNames } from '../model.ts';
-import { esc, head, empty, seg, button, spin, tag, when } from '../ui.ts';
+import { esc, head, empty, seg, button, spin, tag, when, elapsed } from '../ui.ts';
 
 /** What the service and the shell record, in the words of the interface. These are the names of the actions the service writes
  * (`[done, failed]`); an action this table does not know is shown as the service named it. Nothing here reads a message. */
@@ -46,16 +46,25 @@ const outcome = (status: string) => OK.has(status) ? '' : status === 'failed' ||
 const money = (usd: number) => Number.isFinite(Number(usd)) ? `$${Number(usd).toFixed(2)}` : '';
 const log = (path: string) => path ? `<small class="mono break">Log: ${esc(path)}</small>` : '';
 
-function jobCard(s: Snapshot, job: Job, index: number): string {
-  const budget = money(job.budget_usd);
-  return `<article class="card job" aria-labelledby="job-${index}"><div class="top">${spin}<h2 class="grow" id="job-${index}">Adapting ${esc(pluginName(s, job.plugin_id))} for ${esc(harnessName(job.harness))}</h2>${button('Cancel', 'cancel-job', { id: job.id, danger: true })}</div><small>${esc(job.phase)}${job.message ? ` · ${esc(job.message)}` : ''}${budget ? ` · budget up to ${esc(budget)}` : ''}</small>${log(job.log_path)}</article>`;
+/** A running adaptation: its phase as text, a progress bar and the time it has run. The agent reports no fraction, so the bar has no value
+ * (`role="progressbar"` without `aria-valuenow` is indeterminate) and says the phase and the time instead. The time is read from the
+ * clock at each paint; the jobs poll paints this page again, which is what moves it. */
+function jobCard(s: Snapshot, job: Job, index: number, now: number): string {
+  const budget = money(job.budget_usd), ran = elapsed(job.time, now);
+  const said = [job.phase, ran && `running for ${ran}`].filter(Boolean).join(', ');
+  const rest = [job.message, budget && `budget up to ${budget}`].filter(Boolean).map(esc).join(' · ');
+  return `<article class="card job" aria-labelledby="job-${index}"><div class="top">${spin}<h2 class="grow" id="job-${index}">Adapting ${esc(pluginName(s, job.plugin_id))} for ${esc(harnessName(job.harness))}</h2>${button('Cancel', 'cancel-job', { id: job.id, danger: true })}</div>`
+    + `<div class="phase">${job.phase ? `<strong>${esc(job.phase)}</strong>` : ''}${ran ? `<span class="elapsed">Running for ${esc(ran)}</span>` : ''}</div>`
+    + `<div class="bar indeterminate" role="progressbar" aria-label="Adaptation in progress"${said ? ` aria-valuetext="${esc(said)}"` : ''}><i></i></div>`
+    + `${rest ? `<small>${rest}</small>` : ''}${log(job.log_path)}</article>`;
 }
 const item = (e: Entry) => `<li><time>${esc(when(e.time))}</time><div class="grow"><strong>${esc(e.title)}</strong>${e.message ? `<small>${esc(e.message)}</small>` : ''}${log(e.log || '')}</div>${outcome(e.status)}</li>`;
 
-export function view(state: ViewState): string {
+/** `now` is the clock, in milliseconds: the page reads it, and a test sets it. */
+export function view(state: ViewState, now: number = Date.now()): string {
   const s = state.snapshot!, filter = state.afilter, list = entries(s).filter(e => matches(e, filter));
   return head('Activity', 'What Muro did, and why.')
-    + (s.jobs || []).filter(j => j.status === 'running').map((j, i) => jobCard(s, j, i)).join('')
+    + (s.jobs || []).filter(j => j.status === 'running').map((j, i) => jobCard(s, j, i, now)).join('')
     + `<div class="tools">${seg('afilter', filter, FILTERS, 'Filter activity')}</div>`
     + (list.length ? `<ul class="card list act">${list.map(item).join('')}</ul>` : empty(filter === 'all' ? 'Nothing yet' : 'Nothing here', 'Sync runs and AI adaptations show up here.'));
 }

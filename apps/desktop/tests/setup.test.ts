@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { listedPlugin, listing, inList } from '../src/model.ts';
 import { sw } from '../src/ui.ts';
 import * as setup from '../src/pages/setup.ts';
@@ -158,6 +159,58 @@ it('step 2 names a harness it could not read and says when nothing is installed'
   const none = setup.view(blank({ snapshot: withInventory([]), setup: stepped(2, { pick: { 'claude-code': true } }) }));
   assert.match(none, /Nothing installed yet/);
   assert.match(none, /Your list starts empty/);
+});
+
+it('every step ends with one footer that is the last box of its card, whatever the list above it', () => {
+  const many = Array.from({ length: 60 }, (_, i): InstalledPlugin => ({ id: `p${i}`, name: `plugin-${i}`, version: '1.0.0', path: `D:/plugins/p${i}`, managed: false }));
+  const states = [
+    [1, blank({ snapshot: noTargets(), discovered: [found('claude-code', 'Claude Code'), found('codex', 'Codex')], setup: stepped(1) }), /setup-next/],
+    [2, blank({ snapshot: withInventory(many), setup: stepped(2, { pick: { 'claude-code': true } }) }), /setup-back.*setup-next/],
+    [2, blank({ snapshot: withInventory([]), setup: stepped(2, { pick: { 'claude-code': true } }) }), /setup-back.*setup-next/],
+    [3, blank({ snapshot: snapshot(), setup: stepped(3) }), /setup-back.*setup-finish/],
+  ] as const;
+  for (const [step, state, buttons] of states) {
+    const html = setup.view(state);
+    assert.equal(html.match(/class="setupfoot"/g)?.length, 1, `step ${step}: one footer`);
+    const footer = html.slice(html.indexOf('<div class="setupfoot">'));
+    assert.ok(footer.endsWith('</div></section></div>'), `step ${step}: nothing of the card comes after the footer, so it can stay at the bottom while the rest scrolls`);
+    assert.match(footer, buttons, `step ${step}: its buttons are in it`);
+  }
+  assert.ok(setup.view(states[1][1]).split('<li>').length > 60, 'the long list is in the same card');
+});
+
+/** The rules of the stylesheet that are not inside an at-rule (a media query or a keyframe list), as [selector, declarations]. */
+const topLevelRules = (css: string): [string, string][] => {
+  const rules: [string, string][] = [];
+  let depth = 0, start = 0, head = '';
+  for (let i = 0; i < css.length; i++) {
+    if (css[i] === '{') { if (depth++ === 0) { head = css.slice(start, i).trim(); start = i + 1; } }
+    else if (css[i] === '}' && --depth === 0) { if (!head.startsWith('@')) rules.push([head, css.slice(start, i)]); start = i + 1; }
+  }
+  return rules;
+};
+/** What the stylesheet declares for a selector: every rule with exactly that selector, a later one over an earlier one. */
+const style = (selector: string): Record<string, string> => {
+  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const declared: Record<string, string> = {};
+  for (const [head, body] of topLevelRules(css)) {
+    if (head !== selector) continue;
+    for (const declaration of body.split(';')) { const colon = declaration.indexOf(':'); if (colon > 0) declared[declaration.slice(0, colon).trim()] = declaration.slice(colon + 1).trim(); }
+  }
+  return declared;
+};
+
+it('the first run\'s footer sticks to the bottom of the window: the page scrolls, not the wrap, and the card is a column, not a grid', () => {
+  // What a sticky box needs, each of which was missing: it moves inside the nearest scrolling ancestor and inside its parent.
+  assert.equal(style('.main')['overflow'], 'auto', 'the page is what scrolls');
+  assert.equal(style('.setupwrap')['overflow'], 'visible', 'an overflow:auto wrap is the scroller the footer would look at, and it never overflows');
+  assert.equal(style('.setupcard')['display'], 'flex', 'in a grid row as tall as the footer a sticky box has nowhere to move');
+  assert.equal(style('.setupcard')['flex-direction'], 'column');
+  assert.equal(style('.setupfoot')['position'], 'sticky');
+  assert.equal(style('.setupfoot')['bottom'], '0');
+  assert.match(style('.setupfoot')['background'], /^var\(--/, 'what scrolls under it does not show through');
+  assert.equal(style('.setupfoot')['display'], 'flex', 'Back and Continue stay at the two ends');
+  assert.match(style('.main:has(.setupcard)')['scroll-padding-bottom'], /^\d+px$/, 'a box focused with the keyboard is not left under the footer');
 });
 
 it('step 3 offers two switches, on by default, and disables the one the shell cannot honour', () => {

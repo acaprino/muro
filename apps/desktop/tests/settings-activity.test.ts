@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { Snapshot, ViewState, Job, Activity as Event, Target } from '../src/types.ts';
 import { frame } from '../src/views.ts';
 import { exclusiveSeg } from '../src/forms.ts';
+import { elapsed } from '../src/ui.ts';
 import { view as settings } from '../src/pages/settings.ts';
 import { view as activity, entries, matches } from '../src/pages/activity.ts';
 
@@ -136,12 +137,52 @@ test('Activity: the filters', () => {
 test('Activity: a running adaptation has its card with phase, budget, log and Cancel; the list and its filter come after', () => {
   const html = activity(viewState(snapshot({ jobs: [job()], activity: [event('1', '10', 'check', 'failed', 'Sources not resolved')] })));
   assert.match(html, /<article class="card job"[^>]*><div class="top"><i class="spin"[^>]*><\/i><h2 class="grow" id="job-0">Adapting Docs &lt;b&gt;writer&lt;\/b&gt; for OpenCode<\/h2><button[^>]*data-action="cancel-job"[^>]*data-id="job-1"/);
-  assert.match(html, /harmonization · Working · budget up to \$2\.00/);
+  assert.match(html, /<strong>harmonization<\/strong>/, 'its phase');
+  assert.match(html, /<small>Working · budget up to \$2\.00<\/small>/);
   assert.match(html, /Log: C:\/data\/jobs\/job-1\/log\.txt/);
   assert.ok(html.indexOf('class="card job"') < html.indexOf('role="radiogroup"') && html.indexOf('role="radiogroup"') < html.indexOf('class="card list act"'));
   assert.match(html, /aria-label="Filter activity"/);
   assert.match(html, /<span class="tag bad">Failed<\/span>/);
   assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI adaptation|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI adaptation', 'Problems']);
+});
+
+const START = 1700000500;
+test('Activity: a running adaptation shows its phase as text, a progress bar with no value and the time it has run', () => {
+  const html = activity(viewState(snapshot({ jobs: [job({ time: String(START) })] })), (START + 125) * 1000);
+  const bar = html.match(/<div class="bar indeterminate"[^>]*>/)?.[0] ?? '';
+  assert.match(bar, /role="progressbar"/);
+  assert.match(bar, /aria-label="Adaptation in progress"/);
+  assert.doesNotMatch(bar, /aria-value(now|min|max)=/, 'a bar without a value is indeterminate, whatever the page says about time');
+  assert.match(bar, /aria-valuetext="harmonization, running for 2 min 5 s"/, 'what a screen reader reads when it reaches the bar');
+  assert.match(html, /<strong>harmonization<\/strong>/);
+  assert.match(html, /<span class="elapsed">Running for 2 min 5 s<\/span>/);
+  assert.equal(html.match(/role="progressbar"/g)?.length, 1);
+});
+
+test('Activity: the elapsed time follows the clock, so each poll of the jobs moves it', () => {
+  const s = snapshot({ jobs: [job({ time: String(START) })] });
+  const at = (seconds: number) => activity(viewState(s), (START + seconds) * 1000);
+  assert.match(at(3), /Running for 3 s</);
+  assert.match(at(6), /Running for 6 s</);
+  assert.match(at(61), /Running for 1 min 1 s</);
+  assert.match(at(3725), /Running for 1 h 2 min</);
+});
+
+test('elapsed: seconds, minutes with seconds, hours with minutes; no time that is not a stamp, none before the start', () => {
+  const at = (seconds: number) => elapsed(String(START), (START + seconds) * 1000);
+  assert.deepEqual([0, 1, 59, 60, 125, 3599, 3600, 7260].map(at), ['0 s', '1 s', '59 s', '1 min 0 s', '2 min 5 s', '59 min 59 s', '1 h 0 min', '2 h 1 min']);
+  assert.equal(at(-30), '0 s', 'a clock that is a little behind shows no negative time');
+  assert.equal(elapsed(`${START}000`, (START + 10) * 1000), '10 s', 'a stamp in milliseconds');
+  for (const value of ['', 'soon', '12', '<img>', null, undefined]) assert.equal(elapsed(value, START * 1000), '', String(value));
+});
+
+test('Activity: a running adaptation whose start is not a time still shows its bar, and says no time', () => {
+  const html = activity(viewState(snapshot({ jobs: [job({ time: 'earlier' })] })), START * 1000);
+  assert.match(html, /<div class="bar indeterminate" role="progressbar"[^>]*aria-valuetext="harmonization"/);
+  assert.doesNotMatch(html, /Running for|class="elapsed"/);
+  const noPhase = activity(viewState(snapshot({ jobs: [job({ time: String(START), phase: '' })] })), (START + 9) * 1000);
+  assert.match(noPhase, /aria-valuetext="running for 9 s"/);
+  assert.doesNotMatch(noPhase, /<strong><\/strong>/);
 });
 
 test('Activity: empty states', () => {

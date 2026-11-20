@@ -271,3 +271,36 @@ the 60-second quit cut-off and a real sign-in are still not run.
 Real and simulated, apart: the registry and runtime tests, `native.mjs` and the first `native-shell.mjs` run are
 real (real folders, the real service, the real executable); `npm test`, `browser-background.mjs` and
 `browser.mjs` are simulated (a fake transport with no lock, whose `behind` helper stands in for the worker).
+
+## Second fix wave (2026-11-20)
+
+The eight minor findings the final review left (list: `.superpowers/sdd/2026-11-19-desktop-shell-and-sync/fix-wave-2.md`),
+fixed after Muro 0.4.0 and meant for the next release. By the owner's instruction (2026-11-20, "skip test locali", "e anche
+build locale") the evidence is CI on the push; what ran here is what takes seconds, and the tests were written before the
+fixes. Four commits on `develop`: the registry (M1 to M4), the second launch (M5), the tray's Pause (M6), the interface and
+these documents (M7, M8).
+
+| # | What changed | Test | Before the fix | After |
+|---|---|---|---|---|
+| M1 | `remove_target` drops `targets.<id>` from `sync-status.json` (`sync_status::forget_target`; no file is written when there was no entry) | registry `a_removed_target_takes_its_times_with_it` | failed: the removed harness's `synced` and `checked` stayed in `sync` | pass |
+| M2 | A source `~`, `~/x` or `~\x` is expanded to `USERPROFILE` (Windows) or `HOME` before the folder check (`sources::expand_home`, `checkout_in`); the message still names the source as written | `a_leading_tilde_is_the_home_folder`, `a_source_under_the_home_folder_is_found_and_a_missing_one_is_not`, the old `missing_local_folder_fails_before_any_repository_lookup` | failed: `~` was returned as it was; `Source folder not found: ~/plugins/x` for a folder that exists | pass |
+| M3 | Tests only: `check` of an unknown or disabled target fails and leaves `registry.json`, `sync-status.json` and the log byte for byte; the non-string `target_id` message is asserted for `plan` and `check`; the two blocker tests now apply a plan with a real install of a second, ready plugin while the blocked one's entry, installed copy and configuration entry stay | `check_for_an_unknown_or_a_disabled_target_fails_and_changes_nothing`, `plan_for_one_target_leaves_the_others_out`, `a_blocked_plugin_is_never_removed_by_exclusive_sync`, `a_harness_with_a_blocker_gets_no_removal` | no production change was needed: all four passed at once. Mutations: with the harness guard `blockers.len() == blocked_before` weakened the second blocker test failed (2 operations, not 1); with that and the blocked plugin's `desired_native` entry both removed, both failed | pass |
+| M4 | The two messages that quoted JSON values (`Replacement verification failed`, `Inventory error`) use the string, as `plan` does (`text`); the first through `observed_complete`, which a unit test can reach | `a_failed_verification_gives_the_error_as_text_not_as_a_json_value`, `verify_names_a_harness_it_cannot_read_in_words_not_as_a_json_value` | failed: `"Target configuration directory ... C:\\\\gone"` with quotes and doubled backslashes | pass |
+| M5 | A Muro that quits marks itself with `Local\MuroQuit-<hash>` (`single_instance::Quitting`); `single_instance::launch` decides what a starting Muro does: first, running (raise and end), or quitting (wait up to 5 s for it to end holding none of its objects, then be the first, or end if it is still there). The shell asks `launch` and marks itself in `Background::quit` | runtime `a_launch_with_no_muro_running_is_the_first_and_owns_the_signal`, `a_launch_beside_a_running_muro_asks_for_its_window_unless_it_is_a_background_one`, `a_launch_while_the_muro_quits_waits_for_it_to_end_and_takes_its_place`, `a_launch_gives_up_on_a_muro_that_keeps_quitting` (Windows) | with the mark ignored (the old behaviour): `left: "running" right: "first"` and `"closing"` | pass |
+| M6 | A save of `auto_sync` that fails from the tray sets the state line to `Could not pause, try again` (or `resume`; `Could not change automatic sync, try again` when the settings could not be read) and records the error in Activity through `automation_record` (`tray::pause_failed`, `Background::toggle_pause`) | runtime `tray_says_which_change_of_automatic_sync_could_not_be_saved` | the function did not exist; a mutation that swapped the two texts fails the test | pass |
+| M7 | The Activity card of a running adaptation shows its phase as text, an indeterminate progress bar (`role="progressbar"`, no `aria-valuenow`) and `Running for 2 min 5 s`, also as the bar's `aria-valuetext`; the jobs poll paints the page again while Activity is open (`ui.elapsed`, `activity.jobCard`, `app.ts`) | `settings-activity.test.ts`: four new tests and one changed; browser: `browser-settings.mjs` (progress bar asserted in the running-adaptation test, and a new test with Playwright's clock) | the file did not load (`elapsed` not exported); 117 of 118 pass | `npm test` 141 pass |
+| M8 | The footer of a first-run step (Back, Continue) is sticky at the bottom of the window: the wrap no longer scrolls (`overflow:visible`), the card is a column and not a grid (a sticky box has no room in a grid row as tall as itself), `scroll-padding-bottom` keeps a focused box out from under it | `setup.test.ts`: the footer is the last box of every step's card; the stylesheet declares what a sticky footer needs; browser: `browser-setup.mjs`, a 60-row step in a 520 px window, footer in the window at the start, middle and end, last row not under it, Continue works | mutation: with the wrap `overflow:auto` and the card a grid the stylesheet test fails with its message | `npm test` 141 pass |
+
+What ran here, after the last edit: `cargo test -p muro-registry --no-fail-fast` (14 + 4 + 46 pass, 1 + 3 ignored);
+`cargo test -p muro-desktop-runtime --test runtime -- a_launch signal sync tray` (28 pass, three runs in a row, 2.5 s
+each); `npm test` (141 pass); `npx tsc --noEmit` (clean); `rustfmt --check` on `single_instance.rs`,
+`tray.rs` and `main.rs` (clean).
+
+Not run, on the instruction: `cargo check` or any build of the shell (`apps/desktop/src-tauri/src/main.rs` changed in
+M5 and M6 and was only read through; the CI step *Shell check* compiles it); `native-shell.mjs` (its second-launch
+section covers a running Muro; a launch while one quits has only the runtime tests, and the tray's Pause is a native
+menu nothing reaches); the three browser changes above (written without a run: the progress bar, the poll with the clock,
+the sticky footer); the full `cargo test -p muro-desktop-runtime` (it writes the Run key and takes about half a minute);
+`clippy`; the full suites of the Python side. Real and simulated, apart: the registry and runtime tests are real (real
+folders, the real service, real Windows events); `npm test` renders strings and reads the stylesheet as text, and the
+browser tests run on the fake transport.

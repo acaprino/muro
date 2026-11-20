@@ -277,3 +277,21 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .setupcard .set>.row:first-child{border-top:0}
 .pick label:has(input:disabled){cursor:default}
 .pick label:has(input:disabled) strong{color:var(--muted)}
+/* Fix wave 2 */
+/* A running adaptation: its phase, the time it has run, and a bar that has no value (the agent reports no fraction). */
+.job .phase{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.job .elapsed{color:var(--muted);font-variant-numeric:tabular-nums}
+.bar.indeterminate{position:relative}
+.bar.indeterminate i{position:absolute;top:0;bottom:0;left:0;width:35%;transition:none;animation:indeterminate 1.4s ease-in-out infinite}
+@keyframes indeterminate{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+/* Where motion is off the bar stands full and faded: a part of it filled would read as a fraction done. */
+@media (prefers-reduced-motion:reduce){.bar.indeterminate i{width:100%;opacity:.45}}
+@media (forced-colors:active){.bar.indeterminate{border:1px solid CanvasText}.bar.indeterminate i{forced-color-adjust:none;background:Highlight}}
+/* The first run: Back and Continue stay at the bottom of the window while a long list scrolls. A sticky box moves inside the nearest scrolling
+   ancestor, which must be the page (`.main`), not the wrap (an `overflow:auto` that never overflows would be the one it looks at), and inside
+   its parent, which must not be a grid whose row is as tall as the footer: so the wrap does not scroll and the card is a column of boxes. */
+.setupwrap{overflow:visible}
+.setupcard{display:flex;flex-direction:column}
+.setupfoot{position:sticky;bottom:0;z-index:1;padding:12px 0;background:var(--glass-strong);backdrop-filter:var(--glass-blur);border-top:1px solid var(--line)}
+/* A box focused with the keyboard is brought into view above the footer, not under it. */
+.main:has(.setupcard){scroll-padding-bottom:84px}

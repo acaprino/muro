@@ -347,6 +347,11 @@ await test('Activity: running adaptations first with their phase and Cancel, the
   assert.match(text, /docs-writer/);
   assert.match(text, /OpenCode/);
   assert.match(text, /harmonization/, 'its phase');
+  const bar = job.getByRole('progressbar', { name: 'Adaptation in progress' });
+  assert.equal(await bar.count(), 1, 'a progress bar');
+  assert.equal(await bar.getAttribute('aria-valuenow'), null, 'with no value: it is indeterminate');
+  assert.match(await bar.getAttribute('aria-valuetext'), /^harmonization, running for 3 min \d+ s$/, 'what a screen reader reads at the bar');
+  assert.match(text, /Running for 3 min \d+ s/, 'the time it has run, from its start');
   assert.match(text, /Claude Code is adapting the plugin for OpenCode\./);
   assert.match(text, /\$2\.00/, 'its budget');
   assert.match(text, /C:\/Users\/you\/Muro\/data\/jobs\/job-1\/log\.txt/, 'where its log is');
@@ -356,6 +361,18 @@ await test('Activity: running adaptations first with their phase and Cancel, the
   assert.equal(await page.locator('ul.act li').first().locator('time').textContent().then(t => /today|yesterday|\d/.test(t)), true);
   assert.equal(await page.locator('section.set').count(), 0);
   await page.screenshot({ path: shots + '/activity-dark.png' });
+});
+
+await test('Activity: the time a running adaptation has run moves with the poll of the jobs', 'demo', { clock: true }, async app => {
+  const { page } = app;
+  await openActivity(page);
+  const elapsed = page.locator('article.job .elapsed');
+  await elapsed.filter({ hasText: /^Running for 3 min \d+ s$/ }).waitFor();
+  // Time stands still from here: what passes is what the test lets pass. The adaptation started three minutes before.
+  await page.clock.pauseAt(new Date(Date.now() + 2_000));
+  await page.clock.fastForward(125_000);
+  await elapsed.filter({ hasText: /^Running for 5 min \d+ s$/ }).waitFor();
+  assert.equal(await page.locator('article.job [role=progressbar]').getAttribute('aria-valuenow'), null, 'still no value');
 });
 
 await test('Activity: Cancel stops the adaptation, which stays in the list as cancelled', 'demo', {}, async app => {

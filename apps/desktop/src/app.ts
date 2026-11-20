@@ -130,7 +130,8 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
  const jobTimer=setInterval(async()=>{
   if(polling||state.busy||dialog.open||!state.snapshot?.jobs?.some(j=>j.status==='running'))return;
   polling=true;
-  try{const before=JSON.stringify(state.snapshot.jobs);state.snapshot.jobs=await request<Job[]>('jobs');let changed=false;if(!state.snapshot.jobs.some(j=>j.status==='running')){adopt(await request<Snapshot>('snapshot'));changed=true;}if(changed||JSON.stringify(state.snapshot?.jobs)!==before)render();}
+  // The Activity page also shows how long each running adaptation has run: the poll paints it again even when the jobs did not change.
+  try{const before=JSON.stringify(state.snapshot.jobs);state.snapshot.jobs=await request<Job[]>('jobs');let changed=false;if(!state.snapshot.jobs.some(j=>j.status==='running')){adopt(await request<Snapshot>('snapshot'));changed=true;}if(changed||state.page==='activity'||JSON.stringify(state.snapshot?.jobs)!==before)render();}
   catch(e){fail(e);}finally{polling=false;}
  },3000);
  void reload().then(()=>{if(state.snapshot){void discover();void modules[state.page].opened?.(app);}});

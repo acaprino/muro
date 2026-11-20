@@ -23,5 +23,9 @@ export const field=(label:string,name:string,value='',options:{required?:boolean
  const slot=options.error!==false,described=[options.hint?`hint-${name}`:'',slot?`err-${name}`:''].filter(Boolean).join(' ');
  return `<label class="fld"><span>${esc(label)}${options.optional?'<em>optional</em>':''}</span><input ${[`name="${name}"`,`value="${esc(value)}"`,`type="${options.type||'text'}"`,options.mono?'class="mono"':'',options.placeholder?`placeholder="${esc(options.placeholder)}"`:'',options.required?'aria-required="true"':'',options.readonly?'readonly':'',options.autofocus?'autofocus':'',...Object.entries(options.attrs||{}).map(([k,v])=>`${k}="${esc(v)}"`),described?`aria-describedby="${described}"`:''].filter(Boolean).join(' ')}>${options.hint?`<small id="hint-${name}">${esc(options.hint)}</small>`:''}${slot?`<small class="err" id="err-${name}" role="alert"></small>`:''}</label>`;
 };
+/** A stamp the service wrote, in epoch seconds (10 digits) or milliseconds (13), as milliseconds; null for anything else. */
+const stamp=(value:unknown)=>{const s=String(value??'');return /^\d{10}(\d{3})?$/.test(s)?Number(s)*(s.length===10?1000:1):null;};
 /** The service stamps some events in epoch seconds: shown as a date, anything else as it came. */
-export const when=(value:unknown)=>{const s=String(value??'');return /^\d{10}(\d{3})?$/.test(s)?new Date(Number(s)*(s.length===10?1000:1)).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):s;};
+export const when=(value:unknown)=>{const ms=stamp(value);return ms===null?String(value??''):new Date(ms).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'});};
+/** How long ago a stamp was at `now` (milliseconds): "45 s", "2 min 5 s", "1 h 2 min"; empty when the value is no stamp, and never negative. */
+export const elapsed=(value:unknown,now:number)=>{const ms=stamp(value);if(ms===null)return '';const s=Math.max(0,Math.floor((now-ms)/1000)),h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h} h ${m} min`:m?`${m} min ${s%60} s`:`${s} s`;};
