@@ -438,13 +438,18 @@ def _listed(path: Path, name: str) -> list:
 
 
 def _package_members(package: Path, manifest: dict[str, Any]) -> dict[str, _Member]:
-    """The package's own files, project.json first checked: refuse a project that has none."""
+    """The package's own files, project.json first checked: refuse a project that has none.
+
+    The version lives once, in `sources.json`: the packed `project.json` carries that version whatever the
+    source file says (the source keeps a `version` for the schema). When they agree the file travels as it is.
+    """
     path = package / "project.json"
     if not path.is_file():
         raise ValueError(f"{path} is missing: a project file needs a project.json")
     slug = manifest.get("plugin", {}).get("slug")
     try:
-        problem = _project_json_errors(json.loads(path.read_text(encoding="utf-8")), slug)
+        meta = json.loads(path.read_text(encoding="utf-8"))
+        problem = _project_json_errors(meta, slug)
     except (ValueError, UnicodeError) as exc:
         problem = f"it is not valid JSON ({exc})"
     if problem:
@@ -466,6 +471,10 @@ def _package_members(package: Path, manifest: dict[str, Any]) -> dict[str, _Memb
             raise ValueError(f"{path} is a link: a project file carries no links")
         if path.is_dir():
             _add_tree(members, path, f"{folder}/")
+    version = manifest.get("plugin", {}).get("version")
+    if isinstance(version, str) and meta["version"] != version:
+        text = json.dumps({**meta, "version": version}, ensure_ascii=False, indent=2) + "\n"
+        members["project.json"] = _Member(text.encode("utf-8"), False)
     return members
 
 

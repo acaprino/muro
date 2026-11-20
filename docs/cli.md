@@ -301,7 +301,7 @@ everything about a unified plugin. Its first member, stored uncompressed, is `mi
 
 | Member | What it is |
 | --- | --- |
-| `project.json` | `{schema: 1, name, slug, version, author, created, changed, repository: {url, branch, tag_prefix} \| null, builtin}`; times ISO 8601 in UTC; `slug` is the plugin's slug in `sources.json` |
+| `project.json` | `{schema: 1, name, slug, version, author, created, changed, repository: {url, branch, tag_prefix} \| null, builtin}`; times ISO 8601 in UTC; `slug` is the plugin's slug in `sources.json`; the version lives once, in `sources.json`: `pack` writes the plugin's version there into the packed file, whatever the source `project.json` says (it is carried byte for byte when they agree) |
 | the package | `sources.json`, `delivery.json`, `ROUTER.md`, `entries.json`, `guide-examples.json`, `eval-cases.json` (each when present), `capabilities/`, `custom-instructions/` and `prompts/` (when the package has its own); nothing else in the folder travels |
 | `records.json`, `history.json`, `CHANGELOG.md` | `{records: [...]}`, `{runs: [...]}` and the release notes; a package without them gets empty ones |
 | `inputs/<source id>/…` | each source's selected paths (media and `notice_paths` files included), its license file and the `NOTICE` beside it (the files the build's license gate carries with a source; Apache-2.0 asks for the NOTICE to travel), at the pinned commit |

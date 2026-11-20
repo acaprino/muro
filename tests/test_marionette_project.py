@@ -1,15 +1,18 @@
 """Marionette ships with every Muro as the default project (ADR-0028, decision 5).
 
 `examples/marionette/` carries the project's own files beside the package: `project.json`, `records.json`,
-`history.json` and `CHANGELOG.md`. Their content comes from files that already exist (the router's
-harmonization record, `docs/releases/marionette-v*.md`, `sources.json`), so these tests compare each file with
-its source; the subjects of a record are an AI judgment, which is only checked to name things the package has.
-The staging step in `scripts/desktop_resources.py` packs them with the sources it can fetch; its tests run the
-step with a recording stand-in for the two commands, because a real run needs the network and a build.
+`history.json` and `CHANGELOG.md`. What they contain is checked for consistency with its sources (a run with
+its release note, a changelog entry with its note, a record's date with its own text); never for completeness,
+so a release made by someone else, a note without a run or an edited bullet of the router fails nothing here.
+The version lives once, in `sources.json`: `muro project pack` writes it into the packed `project.json`.
+The subjects of a record are an AI judgment, only checked to name things the package has.
+The staging step in `scripts/desktop_resources.py` packs the project with the sources it can fetch; its tests run
+the step with a recording stand-in for the two commands, because a real run needs the network and a build.
 """
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -40,20 +43,8 @@ def manifest():
     return load("sources.json")
 
 
-def harmonization_record():
-    """The section's date and its bullets, each as Markdown reads an item: its lines joined by one space."""
-    lines = (PACKAGE / "ROUTER.md").read_text(encoding="utf-8").splitlines()
-    start = next(i for i, line in enumerate(lines) if line.startswith("## Harmonization record"))
-    section_date = DAY.search(lines[start]).group()
-    bullets = []
-    for line in lines[start + 1:]:
-        if line.startswith("<!--") or line.startswith("## "):
-            break
-        if line.startswith("- "):
-            bullets.append(line[2:].strip())
-        elif line.startswith("  ") and bullets:
-            bullets[-1] += " " + line.strip()
-    return section_date, bullets
+def version_key(version):
+    return tuple(int(part) for part in version.split("."))
 
 
 def release_notes():
@@ -71,7 +62,7 @@ def release_notes():
                 break
             block.append(line)
         notes.append((path.stem.removeprefix("marionette-v"), lines[0][2:].strip(), "\n".join(block)))
-    return sorted(notes, key=lambda note: tuple(int(part) for part in note[0].split(".")), reverse=True)
+    return sorted(notes, key=lambda note: version_key(note[0]), reverse=True)
 
 
 # --- project.json -----------------------------------------------------------------------------------
@@ -80,9 +71,8 @@ def test_project_json_describes_marionette_as_the_default_project():
     meta = load("project.json")
     plugin = manifest()["plugin"]
     assert project._project_json_errors(meta, plugin["slug"]) is None      # what `pack` enforces
-    assert meta["name"] == "Marionette" == plugin["name"]
+    assert meta["name"] == "Marionette" == plugin["name"]                  # its version is not compared: see pack
     assert meta["slug"] == plugin["slug"]
-    assert meta["version"] == plugin["version"]
     assert meta["author"] == "acaprino"
     assert meta["builtin"] is True
     assert meta["repository"] == {"url": "https://github.com/acaprino/marionette", "branch": "main",
@@ -90,11 +80,11 @@ def test_project_json_describes_marionette_as_the_default_project():
     assert set(meta) == {"schema", "name", "slug", "version", "author", "created", "changed", "repository", "builtin"}
 
 
-def test_project_times_are_utc_created_first_and_changed_with_the_last_run():
+def test_project_times_are_utc_and_created_comes_first():
     meta, runs = load("project.json"), load("history.json")["runs"]
     assert UTC_TIME.fullmatch(meta["created"]) and UTC_TIME.fullmatch(meta["changed"])
-    assert meta["created"] <= runs[-1]["time"]              # the first release commit comes before the first note
-    assert meta["changed"] == runs[0]["time"]               # the project last changed with its newest run
+    assert meta["created"] <= meta["changed"]
+    assert meta["created"] <= min(run["time"] for run in runs)      # the first release commit comes before any note
 
 
 # --- records.json -----------------------------------------------------------------------------------
@@ -110,18 +100,17 @@ def test_records_have_the_project_schema():
         assert isinstance(record["subjects"], list) and all(isinstance(s, str) for s in record["subjects"])
         assert len(set(record["subjects"])) == len(record["subjects"]), record["id"]
         assert record["author"] == "muro" and record["binding"] is False
+        assert record["text"].strip() == record["text"] and record["text"], record["id"]
 
 
-def test_every_record_is_a_bullet_of_the_harmonization_record_with_its_date():
-    section_date, bullets = harmonization_record()
-    records = load("records.json")["records"]
-    texts = [record["text"] for record in records]
-    assert len(set(texts)) == len(texts)
-    for record in records:
-        assert record["text"] in bullets, f"{record['id']} is not a bullet of ROUTER.md, word for word"
+def test_a_record_that_states_a_date_has_that_date():
+    """The rule for a record's date: the first date its text states. The router is not read: a bullet edited
+    there later is a decision of its own, and a text without a date takes the section's date, which a new
+    harmonization moves."""
+    for record in load("records.json")["records"]:
         stated = DAY.search(record["text"])
-        assert record["date"] == (stated.group() if stated else section_date), record["id"]
-    assert texts == [bullet for bullet in bullets if bullet in texts], "records keep the router's order"
+        if stated:
+            assert record["date"] == stated.group(), record["id"]
 
 
 def test_every_record_subject_is_a_capability_or_a_source_of_the_package():
@@ -133,32 +122,39 @@ def test_every_record_subject_is_a_capability_or_a_source_of_the_package():
 
 # --- history.json and CHANGELOG.md -------------------------------------------------------------------
 
-def test_history_has_one_completed_run_per_release_note_newest_first():
+def test_each_history_run_matches_its_release_note_and_runs_are_newest_first():
+    """A run needs its note; a note needs no run (a release made later has none until its history is written)."""
     runs = load("history.json")["runs"]
-    notes = release_notes()
-    assert [run["version"] for run in runs] == [note[0] for note in notes]
-    assert len({run["id"] for run in runs}) == len(runs)
+    paragraphs = {version: paragraph for version, _title, paragraph in release_notes()}
+    assert runs and set(load("history.json")) == {"runs"}
+    versions = [version_key(run["version"]) for run in runs]
+    assert versions == sorted(set(versions), reverse=True)              # newest first, none twice
     assert [run["time"] for run in runs] == sorted((run["time"] for run in runs), reverse=True)
-    for run, (version, _title, paragraph) in zip(runs, notes):
+    assert len({run["id"] for run in runs}) == len(runs)
+    for run in runs:
         assert set(run) == {"id", "time", "version", "status", "budget_usd", "engine", "pins", "changelog"}
-        assert run["id"] == f"marionette-v{version}"
+        assert run["id"] == f"marionette-v{run['version']}"
+        assert run["version"] in paragraphs, f"{run['id']} has no docs/releases note"
+        assert run["changelog"] == paragraphs[run["version"]], run["id"]
         assert UTC_TIME.fullmatch(run["time"]), run["id"]
         assert (run["status"], run["budget_usd"], run["engine"]) == ("completed", None, None), run["id"]
-        assert run["changelog"] == paragraph, run["id"]
         assert run["pins"] and all(COMMIT.fullmatch(commit) for commit in run["pins"].values()), run["id"]
         assert all(isinstance(source_id, str) and source_id for source_id in run["pins"]), run["id"]
 
 
-def test_the_newest_run_is_the_version_of_the_package():
-    plugin = manifest()["plugin"]
-    assert load("history.json")["runs"][0]["version"] == plugin["version"] == load("project.json")["version"]
-
-
-def test_changelog_holds_each_notes_title_and_first_paragraph_newest_first():
+def test_each_changelog_entry_is_a_release_notes_title_and_first_paragraph_newest_first():
+    notes = {title: (version, paragraph) for version, title, paragraph in release_notes()}
     text = (PACKAGE / "CHANGELOG.md").read_text(encoding="utf-8")
-    expected = "\n".join(f"# {title}\n\n{paragraph}\n" for _version, title, paragraph in release_notes())
-    assert text == expected
-    assert [run["changelog"] for run in load("history.json")["runs"]] == [note[2] for note in release_notes()]
+    entries = re.split(r"(?m)^# ", text)
+    assert entries[0] == "" and len(entries) > 1, "CHANGELOG.md is a list of '# <note title>' entries"
+    seen = []
+    for entry in entries[1:]:
+        title, _, rest = entry.partition("\n\n")
+        assert title in notes, f"{title!r} is not the title of a docs/releases note"
+        version, paragraph = notes[title]
+        assert rest.rstrip("\n") == paragraph, title
+        seen.append(version_key(version))
+    assert seen == sorted(set(seen), reverse=True)                      # newest first, none twice
 
 
 # --- the package as a project ------------------------------------------------------------------------
@@ -186,14 +182,16 @@ def test_muro_project_pack_of_marionette_carries_the_four_files_and_reads_back_a
                  "--sources-cache", str(cache)])
     assert code == 0, capsys.readouterr().err
     folder = project.unpack(mp, tmp_path / "unpacked")
-    for name in ("project.json", "records.json", "history.json", "CHANGELOG.md", "sources.json", "ROUTER.md"):
+    for name in ("records.json", "history.json", "CHANGELOG.md", "sources.json", "ROUTER.md"):
         assert (folder / name).read_bytes() == (PACKAGE / name).read_bytes(), name
+    packed = {**load("project.json"), "version": manifest()["plugin"]["version"]}   # the version is sources.json's
+    assert json.loads((folder / "project.json").read_text(encoding="utf-8")) == packed
     sources = manifest()["sources"]
     for src in sources:
         assert (folder / "inputs" / src["id"] / license_files(src)[0]).is_file(), src["id"]
 
     shown = project.info(mp, tmp_path / "cache")
-    assert shown["project"] == load("project.json")
+    assert shown["project"] == packed
     assert shown["records"] == load("records.json")["records"]
     assert shown["history"] == load("history.json")["runs"]
     assert shown["changelog"] == (PACKAGE / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -201,6 +199,23 @@ def test_muro_project_pack_of_marionette_carries_the_four_files_and_reads_back_a
     rows = {row["part"]: row["detail"] for row in shown["files"]}
     assert rows["Decision records"].startswith(f"{len(shown['records'])} records")
     assert rows["History"].startswith(f"{len(shown['history'])} runs")
+
+
+def test_pack_writes_the_version_of_sources_json_into_the_packed_project_json(tmp_path, capsys):
+    """The version lives once, in sources.json: a release bumps it there and nowhere else."""
+    copy = tmp_path / "marionette"
+    shutil.copytree(PACKAGE, copy)
+    stale = json.loads((copy / "project.json").read_text(encoding="utf-8"))
+    stale["version"] = "0.0.1"
+    (copy / "project.json").write_text(json.dumps(stale, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    cache = fake_sources_cache(tmp_path / "sources")
+    code = main(["project", "pack", "--manifest", str(copy / "sources.json"), "--out", str(tmp_path / "m.mp"),
+                 "--sources-cache", str(cache)])
+    assert code == 0, capsys.readouterr().err
+    packed = json.loads((project.unpack(tmp_path / "m.mp", tmp_path / "unpacked") / "project.json").read_text(encoding="utf-8"))
+    assert packed == {**stale, "version": manifest()["plugin"]["version"]}
+    assert list(packed) == list(stale)                                   # same fields, same order: only the version moved
+    assert json.loads((copy / "project.json").read_text(encoding="utf-8"))["version"] == "0.0.1"   # the source is not touched
 
 
 # --- the staging step ---------------------------------------------------------------------------------
