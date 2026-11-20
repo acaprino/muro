@@ -187,6 +187,28 @@ def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
         return 1
 
 
+def _run_project(args: argparse.Namespace) -> int:
+    """`muro project pack|unpack|info`: the `.mp` file (muro/project.py)."""
+    from . import project
+    try:
+        if args.project_command == "pack":
+            loaded = _read_manifest(args.manifest)
+            if loaded is None:
+                return 1
+            _manifest, _manifest_path, project_root = loaded
+            print(project.pack(project_root, args.out, sources_cache=args.sources_cache,
+                               release_dir=args.release))
+        elif args.project_command == "unpack":
+            print(project.unpack(args.mp, args.out))
+        else:
+            print(json.dumps(project.info(args.mp, args.cache or project.default_cache_root()),
+                             ensure_ascii=False, indent=2))
+        return 0
+    except (OSError, ValueError) as e:
+        print(f"Project {args.project_command} failed: {e}", file=sys.stderr)
+        return 1
+
+
 def _captured(fn) -> tuple[int, str]:
     """Run a command function with stdout/stderr captured; errors become (1, text).
 
@@ -413,11 +435,29 @@ def _modern_main(argv: list[str]) -> int:
     p = eval_sub.add_parser("score", parents=[common],
                             help="Score the host AI's decisions against eval-cases.json")
     p.add_argument("decisions", type=Path, help="The host AI's decisions JSON")
+    p = sub.add_parser("project", help="The .mp project file: one zip with a package, its inputs and its release")
+    project_sub = p.add_subparsers(dest="project_command", metavar="pack|unpack|info", required=True)
+    p = project_sub.add_parser("pack", parents=[common],
+                               help="Pack a package, its sources at their pins and a built release into a .mp")
+    p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
+    p.add_argument("--sources-cache", type=Path, metavar="DIR",
+                   help="Folder keeping each source's files per id and commit: read first, filled after a fetch")
+    p.add_argument("--release", type=Path, metavar="DIR",
+                   help="The --out folder of a build (<DIR>/<slug>/...); without it the file carries no release")
+    p = project_sub.add_parser("unpack", help="Unpack a .mp into a new folder (refuses unsafe members and limits)")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--out", type=Path, required=True, help="A new folder")
+    p = project_sub.add_parser("info", help="Print what a .mp holds, as JSON (unpacked once per file content)")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
 
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "project":
+        return _run_project(args)
 
     if args.command == "init":
         return _run_init(args.directory, args.repo_url, slug=args.slug,

@@ -287,6 +287,50 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
+### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--cache DIR]`
+
+The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
+everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
+(`application/vnd.muro.project+zip`). The other members:
+
+| Member | What it is |
+| --- | --- |
+| `project.json` | `{schema: 1, name, slug, version, author, created, changed, repository: {url, branch, tag_prefix} \| null, builtin}`; times ISO 8601 in UTC; `slug` is the plugin's slug in `sources.json` |
+| the package | `sources.json`, `delivery.json`, `ROUTER.md`, `entries.json`, `guide-examples.json`, `eval-cases.json` (each when present), `capabilities/`, `custom-instructions/` and `prompts/` (when the package has its own); nothing else in the folder travels |
+| `records.json`, `history.json`, `CHANGELOG.md` | `{records: [...]}`, `{runs: [...]}` and the release notes; a package without them gets empty ones |
+| `inputs/<source id>/…` | each source's selected paths (media and notice paths included) and its license file, at the pinned commit |
+| `release/<slug>/…` | a built release, as `build --out` lays it out |
+
+`pack` reads the package named by `--manifest` (its folder is the package) and refuses a package that does not
+`validate`, a missing or malformed `project.json`, a source that fails its check, a link anywhere in what it
+carries, and a file that `unpack` would refuse. Each source is fetched and checked at its pin with the same
+functions `check-sources` and `build` use (license gate, coverage gate, the pin's release or HEAD); like
+`check-sources`, it needs the network unless the source is local or already in `--sources-cache`. That folder
+keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
+holds them): `pack` reads a snapshot it finds there without fetching, and stores the one it fetched. The
+cache is trusted as written; keep it yours. `--release` is the `--out` folder of a build (`<DIR>/<slug>/…`);
+without it the file carries no release. The file is written whole or not at all, and the same project packs
+to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
+
+`unpack` writes into a new (or empty) folder only, all or nothing. A `.mp` from elsewhere is untrusted input:
+a member with an absolute path, a drive letter, `..`, a backslash, a colon, a name ending in a dot or space, or
+that is a link, a device or encrypted is refused before anything is written, a file that is not a zip, or whose
+first member is not the stored `mimetype`, is refused as `Not a Muro project file`, and unpacking stops at 2 GiB
+uncompressed or 50,000 members (`MAX_BYTES`, `MAX_MEMBERS` in `muro/project.py`; `pack` stops at the same).
+
+`info` prints JSON on stdout. It unpacks the file once per SHA-256 of its content into `--cache` (default: a
+per-user folder, `%LOCALAPPDATA%\muro\projects` on Windows, else `$XDG_CACHE_HOME/muro/projects` or
+`~/.cache/muro/projects`; nothing prunes it) and reads it from there. For now it answers
+`{"project": <project.json>, "digest": <sha-256>}`. `pack` and `unpack` print the path they wrote. Exit `0`
+on success, `1` with the reason on stderr otherwise.
+
+```sh
+muro build --manifest examples/marionette/sources.json --out /tmp/stage
+muro project pack --manifest examples/marionette/sources.json --out marionette.mp \
+  --sources-cache ~/.cache/muro-sources --release /tmp/stage
+muro project info marionette.mp
+```
+
 ## Legacy flag mapping
 
 | Legacy (`muro_build.py`) | Subcommand |
@@ -298,7 +342,7 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
 | `--harmonize` | `muro harmonize` |
 | `--prepare-eval` | `muro eval prepare` |
 | `--score-eval <file>` | `muro eval score <file>` |
-| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro mcp`, `muro agent`, `muro absorb` |
+| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro mcp`, `muro agent`, `muro absorb`, `muro project` |
 
 ## How-to: the common workflows
 
@@ -328,6 +372,8 @@ harmonize, validate, build, install.
 - `muro agent` refuses plain `http` endpoints off localhost.
 - Model answers can only land on the allowlisted package paths; path
   traversal is rejected before any write.
+- A `.mp` from elsewhere is untrusted input: `unpack` refuses traversal, absolute paths, drive letters and links
+  before it writes anything, and stops at 2 GiB or 50,000 members.
 - Source material is evidence, not instructions: intake and build never
   execute upstream code, and the license gate runs before anything is
   packaged or scaffolded.
