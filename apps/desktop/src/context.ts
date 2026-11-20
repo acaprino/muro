@@ -25,14 +25,20 @@ export interface App {
 }
 /** An action is named by a control's `data-action`; its `data-*` and the element come with it. A name has one owner: two modules declaring it make `mountApp` throw. */
 export type Actions = Record<string, (app: App, data: DOMStringMap, el: HTMLElement) => void | Promise<void>>;
+/** The controls whose `input` and `change` events a page module hears: a text box, a choice, a text area. */
+export type TextBox = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+/** The control an event came from, when it is one a page module hears; otherwise null. The one place that says which they are. */
+export const textBoxOf = (target: EventTarget | null): TextBox | null => target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target : null;
 export interface PageModule {
   /** The page, as HTML for the `main` element. */
   view(state: ViewState): string;
   actions: Actions;
   /** A text box of the page or of a dialog was typed in (the `input` event); true when handled. Never re-render here for a box that holds the caret. */
-  input?(app: App, el: HTMLInputElement | HTMLSelectElement): boolean;
+  input?(app: App, el: TextBox): boolean;
   /** A control of the page or of a dialog changed (the `change` event); true when handled. */
-  change?(app: App, el: HTMLInputElement | HTMLSelectElement): boolean;
+  change?(app: App, el: TextBox): boolean;
+  /** A key was pressed in the page or in a dialog; true when handled (the module then calls `preventDefault` itself). */
+  keydown?(app: App, e: KeyboardEvent): boolean;
   /** The page was opened (a tab, the first paint). */
   opened?(app: App): void | Promise<void>;
 }

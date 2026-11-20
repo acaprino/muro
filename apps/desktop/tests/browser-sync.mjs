@@ -21,7 +21,7 @@ const sideways = page => page.evaluate(() => document.documentElement.scrollWidt
 
 await test('tabs and an app bar without a sidebar', 'changes', {}, async ({ page }) => {
   await page.locator('nav').waitFor();
-  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Sync', 'Activity', 'Settings']);
+  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings']);
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Sync', 'Sync is current');
   for (const gone of ['sidebar', 'topbar', 'bottom']) assert.equal(await page.locator('.' + gone).count(), 0, `no .${gone}`);
   assert.equal(await page.evaluate(() => document.documentElement.dataset.look), undefined, 'one look only');

@@ -19,6 +19,10 @@ fn plugin_as(root: &Path, artifact: &Path, id: &str, targets: &[&str]) {
     let s = snapshot(root);
     request(root,"save_plugin",json!({"revision":s["registry"]["revision"],"plugin":{"id":id,"name":"Example","source":artifact,"policy":"pinned","pinned_version":"1.0.0","targets":targets,"distributions":[{"harness":"opencode","path":artifact,"version":"1.0.0"}]}})).unwrap();
 }
+fn remove_target(root: &Path, id: &str) -> anyhow::Result<Value> {
+    let s = snapshot(root);
+    request(root, "remove_target", json!({"revision":s["registry"]["revision"],"id":id}))
+}
 fn fixture() -> (
     tempfile::TempDir,
     std::path::PathBuf,
@@ -439,7 +443,69 @@ fn plan_for_one_target_leaves_the_others_out() {
             .to_string()
             .contains("disabled")
     );
-    assert!(request(&r, "plan", json!({"target_id":7})).is_err());
+    for action in ["plan", "check"] {
+        assert_eq!(
+            request(&r, action, json!({"target_id":7}))
+                .unwrap_err()
+                .to_string(),
+            "target_id must be a string",
+            "{action}"
+        );
+    }
+}
+
+#[test]
+fn check_for_an_unknown_or_a_disabled_target_fails_and_changes_nothing() {
+    let (t, r, p, a) = fixture();
+    two_targets(t.path(), &r, &p, &a);
+    // The plugin was never resolved: a check that ran would record its revision and raise the
+    // registry revision, so an unchanged revision shows that nothing ran.
+    let before = snapshot(&r);
+    let registry = fs::read(r.join("registry.json")).unwrap();
+    let status = fs::read(r.join("sync-status.json")).unwrap();
+    for (id, message) in [("missing", "Target not found"), ("off", "Target is disabled")] {
+        let error = request(&r, "check", json!({"target_id":id}))
+            .unwrap_err()
+            .to_string();
+        assert_eq!(error, message, "{id}");
+    }
+    let after = snapshot(&r);
+    assert_eq!(after["registry"]["revision"], before["registry"]["revision"]);
+    assert_eq!(after["registry"], before["registry"]);
+    assert_eq!(after["activity"], before["activity"]);
+    assert_eq!(fs::read(r.join("registry.json")).unwrap(), registry);
+    assert_eq!(fs::read(r.join("sync-status.json")).unwrap(), status);
+}
+
+#[test]
+fn a_removed_target_takes_its_times_with_it() {
+    let (t, r, p, a) = fixture();
+    // A target nobody checked has no times to take: no record is written for it.
+    target(&r, &p);
+    remove_target(&r, "oc").unwrap();
+    assert!(!r.join("sync-status.json").exists());
+    // Two harnesses, both checked and synced.
+    two_targets(t.path(), &r, &p, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let synced = snapshot(&r)["sync"].clone();
+    assert!(is_epoch_seconds(&synced["targets"]["other"]["synced"]), "{synced}");
+    // `other` leaves its plugin, then the registry.
+    plugin_as(&r, &a, "example", &["oc"]);
+    let removed = remove_target(&r, "other").unwrap();
+    assert!(removed["sync"]["targets"].get("other").is_none(), "{removed}");
+    let sync = snapshot(&r)["sync"].clone();
+    assert!(sync["targets"].get("other").is_none(), "{sync}");
+    assert_eq!(sync["targets"]["oc"], synced["targets"]["oc"]);
+    // A new harness with the same id starts with no times of its own.
+    let again = t.path().join("other-profile");
+    target_as(&r, &again, "other", true);
+    plugin_as(&r, &a, "example", &["oc", "other"]);
+    assert!(snapshot(&r)["sync"]["targets"].get("other").is_none());
+    request(&r, "plan", json!({})).unwrap();
+    let sync = snapshot(&r)["sync"].clone();
+    assert!(is_epoch_seconds(&sync["targets"]["other"]["checked"]), "{sync}");
+    assert!(sync["targets"]["other"]["synced"].is_null(), "{sync}");
 }
 
 #[test]
@@ -598,6 +664,37 @@ mod blockers {
         assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
         plan
     }
+    /// A second plugin, ready to install on the fixture target: the apply of a plan that has
+    /// blockers then does real work there.
+    fn ready_second(temp: &Path, r: &Path) {
+        plugin_as(r, &second_artifact(temp), "second", &["oc"]);
+    }
+    /// The plan has one install, the second plugin's, and no removal.
+    fn assert_installs_only_the_second(plan: &Value) {
+        let ops = plan["operations"].as_array().unwrap();
+        assert_eq!(ops.len(), 1, "{plan}");
+        assert_eq!(ops[0]["kind"], "install", "{plan}");
+        assert_eq!(ops[0]["plugin_id"], "second", "{plan}");
+        assert_eq!(removals(plan), Vec::<Value>::new(), "{plan}");
+    }
+    /// After an apply that allowed the blocker: the second plugin is installed, and the
+    /// blocked plugin's inventory entry (`kept`, read before), its installed copy and its entry
+    /// in the harness configuration are still there.
+    fn assert_second_installed_beside(r: &Path, p: &Path, kept: &Value) {
+        let after = installed(r);
+        // Entries Muro does not manage (a plugin someone added by hand) have no registry id.
+        let mut ids: Vec<_> = after
+            .iter()
+            .filter_map(|i| i["registry_id"].as_str())
+            .collect();
+        ids.sort_unstable();
+        assert_eq!(ids, ["example", "second"], "{after:?}");
+        let entry = after.iter().find(|i| i["registry_id"] == "example");
+        assert_eq!(entry, Some(kept));
+        assert!(Path::new(kept["path"].as_str().unwrap()).is_dir(), "{kept}");
+        let config = fs::read_to_string(p.join("opencode.json")).unwrap();
+        assert!(config.contains(kept["id"].as_str().unwrap()), "{config}");
+    }
     /// The fixture's exclusive target with the example plugin installed.
     fn installed_example(r: &Path, p: &Path, a: &Path) {
         target(r, p);
@@ -676,24 +773,23 @@ mod blockers {
 
     #[test]
     fn a_blocked_plugin_is_never_removed_by_exclusive_sync() {
-        let (_t, r, p, a) = fixture();
+        let (t, r, p, a) = fixture();
         installed_example(&r, &p, &a);
-        let config = fs::read(p.join("opencode.json")).unwrap();
+        let kept = installed(&r)[0].clone();
         fs::rename(&a, a.with_extension("moved")).unwrap();
+        ready_second(t.path(), &r);
         let plan = request(&r, "plan", json!({})).unwrap();
         assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
-        assert_eq!(removals(&plan), Vec::<Value>::new(), "{plan}");
+        assert_installs_only_the_second(&plan);
         apply_allowing_blockers(&r, &plan);
-        assert_eq!(fs::read(p.join("opencode.json")).unwrap(), config);
-        let installed = installed(&r);
-        assert_eq!(installed.len(), 1);
-        assert_eq!(installed[0]["registry_id"], "example");
+        assert_second_installed_beside(&r, &p, &kept);
     }
 
     #[test]
     fn a_harness_with_a_blocker_gets_no_removal() {
-        let (_t, r, p, a) = fixture();
+        let (t, r, p, a) = fixture();
         installed_example(&r, &p, &a);
+        let kept_entry = installed(&r)[0].clone();
         let path = p.join("opencode.json");
         let mut config: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
         config["plugins"]
@@ -703,16 +799,20 @@ mod blockers {
         fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
         let moved = a.with_extension("moved");
         fs::rename(&a, &moved).unwrap();
+        ready_second(t.path(), &r);
         let plan = request(&r, "plan", json!({})).unwrap();
         assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
-        assert_eq!(removals(&plan), Vec::<Value>::new(), "{plan}");
+        assert_installs_only_the_second(&plan);
         apply_allowing_blockers(&r, &plan);
         let kept = fs::read_to_string(&path).unwrap();
         assert!(kept.contains("outside-plugin@1.0.0"), "{kept}");
+        assert_second_installed_beside(&r, &p, &kept_entry);
+        // With the blocker gone the harness is clear, and only then is the outside plugin removed.
         fs::rename(&moved, &a).unwrap();
         let plan = request(&r, "plan", json!({})).unwrap();
         assert_eq!(plan["blockers"], json!([]), "{plan}");
         assert_eq!(removals(&plan), vec![json!("outside-plugin@1.0.0")]);
+        assert_eq!(plan["operations"].as_array().unwrap().len(), 1, "{plan}");
     }
 
     /// A managed harness whose folder was deleted is a blocker of every plan; `apply` locks
@@ -740,6 +840,25 @@ mod blockers {
         assert_eq!(ids, vec![json!("example")]);
         assert!(!gone.exists());
     }
+}
+
+#[test]
+fn verify_names_a_harness_it_cannot_read_in_words_not_as_a_json_value() {
+    let (t, r, p, a) = fixture();
+    let gone = t.path().join("gone-profile");
+    fs::create_dir_all(&gone).unwrap();
+    target(&r, &p);
+    target_as(&r, &gone, "gone", true);
+    plugin(&r, &a);
+    fs::remove_dir_all(&gone).unwrap();
+    let out = request(&r, "maintenance", json!({"kind":"verify"})).unwrap();
+    assert_eq!(
+        out["details"],
+        json!([format!(
+            "Inventory error: Target configuration directory does not exist: {}",
+            gone.display()
+        )])
+    );
 }
 
 #[test]

@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Transport } from '../src/types.ts';
-import { serial } from '../src/queue.ts';
+import { serial, ALONE } from '../src/queue.ts';
 
 /** A transport whose answers the test gives by hand, and which records what was sent and when. */
 function manual() {
@@ -67,6 +67,43 @@ test('an action named as alone is sent at once, waits for nobody and holds nobod
   await scan;
   m.answer('discover');
   assert.equal(await discover, 'discover');
+});
+
+// A free-text simulation lasts as long as the AI takes (tens of seconds through a harness). The page's queue is `serial(transport, ALONE)`:
+// the service serves each request on its own worker and `simulate` holds no registry lock, so nothing else of the window waits for it,
+// and Cancel (`cancel_simulation`) reaches the service while the run it stops is still going.
+test('while a simulation is pending, another request of the window is answered, and Cancel is answered before the simulation', async () => {
+  const m = manual(), request = serial(m.send, ALONE);
+  const simulation = request('simulate'), snapshot = request('snapshot'), cancel = request('cancel_simulation');
+  const order: string[] = [];
+  void simulation.then(() => order.push('simulate'), () => order.push('simulate'));
+  void snapshot.then(() => order.push('snapshot'));
+  void cancel.then(() => order.push('cancel_simulation'));
+  await later();
+  assert.deepEqual([...m.sent].sort(), ['cancel_simulation', 'simulate', 'snapshot'], 'all three are on their way: the simulation holds nobody back');
+  m.answer('snapshot');
+  assert.equal(await snapshot, 'snapshot');
+  m.answer('cancel_simulation');
+  assert.equal(await cancel, 'cancel_simulation');
+  assert.deepEqual(order, ['snapshot', 'cancel_simulation'], 'the simulation is still unanswered');
+  m.answer('simulate', false, 'Stopped');
+  await simulation.catch(() => undefined);
+  assert.deepEqual(order, ['snapshot', 'cancel_simulation', 'simulate']);
+});
+
+test('a request that takes the registry lock still waits for the one before it, simulation or not', async () => {
+  const m = manual(), request = serial(m.send, ALONE);
+  const simulation = request('simulate'), plan = request('plan'), scan = request('scan');
+  await later();
+  assert.deepEqual([...m.sent].sort(), ['plan', 'simulate'], 'scan waits for plan, which takes the lock; simulate takes none');
+  m.answer('plan');
+  await plan;
+  await later();
+  assert.deepEqual(m.sent.slice(2), ['scan']);
+  m.answer('scan');
+  await scan;
+  m.answer('simulate');
+  await simulation;
 });
 
 test('a request made while the queue is empty is sent at once', async () => {

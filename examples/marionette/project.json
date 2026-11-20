@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "name": "Marionette",
+  "slug": "marionette",
+  "version": "0.5.0",
+  "author": "acaprino",
+  "created": "2026-11-10T14:25:06Z",
+  "changed": "2026-11-19T21:05:47Z",
+  "repository": {
+    "url": "https://github.com/acaprino/marionette",
+    "branch": "main",
+    "tag_prefix": "marionette-v"
+  },
+  "builtin": true
+}

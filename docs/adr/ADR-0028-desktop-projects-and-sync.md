@@ -75,6 +75,24 @@ dove fare cosa", "manca tutta questa parte di gestione progetti".
    background se avviato deve fare monitor dei plugin delle harness e
    assicurarsi che siano aggiornati e sync con configurazione in muro del
    catalogo".
+10. **The simulator, and two ways to reach the AI.** The simulator of a
+    free-text request is wanted ("voglio il simulatore"). And "muro deve
+    funzionare sia con harness locale con mcp, quindi usando l'harness, o
+    tramite openai like api": every AI job of the app (simulating a request,
+    harmonizing a project) runs either through a coding agent installed on
+    the computer, which reaches the factory through `muro mcp` (ADR-0022), or
+    through an OpenAI-compatible endpoint, as `muro agent` does (ADR-0022:
+    key from an environment variable only, plain `http` refused off
+    localhost).
+11. **A binding record is proven by the AI's recorded judgment** (owner,
+    2026-11-20). After a harmonization the AI states, for each binding record,
+    whether it was followed and why, naming the capability or choice that
+    applies it. Muro shows that answer beside the record and does not accept
+    a run whose answer is missing.
+12. **A `.mp` is one zip archive** ("archivio zip unico", 2026-11-20). Muro
+    unpacks it to work on it and packs it again after a change. Git sees one
+    binary file: the differences between two versions of a project are shown
+    by Muro (its history and changelog), not by Git.
 
 The mockup is the reference for layout, flows and wording. Its numbers for
 Marionette are read from `examples/marionette`.
@@ -202,6 +220,37 @@ What follows replaces the sentences marked above and adds to the list.
 - **The activity log keeps the last 500 events**, and a `sync-status.json` that
   cannot be read is no record (it is derived state; the next check writes it).
 
+### Amendment of 2026-11-20, plan 2 (Projects, read side)
+
+Implementation choices of the second plan, none separately approved. They replace
+two sentences above: the page's queue and the "`.mp` container" line.
+
+- **The page's queue lets three requests go beside it**: `discover`, `simulate`
+  and `cancel_simulation` (`ALONE` in `apps/desktop/src/queue.ts`, the one list).
+  A free-text simulation lasts as long as the AI takes and holds no registry lock
+  while it works; in the queue it froze every other action of the window and made
+  Cancel wait behind the run it should stop. The shell still holds a `simulate`
+  back while a sync runs, and lets `cancel_simulation` and `env_present` through.
+- **A `.mp` is the container of decisions 3 and 12**, specified in
+  `docs/cli.md` (`muro project pack`, `unpack`, `info`). The desktop reads a file
+  only through the factory. A project opened by the person stays where it is
+  (`registry.projects`, `{id, path}`); the default project is copied once, to
+  `data/projects/`. A project file that changes after its plugin was built makes
+  the build stale in a plan (the installed copy stays).
+- **`settings.ai`** (`engine`, `harness`, `budget_usd`, `api_base`, `model`,
+  `api_key_env`) is the one place the engine of every AI job is chosen (decision
+  10); the old `agent` setting stays equal to `ai.harness`. The key is never a
+  setting: `api_key_env` names the environment variable it is read from, and a
+  value that is not a variable name is refused without being echoed. Adapting a
+  plugin still runs a coding agent whichever engine answers the simulator, and
+  the Adapt with AI dialog reads the harness and the budget it starts from here.
+- **`install_project` sets a project's builds and its targets in one request**;
+  the page saves nothing of the plugin itself.
+- **The simulator's harness engines are headless calls with the factory's
+  `muro mcp`** (Claude Code with `--setting-sources project,local`, so the
+  person's own plugins do not load; Codex read-only). Neither was run against a
+  real harness (see the verification record).
+
 ## Consequences
 
 - The Harnesses and Plugins pages disappear: a harness is a column of the Sync
@@ -217,7 +266,9 @@ What follows replaces the sentences marked above and adds to the list.
 
 ## Not decided
 
-- Whether a simulation of a free-text request, which needs the AI and costs a
-  call, is offered beside the documented examples.
-- How the app proves that a binding record was followed: a factory check, or an
-  AI judgment recorded with its reason.
+Nothing open on 2026-11-20: decisions 10 to 12 settled the three questions that
+were.
+
+## Amendment of 2026-11-20 (fix wave after the final review of plan 2)
+
+This is a labelled note, not a decision: `install_project` takes `{id, targets}`, the ids of the managed harnesses the project is installed on (the plugin's targets become exactly those; a build is made for each distinct kind), the plugin inside a `.mp` is checked against its package (`muro project verify`) at pack and at install, `remove_project` takes a project off the list (never the default one), and a coding agent is given only `muro mcp --tools simulate_prepare,simulate_check` and judged by the factory on the answer it ends with (decisions 10 and 11 unchanged otherwise).

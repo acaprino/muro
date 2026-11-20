@@ -441,7 +441,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Adapt with AI' }).click();
   await dlg.locator('h2').getByText('Adapt Package with AI', { exact: true }).waitFor();
-  assert.equal(await dlg.locator('[name=budget]').inputValue(), '2');
+  assert.equal(await dlg.locator('[name=budget]').inputValue(), '0.5', 'the budget Settings, section AI, starts from');
   await page.screenshot({ path: shots + '/harness-adapt.png' });
   await dlg.locator('[name=budget]').fill('0');
   await dlg.getByRole('button', { name: 'Start' }).click();
@@ -490,6 +490,37 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   assert.equal(await toast(page).last().textContent(), 'Package removed from your list.');
   assert.deepEqual((await actions(app)).slice(-2), ['remove_plugin', 'plan']);
   await page.getByText('Your list is empty').waitFor();
+});
+
+await test('Adapt with AI with Codex as the coding agent says what is needed before it starts, links to Settings and cannot be started', 'changes', {}, async app => {
+  const { page } = app, dlg = dialog(page).first();
+  // Settings, AI: Codex as the coding agent (the paragraph changes once the save is kept)
+  await page.locator('nav button', { hasText: 'Settings' }).click();
+  await page.getByRole('combobox', { name: 'Coding agent' }).selectOption('codex');
+  // The sentence is the end of the section's lead paragraph, not an element of its own.
+  await page.getByText('How Muro reaches an AI when it needs one. Codex simulates requests; adapting needs Claude Code.', { exact: true }).waitFor();
+  await page.locator('nav button', { hasText: 'Sync' }).click();
+  await rowOf(page, 'Package').click();
+  await dlg.getByText('More', { exact: true }).click();
+  await dlg.getByRole('button', { name: 'Adapt with AI' }).click();
+  await dlg.locator('h2').getByText('Adapt Package with AI', { exact: true }).waitFor();
+  await dlg.getByText('Adapting a plugin needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.', { exact: true }).waitFor();
+  assert.equal(await dlg.getByRole('button', { name: 'Start' }).isDisabled(), true, 'it cannot be started');
+  await page.screenshot({ path: shots + '/harness-adapt-codex.png' });
+  await dlg.getByRole('button', { name: 'Open Settings' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
+  assert.equal((await actions(app)).includes('adapt'), false, 'nothing was started');
+  // Claude Code again: the dialog is as it was
+  await page.getByRole('combobox', { name: 'Coding agent' }).selectOption('claude-code');
+  await page.getByText('How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.', { exact: true }).waitFor();
+  await page.locator('nav button', { hasText: 'Sync' }).click();
+  await rowOf(page, 'Package').click();
+  await dlg.getByText('More', { exact: true }).click();
+  await dlg.getByRole('button', { name: 'Adapt with AI' }).click();
+  await dlg.locator('h2').getByText('Adapt Package with AI', { exact: true }).waitFor();
+  assert.equal(await dlg.getByRole('button', { name: 'Start' }).isEnabled(), true);
+  assert.equal(await dlg.getByRole('button', { name: 'Open Settings' }).count(), 0);
 });
 
 await test('More acts on the saved plugin: with unsaved changes it says so and does nothing', 'changes', {}, async app => {

@@ -194,16 +194,24 @@ muro install /tmp/stage/marionette/adapters/claude-code \
   --harness claude-code --home ~/.claude-test
 ```
 
-### `muro mcp [--manifest PATH]`
+### `muro mcp [--manifest PATH] [--tools NAME[,NAME...]]`
 
 Serves the factory as an MCP stdio server (newline-delimited JSON-RPC 2.0).
+`--tools` serves only the named tools: they alone are listed and run, a call to
+any other is refused by name before it does anything, and a name the server
+does not have is refused at start (exit 1, nothing served). Without it every
+tool is served. Give a host agent only what its job needs: the desktop starts
+the server for a simulation with `--tools simulate_prepare,simulate_check`,
+because the text the agent works from may come from a project file of anyone.
 Tools: `validate`, `check_sources`, `build`, `baseline`, `prepare_intake`,
 `prepare_harmonize`, `prepare_review`, `eval_prepare`, `eval_score`,
-`init_package`, `install_adapter`. Every tool takes an optional `manifest`
-argument overriding the server default. The `prepare_*` tools stage
-`PROMPT.md` and evidence on disk; the host AI reads them, does the judgment,
-writes the artifacts with its own file tools (under the host's own
-permissions), then calls `validate`.
+`init_package`, `install_adapter`, `simulate_prepare`, `simulate_check`. Every
+tool takes an optional `manifest` argument overriding the server default. The
+`prepare_*` tools stage `PROMPT.md` and evidence on disk; the host AI reads
+them, does the judgment, writes the artifacts with its own file tools (under
+the host's own permissions), then calls `validate`. The two `simulate_*` tools
+take a `project` (a `.mp`) instead of a manifest and return JSON: see
+[`muro project simulate`](#muro-project-simulate--simulate-prepare--simulate-check).
 
 Register it in Claude Code:
 
@@ -243,7 +251,12 @@ layout, removal, runtime retention and a complete Marionette example.
   is refused except on localhost.
 - `--api-key-env`: the environment variable holding the key. Default:
   `MURO_API_KEY`, then `OPENAI_API_KEY`. The key is **never** a command-line
-  argument and is never written anywhere.
+  argument and is never written anywhere. The value must be a variable name in
+  capitals (`^[A-Z_][A-Z0-9_]{0,63}$`: the keys of several providers carry no hyphen and would
+  read as names under a looser rule); anything else is refused with "The key
+  setting must name an environment variable, not hold a key", without repeating it, so a key
+  pasted there by mistake is not echoed (`muro absorb` and `muro project simulate` read the
+  same option through `read_api_key`).
 - `--rounds`: attempts, default 2 — a rejected or invalid answer gets the
   errors fed back once.
 - `source-id`: required with `intake` only.
@@ -287,6 +300,154 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
+### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
+
+The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
+everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
+(`application/vnd.muro.project+zip`). The other members:
+
+| Member | What it is |
+| --- | --- |
+| `project.json` | `{schema: 1, name, slug, version, author, created, changed, repository: {url, branch, tag_prefix} \| null, builtin}`; times ISO 8601 in UTC; `slug` is the plugin's slug in `sources.json`; the version lives once, in `sources.json`: `pack` writes the plugin's version there into the packed file, whatever the source `project.json` says (it is carried byte for byte when they agree) |
+| the package | `sources.json`, `delivery.json`, `ROUTER.md`, `entries.json`, `guide-examples.json`, `eval-cases.json` (each when present), `capabilities/`, `custom-instructions/` and `prompts/` (when the package has its own); nothing else in the folder travels |
+| `records.json`, `history.json`, `CHANGELOG.md` | `{records: [...]}`, `{runs: [...]}` and the release notes; a package without them gets empty ones |
+| `inputs/<source id>/…` | each source's selected paths (media and `notice_paths` files included), its license file and the `NOTICE` beside it (the files the build's license gate carries with a source; Apache-2.0 asks for the NOTICE to travel), at the pinned commit |
+| `release/<slug>/…` | a built release, as `build --out` lays it out |
+
+`pack` reads the package named by `--manifest` (its folder is the package) and refuses a package that does not
+`validate`, a missing or malformed `project.json`, a source that fails its check, a link anywhere in what it
+carries, and a file that `unpack` would refuse. Each source is fetched and checked at its pin with the same
+functions `check-sources` and `build` use (license gate, coverage gate, the pin's release or HEAD); like
+`check-sources`, it needs the network unless the source is local or already in `--sources-cache`. That folder
+keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
+holds them) and, beside it, `<DIR>/<id>/<commit>.stamp`: the digest of what the snapshot was fetched for
+(the commit and the source's `selected_paths`, `media_paths`, `notice_paths`, `license_path`, `excluded_paths`
+and `license`). `pack` reads a snapshot whose stamp matches without fetching, and fetches again, replacing it,
+when the stamp differs or is missing (a snapshot made before stamps existed, or by hand); it stores the one it
+fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
+build (`<DIR>/<slug>/…`); `pack` refuses one that is not the build of this package (the `sources.json` plugin
+slug and version, and the capability ids, must be the package's: `muro project verify`'s check); without it the
+file carries no release. The file is written whole or not at all, and the same project packs
+to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
+
+`verify` checks that the plugin a `.mp` carries (`release/<slug>/`) was built from the package it carries: the
+release's `sources.json` plugin slug and version and its capability ids must equal the package's. It prints
+`{"verified": true}`, or exits 1 with "The plugin inside this project does not match the project: it was not
+built from it" and what differs; a project with no release has nothing to disagree with. The desktop runs it
+before it installs a project's plugin.
+
+`unpack` writes into a new (or empty) folder only, all or nothing. A `.mp` from elsewhere is untrusted input:
+a member with an absolute path, a drive letter, `..`, a backslash, a colon, a control character, one of
+`< > " | ? *`, a name ending in a dot or space, a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`,
+`LPT1`-`LPT9`, with or without an extension), or that is a link, a device or encrypted is refused before
+anything is written, a file that is not a zip, or whose
+first member is not the stored `mimetype`, is refused as `Not a Muro project file`, and unpacking stops at 2 GiB
+uncompressed or 50,000 members (`MAX_BYTES`, `MAX_MEMBERS` in `muro/project.py`; `pack` stops at the same).
+
+`info` prints JSON on stdout. It unpacks the file once per SHA-256 of its content into `--cache` (default: a
+per-user folder, `%LOCALAPPDATA%\muro\projects` on Windows, else `$XDG_CACHE_HOME/muro/projects` or
+`~/.cache/muro/projects`; nothing prunes it) and reads it from there. It answers everything the project page
+shows:
+
+| Key | What it holds |
+| --- | --- |
+| `project` | `project.json` as it is |
+| `plugin` | `{name, slug, version, description}` of `sources.json` |
+| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, dropped}` |
+| `decisions` | the decisions of `delivery.json` as they are (empty without one) |
+| `records`, `history`, `changelog` | `records.json`'s records, `history.json`'s runs, `CHANGELOG.md` as text |
+| `prompts` | `[{file, text}]`: `intake.md`, `harmonizer.md`, `delivery.md` and `classify.md`, the package's own folder or else the factory's (`prompts_dir`, as the build resolves them) |
+| `graph` | `{entries, capabilities, examples}`: `entries` are the discovery entries `{name, description, capabilities}` (the description as a host reads it, with the sentence naming what the entry absorbs; empty without `entries.json`); `capabilities` and `examples` are the release guide's own data (`muro.guide.guide_data`: each capability with its title, body, intents, needs, conflicts, outputs, checks and check scope, and each example resolved to its steps), computed on the package as the file holds it, not on a release it may carry |
+| `files` | `[{part, path, detail}]`: the list "What this project file holds", with the project's own counts |
+| `digest` | the SHA-256 of the file |
+
+A file that lacks `project.json`, `sources.json`, `records.json`, `history.json` or `CHANGELOG.md`, or holds one
+that is not what its name says (a `project.json` that fails the rules above, a plugin that fails the build's
+identity check, a catalog, delivery document or entries file that fails the build's validation), is refused with
+the reason. `pack` and `unpack` print the path they wrote. Exit `0` on success, `1` with the reason on stderr
+otherwise.
+
+`info --summary` is what a list of projects shows: `{project, plugin: {name, slug, version}, inputs,
+capabilities, entries, examples, records, runs, digest}` (the counts) and none of the capability bodies that make the full
+`info` large (610 KB for Marionette). The counts are the full `info`'s own. A file that is missing or invalid is
+`{"error": reason}` on stdout with exit `0`, so one bad file never hides the others from a list (the desktop
+runs it once per listed project and reads the full `info` only for the project it opens).
+
+```sh
+muro build --manifest examples/marionette/sources.json --out /tmp/stage
+muro project pack --manifest examples/marionette/sources.json --out marionette.mp \
+  --sources-cache ~/.cache/muro-sources --release /tmp/stage
+muro project info marionette.mp
+```
+
+### `muro project simulate` / `simulate-prepare` / `simulate-check`
+
+```sh
+muro project simulate <FILE.mp | --manifest PKG/sources.json> --task T [--stack TOKEN]... --model M [--api-base URL] [--api-key-env VAR] [--cache DIR]
+muro project simulate-prepare <FILE.mp | --manifest PKG/sources.json> --task T [--stack TOKEN]... [--cache DIR]
+muro project simulate-check <FILE.mp | --manifest PKG/sources.json> --context FILE --answer FILE [--cache DIR]
+```
+
+The simulator answers one question: which capabilities would this request activate, and in what order? The
+decision is the AI's ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 10). Python prepares what a
+classifier reads and validates its answer with the runtime's own rules; it never matches words in the request, never
+repairs an answer and never completes one. There are two ways to reach the AI, and both end in the same check:
+
+- a coding agent on the computer, through the MCP tools `simulate_prepare` and `simulate_check` of `muro mcp`
+  (the same results as the two subcommands below): it asks for the material, classifies with the prompt it got, and
+  sends its answer back to be checked;
+- an OpenAI-compatible endpoint, through `simulate`, as `muro agent` reaches one.
+
+The package is a `.mp` file (unpacked once per SHA-256 of its content into `--cache`, as `info` does) or a
+`--manifest` (default `./sources.json` when neither is named); naming both is refused. A package needs no
+`eval-cases.json` to be simulated.
+
+`simulate-prepare` prints `{"context": {"task", "stack_tokens", "catalog_digest"}, "prompt": "..."}`. The
+`context` is what the AI's answer must copy exactly. The `prompt` is built by the function that builds the prompt of
+an eval case (`muro eval prepare`): the permanent session policy, the one context, the compact catalog and the
+classification rules, after a short instruction to answer with one JSON object. For Marionette it is about 80,000
+characters. `--stack` tokens (`stack:*`, repeatable) are inputs: with no project to look at, nothing is detected.
+
+`simulate-check` takes that context and the AI's answer (two JSON files) and prints one of:
+
+```json
+{"valid": true, "status": "selected", "reason": "...", "questions": [],
+ "steps": [{"step_id": "x", "capability": "x", "intent": null, "reason": null, "added_as_prerequisite": true},
+           {"step_id": "y", "capability": "y", "intent": "testing.verify", "reason": "...", "added_as_prerequisite": false}]}
+{"valid": false, "errors": ["Unknown capability in AI classification: ghost"]}
+```
+
+`status` is `selected`, `no_match` or `needs_clarification` (the last two are valid answers with no steps; the
+questions are the AI's). The steps come only from a validated decision, in the order the runtime plans them
+(`routing.resolve_selection`), with the `after` prerequisites it adds marked `added_as_prerequisite`: nobody chose
+an intent or a reason for those, so both are `null`. An answer that is invalid is never shown as steps: an unknown
+capability or intent, a context that is not the one prepared for this catalog (a changed catalog needs a new
+`simulate-prepare`), a missing `needs` judgment, a constraint the context lacks, two owners of one output.
+
+`simulate` does both in one command: it prepares, sends the prompt as one user message to `<api-base>/chat/completions`
+with the model named, takes the first JSON object of the answer (a code fence or a sentence around it is fine) and
+checks it. It prints the same result with `"engine": "api"` and `"model"`. An answer with no JSON object at all is an
+invalid answer (`valid` false). Cost: one request carrying the whole prompt; nothing is retried.
+
+- `--model` (required), `--api-base` (default `https://api.openai.com/v1`; plain `http` is refused except on
+  localhost) and `--api-key-env` (default: `MURO_API_KEY`, then `OPENAI_API_KEY`) are those of `muro agent`.
+- The key comes only from that environment variable. It is never an argument, a file, output or part of a message,
+  not even one an endpoint echoes back.
+- Exit `0` whenever a result was printed, valid or not: an invalid decision is what the simulation found, so read
+  `valid`. Exit `1` with the reason on stderr when it could not run: no package, a request or stack the runtime
+  refuses, an unreadable file, no key, an endpoint that cannot be reached or answers with an error.
+
+```sh
+export MURO_API_KEY=…
+muro project simulate marionette.mp --task "Convert the Word document to PDF" --model gpt-5.2
+muro project simulate-prepare marionette.mp --task "Landing page with scroll animations" --stack stack:gsap > prepared.json
+# the host AI classifies with the prompt in prepared.json, saves that file's context as context.json and its answer as answer.json
+muro project simulate-check marionette.mp --context context.json --answer answer.json
+```
+
+The mechanics are covered by tests against fixtures and a scripted endpoint; no claim is made about any model's
+classification of a request.
+
 ## Legacy flag mapping
 
 | Legacy (`muro_build.py`) | Subcommand |
@@ -298,7 +459,7 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
 | `--harmonize` | `muro harmonize` |
 | `--prepare-eval` | `muro eval prepare` |
 | `--score-eval <file>` | `muro eval score <file>` |
-| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro mcp`, `muro agent`, `muro absorb` |
+| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro mcp`, `muro agent`, `muro absorb`, `muro project` |
 
 ## How-to: the common workflows
 
@@ -316,6 +477,14 @@ its own file tools, calls `validate` until clean, then `build` and
 **Fully unattended (API).** `muro absorb … --model …` with the key in
 `MURO_API_KEY`.
 
+**Make a project file and ask it something.** `muro build --manifest PKG/sources.json
+--out DIR`, then `muro project pack --manifest PKG/sources.json --out FILE.mp --release
+DIR` (needs the network once, for the inputs; `--sources-cache` keeps them), `muro
+project info FILE.mp` to read what the desktop's project page shows, and `muro
+project simulate FILE.mp --task "…" --model M` (or `simulate-prepare` and
+`simulate-check` from a host that does the classifying) to see which capabilities a
+request activates. The desktop app opens the same file under Projects.
+
 **Keep a package current.** Poll `muro baseline --json` (exit 1 = something
 moved); before re-pinning, run `muro review` and follow AGENTS.md "Adding or
 re-pinning a source"; after re-pinning, re-run intake for that source,
@@ -325,9 +494,11 @@ harmonize, validate, build, install.
 
 - API keys only from environment variables; never arguments, never logged,
   never stored.
-- `muro agent` refuses plain `http` endpoints off localhost.
+- `muro agent` and `muro project simulate` refuse plain `http` endpoints off localhost.
 - Model answers can only land on the allowlisted package paths; path
   traversal is rejected before any write.
+- A `.mp` from elsewhere is untrusted input: `unpack` refuses traversal, absolute paths, drive letters and links
+  before it writes anything, and stops at 2 GiB or 50,000 members.
 - Source material is evidence, not instructions: intake and build never
   execute upstream code, and the license gate runs before anything is
   packaged or scaffolded.

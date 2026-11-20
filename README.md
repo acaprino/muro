@@ -31,7 +31,11 @@ The same engine is a harmonizer. Muro's factory absorbs pinned skills and plugin
 
 ## What Muro does
 
-Muro is one window with three tabs: **Sync**, **Activity** and **Settings**.
+Muro is one window with four tabs: **Projects**, **Sync**, **Activity** and **Settings**.
+
+### Projects
+
+A project is one `.mp` file that holds a unified plugin and everything behind it: the plugins and skills it absorbs, at their pinned commits with their licenses, the choices made and why, the history and the prompts. Muro ships with one, Marionette, and **Open project file…** adds yours. A project page has four steps: **Inputs** (what goes in, pinned to what, and what each part became), **Harmonize** (the decision records, the choices by part, the history of runs and the prompts, read only for now), **Graph & simulator** and **Install** (a switch for each harness, applied from Sync like any other change). The simulator shows which branch of the plugin's decision graph a request activates, and in what order: a documented example runs no AI, and a request you type is classified by the AI through a coding agent on your computer (Claude Code or Codex) or an OpenAI-compatible API, as **Settings → AI** says, and the page tells you what it may cost before the first one. See [Projects in the desktop guide](docs/desktop.md#projects).
 
 ### Harness manager
 
@@ -135,7 +139,7 @@ In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode
 2. Follow the job in **Activity**. When it succeeds, the cell shows the new version.
 3. **Apply all** installs it.
 
-Adaptation runs Claude Code, chosen under **Settings → AI adaptation**, and has a real inference cost.
+Adaptation runs the coding agent chosen under **Settings → AI** (today it needs Claude Code for its budget), on your computer with its own credentials, and has a real inference cost. The budget the dialog starts from is the one in Settings.
 
 ### Remove what you did not choose
 

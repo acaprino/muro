@@ -46,6 +46,17 @@ pub fn pause_label(status: &Value) -> &'static str {
     }
 }
 
+/// The state line when saving `auto_sync` failed (the registry stayed busy past the retry, say):
+/// the change that was being made, from the `status` read before the save, so a person sees that
+/// the item did nothing instead of a silent click. It stands until the next poll writes the line.
+pub fn pause_failed(status: &Value) -> &'static str {
+    match status["settings"]["auto_sync"].as_bool() {
+        Some(true) => "Could not pause, try again",
+        Some(false) => "Could not resume, try again",
+        None => "Could not change automatic sync, try again",
+    }
+}
+
 /// `HH:MM` on this machine's clock for `epoch` seconds since 1970. Windows only: elsewhere
 /// there is no local time to read without another dependency, and the line shows none.
 pub fn local_clock(epoch: u64) -> Option<String> {

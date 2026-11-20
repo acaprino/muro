@@ -277,3 +277,111 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .setupcard .set>.row:first-child{border-top:0}
 .pick label:has(input:disabled){cursor:default}
 .pick label:has(input:disabled) strong{color:var(--muted)}
+/* Fix wave 2 */
+/* A running adaptation: its phase, the time it has run, and a bar that has no value (the agent reports no fraction). */
+.job .phase{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.job .elapsed{color:var(--muted);font-variant-numeric:tabular-nums}
+.bar.indeterminate{position:relative}
+.bar.indeterminate i{position:absolute;top:0;bottom:0;left:0;width:35%;transition:none;animation:indeterminate 1.4s ease-in-out infinite}
+@keyframes indeterminate{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+/* Where motion is off the bar stands full and faded: a part of it filled would read as a fraction done. */
+@media (prefers-reduced-motion:reduce){.bar.indeterminate i{width:100%;opacity:.45}}
+@media (forced-colors:active){.bar.indeterminate{border:1px solid CanvasText}.bar.indeterminate i{forced-color-adjust:none;background:Highlight}}
+/* The first run: Back and Continue stay at the bottom of the window while a long list scrolls. A sticky box moves inside the nearest scrolling
+   ancestor, which must be the page (`.main`), not the wrap (an `overflow:auto` that never overflows would be the one it looks at), and inside
+   its parent, which must not be a grid whose row is as tall as the footer: so the wrap does not scroll and the card is a column of boxes. */
+.setupwrap{overflow:visible}
+.setupcard{display:flex;flex-direction:column}
+.setupfoot{position:sticky;bottom:0;z-index:1;padding:12px 0;background:var(--glass-strong);backdrop-filter:var(--glass-blur);border-top:1px solid var(--line)}
+/* A box focused with the keyboard is brought into view above the footer, not under it. */
+.main:has(.setupcard){scroll-padding-bottom:84px}
+/* Projects: the list, a project's header and file, the four steps. Tasks 7 and 8 append their own blocks under their own comments. */
+.crumb{margin-bottom:10px}
+.projhead{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+.projhead .sym{width:40px;height:40px;line-height:40px;font-size:14px}
+.projhead h1{overflow-wrap:anywhere}
+.projfile{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px;color:var(--muted)}
+.projfile code{overflow-wrap:anywhere}
+.projfile details{flex:1 1 100%}
+.pfiles{margin:0 0 16px;padding:12px 14px}
+.pfiles li{display:grid;grid-template-columns:130px minmax(0,1fr) auto;gap:16px;padding:5px 0;align-items:baseline}
+.pfiles li>*{min-width:0;overflow-wrap:anywhere}
+.steps4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.steps4 button{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--panel);min-width:0}
+.steps4 button:hover{background:var(--raised)}
+.steps4 button[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+.steps4 .num{width:24px;height:24px;border-radius:50%;background:var(--raised);font-weight:700;font-size:12px;line-height:24px;text-align:center;flex:none}
+.steps4 button[aria-selected="true"] .num{background:var(--primary);color:var(--on-primary)}
+.steps4 span.t{display:grid;min-width:0}
+.steps4 small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list>li.go small.pfile{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list>li.go>button>span.grow>strong{overflow-wrap:anywhere}
+/* A project's row holds its opening button, which is the row, and beside it the button that removes it from the list. */
+.list>li.go>button.btn{width:auto;flex:none;margin-right:12px;padding:0 9px;gap:7px;border-radius:var(--r-sm);display:inline-flex}
+.list>li.go>button.btn:hover{background:var(--wash-hover)}
+.list>li.go>button[data-action=open-project]{flex:1 1 auto;min-width:0}
+.list>li>.btn.sm{flex:none}
+.sub{margin:-4px 0 10px}
+.pinputs .ver small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
+@media (max-width:980px){.steps4{grid-template-columns:repeat(2,1fr)}.pfiles li{grid-template-columns:1fr;gap:2px}}
+@media (forced-colors:active){.steps4 button[aria-selected="true"]{outline:2px solid Highlight}}
+/* Project step 2: the strip and the four views of the harmonization. */
+.dec>li{align-items:flex-start}
+.dec>li>.tag{margin-top:1px;min-width:78px;justify-content:center}
+.dec .grow>*{overflow-wrap:anywhere}
+.dec .to{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+#step-panel .tools .seg{max-width:100%;flex-wrap:wrap}
+#step-panel .tools select{max-width:100%}
+.runs td{vertical-align:top}
+.runs .note{min-width:260px;white-space:pre-line;overflow-wrap:anywhere}
+.prompt{margin:0;padding:12px;flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);font:12px/1.5 "Cascadia Code",Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+/* Settings AI: the engine choice may be wider than a narrow window, a hint can hold a line of status, a box that does not apply reads as off. */
+.set .row .seg{max-width:100%;flex-wrap:wrap}
+.row small .line{display:block}
+.row input:disabled{opacity:.55;cursor:default}
+/* Project step 3: the simulator on the left, the decision graph on the right. The graph card scrolls inside itself, so 37 capabilities and a long name never widen the page. */
+.two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.sim{display:grid;gap:12px;min-width:0}
+.simbox{display:grid;gap:6px}
+.simbox .acts{margin-top:2px}
+.simnote{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--wash);color:var(--muted)}
+.simres{padding:12px 14px;display:grid;gap:8px;min-width:0}
+.simres strong,.simask,.simreason{overflow-wrap:anywhere}
+.simtags{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.simres ol li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.simres ol li>div{min-width:0;overflow-wrap:anywhere}
+.simres ol b{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:11px;line-height:20px;text-align:center}
+.simlist{display:grid;gap:4px;padding-left:18px;list-style:disc;overflow-wrap:anywhere}
+.simwho{color:var(--muted)}
+.exlist{max-height:420px;overflow:auto}
+.exlist button{display:grid;gap:1px;width:100%;padding:9px 12px;border-bottom:1px solid var(--line)}
+.exlist li:last-child button{border-bottom:0}
+.exlist button:hover{background:var(--wash)}
+.exlist button[aria-pressed="true"]{background:var(--raised);box-shadow:inset 2px 0 0 var(--accent)}
+.exlist small{overflow-wrap:anywhere}
+.graphcard{padding:12px 14px;overflow:auto;max-height:calc(100vh - 300px);min-height:320px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;border-top:2px solid var(--line-strong);vertical-align:middle;margin-right:6px}
+.legend i.need{border-top-style:dashed;border-color:var(--warn)}
+.legend i.conf{border-top-style:dotted;border-color:var(--bad)}
+.legend i.on{border-color:var(--accent)}
+svg.graph{display:block}
+.graph foreignObject{overflow:visible}
+.graph .e{fill:none;stroke:var(--line-strong);stroke-width:1.2;opacity:.55}
+.graph .e.need{stroke:var(--warn);stroke-dasharray:5 4;opacity:.9}
+.graph .e.conf{stroke:var(--bad);stroke-dasharray:1.5 4;stroke-linecap:round;opacity:.9}
+.graph .n rect{fill:var(--raised);stroke:var(--line);stroke-width:1}
+.graph .n text{fill:var(--text);font:12px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+.graph .n.ent text{font-weight:600}
+.graph.sim .e:not(.on),.graph.sim .n:not(.on){opacity:.22}
+.graph.sim .n:focus-within{opacity:1}
+.graph .e.on{stroke:var(--accent);stroke-width:2;opacity:1}
+.graph .n.ent.on rect{stroke:var(--accent);stroke-width:1.6;fill:color-mix(in srgb,var(--accent) 16%,var(--panel))}
+.dl .kv dd{min-width:0;overflow-wrap:anywhere}
+.dl .kv dd.stack{display:grid}
+.gnode{position:relative;display:flex;align-items:center;box-sizing:border-box;min-width:100%;width:max-content;height:22px;padding:0 32px 0 10px;border:1px solid var(--line);border-radius:6px;background:var(--raised);color:var(--text);font-size:12px;white-space:nowrap}
+.gnode:hover{border-color:var(--line-strong)}
+.gnode.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel))}
+.gnum{position:absolute;right:5px;top:50%;margin-top:-8px;width:16px;height:16px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;line-height:16px;text-align:center}
+@media (max-width:980px){.two{grid-template-columns:minmax(0,1fr)}.graphcard{max-height:70vh}}
+@media (forced-colors:active){.graph .e{stroke:CanvasText}.graph .n rect{stroke:CanvasText;fill:Canvas}.graph .n text{fill:CanvasText}.gnode{border-color:CanvasText}.gnode.on{outline:2px solid Highlight}}

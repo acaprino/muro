@@ -73,6 +73,17 @@ pub fn carry_revision(root: &Path, from: u64, to: u64) -> Result<()> {
     write(&root.join(FILE), &state)
 }
 
+/// A target left the registry: its times go with it, or a new target given the same id would
+/// start with the removed one's `synced` and `checked`. It writes no file when it had none.
+pub fn forget_target(root: &Path, id: &str) -> Result<()> {
+    let mut state = load(root)?;
+    let removed = state["targets"].as_object_mut().and_then(|all| all.remove(id));
+    if removed.is_none() {
+        return Ok(());
+    }
+    write(&root.join(FILE), &state)
+}
+
 /// Records an applied plan: the targets it changed are synced, and the operations it applied
 /// are no longer pending. `blockers` stays as the check counted it: an apply that left
 /// blockers out did not resolve them.

@@ -27,9 +27,31 @@ def _tool(name: str, description: str, properties: dict[str, Any], required: lis
 
 
 _MANIFEST = {"manifest": {"type": "string", "description": "Path to the package's sources.json"}}
+_PROJECT = {"project": {"type": "string", "description": "Path to a .mp project file, instead of a manifest"}, **_MANIFEST}
 
 
-def tool_definitions() -> list[dict[str, Any]]:
+def tool_definitions(allowed: frozenset[str] | set[str] | list[str] | None = None) -> list[dict[str, Any]]:
+    """The tools the server lists: all of them, or only the named ones (`muro mcp --tools`)."""
+    return [tool for tool in _all_definitions() if allowed is None or tool["name"] in allowed]
+
+
+def parse_tools(text: str) -> frozenset[str]:
+    """The tools `--tools` names: a comma-separated list of names this server has, none empty.
+
+    A host agent is given the server for one job (the desktop's simulator gives it two tools), and the
+    text it works from may come from anyone: a tool it was not given must not be there to call.
+    """
+    names = [name.strip() for name in text.split(",")]
+    if not text.strip() or not all(names):
+        raise ValueError("--tools takes a comma-separated list of tool names, none of them empty")
+    known = [tool["name"] for tool in _all_definitions()]
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        raise ValueError(f"--tools names {', '.join(unknown)}, which this server does not have (it has {', '.join(known)})")
+    return frozenset(names)
+
+
+def _all_definitions() -> list[dict[str, Any]]:
     return [
         _tool("validate", "Validate the package's capabilities, ROUTER.md, entries and delivery.", _MANIFEST, []),
         _tool("check_sources", "Verify pinned sources, licenses and plugin identity (contacts the pinned remotes).",
@@ -45,6 +67,20 @@ def tool_definitions() -> list[dict[str, Any]]:
         _tool("eval_prepare", "Stage the routing eval prompt and cases, without the expectations.", _MANIFEST, []),
         _tool("eval_score", "Score eval decisions (a JSON file you wrote) against eval-cases.json.",
               {**_MANIFEST, "decisions": {"type": "string"}}, ["decisions"]),
+        _tool("simulate_prepare",
+              "Prepare the simulation of one request against a project's catalog. Returns {context, prompt}: "
+              "classify the request yourself with the prompt (the decision is yours; Python never classifies), "
+              "then call simulate_check with your answer. Name a .mp `project` or a `manifest`.",
+              {**_PROJECT, "task": {"type": "string", "description": "The request to simulate"},
+               "stack": {"type": "array", "items": {"type": "string"},
+                         "description": "stack:* constraint tokens the request carries"}},
+              ["task"]),
+        _tool("simulate_check",
+              "Validate your classification of a simulated request with the runtime's own rules. Returns the "
+              "ordered steps, or why the answer is invalid (nothing is repaired). Pass the context "
+              "simulate_prepare returned and your answer, a JSON object.",
+              {**_PROJECT, "context": {"type": "object"}, "answer": {"type": "object"}},
+              ["context", "answer"]),
         _tool("init_package",
               "Scaffold a new single-source package from a repository link: resolves the pin "
               "(newest non-prerelease tag, or --head), verifies the license gate, writes sources.json. "
@@ -63,9 +99,13 @@ def tool_definitions() -> list[dict[str, Any]]:
     ]
 
 
-def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path) -> tuple[int, str]:
+def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path,
+              allowed: frozenset[str] | None = None) -> tuple[int, str]:
+    """Run one tool. With `allowed` (the server's `--tools`) a tool outside it is refused before anything runs."""
     from . import cli
 
+    if allowed is not None and name not in allowed:
+        return 1, f"This server does not serve the tool {name}"
     _captured = cli._captured  # the one capture helper, exception net included
     manifest_arg = Path(arguments.get("manifest") or default_manifest)
 
@@ -97,6 +137,13 @@ def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path) -> t
         return with_manifest(lambda _m, _p, root: cli._run_eval(root, True, None))
     if name == "eval_score":
         return with_manifest(lambda _m, _p, root: cli._run_eval(root, False, Path(arguments["decisions"])))
+    if name in ("simulate_prepare", "simulate_check"):
+        mp = Path(arguments["project"]) if arguments.get("project") else None
+        # A project file replaces the server's default manifest; naming both is refused.
+        where = (mp, Path(arguments["manifest"]) if arguments.get("manifest") else (None if mp else default_manifest), None)
+        if name == "simulate_prepare":
+            return _captured(lambda: cli._run_simulate_prepare(*where, arguments.get("task"), arguments.get("stack") or []))
+        return _captured(lambda: cli._run_simulate_check(*where, arguments.get("context"), arguments.get("answer")))
     if name == "init_package":
         def init_body() -> int:
             from .scaffold import scaffold_package
@@ -124,8 +171,8 @@ def _write(message: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def serve(default_manifest: Path) -> int:
-    """Serve MCP on stdio until stdin closes."""
+def serve(default_manifest: Path, tools: frozenset[str] | None = None) -> int:
+    """Serve MCP on stdio until stdin closes: every tool, or only `tools` (listed and callable alike)."""
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -152,14 +199,14 @@ def serve(default_manifest: Path) -> int:
             _write({"jsonrpc": "2.0", "id": msg_id, "result": {}})
             continue
         if method == "tools/list":
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tool_definitions()}})
+            _write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tool_definitions(tools)}})
             continue
         if method == "tools/call":
             params = message.get("params") or {}
             name = params.get("name", "")
             arguments = params.get("arguments") or {}
             try:
-                code, text = call_tool(name, arguments, default_manifest)
+                code, text = call_tool(name, arguments, default_manifest, tools)
             except Exception as exc:  # a tool bug must not kill the server
                 code, text = 1, f"{type(exc).__name__}: {exc}"
             _write({"jsonrpc": "2.0", "id": msg_id, "result": {

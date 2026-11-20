@@ -187,6 +187,106 @@ def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
         return 1
 
 
+def _run_project(args: argparse.Namespace) -> int:
+    """`muro project pack|unpack|info|verify`: the `.mp` file (muro/project.py)."""
+    from . import project
+    try:
+        if args.project_command == "pack":
+            loaded = _read_manifest(args.manifest)
+            if loaded is None:
+                return 1
+            _manifest, _manifest_path, project_root = loaded
+            print(project.pack(project_root, args.out, sources_cache=args.sources_cache,
+                               release_dir=args.release))
+        elif args.project_command == "unpack":
+            print(project.unpack(args.mp, args.out))
+        elif args.project_command == "verify":
+            project.verify(args.mp, args.cache or project.default_cache_root())
+            _print_json({"verified": True})
+        else:
+            read = project.summary if args.summary else project.info
+            print(json.dumps(read(args.mp, args.cache or project.default_cache_root()),
+                             ensure_ascii=False, indent=2))
+        return 0
+    except (OSError, ValueError) as e:
+        print(f"Project {args.project_command} failed: {e}", file=sys.stderr)
+        return 1
+
+
+_SIMULATE_COMMANDS = ("simulate", "simulate-prepare", "simulate-check")
+
+
+def _simulation_package(mp: Path | None, manifest: Path | None, cache: Path | None) -> Path | None:
+    """The package folder a simulation reads: a `.mp` unpacked once through the cache, or a manifest's folder.
+
+    None when the manifest is missing (already reported, like every command that reads one).
+    """
+    if mp is not None and manifest is not None:
+        raise ValueError("name a project file or a manifest, not both")
+    if mp is not None:
+        from . import project
+        return project.cached(Path(mp), Path(cache) if cache else project.default_cache_root())
+    loaded = _read_manifest(Path(manifest) if manifest else Path("sources.json"))
+    return loaded[2] if loaded else None
+
+
+def _print_json(document: dict) -> None:
+    print(json.dumps(document, ensure_ascii=False, indent=2))
+
+
+def _run_simulate_prepare(mp: Path | None, manifest: Path | None, cache: Path | None, task: str, stack: list) -> int:
+    """What the classifier needs for one request (muro/simulate.py `prepare`), as JSON."""
+    from .simulate import prepare
+    package = _simulation_package(mp, manifest, cache)
+    if package is None:
+        return 1
+    _print_json(prepare(package, task, stack))
+    return 0
+
+
+def _run_simulate_check(mp: Path | None, manifest: Path | None, cache: Path | None, context, answer) -> int:
+    """The AI's answer validated as a runtime decision (`check`), as JSON. An invalid answer is a result: exit 0."""
+    from .simulate import check
+    package = _simulation_package(mp, manifest, cache)
+    if package is None:
+        return 1
+    _print_json(check(package, context, answer))
+    return 0
+
+
+def _run_simulate(mp: Path | None, manifest: Path | None, cache: Path | None, task: str, stack: list,
+                  api_base: str, model: str, api_key_env: str | None) -> int:
+    """One request through an OpenAI-compatible endpoint (`simulate_api`), as JSON."""
+    from .simulate import simulate_api
+    package = _simulation_package(mp, manifest, cache)
+    if package is None:
+        return 1
+    _print_json(simulate_api(package, task, stack, api_base=api_base, model=model, api_key_env=api_key_env))
+    return 0
+
+
+def _read_json_file(path: Path, what: str):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"the {what} file is not valid JSON: {e}") from None
+
+
+def _run_simulation(args: argparse.Namespace) -> int:
+    """`muro project simulate|simulate-prepare|simulate-check`: the simulator (muro/simulate.py)."""
+    try:
+        if args.project_command == "simulate-prepare":
+            return _run_simulate_prepare(args.mp, args.manifest, args.cache, args.task, args.stack)
+        if args.project_command == "simulate-check":
+            return _run_simulate_check(args.mp, args.manifest, args.cache,
+                                       _read_json_file(args.context, "context"), _read_json_file(args.answer, "answer"))
+        return _run_simulate(args.mp, args.manifest, args.cache, args.task, args.stack,
+                             args.api_base, args.model, args.api_key_env)
+    except (OSError, ValueError) as e:
+        print(f"Simulation failed: {e}", file=sys.stderr)
+        return 1
+
+
 def _captured(fn) -> tuple[int, str]:
     """Run a command function with stdout/stderr captured; errors become (1, text).
 
@@ -375,8 +475,11 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--harness", required=True, choices=("claude-code", "codex", "opencode", "pi"))
     p.add_argument("--home", required=True, type=Path,
                    help="The harness home to install into (e.g. resolved through Mukade's scan)")
-    sub.add_parser("mcp", parents=[common],
-                   help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
+    p = sub.add_parser("mcp", parents=[common],
+                       help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
+    p.add_argument("--tools", metavar="NAME[,NAME...]",
+                   help="Serve only these tools (listed and callable; a name the server does not have is refused "
+                        "at start). Without it every tool is served: give a host agent only what its job needs")
     p = sub.add_parser("agent", parents=[common],
                        help="Run an AI-owned step through an OpenAI-compatible endpoint "
                             "(key from an environment variable, never an argument)")
@@ -413,11 +516,62 @@ def _modern_main(argv: list[str]) -> int:
     p = eval_sub.add_parser("score", parents=[common],
                             help="Score the host AI's decisions against eval-cases.json")
     p.add_argument("decisions", type=Path, help="The host AI's decisions JSON")
+    p = sub.add_parser("project", help="The .mp project file: one zip with a package, its inputs and its release")
+    project_sub = p.add_subparsers(dest="project_command", required=True,
+                                   metavar="pack|unpack|info|verify|simulate|simulate-prepare|simulate-check")
+    p = project_sub.add_parser("pack", parents=[common],
+                               help="Pack a package, its sources at their pins and a built release into a .mp")
+    p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
+    p.add_argument("--sources-cache", type=Path, metavar="DIR",
+                   help="Folder keeping each source's files per id and commit: read first, filled after a fetch")
+    p.add_argument("--release", type=Path, metavar="DIR",
+                   help="The --out folder of a build (<DIR>/<slug>/...); without it the file carries no release")
+    p = project_sub.add_parser("unpack", help="Unpack a .mp into a new folder (refuses unsafe members and limits)")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--out", type=Path, required=True, help="A new folder")
+    p = project_sub.add_parser("info", help="Print what a .mp holds, as JSON (unpacked once per file content)")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--summary", action="store_true",
+                   help="Only the identity, the counts and the digest; a missing or invalid file is "
+                        "an \"error\" in the JSON, with exit 0")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
+    p = project_sub.add_parser("verify", help="Check that the plugin a .mp carries was built from the package it "
+                                              "carries (release slug, version and capability ids); exit 1 when not")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
+    # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
+    where = argparse.ArgumentParser(add_help=False)
+    where.add_argument("mp", nargs="?", type=Path, help="The .mp file (or name --manifest instead)")
+    where.add_argument("--manifest", type=Path, help="A package's sources.json, instead of a .mp file")
+    where.add_argument("--cache", type=Path, metavar="DIR",
+                       help="Where unpacked projects are kept (default: a per-user cache folder)")
+    request = argparse.ArgumentParser(add_help=False)
+    request.add_argument("--task", required=True, help="The request to simulate")
+    request.add_argument("--stack", action="append", default=[], metavar="TOKEN",
+                         help="A stack:* constraint token the request carries (repeatable)")
+    p = project_sub.add_parser("simulate-prepare", parents=[where, request],
+                               help="Print, as JSON, what a classifier needs for one request: its context and prompt")
+    p = project_sub.add_parser("simulate-check", parents=[where],
+                               help="Validate an AI answer as the runtime validates a decision and print its steps as JSON")
+    p.add_argument("--context", type=Path, required=True, help="The context simulate-prepare printed (JSON file)")
+    p.add_argument("--answer", type=Path, required=True, help="The AI's classification (JSON file)")
+    p = project_sub.add_parser("simulate", parents=[where, request],
+                               help="Ask an OpenAI-compatible endpoint which capabilities a request activates, "
+                                    "validate the answer and print the steps as JSON")
+    p.add_argument("--model", required=True, help="Model id the endpoint serves")
+    p.add_argument("--api-base", default="https://api.openai.com/v1",
+                   help="OpenAI-compatible base URL (default: https://api.openai.com/v1)")
+    p.add_argument("--api-key-env", default=None,
+                   help="Environment variable holding the key (default: MURO_API_KEY, then OPENAI_API_KEY)")
 
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
         return 0
+    if args.command == "project":
+        return _run_simulation(args) if args.project_command in _SIMULATE_COMMANDS else _run_project(args)
 
     if args.command == "init":
         return _run_init(args.directory, args.repo_url, slug=args.slug,
@@ -433,8 +587,13 @@ def _modern_main(argv: list[str]) -> int:
                            api_base=args.api_base, model=args.model,
                            api_key_env=args.api_key_env, rounds=args.rounds, out=args.out)
     if args.command == "mcp":
-        from .mcp import serve
-        return serve(args.manifest)
+        from .mcp import parse_tools, serve
+        try:
+            tools = None if args.tools is None else parse_tools(args.tools)
+        except ValueError as e:
+            print(f"mcp failed: {e}", file=sys.stderr)
+            return 1
+        return serve(args.manifest, tools)
 
     loaded = _read_manifest(args.manifest)
     if loaded is None:

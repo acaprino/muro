@@ -1,5 +1,5 @@
 import type { ViewState, SetupState, Snapshot, Target, Discovered, InstalledPlugin, Autostart } from '../types.ts';
-import type { App, Actions } from '../context.ts';
+import type { App, Actions, TextBox } from '../context.ts';
 import { inList, listing, intervalOptions } from '../model.ts';
 import { esc, mark, sw, button, empty, spin } from '../ui.ts';
 
@@ -73,6 +73,7 @@ const newTarget = (found: Discovered): Target => ({ id: crypto.randomUUID(), har
 const card = (s: Held, body: string) => `<div class="setupwrap"><section class="setupcard" aria-labelledby="setup-title"><div class="steps" aria-hidden="true">${[1, 2, 3].map(n => `<i class="${n <= s.step ? 'on' : ''}"></i>`).join('')}</div><small id="setup-step">Step ${s.step} of 3</small>${body}</section></div>`;
 const title = (s: Held, text: string, sub: string) => `<h1 id="setup-title" tabindex="-1" aria-describedby="setup-step${s.err ? ' setup-error' : ''}">${esc(text)}</h1><p class="muted">${esc(sub)}</p>`;
 const failure = (s: Held) => `<p class="err" id="setup-error" role="alert">${esc(s.err)}</p>`;
+/** The footer of a step: Back on the left, the way on on the right. It is the last box of the card, which the stylesheet keeps at the bottom of the window while a long list scrolls (`.setupfoot` is sticky), so a step puts nothing after it. */
 const foot = (left: string, right: string) => `<div class="setupfoot">${left || '<span></span>'}${right}</div>`;
 const row = (label: string, hint: string, control: string) => `<div class="row"><div><strong>${esc(label)}</strong><small>${esc(hint)}</small></div>${control}</div>`;
 /** A row of step 1 or 2: a real checkbox wrapped by its label. `lead` and `note` are HTML the caller has escaped. */
@@ -156,7 +157,7 @@ export const actions: Actions = {
 };
 
 /** A tick of step 1 or 2. Nothing else on the page is this module's. */
-export const change = (app: App, el: HTMLInputElement | HTMLSelectElement): boolean => {
+export const change = (app: App, el: TextBox): boolean => {
   if (el.name !== 'pick' && el.name !== 'keep') return false;
   const s = begin(app.state);
   (el.name === 'pick' ? s.pick : s.keep)[el.value] = (el as HTMLInputElement).checked;

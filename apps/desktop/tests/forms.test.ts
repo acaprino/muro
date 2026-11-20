@@ -111,6 +111,43 @@ test('the adapt dialog asks for a harness and a budget above zero, tied to its e
  assert.doesNotMatch(adaptDialog(viewState(snapshot()),{...plugin,name:'<b>x</b>'}),/<b>x/);
 });
 
+// Settings, section AI, owns the engine: the dialog reads `registry.settings.ai` (the harness, the budget it starts from) and never the old `agent` alone.
+const settingsWith=(ai:Record<string,unknown>|undefined,agent='claude-code'):Snapshot=>{
+ const s=snapshot();s.registry.settings={...s.registry.settings,agent,...(ai?{ai:{engine:'harness',harness:'claude-code',budget_usd:2,api_base:'https://api.openai.com/v1',model:'',api_key_env:'MURO_API_KEY',...ai}}:{})} as Snapshot['registry']['settings'];return s;
+};
+const plain=(html:string)=>html.replace(/<[^>]*>/g,' ').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+/** What the dialog says under its title: the choice of harnesses below it lists them all by name. */
+const said=(html:string)=>plain(html.match(/<div class="dlhead">[\s\S]*?<\/p>/)![0]);
+const NEEDS='Adapting a plugin needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
+const start=(html:string)=>html.match(/<button type="submit"[^>]*>Start<\/button>/)![0];
+test('the adapt dialog names Claude Code and starts from the budget of the AI settings',()=>{
+ const claude=adaptDialog(viewState(settingsWith({harness:'claude-code',budget_usd:3.25})),plugin);
+ assert.match(said(claude),/Claude Code rebuilds this plugin/);assert.match(said(claude),/It uses Claude Code's own credentials/);assert.match(claude,/name="budget" value="3.25"/);
+ assert.doesNotMatch(said(claude),/needs a coding agent/,'a harness engine needs no explanation');
+ assert.equal(start(claude),'<button type="submit" class="btn primary">Start</button>');assert.doesNotMatch(claude,/data-action="page"/,'no link to Settings: nothing to change');
+});
+test('with Codex as the agent, whatever the engine, the dialog says adapting needs Claude Code, links to Settings and cannot be started',()=>{
+ for(const [why,ai] of [['the harness engine',{harness:'codex',budget_usd:0.5}],['the API engine',{engine:'api',harness:'codex',budget_usd:1.5,model:'gpt-test'}]] as const){
+  const html=adaptDialog(viewState(settingsWith(ai,'claude-code')),plugin);
+  assert.equal(said(html),`Adapt Package with AI ${NEEDS}`,why);assert.doesNotMatch(said(html),/Codex/,'it is not offered Codex');
+  assert.equal(start(html),'<button type="submit" class="btn primary" disabled>Start</button>',`${why}: Start is disabled`);
+  assert.match(html,/<footer><button type="button" class="btn left" data-action="page" data-id="settings"><span>Open Settings<\/span><\/button><button type="button" class="btn" data-close>Cancel<\/button>/,`${why}: the link to Settings`);
+  assert.match(html,/name="budget" value="(0.5|1.5)"/);assert.doesNotMatch(html,/gpt-test/);
+ }
+});
+test('with the API as the engine and Claude Code as the agent the dialog says adapting runs a coding agent on this computer',()=>{
+ const api=adaptDialog(viewState(settingsWith({engine:'api',harness:'claude-code',budget_usd:1.5,model:'gpt-test'})),plugin);
+ assert.match(said(api),/Adapting a plugin needs a coding agent on this computer: Claude Code\./);
+ assert.match(said(api),/It uses Claude Code's own credentials/);assert.doesNotMatch(api,/gpt-test/);assert.match(api,/name="budget" value="1.5"/);
+ assert.equal(start(api),'<button type="submit" class="btn primary">Start</button>');
+});
+test('a service with no AI settings yet falls back to its agent and to a budget of 2; a budget of nothing is not offered',()=>{
+ const old=adaptDialog(viewState(settingsWith(undefined,'codex')),plugin);
+ assert.equal(said(old),`Adapt Package with AI ${NEEDS}`,'its agent is Codex');assert.match(old,/name="budget" value="2"/);
+ assert.match(adaptDialog(viewState(settingsWith({budget_usd:0})),plugin),/name="budget" value="2"/);
+ assert.match(said(adaptDialog(viewState(settingsWith(undefined,'claude-code')),plugin)),/Claude Code rebuilds this plugin/);
+});
+
 // ---------- the harness sheet ----------
 test('the harness sheet has the mockup\'s fields and words, and Stop managing only for a harness that exists',()=>{
  const s=snapshot(),state=viewState(s),target=s.registry.targets[0],html=harnessSheet(state,target);

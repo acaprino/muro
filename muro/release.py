@@ -9,7 +9,8 @@ from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
 from .delivery import DELIVERY_FILE, allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
 from .entries import ENTRIES_FILE, load_entries, validate_entries
-from .factory import _helper_name, copy_source_helpers, prompts_dir, runtime_source, unpackaged_reference_errors
+from .factory import (PROMPT_FILES, _helper_name, copy_source_helpers, prompts_dir, runtime_source,
+                      unpackaged_reference_errors)
 from .guide import write_release_guide
 from .sources import copyright_notices, inspect_source, notice_paths, parse_capabilities
 from .custom_instructions import copy_runtime, provenance_ids
@@ -44,7 +45,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
     )
     if errors:
         raise ValueError("Invalid router: " + "; ".join(errors))
-    for prompt in ("intake.md", "delivery.md", "harmonizer.md", "classify.md"):
+    for prompt in PROMPT_FILES:
         path = prompts_dir(project_root) / prompt
         if not path.is_file() or not path.read_text(encoding="utf-8").strip():
             raise ValueError(f"Required AI prompt missing or empty: {path}")

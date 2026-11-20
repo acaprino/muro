@@ -10,12 +10,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, NamedTuple
 
 from .core import parse_router
 from .delivery import load_delivery, session_text, unregistered_active_hooks, validate_delivery
 from .factory import _fresh_workbench, prompts_dir
-from .routing import catalog_digest, catalog_entries, resolve_selection, validate_classification, validate_stack
+from .routing import (catalog_digest, catalog_entries, resolve_selection, selection_step_id, validate_classification,
+                      validate_stack)
 from .runtime import compact_catalog
 from .sources import parse_capabilities
 
@@ -52,7 +53,22 @@ def validate_cases(document: Any, capabilities: list) -> list[str]:
     return errors
 
 
-def _package(project_root: Path):
+class ClassifierMaterial(NamedTuple):
+    """What a classifier is given for any request of a package, and what validates its answer."""
+    by_id: dict
+    rows: list
+    catalog: list
+    prompt: str
+    digest: str
+    conflicts: Any
+    delivery: dict | None
+
+
+def classifier_material(project_root: Path) -> ClassifierMaterial:
+    """The package's catalog, rules and permanent policy, and the digest that binds a decision to them.
+
+    Eval cases are not part of it: a request needs no case (the simulator reads this too).
+    """
     capabilities = parse_capabilities(project_root / "capabilities")
     by_id = {cap.id: cap for cap in capabilities}
     rows = parse_router(project_root / "ROUTER.md")
@@ -65,36 +81,61 @@ def _package(project_root: Path):
     if errors:
         raise ValueError("Invalid delivery: " + "; ".join(errors))
     stack = manifest.get("stack") if isinstance(manifest.get("stack"), dict) else {}
+    return ClassifierMaterial(by_id, rows, catalog, prompt, catalog_digest(catalog, by_id, prompt, delivery),
+                              stack.get("conflicts"), delivery)
+
+
+def _package(project_root: Path) -> tuple[ClassifierMaterial, list[dict]]:
+    material = classifier_material(project_root)
     document = json.loads((project_root / CASES_FILE).read_text(encoding="utf-8"))
-    errors = validate_cases(document, capabilities)
+    errors = validate_cases(document, list(material.by_id.values()))
     if errors:
         raise ValueError("Invalid eval cases: " + "; ".join(errors))
-    return (by_id, rows, catalog, prompt, catalog_digest(catalog, by_id, prompt, delivery),
-            stack.get("conflicts"), document["cases"], delivery)
+    return material, document["cases"]
+
+
+def request_context(task: str, stack_tokens, digest: str, conflicts) -> dict:
+    """The context one request is classified in: the task, its stack tokens and the catalog's digest."""
+    if not isinstance(task, str) or not task.strip():
+        raise ValueError("A nonempty task is required for AI classification")
+    tokens = list(stack_tokens)
+    validate_stack(set(tokens), conflict_groups=conflicts)
+    return {"task": task, "stack_tokens": sorted(tokens), "catalog_digest": digest}
 
 
 def _contexts(cases: list[dict], digest: str, conflicts) -> dict[str, dict]:
-    contexts = {}
-    for case in cases:
-        validate_stack(set(case["stack_tokens"]), conflict_groups=conflicts)
-        contexts[case["id"]] = {"task": case["task"], "stack_tokens": sorted(case["stack_tokens"]), "catalog_digest": digest}
-    return contexts
+    return {case["id"]: request_context(case["task"], case["stack_tokens"], digest, conflicts) for case in cases}
+
+
+def classifier_sections(material: ClassifierMaterial, context_title: str, contexts: dict) -> str:
+    """The text every classification reads, in this order: permanent session policy, the context(s), compact catalog, rules."""
+    policy = session_text(material.delivery)
+    return (
+        ("## Permanent session policy\n\n" + policy + "\n\n" if policy else "")
+        + f"## {context_title}\n\n```json\n" + json.dumps(contexts, ensure_ascii=False, indent=1) + "\n```\n\n"
+        "## Catalog\n\n```json\n" + json.dumps(compact_catalog(material.catalog), ensure_ascii=False, separators=(",", ":")) + "\n```\n\n"
+        "## Rules\n\n" + material.prompt
+    )
+
+
+def route_steps(material: ClassifierMaterial, route: dict, stack: set[str]) -> list[str]:
+    """The ordered steps (prerequisites added) the runtime plans for a validated `selected` decision."""
+    return resolve_selection(material.rows, [selection_step_id(s) for s in route["selections"]], stack, set(),
+                             {key: cap.conflicts for key, cap in material.by_id.items()},
+                             conflict_groups=material.conflicts)
 
 
 def prepare_eval(project_root: Path, output_dir: Path) -> Path:
     """Write the classifier's material: rules, compact catalog and one context per case, without expectations."""
-    _, _, catalog, prompt, digest, conflicts, cases, delivery = _package(project_root)
-    contexts = _contexts(cases, digest, conflicts)
+    material, cases = _package(project_root)
+    contexts = _contexts(cases, material.digest, material.conflicts)
     _fresh_workbench(output_dir, {"PROMPT.md", "contexts.json"})
     text = (
         "# Routing eval\n\nClassify each request below independently, exactly as you would at runtime, with the rules and\n"
         "catalog that follow. There is no project to inspect: decide from the request and its stack tokens.\n"
         "Write one JSON file `decisions.json` of the form `{\"decisions\": {\"<case id>\": <classification>}}`, where each\n"
         "classification copies that case's context (task, stack_tokens, catalog_digest) exactly.\n\n"
-        + ("## Permanent session policy\n\n" + session_text(delivery) + "\n\n" if session_text(delivery) else "")
-        + "## Cases (context per case id)\n\n```json\n" + json.dumps(contexts, ensure_ascii=False, indent=1) + "\n```\n\n"
-        "## Catalog\n\n```json\n" + json.dumps(compact_catalog(catalog), ensure_ascii=False, separators=(",", ":")) + "\n```\n\n"
-        "## Rules\n\n" + prompt
+        + classifier_sections(material, "Cases (context per case id)", contexts)
     )
     (output_dir / "PROMPT.md").write_text(text, encoding="utf-8")
     (output_dir / "contexts.json").write_text(json.dumps(contexts, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -103,27 +144,25 @@ def prepare_eval(project_root: Path, output_dir: Path) -> Path:
 
 def score_eval(project_root: Path, decisions_path: Path) -> dict[str, Any]:
     """Validate each decision with the runtime's rules and compare status and ordered capabilities."""
-    by_id, rows, _, _, digest, conflicts, cases, _ = _package(project_root)
-    contexts = _contexts(cases, digest, conflicts)
+    material, cases = _package(project_root)
+    contexts = _contexts(cases, material.digest, material.conflicts)
     document = json.loads(decisions_path.read_text(encoding="utf-8"))
     decisions = document.get("decisions") if isinstance(document, dict) else None
     if not isinstance(decisions, dict):
         raise ValueError("decisions file must be an object with a decisions map")
     failures = []
-    capability_conflicts = {key: cap.conflicts for key, cap in by_id.items()}
     for case in cases:
         identifier, expect = case["id"], case["expect"]
         try:
             if identifier not in decisions:
                 raise ValueError("no decision for this case")
-            route = validate_classification(decisions[identifier], contexts[identifier], by_id)
+            route = validate_classification(decisions[identifier], contexts[identifier], material.by_id)
             got = [selection["capability"] for selection in route["selections"]]
             if route["status"] == "selected":
-                resolve_selection(rows, [s.get("step_id") or s["capability"] for s in route["selections"]],
-                                  set(case["stack_tokens"]), set(), capability_conflicts, conflict_groups=conflicts)
+                route_steps(material, route, set(case["stack_tokens"]))
             if route["status"] != expect["status"] or got != expect["capabilities"]:
                 failures.append({"id": identifier, "expected": expect, "got": {"status": route["status"], "capabilities": got},
                                  "reason": route["reason"]})
         except ValueError as exc:
             failures.append({"id": identifier, "expected": expect, "error": str(exc)})
-    return {"total": len(cases), "passed": len(cases) - len(failures), "catalog_digest": digest, "failures": failures}
+    return {"total": len(cases), "passed": len(cases) - len(failures), "catalog_digest": material.digest, "failures": failures}

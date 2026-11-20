@@ -110,7 +110,7 @@ await test('with every plugin unticked Finish imports nothing, saves the two swi
   await button(page, 'Finish').click();
   await page.locator('nav').waitFor();
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Sync', 'Sync is current');
-  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Sync', 'Activity', 'Settings']);
+  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings']);
   assert.equal(await page.locator('#setup-title').count(), 0);
   assert.equal(await named(app, 'save_plugin').then(c => c.length), 0, 'nothing imported');
   const [settings] = await named(app, 'settings');
@@ -290,6 +290,29 @@ await test('the three steps in the light theme', 'first-run', { colorScheme: 'li
   await button(page, 'Continue').click();
   await step(page, 3, THREE);
   await page.screenshot({ path: shots + '/setup-3-light.png' });
+});
+
+await test('on a long list the footer of the step stays in the window and Continue works from where the list starts', 'first-run', { viewport: { width: 1100, height: 520 } }, async app => {
+  const { page } = app;
+  await toStepTwo(app);
+  // The fake has one plugin installed: forty more rows of its kind make the step taller than the window.
+  await page.evaluate(() => { const list = document.querySelector('.pick'), row = list.querySelector('li'); for (let i = 0; i < 40; i++) list.append(row.cloneNode(true)); });
+  const geometry = () => page.evaluate(() => {
+    const main = document.getElementById('main'), foot = document.querySelector('.setupfoot').getBoundingClientRect(), last = document.querySelector('.pick li:last-child').getBoundingClientRect();
+    return { scrollable: main.scrollHeight > main.clientHeight + 200, footTop: foot.top, footBottom: foot.bottom, lastBottom: last.bottom, height: window.innerHeight };
+  });
+  const scrollTo = top => page.evaluate(y => document.getElementById('main').scrollTo(0, y), top);
+  for (const [where, top] of [['at the start', 0], ['in the middle', 600], ['at the end', 1e6]]) {
+    await scrollTo(top);
+    const g = await geometry();
+    assert.ok(g.scrollable, 'the step is taller than the window');
+    assert.ok(g.footBottom <= g.height + 1 && g.footTop >= 0, `the footer is in the window ${where}: ${JSON.stringify(g)}`);
+    if (top === 1e6) assert.ok(g.lastBottom <= g.footTop + 1, `the last row is not left under the footer: ${JSON.stringify(g)}`);
+    if (top === 600) await page.screenshot({ path: shots + '/setup-2-long.png' });
+  }
+  await scrollTo(0);
+  await button(page, 'Continue').click();
+  await step(page, 3, THREE);
 });
 
 await test('no sideways scroll on a narrow window, and the card fits', 'first-run', { viewport: { width: 400, height: 800 } }, async app => {

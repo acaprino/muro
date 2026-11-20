@@ -120,9 +120,38 @@ fn select_ref(plugin: &Value, repo: &Path, url: &url::Url) -> Result<String> {
         _ => bail!("Invalid version policy"),
     }
 }
+/// The user's home folder: `USERPROFILE` on Windows, `HOME` elsewhere.
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+        .filter(|home| !home.is_empty())
+        .map(PathBuf::from)
+}
+/// A source that is `~`, or starts with `~/` or `~\`, names a place under `home`. Any other
+/// source (`~user` is not the user's own home), or no known `home`, is the path as written.
+fn expand_home(source: &str, home: Option<&Path>) -> PathBuf {
+    let Some(home) = home else {
+        return PathBuf::from(source);
+    };
+    match source.strip_prefix('~') {
+        Some("") => home.to_path_buf(),
+        // Every separator goes: a path that starts with one would replace the home on `join`.
+        Some(rest) if rest.starts_with(['/', '\\']) => {
+            home.join(rest.trim_start_matches(['/', '\\']))
+        }
+        _ => PathBuf::from(source),
+    }
+}
 fn checkout(root: &Path, plugin: &Value) -> Result<(PathBuf, String, String)> {
+    checkout_in(root, plugin, home_dir().as_deref())
+}
+/// `checkout` for a given home folder, which a test sets and the user's own never changes.
+fn checkout_in(
+    root: &Path,
+    plugin: &Value,
+    home: Option<&Path>,
+) -> Result<(PathBuf, String, String)> {
     let source = str_field(plugin, "source")?;
-    let path = Path::new(source);
+    let path = expand_home(source, home);
     if path.is_dir() {
         let path = path.canonicalize()?;
         return Ok((path.clone(), tree_hash(&path)?, "local".into()));
@@ -288,6 +317,53 @@ mod tests {
         ] {
             let plugin = json!({"id":"gone","source":source,"policy":"head","distributions":[]});
             let error = resolve(t.path(), &plugin).unwrap_err();
+            assert_eq!(
+                format!("{error:#}"),
+                format!("Source folder not found: {source}")
+            );
+        }
+        assert!(!t.path().join("sources").exists());
+    }
+    #[test]
+    fn a_leading_tilde_is_the_home_folder() {
+        let home = Path::new("home-folder");
+        for (source, expanded) in [
+            ("~", home.to_path_buf()),
+            ("~/", home.to_path_buf()),
+            ("~/plugins/x", home.join("plugins").join("x")),
+            // Never an absolute path that would replace the home folder when joined.
+            ("~//x", home.join("x")),
+            (r"~\x", home.join("x")),
+        ] {
+            assert_eq!(expand_home(source, Some(home)), expanded, "{source}");
+        }
+        // Other shapes are paths as written: another user's home, a tilde inside a name, and no
+        // home folder to expand to.
+        for source in ["~other/x", "a/~/x", "~x", "/abs/~", "plain"] {
+            assert_eq!(expand_home(source, Some(home)), Path::new(source), "{source}");
+        }
+        assert_eq!(expand_home("~/x", None), Path::new("~/x"));
+    }
+    #[test]
+    fn a_source_under_the_home_folder_is_found_and_a_missing_one_is_not() {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("home");
+        let folder = home.join("plugins").join("x");
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("input.md"), "content").unwrap();
+        let found = json!({"id":"x","source":"~/plugins/x","policy":"head","distributions":[]});
+        let (path, _, version) = checkout_in(t.path(), &found, Some(&home)).unwrap();
+        assert_eq!(path, folder.canonicalize().unwrap());
+        assert_eq!(version, "local");
+        // The home folder itself is a folder: it is the source.
+        let itself = json!({"id":"x","source":"~","policy":"head","distributions":[]});
+        let (path, _, _) = checkout_in(t.path(), &itself, Some(&home)).unwrap();
+        assert_eq!(path, home.canonicalize().unwrap());
+        // A folder that is not there fails as before, with the source as it was written and
+        // without a lookup as a repository.
+        for source in ["~/plugins/missing", r"~\plugins\missing"] {
+            let plugin = json!({"id":"x","source":source,"policy":"head","distributions":[]});
+            let error = checkout_in(t.path(), &plugin, Some(&home)).unwrap_err();
             assert_eq!(
                 format!("{error:#}"),
                 format!("Source folder not found: {source}")

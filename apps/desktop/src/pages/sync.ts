@@ -1,6 +1,6 @@
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
-import type { App, Actions } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan } from '../model.ts';
+import type { App, Actions, TextBox } from '../context.ts';
+import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
@@ -34,7 +34,7 @@ function strip(state:ViewState):string {
  return `<section class="strip ${tone}" aria-label="Sync state"><span class="sico">${ico}</span><div class="grow"><strong>${title}</strong><small>${text}</small><small class="meta"><span>Last check <b>${esc(stamp(last))}</b></span><span>Last sync <b>${esc(stamp(s.sync.last_sync))}</b></span><span>${next}</span></small></div>${button('Check now','check',{icon:'sync',primary:lead&&!a,busy:state.checking,disabled:state.checking||!!a})}${a?'':extra}</section>`;
 }
 /** One plugin on one harness, read by `cellState`: the installed version, or the change the plan holds for it. */
-function cell(state:ViewState,p:Plugin,t:Target):string {
+export function cell(state:ViewState,p:Plugin,t:Target):string {
  const c=cellState(p,t,state.snapshot!,state.plan);
  switch(c.kind){
   case 'ok':return `<span class="cell ok">${icon('check')}<span>${esc(c.to)}</span></span>`;
@@ -195,9 +195,10 @@ function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
  const dialog=app.openDialog(adaptDialog(app.state,p)),form=dialog.querySelector<HTMLFormElement>('#adapt-form')!;
  form.onsubmit=e=>{
   e.preventDefault();const data=new FormData(form),budget=Number(data.get('budget')),harness=String(data.get('harness'));
+  if(engineOf(app.state.snapshot!.registry.settings).harness==='codex')return;   // the dialog says why and its Start is disabled: an Enter in a field starts nothing either
   if(!showErrors(form,Number.isFinite(budget)&&budget>0?{}:{budget:'Enter a budget above zero.'}))return;
   app.closeDialog();
-  void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:app.state.snapshot!.registry.settings.agent,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
+  void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:engineOf(app.state.snapshot!.registry.settings).harness,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
  };
 }
 /** Paints the instructions section of the open plugin dialog again, keeping it open and, when the control that was used lives in it, the keyboard where it was. */
@@ -265,7 +266,7 @@ export const actions:Actions={
  'set-exclusive':(app,d)=>d.id==='keep'||d.id==='remove'?setExclusive(app,d.id):undefined,
  rescan:async app=>{closeMenu(true);await app.run('Reading installed plugins…',()=>app.request<Snapshot>('scan'),v=>app.adopt(v));await app.replan();await app.discover();},
 };
-export function input(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
+export function input(app:App,el:TextBox):boolean {
  if(el.id==='search'){
   // Only the rows are painted again: a full render would take the caret out of the box.
   app.state.query=el.value;const body=document.getElementById('rows');if(body)body.innerHTML=rows(app.state);return true;
@@ -278,7 +279,7 @@ export function input(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
  else if(form&&el.name==='source'&&!form.dataset.named){const name=form.querySelector<HTMLInputElement>('[name=name]');if(name){name.value=lastPart(el.value);clearError(name);}}
  return false;
 }
-export function change(app:App,el:HTMLInputElement|HTMLSelectElement):boolean {
+export function change(app:App,el:TextBox):boolean {
  if(el.name==='filter'&&el.closest('.tools')){app.state.filter=el.value as Filter;app.render();return true;}
  if(el.name==='policy'&&el.closest('dialog')){const pinned=el.closest('dialog')!.querySelector<HTMLElement>('#pinned-field');if(pinned)pinned.hidden=el.value!=='pinned';return true;}
  if(el.name==='excl'){void setExclusive(app,el.value==='remove'?'remove':'keep');return true;}

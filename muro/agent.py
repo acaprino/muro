@@ -36,8 +36,20 @@ def _contract(where: str, allowed: str) -> str:
     )
 
 
+# An environment variable's name in capitals, `^[A-Z_][A-Z0-9_]{0,63}$`: the same rule in `muro-registry`
+# (`ai::validate_key_env`) and in the desktop's settings page. A looser rule read real keys that carry no
+# hyphen (`gsk_...`, `hf_...`, plain letters and digits) as names, and a name is repeated in messages.
+_VARIABLE_NAME = re.compile(r"[A-Z_][A-Z0-9_]{0,63}")
+
+
 def read_api_key(env_name: str | None) -> str:
-    """The key from the named variable, or MURO_API_KEY then OPENAI_API_KEY."""
+    """The key from the named variable, or MURO_API_KEY then OPENAI_API_KEY.
+
+    The name is validated as a variable name before it is used or repeated anywhere: a key pasted
+    here by mistake is refused without being echoed in the error.
+    """
+    if env_name and not _VARIABLE_NAME.fullmatch(env_name):
+        raise ValueError("The key setting must name an environment variable, not hold a key")
     names = [env_name] if env_name else ["MURO_API_KEY", "OPENAI_API_KEY"]
     for name in names:
         value = os.environ.get(name, "")
@@ -49,8 +61,9 @@ def read_api_key(env_name: str | None) -> str:
 def _post_chat(api_base: str, api_key: str, model: str, messages: list[dict[str, str]]) -> str:
     base = api_base.rstrip("/")
     url = base + "/chat/completions"
-    host = urllib.parse.urlsplit(url).hostname or ""
-    if not url.startswith("https://") and host not in {"localhost", "127.0.0.1", "::1"}:
+    parts = urllib.parse.urlsplit(url)
+    # `urlsplit` gives the scheme and the host in lowercase: `HTTPS://` is https, `HTTP://example.com` is not.
+    if parts.scheme not in {"https", "http"} or (parts.scheme == "http" and (parts.hostname or "") not in {"localhost", "127.0.0.1", "::1"}):
         raise ValueError("the endpoint must be https (plain http is allowed only on localhost)")
     payload = json.dumps({"model": model, "messages": messages, "temperature": 0}).encode("utf-8")
     request = urllib.request.Request(url, data=payload, method="POST", headers={
