@@ -220,6 +220,16 @@ async function addToList(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
  if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]});return;}
  await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',{plugin:listedPlugin(p,t),revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`,'good');repaintInstalled(app,t.id);});
 }
+/** The service refuses to remove a harness that a plugin still lists, so the plugins that list it are saved without it first, one after the other, each with the revision the one before returned; then the harness goes. A failure says how many plugins were already taken off it, and those stay saved. */
+async function stopManaging(app:App,t:Target):Promise<Snapshot> {
+ let revision=app.state.snapshot!.registry.revision,last:Snapshot|undefined,detached=0;
+ try{
+  for(const p of app.state.snapshot!.registry.plugins.filter(p=>p.targets.includes(t.id))){
+   last=await app.request<Snapshot>('save_plugin',{plugin:{...p,targets:p.targets.filter(id=>id!==t.id)},revision});revision=last.registry.revision;detached++;
+  }
+  return await app.request<Snapshot>('remove_target',{id:t.id,revision});
+ }catch(e){if(last)app.adopt(last);throw new Error(`${detached?`${plural(detached,'plugin')} no longer ${detached===1?'lists':'list'} ${t.name}. `:''}${t.name} was not removed: ${message(e)}`);}
+}
 /** The one rule for plugins outside the list, for every harness: one `save_target` after the other, each with the revision the one before returned. A harness that has it already is not saved again. It stops at the first one that fails, says how many were saved, and the ones saved stay saved. */
 async function setExclusive(app:App,mode:'keep'|'remove'):Promise<void> {
  const wanted=mode==='remove',targets=app.state.snapshot!.registry.targets.filter(t=>t.exclusive!==wanted);if(!targets.length)return;
@@ -242,7 +252,7 @@ export const actions:Actions={
  'add-target':app=>{closeMenu(true);editTarget(app);},
  'edit-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)editTarget(app,t);},
  'manage-found':(app,d)=>{closeMenu(true);editTarget(app,undefined,foundHarnesses(app.state).find(f=>f.harness===d.id));},
- 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm(`Stop managing ${t.name}?`,'Its plugins stay installed. Muro only stops syncing it.','Stop managing',()=>void app.run('Updating harnesses…',()=>app.request<Snapshot>('remove_target',{id:t.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`Muro no longer manages ${t.name}.`);}),true);},
+ 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm(`Stop managing ${t.name}?`,'Its plugins stay installed. Muro only stops syncing it.','Stop managing',()=>void app.run('Updating harnesses…',()=>stopManaging(app,t),v=>{app.adopt(v);app.notify(`Muro no longer manages ${t.name}.`);}),true);},
  'remove-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)app.confirm(`Remove ${p.name} from your list?`,'It stays installed where it is, unless plugins outside your list are always uninstalled.','Remove',()=>void app.run('Updating your list…',()=>app.request<Snapshot>('remove_plugin',{id:p.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} removed from your list.`);}),true);},
  'add-distribution':(_app,_d,el)=>{const rows=el.closest('form')?.querySelector('#distributions');rows?.insertAdjacentHTML('beforeend',distributionRow());rows?.lastElementChild?.querySelector<HTMLElement>('select')?.focus();},
  'remove-distribution':(_app,_d,el)=>{const row=el.closest('.distribution-row'),next=(row?.nextElementSibling??row?.previousElementSibling)?.querySelector<HTMLElement>('select'),add=el.closest('form')?.querySelector<HTMLElement>('[data-action=add-distribution]');row?.remove();(next??add)?.focus();},

@@ -10,7 +10,8 @@
 //   instructionFiles, instructionStale   the custom-instructions state of every plugin
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
 // installed outside the list), two-harnesses (a change on each of two harnesses), first-run (no harness, two found,
-// one with an installed plugin), demo (the data of the documentation screenshots).
+// one with an installed plugin), demo (the data of the documentation screenshots), demo-synced (the same, everything
+// installed and nothing running: the Sync page after a sync), demo-activity (the demo with a failed check and an automatic sync in its history).
 const ago = minutes => String(Math.floor(Date.now() / 1000) - minutes * 60);
 const build = (harness, version, origin = 'native') => ({ harness, path: `D:/Muro/data/artifacts/${harness}-${version}`, version, origin });
 const harnessTarget = (id, harness, name, extra = {}) => ({ id, harness, name, root: `D:/isolated/${harness}`, executable: harness, enabled: true, exclusive: false, ...extra });
@@ -28,20 +29,23 @@ function scenarioData(scenario) {
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
     case 'first-run': return { ...base, targets: [], installed: {}, found: [foundHarness('claude-code', 'Claude Code', { version: '2.1.4' }), foundHarness('codex', 'Codex')], byHarness: { 'claude-code': [installedPlugin('commit-helper', 'commit-helper', '2.1.0', false)] } };
-    case 'demo': {
+    case 'demo': case 'demo-synced': case 'demo-activity': {
+      const done = scenario === 'demo-synced';
       const targets = [harnessTarget('claude', 'claude-code', 'Claude Code', { root: 'C:/Users/you/.claude', exclusive: true }), harnessTarget('codex', 'codex', 'Codex', { root: 'C:/Users/you/.codex' }), harnessTarget('opencode', 'opencode', 'OpenCode', { root: 'C:/Users/you/.config/opencode' })];
       const plugins = [
         plugin('marionette', 'Marionette', ['claude', 'codex', 'opencode'], [build('claude-code', '0.4.0'), build('codex', '0.4.0'), build('opencode', '0.4.0')], { source: 'github.com/acaprino/marionette', upstream_version: 'v0.4.0' }),
         plugin('commit-helper', 'commit-helper', ['claude', 'codex'], [build('claude-code', '2.1.0'), build('codex', '2.1.0')], { upstream_version: 'v2.1.0' }),
         plugin('test-runner', 'test-runner', ['opencode'], [build('opencode', '1.0.4')], { policy: 'pinned', pinned_version: '1.0.4', upstream_version: 'v1.0.4' }),
-        plugin('docs-writer', 'docs-writer', ['claude', 'opencode'], [build('claude-code', '1.2.0')], { upstream_version: 'v1.2.0' }),
+        plugin('docs-writer', 'docs-writer', ['claude', 'opencode'], [build('claude-code', '1.2.0'), ...(done ? [build('opencode', '1.2.0')] : [])], { upstream_version: 'v1.2.0' }),
         plugin('sql-companion', 'sql-companion', [], [], { policy: 'head', upstream_version: '' }),
       ];
-      const installed = { claude: [installedPlugin('marionette', 'Marionette', '0.3.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0'), installedPlugin('docs-writer', 'docs-writer', '1.2.0'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)], codex: [installedPlugin('marionette', 'Marionette', '0.4.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0')], opencode: [installedPlugin('marionette', 'Marionette', '0.4.0')] };
-      const synced = { claude: { checked: ago(14), synced: ago(1500) }, codex: { checked: ago(14), synced: ago(1500) }, opencode: { checked: ago(14), synced: ago(1500) } };
-      const jobs = [{ id: 'job-1', plugin_id: 'docs-writer', harness: 'opencode', status: 'running', phase: 'harmonization', budget_usd: 2, log_path: 'C:/Users/you/Muro/data/jobs/job-1/log.txt', message: 'Claude Code is adapting the plugin for OpenCode.', time: ago(3) }];
-      const activity = [{ id: 'a1', time: ago(1500), action: 'apply', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
-      return { ...base, auto_sync: true, targets, plugins, installed, found: [foundHarness('pi', 'Pi', { version: '0.9.1' }), foundHarness('hermes', 'Hermes Agent', { version: '0.7.0' })], jobs, activity, sync: { last_check: ago(14), last_sync: ago(1500), revision: null, pending: null, blockers: null, targets: synced } };
+      const installed = { claude: [installedPlugin('marionette', 'Marionette', done ? '0.4.0' : '0.3.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0'), installedPlugin('docs-writer', 'docs-writer', '1.2.0'), ...(done ? [] : [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)])], codex: [installedPlugin('marionette', 'Marionette', '0.4.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0')], opencode: [installedPlugin('marionette', 'Marionette', '0.4.0'), ...(done ? [installedPlugin('test-runner', 'test-runner', '1.0.4'), installedPlugin('docs-writer', 'docs-writer', '1.2.0')] : [])] };
+      const [checkedAgo, syncedAgo] = done ? [3, 3] : [14, 1500];
+      const synced = { claude: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, codex: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, opencode: { checked: ago(checkedAgo), synced: ago(syncedAgo) } };
+      const jobs = done ? [] : [{ id: 'job-1', plugin_id: 'docs-writer', harness: 'opencode', status: 'running', phase: 'harmonization', budget_usd: 2, log_path: 'C:/Users/you/Muro/data/jobs/job-1/log.txt', message: 'Claude Code is adapting the plugin for OpenCode.', time: ago(3) }];
+      const earlier = scenario === 'demo-activity' ? [{ id: 'a0', time: ago(2900), action: 'check', status: 'failed', message: 'Plan calculated; sources not resolved: sql-companion' }] : [], between = scenario === 'demo-activity' ? [{ id: 'a3', time: ago(75), action: 'Automatic sync', status: 'complete', message: '2 changes applied' }] : [];
+      const activity = [...earlier, { id: 'a1', time: ago(1500), action: 'apply', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, ...between, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
+      return { ...base, auto_sync: true, targets, plugins, installed, found: [foundHarness('pi', 'Pi', { version: '0.9.1' }), foundHarness('hermes', 'Hermes Agent', { version: '0.7.0' })], jobs, activity, sync: { last_check: ago(checkedAgo), last_sync: ago(syncedAgo), revision: null, pending: null, blockers: null, targets: synced } };
     }
     default: return { ...base, found: [foundHarness('codex', 'Codex', { version: 'test' })] };
   }
@@ -141,7 +145,13 @@ export function createTransport(scenario = 'default') {
         if (at >= 0) reg.targets[at] = t; else { reg.targets.push(t); installed[t.id] = structuredClone(data.byHarness[t.harness] || []); }
         return bump();
       }
-      case 'remove_target': { mutate(payload); reg.targets = reg.targets.filter(t => t.id !== payload.id); reg.plugins.forEach(p => p.targets = p.targets.filter(id => id !== payload.id)); return bump(); }
+      // The service refuses to remove a harness a plugin still lists (service.rs, "Remove this target from its plugins first").
+      case 'remove_target': {
+        mutate(payload);
+        if (reg.plugins.some(p => p.targets.includes(payload.id))) throw new Error('Remove this target from its plugins first');
+        reg.targets = reg.targets.filter(t => t.id !== payload.id);
+        return bump();
+      }
       case 'settings': {
         if (payload.revision !== reg.revision) throw new Error('Version conflict: the registry changed, reload it');
         if (flags.rejectSettings) throw new Error('Version conflict: settings not saved');
