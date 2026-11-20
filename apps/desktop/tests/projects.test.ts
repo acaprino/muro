@@ -8,7 +8,6 @@ import { frame, modules } from '../src/views.ts';
 import * as projects from '../src/pages/projects.ts';
 import * as inputs from '../src/pages/project/inputs.ts';
 import * as install from '../src/pages/project/install.ts';
-import * as harmonize from '../src/pages/project/harmonize.ts';
 import * as graph from '../src/pages/project/graph.ts';
 import { STEPS, blankProjects, fresh, recall, remember } from '../src/pages/project/state.ts';
 import { createTransport } from './fake-transport.js';
@@ -336,12 +335,12 @@ it('a new project opens on its first step, with no filter', () => {
 });
 
 // ---------- the steps Tasks 7 and 8 build: until then each says so ----------
-test('Harmonize and Graph & simulator are placeholders that say they come in this version, and own no action yet', () => {
-  const state = opened({}, 'harmonize');
-  assert.match(harmonize.view(state, info()), /Harmonize<\/strong><span>Coming in this version/);
+test('Graph & simulator is a placeholder that says it comes in this version, and owns no action yet (Harmonize is built: tests/project-harmonize.test.ts)', () => {
+  const state = opened({}, 'graph');
   assert.match(graph.view(state, info()), /Graph &amp; simulator<\/strong><span>Coming in this version/);
-  assert.deepEqual(Object.keys(harmonize.actions).concat(Object.keys(graph.actions)), []);
-  for (const step of ['harmonize', 'graph'] as const) assert.match(projects.view(opened({}, step)), /Coming in this version/, 'the page shows the module of the step');
+  assert.deepEqual(Object.keys(graph.actions), []);
+  assert.match(projects.view(opened({}, 'graph')), /Coming in this version/, 'the page shows the module of the step');
+  assert.doesNotMatch(projects.view(opened({}, 'harmonize')), /Coming in this version/, 'Harmonize is no placeholder any more');
 });
 test('what a simulation keeps survives a reload through the graph module, and a run in progress does not', () => {
   assert.deepEqual(graph.restoreSim(graph.newSim()), graph.newSim());

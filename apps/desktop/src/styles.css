@@ -320,3 +320,13 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .pinputs .ver small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
 @media (max-width:980px){.steps4{grid-template-columns:repeat(2,1fr)}.pfiles li{grid-template-columns:1fr;gap:2px}}
 @media (forced-colors:active){.steps4 button[aria-selected="true"]{outline:2px solid Highlight}}
+/* Project step 2: the strip and the four views of the harmonization. */
+.dec>li{align-items:flex-start}
+.dec>li>.tag{margin-top:1px;min-width:78px;justify-content:center}
+.dec .grow>*{overflow-wrap:anywhere}
+.dec .to{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+#step-panel .tools .seg{max-width:100%;flex-wrap:wrap}
+#step-panel .tools select{max-width:100%}
+.runs td{vertical-align:top}
+.runs .note{min-width:260px;white-space:pre-line;overflow-wrap:anywhere}
+.prompt{margin:0;padding:12px;flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);font:12px/1.5 "Cascadia Code",Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}

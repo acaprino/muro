@@ -117,12 +117,9 @@ await test('the steps are a tablist with arrow keys: the keyboard goes with the 
   assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'the focused tab has a visible focus');
 });
 
-await test('Harmonize and Graph & simulator are the steps their own tasks fill: each says so', 'projects', {}, async app => {
+await test('Graph & simulator is the step its own task fills: it says so (Harmonize is built, see its section below)', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
-  await tab(page, 'Harmonize').click();
-  await page.getByText('Coming in this version').waitFor();
-  assert.equal(await page.getByRole('tabpanel').getAttribute('aria-labelledby'), 'step-tab-harmonize');
   await tab(page, 'Graph').click();
   assert.equal(await page.getByRole('tabpanel').getAttribute('aria-labelledby'), 'step-tab-graph');
   await page.getByText('Coming in this version').waitFor();
@@ -302,6 +299,171 @@ await test('the light theme keeps the project page readable', 'projects', { colo
   await openMarionette(page);
   await page.getByText('What this project file holds').click();
   await page.screenshot({ path: shots + '/project-light.png' });
+});
+
+// ---------- Plan 2, Task 7: step 2, Harmonize (the project's history and reasons, read only) ----------
+const harmonizeTab = async page => { await openMarionette(page); await tab(page, 'Harmonize').click(); await page.locator('section.strip').waitFor(); };
+const viewRadio = (page, name) => page.getByRole('radiogroup', { name: 'Harmonization views' }).getByRole('radio', { name: new RegExp('^' + name) });
+const choose = async (page, name) => { await viewRadio(page, name).check({ force: true }); await page.getByRole('region', { name }).waitFor(); };
+const flat = async locator => (await locator.innerText()).replace(/\s+/g, ' ').trim();
+const rowsOf = async locator => Promise.all((await locator.all()).map(flat));
+const focused = (page, attribute) => page.evaluate(a => document.activeElement?.getAttribute(a), attribute);
+
+await test('Harmonize: the state strip, the four views as a radio group, the decision records, and nothing to write', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  assert.equal(await page.getByRole('tabpanel').getAttribute('aria-labelledby'), 'step-tab-harmonize');
+  assert.match(await flat(page.locator('section.strip')), /^Harmonized Last run 18 Nov 2026, \d\d:\d\d Version 0\.5\.0 Agent Claude Code$/);
+  assert.deepEqual(await page.getByRole('radiogroup', { name: 'Harmonization views' }).locator('label').allTextContents(), ['Decision records · 2', 'Choices by part · 6', 'History · 2', 'Prompts']);
+  assert.equal(await viewRadio(page, 'Decision records').isChecked(), true);
+  assert.deepEqual(await rowsOf(page.locator('.dec > li')), ['By Muro 2026-11-10 · design-taste One owner per output.', 'Yours · binding 2026-11-12 · office-docs Documents keep the source\'s limits.']);
+  assert.equal(await page.getByRole('button', { name: /^(Edit|Add a record|Add input|Harmonize|Harmonize again|Move pin)$/ }).count(), 0, 'the write side is plan 3');
+  assert.equal(await page.locator('#step-panel button').count(), 0, 'nothing to press in the records');
+  await page.screenshot({ path: shots + '/project-harmonize-records.png' });
+});
+
+await test('Harmonize, Choices by part: filter by input and by form, the count, links to capabilities, and the filters are kept', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await choose(page, 'Choices by part');
+  const count = () => flat(page.locator('#step-panel .tools strong'));
+  assert.equal(await count(), '6 of 6');
+  assert.equal((await rowsOf(page.locator('.dec > li')))[0], 'Capability taste-skill SKILL.md Its method is a design capability. → design-taste');
+  const link = page.locator('.dec .to button').first();
+  assert.deepEqual([await link.getAttribute('data-action'), await link.getAttribute('data-id'), await link.getAttribute('aria-label')], ['open-capability', 'design-taste', 'Open capability design-taste']);
+  assert.deepEqual(await page.getByLabel('Filter by input').locator('option').allTextContents(), ['All inputs', 'taste-skill', 'genoffice', 'superpowers']);
+  assert.deepEqual(await page.getByRole('radiogroup', { name: 'Filter by form' }).locator('label').allTextContents(), ['All', 'Capability', 'Always on', 'Hook', 'Dropped']);
+  await page.getByLabel('Filter by input').selectOption('genoffice');
+  await page.locator('#step-panel .tools strong', { hasText: '2 of 6' }).waitFor();
+  assert.deepEqual((await rowsOf(page.locator('.dec > li'))).map(t => t.split(' ').slice(0, 3).join(' ')), ['Capability genoffice skills/docx', 'Hook genoffice hooks/guard.json']);
+  await page.getByRole('radiogroup', { name: 'Filter by form' }).getByRole('radio', { name: 'Hook' }).check({ force: true });
+  await page.locator('#step-panel .tools strong', { hasText: '1 of 6' }).waitFor();
+  assert.equal(await focused(page, 'value'), 'hook', 'the radio keeps the focus');
+  assert.equal(await page.getByLabel('Filter by input').inputValue(), 'genoffice', 'the input filter is still chosen');
+  assert.deepEqual(await kept(page).then(r => [r.view, r.dsrc, r.dform]), ['choices', 'genoffice', 'hook']);
+  await page.getByLabel('Filter by input').selectOption('superpowers');
+  await page.getByText('No choice matches this filter.').waitFor();
+  assert.equal(await page.locator('.dec').count(), 0);
+  assert.equal(await count(), '0 of 6');
+  await page.getByLabel('Filter by input').selectOption('');
+  await page.getByRole('radiogroup', { name: 'Filter by form' }).getByRole('radio', { name: 'All' }).check({ force: true });
+  await page.locator('#step-panel .tools strong', { hasText: '6 of 6' }).waitFor();
+  assert.equal(await page.locator('.dec > li').count(), 6);
+  await page.screenshot({ path: shots + '/project-harmonize-choices.png' });
+});
+
+await test('Harmonize: the arrow keys move between the views and the radio keeps the keyboard', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await viewRadio(page, 'Decision records').focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('region', { name: 'Choices by part' }).waitFor();
+  assert.equal(await viewRadio(page, 'Choices by part').isChecked(), true);
+  assert.equal(await focused(page, 'value'), 'choices');
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('region', { name: 'History' }).waitFor();
+  assert.equal(await focused(page, 'value'), 'history');
+  await page.keyboard.press('ArrowLeft');
+  await page.getByRole('region', { name: 'Choices by part' }).waitFor();
+  assert.equal(await focused(page, 'value'), 'choices');
+});
+
+await test('Harmonize, History: one row a run with its version and tag, changelog, result, budget and engine', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await choose(page, 'History');
+  assert.deepEqual(await page.locator('.runs th').allTextContents(), ['When', 'Version', 'Changelog', 'Result', 'Budget', 'Engine']);
+  const rows = await rowsOf(page.locator('.runs tbody tr'));
+  assert.equal(rows.length, 2);
+  assert.match(rows[0], /^18 Nov 2026, \d\d:\d\d 0\.5\.0 current marionette-v0\.5\.0 Moved taste-skill to v1\.2\.0\. Built and validated \$2\.00 Claude Code$/, 'the newest first, its tag from the repository\'s prefix');
+  assert.match(rows[1], /^10 Nov 2026, \d\d:\d\d 0\.4\.0 marionette-v0\.4\.0 First harmonization\. Built and validated — —$/, 'no budget and no engine recorded');
+  const region = page.getByRole('region', { name: 'Runs' });
+  await region.focus();
+  assert.equal(await focused(page, 'aria-label'), 'Runs', 'the table can be scrolled with the keyboard');
+  assert.equal(await page.getByRole('button', { name: /Edit|Harmonize|Cancel/ }).count(), 0);
+  await page.screenshot({ path: shots + '/project-harmonize-history.png' });
+});
+
+await test('Harmonize, History: a project with no repository has no tag', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ pickPath: 'D:/Notes/Notes.mp' });
+  await goProjects(page);
+  await page.getByRole('button', { name: 'Open project file…' }).click();
+  await page.locator('li.go', { hasText: 'Notes' }).getByRole('button').click();
+  await page.getByRole('heading', { name: 'Notes', level: 1 }).waitFor();
+  await tab(page, 'Harmonize').click();
+  await choose(page, 'History');
+  const rows = await rowsOf(page.locator('.runs tbody tr'));
+  assert.match(rows[0], /^18 Nov 2026, \d\d:\d\d 0\.5\.0 current Moved taste-skill/, 'no line with a tag');
+  assert.equal(await page.locator('.runs small').count(), 0);
+});
+
+await test('Harmonize, Prompts: each prompt with an Open that shows its text in a sheet, and the focus goes in and comes back', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await choose(page, 'Prompts');
+  const items = await rowsOf(page.locator('#step-panel li'));
+  assert.equal(items.length, 4);
+  assert.match(items[0], /^intake\.md Reads the inputs, classifies what they do and extracts capabilities with their provenance\. Open$/);
+  assert.deepEqual(await page.locator('#step-panel li button').evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Open intake.md', 'Open harmonizer.md', 'Open delivery.md', 'Open classify.md']);
+  await page.getByRole('button', { name: 'Open intake.md' }).click();
+  const sheet = page.getByRole('dialog', { name: 'intake.md' });
+  await sheet.waitFor();
+  assert.equal(await sheet.evaluate(d => d.classList.contains('sheet')), true, 'a sheet, on the right');
+  assert.equal(await sheet.locator('pre.prompt').textContent(), '# intake.md\n\nThe prompt.');
+  assert.equal(await page.evaluate(() => !!document.activeElement?.closest('dialog')), true, 'the focus is in the sheet');
+  let reached = false;
+  for (let i = 0; i < 3 && !reached; i++) { await page.keyboard.press('Tab'); reached = await page.evaluate(() => !!document.activeElement?.classList.contains('prompt')); }
+  assert.equal(reached, true, 'the text can be reached with the keyboard, to scroll it');
+  await page.screenshot({ path: shots + '/project-harmonize-prompt.png' });
+  await page.keyboard.press('Escape');
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await focused(page, 'aria-label'), 'Open intake.md', 'the focus returns to the button that opened the sheet');
+  await page.getByRole('button', { name: 'Open classify.md' }).click();
+  await page.getByRole('dialog', { name: 'classify.md' }).getByRole('button', { name: 'Close' }).click();
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await focused(page, 'aria-label'), 'Open classify.md');
+});
+
+await test('Harmonize: the view and its filters survive a reload, and a stored filter for an input the project lacks shows all', 'projects', {}, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await choose(page, 'Choices by part');
+  await page.getByLabel('Filter by input').selectOption('genoffice');
+  await page.locator('#step-panel .tools strong', { hasText: '2 of 6' }).waitFor();
+  await page.reload();
+  await page.locator('nav').waitFor();
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.locator('#step-panel .tools strong', { hasText: '2 of 6' }).waitFor();
+  assert.equal(await viewRadio(page, 'Choices by part').isChecked(), true);
+  assert.equal(await page.getByLabel('Filter by input').inputValue(), 'genoffice');
+  await page.evaluate(() => { const r = JSON.parse(sessionStorage.getItem('muro.project')); r.dsrc = 'vanished'; sessionStorage.setItem('muro.project', JSON.stringify(r)); });
+  await page.reload();
+  await page.locator('nav').waitFor();
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  await page.locator('#step-panel .tools strong', { hasText: '6 of 6' }).waitFor();
+  assert.equal(await page.getByLabel('Filter by input').inputValue(), '');
+});
+
+await test('Harmonize at 760px: no sideways scroll in any view, every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  for (const name of ['Decision records', 'Choices by part', 'History', 'Prompts']) {
+    await choose(page, name);
+    assert.ok(await sideways(page) <= 0, name);
+    const unnamed = await page.evaluate(() => [...document.querySelectorAll('#step-panel button, #step-panel select, #step-panel input, #step-panel [tabindex]')].filter(e => !(e.getAttribute('aria-label') || e.textContent.trim() || [...(e.labels ?? [])].some(l => l.textContent.trim()))).length);
+    assert.equal(unnamed, 0, `${name}: every control is named`);
+  }
+  await choose(page, 'Choices by part');
+  await page.screenshot({ path: shots + '/project-harmonize-760.png' });
+});
+
+await test('Harmonize in the light theme stays readable', 'projects', { colorScheme: 'light' }, async app => {
+  const { page } = app;
+  await harmonizeTab(page);
+  await choose(page, 'Choices by part');
+  await page.screenshot({ path: shots + '/project-harmonize-light.png' });
 });
 
 console.log('PASS: ' + done.join('; '));
