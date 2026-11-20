@@ -80,15 +80,21 @@ pub fn is_included(data: &Path, id: &str, path: &str) -> bool {
     id == DEFAULT_ID && same_file(path) == same_file(&default_file(data).to_string_lossy())
 }
 
+/// A listed project that cannot be read, as the page shows it: its id and path, the reason, and whether it is
+/// the one Muro ships (that entry cannot be removed from the list, readable or not).
+fn failed(data: &Path, id: &str, path: &str, error: &str) -> Value {
+    json!({"id":id,"path":path,"error":error,"included":is_included(data, id, path)})
+}
+
 /// The summary of one listed file as the page shows it: its id and path, and what `info --summary` says,
 /// or the reason it cannot be read. A file that is gone is not worth a factory run.
 fn summary(factory: &Factory, data: &Path, id: &str, path: &str) -> Result<Value> {
     if !Path::new(path).is_file() {
-        return Ok(json!({"id":id,"path":path,"error":missing(path)}));
+        return Ok(failed(data, id, path, &missing(path)));
     }
     let read = factory.project_info(Path::new(path), &cache_dir(data), true)?;
     if let Some(error) = read["error"].as_str() {
-        return Ok(json!({"id":id,"path":path,"error":error}));
+        return Ok(failed(data, id, path, error));
     }
     let mut shown = read;
     shown["id"] = json!(id);
@@ -111,7 +117,7 @@ pub fn projects(data: &Path) -> Result<Value> {
         let (id, path) = (item["id"].as_str().unwrap_or(""), item["path"].as_str().unwrap_or(""));
         // A file the factory cannot read at all (it crashed, it ran out of time) is that project's own
         // error: it must not hide the others from the list.
-        shown.push(summary(&factory, data, id, path).unwrap_or_else(|error| json!({"id":id,"path":path,"error":format!("{error:#}")})));
+        shown.push(summary(&factory, data, id, path).unwrap_or_else(|error| failed(data, id, path, &format!("{error:#}"))));
     }
     Ok(json!(shown))
 }

@@ -96,7 +96,7 @@ fn the_list_has_a_summary_for_each_project_in_order_and_one_bad_file_is_its_own_
     assert_eq!(shown[0]["plugin"]["slug"], "good");
     assert_eq!((shown[0]["inputs"].as_u64(), shown[0]["runs"].as_u64()), (Some(1), Some(6)));
     assert!(shown[0]["digest"].as_str().unwrap().len() == 64 && shown[0].get("error").is_none());
-    assert_eq!(shown[1], json!({"id":"broken","path":broken,"error":"Not a Muro project file: it is not a zip archive"}));
+    assert_eq!(shown[1], json!({"id":"broken","path":broken,"error":"Not a Muro project file: it is not a zip archive","included":false}));
     assert!(shown[2]["error"].as_str().unwrap().starts_with("The project file is missing"), "{}", shown[2]);
     assert!(shown[2].get("plugin").is_none());
     assert_eq!(shown[3]["plugin"]["slug"], "other", "a bad file does not hide the ones after it");
@@ -827,6 +827,10 @@ fn only_the_copy_muro_put_in_its_own_folder_is_included_whatever_a_file_says_of_
     assert_eq!(home.call("project", json!({"id":"foreign"})).unwrap()["included"], false);
     let opened = home.call("open_project", json!({"path":home.file("opened.mp", json!({"plugin":plugin("Opened","opened"),"builtin":true}))})).unwrap();
     assert_eq!(opened["included"], false);
+    // the shipped copy, when it cannot be read, is still the one that stays in the list
+    fs::write(&kept, b"{ not a project").unwrap();
+    let unreadable = home.call("projects", json!({})).unwrap();
+    assert_eq!((unreadable[0]["included"].as_bool(), unreadable[0]["error"].is_string()), (Some(true), true), "{}", unreadable[0]);
     // a project of the person's own that holds the id marionette elsewhere is not the shipped one
     let mine = home.file("mine.mp", json!({"plugin":plugin("Mine","marionette")}));
     assert!(!projects::is_included(&home.data, "marionette", &mine.to_string_lossy()));
