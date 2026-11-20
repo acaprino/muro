@@ -34,7 +34,7 @@ function strip(state:ViewState):string {
  return `<section class="strip ${tone}" aria-label="Sync state"><span class="sico">${ico}</span><div class="grow"><strong>${title}</strong><small>${text}</small><small class="meta"><span>Last check <b>${esc(stamp(last))}</b></span><span>Last sync <b>${esc(stamp(s.sync.last_sync))}</b></span><span>${next}</span></small></div>${button('Check now','check',{icon:'sync',primary:lead&&!a,busy:state.checking,disabled:state.checking||!!a})}${a?'':extra}</section>`;
 }
 /** One plugin on one harness, read by `cellState`: the installed version, or the change the plan holds for it. */
-function cell(state:ViewState,p:Plugin,t:Target):string {
+export function cell(state:ViewState,p:Plugin,t:Target):string {
  const c=cellState(p,t,state.snapshot!,state.plan);
  switch(c.kind){
   case 'ok':return `<span class="cell ok">${icon('check')}<span>${esc(c.to)}</span></span>`;

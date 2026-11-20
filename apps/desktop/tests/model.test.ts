@@ -254,9 +254,9 @@ test('sameOperations compares the operations of two plans in any order, and neve
 
 const stripOf=(html:string)=>html.match(/<section class="strip[\s\S]*?<\/section>/)?.[0]||'';
 const actionsOf=(html:string)=>html.match(/data-action="[a-z-]+"/g)?.map(a=>a.slice(13,-1));
-test('the frame is an app bar with three tabs and a state button, no sidebar; Sync is current',()=>{
+test('the frame is an app bar with four tabs and a state button, no sidebar; Sync is current',()=>{
  const html=frame(viewState(snapshot()));
- assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,4,'three tabs and the state button');
+ assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,5,'four tabs and the state button');
  assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
  assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="appbar">/);assert.match(html,/<main id="main"/);
 });

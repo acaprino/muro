@@ -5,6 +5,7 @@ import { dlHead } from './sheets.ts';
 import { watchTheme } from './look.ts';
 import { serial } from './queue.ts';
 import { esc } from './ui.ts';
+import { blankProjects, recall, remember } from './pages/project/state.ts';
 
 /** How often the open window reads the registry again while it has the focus: the background worker and the tray change it behind the window's back. */
 export const REFRESH_MS=30_000;
@@ -12,7 +13,7 @@ export const REFRESH_MS=30_000;
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
 export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,['discover']);
- const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null};
+ const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
  const dialog=document.createElement('dialog');dialog.tabIndex=-1;document.body.append(dialog);
  const toasts=document.createElement('div');toasts.id='toasts';toasts.setAttribute('role','status');toasts.setAttribute('aria-live','polite');document.body.append(toasts);
  let disposed=false,polling=false,planning:Promise<void>|null=null,again=false,confirmed:(()=>void)|null=null;
@@ -38,7 +39,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
    else if(key!=='#main')want='';
   }
   const opened=[...root.querySelectorAll('details[open][id]')].map(d=>d.id),top=root.querySelector('#main')?.scrollTop||0,across=root.querySelector('.tablewrap')?.scrollLeft||0;
-  root.innerHTML=frame(state);
+  root.innerHTML=frame(state);remember(state.project);
   opened.forEach(id=>document.getElementById(id)?.setAttribute('open',''));
   const main=root.querySelector<HTMLElement>('#main');if(main)main.scrollTop=top;const wrap=root.querySelector('.tablewrap');if(wrap)wrap.scrollLeft=across;
   if(state.busy)root.querySelectorAll<HTMLButtonElement>('button[data-action]:not([data-action=page])').forEach(b=>b.disabled=true);
@@ -88,7 +89,8 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
  const app:App={state,request,render,run,notify,reload,replan,adopt,discover,openDialog,closeDialog,confirm};
 
  const go=(page:Page)=>{state.page=page;render();void modules[page].opened?.(app);};
- const actions:Actions={page:(_app,d)=>{if(d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload()};
+ // The Projects tab, clicked while a project is open, goes back to the list.
+ const actions:Actions={page:(_app,d)=>{if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload()};
  for(const [name,m] of Object.entries(modules))for(const [action,fn] of Object.entries(m.actions)){if(action in actions)throw new Error(`The action "${action}" of the ${name} page is already declared`);actions[action]=fn;}
 
  const click=(e:Event)=>{
@@ -99,9 +101,10 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   e.preventDefault();void Promise.resolve().then(()=>fn(app,el.dataset,el)).catch(fail);
  };
  const route=(hook:'input'|'change')=>(e:Event)=>{const el=e.target;if(!(el instanceof HTMLInputElement||el instanceof HTMLSelectElement))return;for(const m of Object.values(modules))if(m[hook]?.(app,el))return;};
- root.addEventListener('click',click);root.addEventListener('input',route('input'));root.addEventListener('change',route('change'));
+ const keys=(e:KeyboardEvent)=>{for(const m of Object.values(modules))if(m.keydown?.(app,e))return;};
+ root.addEventListener('click',click);root.addEventListener('input',route('input'));root.addEventListener('change',route('change'));root.addEventListener('keydown',keys);
  dialog.addEventListener('click',e=>{if(e.target===dialog&&!state.applying)closeDialog();else click(e);});
- dialog.addEventListener('input',route('input'));dialog.addEventListener('change',route('change'));
+ dialog.addEventListener('input',route('input'));dialog.addEventListener('change',route('change'));dialog.addEventListener('keydown',keys);
  // An apply cannot be dismissed half way; any other dialog closes with Escape.
  dialog.addEventListener('cancel',e=>{if(state.applying)e.preventDefault();});
  dialog.addEventListener('close',()=>{confirmed=null;want=opener;sticky=true;render();});

@@ -2,14 +2,15 @@ import type { ViewState, Page } from './types.ts';
 import type { PageModule } from './context.ts';
 import { syncHeadline, stamp } from './model.ts';
 import { icon, esc, plural, spin, button, head, empty } from './ui.ts';
+import * as projects from './pages/projects.ts';
 import * as sync from './pages/sync.ts';
 import * as activity from './pages/activity.ts';
 import * as settings from './pages/settings.ts';
 import * as setup from './pages/setup.ts';
 
 /** The page modules: what each page shows and the actions, events and first-paint hook it brings. app.ts merges them. */
-export const modules:Record<Page|'setup',PageModule>={sync,activity,settings,setup};
-const tabs=[['sync','sync','Sync'],['activity','clock','Activity'],['settings','sliders','Settings']] as const;
+export const modules:Record<Page|'setup',PageModule>={projects,sync,activity,settings,setup};
+const tabs=[['projects','box','Projects'],['sync','sync','Sync'],['activity','clock','Activity'],['settings','sliders','Settings']] as const;
 
 /** The state button of the app bar: the strip's headline in a few words, and when it was last checked. */
 function stateButton(state:ViewState):string {
@@ -29,6 +30,6 @@ export function frame(state:ViewState):string {
  const s=state.snapshot,first=!!s&&setup.needed(state),running=s?.jobs?.filter(j=>j.status==='running').length||0,waiting=s?syncHeadline(s,state.plan).operations:0;
  const badge:Record<string,[number,string]>={sync:[waiting,`${plural(waiting,'change')} waiting`],activity:[running,`${plural(running,'run')} in progress`]};
  const nav=first?'':`<nav aria-label="Main">${tabs.map(([id,ico,label])=>{const [n,what]=badge[id]||[0,''];return `<button type="button" data-action="page" data-id="${id}" ${state.page===id?'aria-current="page"':''} ${n?`aria-label="${label}, ${what}"`:''}>${icon(ico)}<span class="label">${label}</span>${n?`<span class="n" aria-hidden="true">${n}</span>`:''}</button>`;}).join('')}</nav>`;
- const page=!s?`<div class="page narrow">${head('Sync','Your plugins and the harnesses they are installed in.')+empty(state.busy?'Opening your registry…':'Registry not available',state.error||'Loading local data.',button('Try again','refresh'))}</div>`:first?setup.view(state):`<div class="page ${state.page==='sync'?'':'narrow'}">${modules[state.page].view(state)}</div>`;
+ const page=!s?`<div class="page narrow">${head('Sync','Your plugins and the harnesses they are installed in.')+empty(state.busy?'Opening your registry…':'Registry not available',state.error||'Loading local data.',button('Try again','refresh'))}</div>`:first?setup.view(state):`<div class="page ${state.page==='sync'||state.page==='projects'?'':'narrow'}">${modules[state.page].view(state)}</div>`;
  return `<a class="skip" href="#main">Skip to content</a><header class="appbar"><img class="logo" src="/muro-logo.png" alt="Muro">${nav}${s&&!first?stateButton(state):''}</header><main id="main" class="main" tabindex="-1" aria-busy="${!!state.busy}">${banners(state)}${page}</main>`;
 }

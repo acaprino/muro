@@ -9,10 +9,14 @@
 //   autostartUnsupported         autostart answers supported:false
 //   instructionFiles, instructionStale   the custom-instructions state of every plugin
 //   staleSettings (n)            the next n settings requests are refused as the service refuses a stale revision
+//   Projects: pickPath           what the shell's file dialog answers (a path, or null for a cancelled dialog)
+//             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
+//             rejectInstall      install_project fails ("no build for <harness>"); installAssigns: it also sets the harness as a target of the plugin
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
 //   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision.
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
-// installed outside the list), recorded / recorded-ok / recorded-errors / recorded-unseen (a check the window did not make: one change
+// installed outside the list), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
+// not yet installed on any), recorded / recorded-ok / recorded-errors / recorded-unseen (a check the window did not make: one change
 // waiting, nothing to do, a source not checked, a removal no cell shows), two-harnesses (a change on each of two harnesses), first-run (no harness, two found,
 // one with an installed plugin), demo (the data of the documentation screenshots), demo-synced (the same, everything
 // installed and nothing running: the Sync page after a sync), demo-activity (the demo with a failed check and an automatic sync in its history).
@@ -22,6 +26,47 @@ const harnessTarget = (id, harness, name, extra = {}) => ({ id, harness, name, r
 const plugin = (id, name, targets, distributions, extra = {}) => ({ id, name, source: `github.com/example/${id}`, policy: 'stable', pinned_version: '', targets, distributions, upstream_version: 'v' + (distributions[0]?.version ?? ''), ...extra });
 const installedPlugin = (id, name, version, managed = true) => ({ id: 'native-' + id, registry_id: managed ? id : undefined, name, version, path: `D:/plugins/${id}`, managed });
 const foundHarness = (harness, name, extra = {}) => ({ harness, name, executable: harness, version: '1.0.0', config_root: `D:/config/${harness}`, available: true, supported: true, ...extra });
+
+// A small project in the shape of `muro project info`, Marionette-like: three inputs, six choices, two records, two runs, the four prompts, two entries and four capabilities.
+// Tasks 7 and 8 read the same data: the history, the records, the choices and the graph.
+function projectInfo(name, slug, { builtin = false } = {}) {
+  const decisions = [
+    { source: 'taste-skill', content: 'SKILL.md', form: 'capability', targets: ['design-taste'], reason: 'Its method is a design capability.' },
+    { source: 'taste-skill', content: 'references/anti-slop.md', form: 'capability', targets: ['design-taste'], reason: 'Read by the capability on demand.' },
+    { source: 'taste-skill', content: 'README.md', form: 'dropped', targets: [], reason: 'Describes the repository, not a method.' },
+    { source: 'genoffice', content: 'skills/docx', form: 'capability', targets: ['office-docs'], reason: 'Produces Word files.' },
+    { source: 'genoffice', content: 'hooks/guard.json', form: 'hook', targets: ['office-docs'], reason: 'The source declares it for every session.' },
+    { source: 'superpowers', content: 'skills/using-superpowers', form: 'always-on', targets: [], reason: 'Acts in every session.' },
+  ];
+  const became = id => { const n = { capability: 0, 'always-on': 0, hook: 0, dropped: 0 }; for (const d of decisions) if (d.source === id) n[d.form]++; return n; };
+  const inputs = [
+    { id: 'taste-skill', url: 'https://github.com/example/taste-skill', pin: 'release', release: 'v1.2.0', commit: 'abcdef1234567890', license: 'MIT', paths: ['skills'] },
+    { id: 'genoffice', url: 'https://github.com/example/genoffice', pin: 'head', release: null, commit: '0123456789abcdef', license: 'Apache-2.0', paths: ['skills'] },
+    { id: 'superpowers', url: 'https://github.com/example/superpowers', pin: 'static', release: null, commit: 'fedcba9876543210', license: 'MIT', paths: ['skills'] },
+  ].map(i => ({ ...i, became: became(i.id) }));
+  const capability = (id, title) => ({ id, title, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: title, excludes: '' }], needs: [], conflicts: [] });
+  return {
+    project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' } : null, builtin },
+    plugin: { name, slug, version: '0.5.0', description: `${name}, one plugin` },
+    inputs, decisions,
+    records: [{ id: 'r1', date: '2026-11-10', subjects: ['design-taste'], text: 'One owner per output.', author: 'muro', binding: false }, { id: 'r2', date: '2026-11-12', subjects: ['office-docs'], text: 'Documents keep the source\'s limits.', author: 'you', binding: true }],
+    history: [{ id: 'run-2', time: '2026-11-18T12:00:00Z', version: '0.5.0', status: 'completed', budget_usd: 2, engine: 'claude-code', pins: { 'taste-skill': 'v1.2.0' }, changelog: 'Moved taste-skill to v1.2.0.' }, { id: 'run-1', time: '2026-11-10T09:00:00Z', version: '0.4.0', status: 'completed', budget_usd: null, engine: null, pins: { 'taste-skill': 'v1.1.0' }, changelog: 'First harmonization.' }],
+    changelog: '## 0.5.0\n\nMoved taste-skill to v1.2.0.\n', prompts: ['intake.md', 'harmonizer.md', 'delivery.md', 'classify.md'].map(file => ({ file, text: `# ${file}\n\nThe prompt.` })),
+    graph: {
+      entries: [{ name: `${slug}-design`, description: 'Use when designing an interface.', capabilities: ['design-taste', 'design-review'] }, { name: `${slug}-office`, description: 'Use when producing Word files.', capabilities: ['office-docs', 'office-pdf'] }],
+      capabilities: [capability('design-taste', 'Design taste'), capability('design-review', 'Design review'), capability('office-docs', 'Office documents'), capability('office-pdf', 'Office PDF')],
+      examples: [{ id: 'ex-1', title: 'A landing page', task: 'Design a landing page', status: 'selected' }, { id: 'ex-2', title: 'A letter', task: 'Write a letter as a Word file', status: 'selected' }],
+    },
+    files: [
+      { part: 'Identity', path: 'sources.json · plugin', detail: `The final plugin: ${name}, installed as ${slug}, version 0.5.0` },
+      { part: 'Choices', path: 'delivery.json', detail: '6 decisions: what each part of each input became, and why' },
+      { part: 'Your instructions', path: 'custom-instructions/', detail: 'house-style.md' },
+      { part: 'Built plugin', path: 'release/', detail: 'Ready to install on every harness, with its guide' },
+    ],
+    digest: 'sha256:' + slug.padEnd(8, '0'),
+  };
+}
+const summaryOf = (id, path, info) => ({ id, path, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
 function scenarioData(scenario) {
   const idle = { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, errors: null, targets: {} };
@@ -35,6 +80,7 @@ function scenarioData(scenario) {
     case 'recorded-ok': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0) };
     case 'recorded-errors': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0, { errors: 1 }) };
     case 'recorded-unseen': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] }, sync: recorded(1) };
+    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Marionette', 'marionette', { builtin: true }) }] };
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
@@ -63,10 +109,11 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0 };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installAssigns: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
+  const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
   const STALE = 'Registry revision changed; refresh before saving';   // the service's own words
   const log = (action, status, message) => activity.push({ id: 'a' + ++activityNumber + 'x', time: ago(0), action, status, message });
@@ -115,6 +162,21 @@ export function createTransport(scenario = 'default') {
     if (!only) Object.assign(sync, { last_check: time, revision: reg.revision, pending: operations.length, blockers: blockers.length });
     return structuredClone(plan);
   }
+  const projectOf = id => { const p = projects.find(x => x.id === id); if (!p) throw new Error('Project not found: ' + id); return p; };
+  // The runtime's install_project (plan 2, Task 5): the project's build for each harness is put in the list as the plugin named by its slug. It sets no target unless flags.installAssigns.
+  function installProject({ id, harnesses }) {
+    if (flags.rejectInstall) throw new Error(`The project has no build for ${harnesses[0]}`);
+    const project = projectOf(id);
+    for (const h of harnesses) if (!project.adapters.includes(h)) throw new Error(`The project has no build for ${h}`);
+    const { slug, name, version } = project.info.plugin, distributions = harnesses.map(h => build(h, version));
+    let made = reg.plugins.find(p => p.project === id);
+    if (made) made.distributions = distributions;
+    else reg.plugins.push(made = plugin(slug, name, [], distributions, { project: id, source: 'project:' + id, upstream_version: 'v' + version }));
+    if (flags.installAssigns) for (const t of reg.targets) if (harnesses.includes(t.harness) && !made.targets.includes(t.id)) made.targets.push(t.id);
+    reg.revision++;
+    return { plugin_id: made.id };
+  }
+  const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
   async function apply(payload) {
     if (flags.applyDelay) await new Promise(done => setTimeout(done, flags.applyDelay));
     if (flags.rejectApply) throw new Error('The harness refused the change');
@@ -152,6 +214,20 @@ export function createTransport(scenario = 'default') {
         return { snapshot: snapshot(), plan, errors };
       }
       case 'apply': return apply(payload);
+      case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info));
+      case 'project': return structuredClone(projectOf(payload.id).info);
+      case 'open_project': {
+        if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
+        const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();
+        const known = projects.find(p => p.id === id);
+        if (known) return summaryOf(known.id, known.path, known.info);
+        const info = projectInfo(file, id), added = { id, path: payload.path, adapters: ['claude-code', 'codex'], info };
+        projects.push(added);
+        return summaryOf(id, added.path, info);
+      }
+      case 'install_project': return installProject(payload);
+      case 'pick_file': { unknownShellAction(action); return { path: flags.pickPath }; }
+      case 'open_folder': { unknownShellAction(action); return { opened: true }; }
       case 'save_plugin': {
         mutate(payload);
         if (payload.adopt) adopt(payload);

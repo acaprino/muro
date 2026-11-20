@@ -110,7 +110,7 @@ await test('with every plugin unticked Finish imports nothing, saves the two swi
   await button(page, 'Finish').click();
   await page.locator('nav').waitFor();
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Sync', 'Sync is current');
-  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Sync', 'Activity', 'Settings']);
+  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings']);
   assert.equal(await page.locator('#setup-title').count(), 0);
   assert.equal(await named(app, 'save_plugin').then(c => c.length), 0, 'nothing imported');
   const [settings] = await named(app, 'settings');

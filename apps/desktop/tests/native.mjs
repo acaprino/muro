@@ -151,7 +151,7 @@ try {
   assert.ok(Number(second.targets[id].checked) > Number(synced.targets[id].checked), 'the harness was checked again');
   assert.equal(second.last_sync, synced.last_sync, 'a check that applies nothing leaves Last sync alone');
   await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
-  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Sync', 'Activity', 'Settings']);
+  assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings']);
   assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 1, 'still one plugin: a second plan changed nothing');
   checks.push('a second Check shows "Everything is in sync" with Last check and the harness\'s checked time moved, and Last sync as it was');
 

@@ -27,7 +27,7 @@ export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'
 export interface CellStatus { kind:CellKind; from?:string; to?:string }
 const cell=(kind:CellKind,from?:string,to?:string):CellStatus=>({kind,...(from?{from}:{}),...(to?{to}:{})});
 /** The operation kinds the service plans: each one is a change waiting to be applied. */
-const CHANGES=new Set<string>(['install','update','reinstall','activate','remove']);
+export const CHANGES=new Set<string>(['install','update','reinstall','activate','remove']);
 /** One plugin on one target: the operation of a current plan for that pair, otherwise what the snapshot shows. A removal is only ever read from a plan, because a harness with a blocker gets none. */
 export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Plan|null):CellStatus {
   if(!target.enabled) return cell('paused');
