@@ -75,6 +75,24 @@ dove fare cosa", "manca tutta questa parte di gestione progetti".
    background se avviato deve fare monitor dei plugin delle harness e
    assicurarsi che siano aggiornati e sync con configurazione in muro del
    catalogo".
+10. **The simulator, and two ways to reach the AI.** The simulator of a
+    free-text request is wanted ("voglio il simulatore"). And "muro deve
+    funzionare sia con harness locale con mcp, quindi usando l'harness, o
+    tramite openai like api": every AI job of the app (simulating a request,
+    harmonizing a project) runs either through a coding agent installed on
+    the computer, which reaches the factory through `muro mcp` (ADR-0022), or
+    through an OpenAI-compatible endpoint, as `muro agent` does (ADR-0022:
+    key from an environment variable only, plain `http` refused off
+    localhost).
+11. **A binding record is proven by the AI's recorded judgment** (owner,
+    2026-11-20). After a harmonization the AI states, for each binding record,
+    whether it was followed and why, naming the capability or choice that
+    applies it. Muro shows that answer beside the record and does not accept
+    a run whose answer is missing.
+12. **A `.mp` is one zip archive** ("archivio zip unico", 2026-11-20). Muro
+    unpacks it to work on it and packs it again after a change. Git sees one
+    binary file: the differences between two versions of a project are shown
+    by Muro (its history and changelog), not by Git.
 
 The mockup is the reference for layout, flows and wording. Its numbers for
 Marionette are read from `examples/marionette`.
@@ -217,7 +235,5 @@ What follows replaces the sentences marked above and adds to the list.
 
 ## Not decided
 
-- Whether a simulation of a free-text request, which needs the AI and costs a
-  call, is offered beside the documented examples.
-- How the app proves that a binding record was followed: a factory check, or an
-  AI judgment recorded with its reason.
+Nothing open on 2026-11-20: decisions 10 to 12 settled the three questions that
+were.
