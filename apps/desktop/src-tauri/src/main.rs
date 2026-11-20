@@ -18,7 +18,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tauri::{
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
@@ -225,11 +225,16 @@ impl Background {
     }
 }
 
+/// The event the page listens to: the window was shown again. WebView2 gives the page no focus
+/// event for a window that comes back from the notification area, so the page is told.
+const SHOWN: &str = "muro-shown";
+
 fn show_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        let _ = window.emit(SHOWN, ());
     }
 }
 

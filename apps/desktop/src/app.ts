@@ -10,7 +10,7 @@ import { esc } from './ui.ts';
 export const REFRESH_MS=30_000;
 
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
-export function mountApp(root:HTMLElement,transport:Transport):()=>void {
+export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,['discover']);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null};
  const dialog=document.createElement('dialog');dialog.tabIndex=-1;document.body.append(dialog);
@@ -125,6 +125,8 @@ export function mountApp(root:HTMLElement,transport:Transport):()=>void {
  const refreshTimer=setInterval(()=>{if(document.hasFocus())void refreshIfIdle();},REFRESH_MS);
  const focused=()=>void refreshIfIdle();
  window.addEventListener('focus',focused);
+ // The shell says when it shows the window again: the page gets no focus event then (WebView2). `shown` is the host's way to hear it, and returns how to stop.
+ const stopShown=shown?.(focused);
  const jobTimer=setInterval(async()=>{
   if(polling||state.busy||dialog.open||!state.snapshot?.jobs?.some(j=>j.status==='running'))return;
   polling=true;
@@ -132,5 +134,5 @@ export function mountApp(root:HTMLElement,transport:Transport):()=>void {
   catch(e){fail(e);}finally{polling=false;}
  },3000);
  void reload().then(()=>{if(state.snapshot){void discover();void modules[state.page].opened?.(app);}});
- return ()=>{disposed=true;stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);document.removeEventListener('keydown',keydown);dialog.remove();toasts.remove();root.replaceChildren();};
+ return ()=>{disposed=true;stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();document.removeEventListener('keydown',keydown);dialog.remove();toasts.remove();root.replaceChildren();};
 }
