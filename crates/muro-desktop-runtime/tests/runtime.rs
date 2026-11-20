@@ -653,6 +653,29 @@ fn tray_pause_item_offers_the_opposite_of_the_setting() {
     assert_eq!(tray::pause_label(&json!({"settings":{}})), "Resume automatic sync");
 }
 
+/// The state line after the tray could not save the change its item offered: it names that
+/// change, from the settings read before the save.
+#[test]
+fn tray_says_which_change_of_automatic_sync_could_not_be_saved() {
+    let with = |auto: Value| json!({"settings":{"auto_sync":auto}});
+    let (on, off) = (with(json!(true)), with(json!(false)));
+    assert_eq!(tray::pause_failed(&on), "Could not pause, try again");
+    assert_eq!(tray::pause_failed(&off), "Could not resume, try again");
+    // Settings that could not be read at all: the change is not known, and the line says so.
+    for unknown in [json!({}), json!({"settings":{}}), json!(null)] {
+        assert_eq!(
+            tray::pause_failed(&unknown),
+            "Could not change automatic sync, try again",
+            "{unknown}"
+        );
+    }
+    // The failed change is the one the item offered: its first word, the verb, is in the line.
+    for status in [&on, &off] {
+        let verb = tray::pause_label(status).split(' ').next().unwrap().to_lowercase();
+        assert!(tray::pause_failed(status).to_lowercase().contains(&verb), "{status}");
+    }
+}
+
 /// The local clock is the machine's, so the test cannot name an hour: it checks the shape, and
 /// that a minute later is a minute later (an epoch on a whole UTC hour sits at a quarter hour
 /// in every time zone there is).

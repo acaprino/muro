@@ -170,17 +170,34 @@ impl Background {
     }
 
     /// Flips `auto_sync` in the saved settings; the registry checks the revision. It waits for
-    /// a sync in progress like any request, here on the thread the menu gave it.
-    fn toggle_pause(&self) -> anyhow::Result<()> {
-        let status = self.backend.client.request("status", json!({}))?;
-        let mut settings = status["settings"].clone();
-        settings["auto_sync"] = json!(settings["auto_sync"] != true);
-        self.backend.request(
-            "settings",
-            json!({"revision":status["revision"],"settings":settings}),
-        )?;
-        self.refresh();
-        Ok(())
+    /// a sync in progress like any request, here on the thread the menu gave it. When the save
+    /// fails the state line says which change did not happen, and Activity gets the error.
+    fn toggle_pause(&self) {
+        let status = self.backend.client.request("status", json!({}));
+        let read = status.as_ref().map_or(Value::Null, Value::clone);
+        let saved = status.and_then(|status| {
+            let mut settings = status["settings"].clone();
+            settings["auto_sync"] = json!(settings["auto_sync"] != true);
+            self.backend.request(
+                "settings",
+                json!({"revision":status["revision"],"settings":settings}),
+            )
+        });
+        match saved {
+            Ok(_) => self.refresh(),
+            Err(error) => {
+                let line = tray::pause_failed(&read);
+                eprintln!("Automatic sync: {error:#}");
+                // The line stands until the next poll writes it; a Muro that quits keeps its own.
+                if !self.backend.gate.is_quitting() {
+                    let _ = self.state.set_text(line);
+                }
+                let _ = self.backend.client.request(
+                    "automation_record",
+                    json!({"error":format!("{line}: {error:#}")}),
+                );
+            }
+        }
     }
 
     /// Ends Muro without cutting a sync off: none starts from now on, the one in progress ends
@@ -388,11 +405,7 @@ fn main() {
                     }
                     "pause" => {
                         let work = for_menu.clone();
-                        std::thread::spawn(move || {
-                            if let Err(error) = work.toggle_pause() {
-                                eprintln!("Automatic sync: {error:#}");
-                            }
-                        });
+                        std::thread::spawn(move || work.toggle_pause());
                     }
                     "quit" => for_menu.quit(app),
                     _ => {}
