@@ -23,53 +23,67 @@ Muro is a Windows desktop app that looks after the coding agents on your compute
 The same engine is a harmonizer. Muro's factory absorbs pinned skills and plugins from several sources into one package with its own catalog, coordinator and release for every harness. [Marionette](#marionette-muro-as-a-harmonizer) is the package this repository builds as an example.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/plugins-dark.png">
-  <img src="docs/assets/screenshots/plugins-light.png" alt="Muro's Plugins page: five plugins with their version, harnesses and status. Marionette is selected and its detail says a newer version is ready to install.">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/screenshots/sync-changes-dark.png">
+  <img src="docs/assets/screenshots/sync-changes-light.png" alt="Muro's Sync page after a check: plugins are rows, harnesses are columns, and three changes are ready to apply. Marionette is updated from 0.3.0 to 0.4.0 on Claude Code, test-runner is installed on OpenCode, and old-snippets, which is not in the list, is removed from Claude Code. docs-writer has no version for OpenCode yet.">
 </picture>
 
-<sub>Screenshots use demo data. This one follows your GitHub theme: Muro's default look, Smooth, has a dark and a light theme.</sub>
+<sub>Screenshots use demo data. This one follows your GitHub theme: Muro has a dark and a light theme.</sub>
 
 ## What Muro does
 
+Muro is one window with three tabs: **Sync**, **Activity** and **Settings**.
+
 ### Harness manager
 
-Muro finds the coding agents installed on this computer and manages the ones you pick. For each harness it knows where the plugin configuration lives, which program runs it and what is installed.
+Muro finds the coding agents installed on this computer and manages the ones you pick, in the first run or later with **Add harness**. A harness is a column of the Sync table. For each one Muro knows where its plugin configuration lives, which program runs it and what is installed.
 
-- **Found on this computer** lists every agent detected through [Mukade](https://github.com/acaprino/mukade). **Manage with Muro** adds one; **Add harness** covers one it did not find.
-- **Installed plugins** shows what a harness has, including plugins outside your list. **Add to my list** imports one.
-- For each harness you can pause management, or turn on **exclusive sync** so that plugins outside your list are uninstalled there.
+- **Add harness** lists every agent detected through [Mukade](https://github.com/acaprino/mukade) and also takes one by hand.
+- A column header opens the harness's sheet: its configuration folder and executable, **Keep this harness in sync** (off pauses it), the rule for plugins outside your list on this harness, and **Installed here**, which shows plugins outside your list too; **Add to my list** imports one. **Stop managing** removes the column and leaves the plugins installed.
 
-<img src="docs/assets/screenshots/harnesses.png" alt="Harnesses page: Claude Code, Codex and OpenCode managed by Muro; Pi, Hermes Agent and DeepSeek found on this computer." width="880">
+<img src="docs/assets/screenshots/harness.png" alt="The sheet of the Claude Code harness over the Sync page: name, configuration folder, executable, Keep this harness in sync, Always uninstall plugins that are not in my list, and what is installed there, with old-snippets marked as not in the list and an Add to my list button." width="880">
 
 ### Plugin sync
 
-Your list says which plugin goes on which harness. **Sync** compares it with what is actually installed and lists every change (install, update, remove) with its reason, before anything happens.
+Your list says which plugin goes on which harness. The strip at the top of **Sync** is the state of all of it, and it is always visible: when it was last checked, when it was last synced, and how many changes are waiting. **Check now** compares the list with what is actually installed and lists every change (install, update, remove) with its reason, before anything happens.
 
-- Nothing changes until you press **Apply changes**. Muro first checks that your list, the inventories and the prepared builds are still the ones it compared.
+- Nothing changes until you press **Apply all N changes**. Muro first checks that your list, the inventories and the prepared builds are still the ones it compared; if they are not, or if something is not ready, it opens **Review** instead.
+- A plugin that is not ready (no build for one of its harnesses, or a harness that cannot be read) does not stop the rest: **Review** lists it under **Not ready yet** and applies what is ready. On a harness with such a problem nothing is uninstalled.
 - A check right after a sync finds nothing to do.
-- **Automatic sync** (Settings) runs the same check on an interval while Muro is open, also from the notification area, and applies it without asking: removals on exclusive harnesses included. It stops only on a blocker.
 
-<img src="docs/assets/screenshots/sync.png" alt="Sync page: three changes. Marionette is updated from 0.3.0 to 0.4.0 on Claude Code, test-runner is installed on OpenCode, and old-snippets, which is not in the list, is removed from Claude Code." width="880">
+<img src="docs/assets/screenshots/sync-in-sync.png" alt="Sync page after a sync: Everything is in sync, with the last check and last sync times, and every plugin's installed version in each harness column." width="880">
+
+<img src="docs/assets/screenshots/review.png" alt="The Review changes sheet: Marionette is updated on Claude Code, old-snippets is removed from it, test-runner is installed on OpenCode, and docs-writer is listed under Not ready yet because OpenCode has no version of it." width="880">
+
+### Background
+
+Muro can stay in the notification area and keep your harnesses in line without a window.
+
+- **Start Muro when Windows starts** (Settings → Background) starts it in the notification area, with no window. Closing the window leaves Muro there unless you turn off **Keep running when the window is closed**; **Quit Muro** in the tray menu ends it, after the sync in progress.
+- At start and then at every interval (every hour by default) Muro resolves your plugins' sources, reads every harness and records the result, so the tray icon and the Sync page say how things stand. With **Automatic sync** on it also applies what is ready, removals on harnesses set to *Always uninstall* included; with it off it only checks, and the tray says how many changes are waiting.
+- The tray menu has **Open Muro**, **Sync now**, **Pause automatic sync** and **Quit Muro**.
+- **Activity** lists what Muro did, newest first, with the adaptations that are running, and filters for Sync, AI adaptation and Problems.
+
+<img src="docs/assets/screenshots/settings.png" alt="Settings: Sync, Background, Appearance, AI adaptation and Maintenance, each with its controls, saved as you change them." width="880">
+
+<img src="docs/assets/screenshots/activity.png" alt="Activity: an AI adaptation of docs-writer for OpenCode is running, with a Cancel button, above the checks and syncs Muro did and a check that failed." width="880">
 
 ### Plugin updater
 
-Every plugin follows an update policy: latest stable release, a pinned version or the latest commit. **Check for updates** reads the plugin's source, records the upstream version and revision, and takes the native build the source publishes for each harness. Sync then installs the new version.
+Every plugin follows an update policy: latest stable release, a pinned version or the latest commit. **Check now** reads every plugin's source, records the upstream version and revision, and takes the native build the source publishes for each harness; **Check for updates** in a plugin's dialog does the same for that one plugin. Sync then installs the new version.
 
-- The plugin's detail says what to do next, for example *A newer version is ready to install* with **Review in Sync**.
-- **Plan a reinstall**, under **More actions**, puts back the last verified build, not whatever the source holds today.
+- The *Latest version* column shows what the source offers, and each harness cell shows what is installed there, or the change that is waiting, such as **Update 0.3.0 → 0.4.0**.
+- **Plan a reinstall**, under **More** in a plugin's dialog, puts back the last verified build, not whatever the source holds today.
 - **Settings → Maintenance** verifies the stored builds and deletes the ones nothing uses.
 
 ### AI adaptation
 
-A plugin with no build for one of its harnesses shows **Needs preparing**. **Adapt with AI** has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+A plugin with no build for one of its harnesses shows **No version** in that cell. **Adapt with AI**, under **More** in the plugin's dialog, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
 
 <img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
 
-### Two looks
+### Theme
 
-Smooth is the default, with a dark and a light theme that follow your system. Classic, Muro's original look, is one choice away in **Settings → Appearance**. Muro remembers both choices.
-
-<img src="docs/assets/screenshots/classic.png" alt="The Plugins page in the Classic look: dark, square corners, capitals in the table header." width="880">
+Muro has one look, with a dark and a light theme that follow your system. **Settings → Appearance** sets System, Light or Dark, and Muro remembers it.
 
 ## Install
 
@@ -84,45 +98,52 @@ To build Muro from source, see [desktop setup](docs/desktop.md#run-from-source).
 
 ## First steps
 
-<img src="docs/assets/screenshots/first-use.png" alt="First use: the Plugins page shows three steps. Add a harness is done, Add a plugin is the current step with its button, Sync comes next." width="880">
+The first time Muro opens, and until it manages a harness, three steps take the place of the tabs.
 
-1. **Add a harness.** On **Harnesses**, press **Manage with Muro** on a harness Muro found, or **Add harness**. Its configuration folder is where the harness keeps its settings: for OpenCode the folder of `opencode.json`, for Pi the folder of `settings.json`.
-2. **Add a plugin.** On **Plugins**, press **Add plugin**, give its source (a repository, a marketplace entry or a folder) and tick the harnesses it goes on. Then press **Check for updates** in its detail.
-3. **Sync.** On **Sync**, press **Check for changes**, read the list, then **Apply changes**.
+1. **Pick the agents Muro manages.** Muro lists the coding agents it found, with the folder where each keeps its plugin configuration (for OpenCode the folder of `opencode.json`, for Pi the folder of `settings.json`). Nothing is ticked for you.
 
-The Plugins page shows these three steps, with the button for the next one, until your first plugin is installed.
+   <img src="docs/assets/screenshots/first-run-1.png" alt="First run, step 1 of 3: Which coding agents does Muro manage? Claude Code is ticked and Codex is not, each with its configuration folder, and a Continue button." width="880">
+
+2. **Keep what is installed.** The plugins already on those harnesses become your list; untick the ones you do not want.
+
+   <img src="docs/assets/screenshots/first-run-2.png" alt="First run, step 2 of 3: Start from what is installed. commit-helper, installed on Claude Code, is ticked, with Back and Continue buttons." width="880">
+
+3. **Keep them in sync by itself?** Two switches: automatic sync, and start with Windows. Both are offered on; turn off what you do not want, then **Finish**.
+
+   <img src="docs/assets/screenshots/first-run-3.png" alt="First run, step 3 of 3: Keep them in sync by itself? Automatic sync and Start Muro when Windows starts, both on, with Back and Finish buttons." width="880">
+
+Then, on **Sync**, **Add plugin**: give its source (a repository, a marketplace entry or a folder) and tick the harnesses it goes on. Press **Check now**, read the strip, and press **Apply all**.
 
 ## Usage examples
 
 ### One plugin on every harness
 
-1. **Add plugin**, tick Claude Code, Codex and OpenCode under **Install on**, then **Save plugin**.
-2. In the plugin's detail, **Check for updates**: Muro records the upstream version and the native build for each harness.
-3. **Sync** → **Check for changes** → **Apply changes**.
+1. **Add plugin**, give its source, tick Claude Code, Codex and OpenCode under **Install on**, then **Add plugin**.
+2. **Check now**: Muro records the upstream version and the native build for each harness.
+3. Read the strip, then **Apply all**.
 
 ### Keep everything up to date
 
-- **Check for updates** in a plugin's detail looks for a newer version under its update policy.
-- On **Plugins**, the **Update available** filter shows what is behind; **Sync** lists every update and **Apply changes** installs them.
-- Or turn on **Settings → Sync → Automatic sync** and choose how often it runs. Each run checks every plugin for updates and applies the changes.
+- **Check now** looks for a newer version of every plugin under its update policy. The **Needs action** filter shows the plugins with a change waiting, and **Review** lists every update before **Apply all** installs them.
+- Or turn on **Settings → Background → Automatic sync** and choose how often it runs. Each run checks every plugin for updates and applies the changes.
 
 ### A plugin on a harness it was not made for
 
-In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, it shows **Needs preparing**.
+In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, its OpenCode cell shows **No version**.
 
-1. In its detail, press **Adapt with AI**. The harness without a build is preselected; set the maximum budget.
-2. Follow the job in **Activity**. When it succeeds, the new build appears in the plugin's detail.
-3. **Sync** installs it.
+1. Open the plugin, then **More → Adapt with AI**. The harness without a build is preselected; set the maximum budget.
+2. Follow the job in **Activity**. When it succeeds, the cell shows the new version.
+3. **Apply all** installs it.
 
 Adaptation runs Claude Code, chosen under **Settings → AI adaptation**, and has a real inference cost.
 
 ### Remove what you did not choose
 
-On a harness, open **Settings** and tick **Exclusive sync: uninstall plugins that are not in my list**. The next check in **Sync** lists the removals; nothing is uninstalled until you apply. To keep one of those plugins, open **Installed plugins** on that harness and press **Add to my list**.
+Under **Installed, not in your list**, or in **Settings → Sync**, choose **Always uninstall**: at every sync Muro removes from each harness what is installed there but is not in your list. A harness can differ in its own sheet. The next check lists the removals, each marked *Removed at the next sync*; nothing is uninstalled until you apply, or until automatic sync does. To keep one of those plugins, press **Add to my list** beside it.
 
 ### Your own instructions for a plugin
 
-In the plugin's detail, open **Custom instructions** → **Open folder** and write Markdown notes there. Press **Reload files**, then **Adapt with AI** again for each harness listed under *Instructions changed*. The AI decides whether each note becomes session guidance, a capability or a hook, and records why. See [custom instructions](docs/custom-instructions.md).
+Open the plugin, then **More → Open instructions folder**, and write Markdown notes there. Press **Reload files** under **Custom instructions**, then **More → Adapt with AI** again for each harness listed under *Instructions changed*. The AI decides whether each note becomes session guidance, a capability or a hook, and records why. See [custom instructions](docs/custom-instructions.md).
 
 ### From the command line
 
@@ -131,7 +152,8 @@ Everything the app does is a request to `muroctl`, in the `tools` folder of the 
 ```powershell
 .\tools\muroctl.exe request snapshot     # your list, what is installed, the activity
 .\tools\muroctl.exe request scan         # read the plugins of every harness again
-.\tools\muroctl.exe request plan         # the changes a sync would make
+.\tools\muroctl.exe request check        # resolve the sources, then the changes a sync would make
+.\tools\muroctl.exe request plan         # the changes a sync would make, without resolving the sources
 .\tools\muroctl.exe request apply --input .\apply.json   # {"plan_id": "<the id plan returned>"}
 .\tools\mukade.exe harnesses             # the coding agents found on this computer
 ```
@@ -140,7 +162,7 @@ Everything the app does is a request to `muroctl`, in the `tools` folder of the 
 
 ### Marionette: Muro as a harmonizer
 
-Marionette is an example of how Muro works as a harmonizer. The factory absorbed 17 pinned sources, skills and plugins for web and product design, motion, Office files, explainers, research papers, engineering method and prose, into **one package**: 37 capabilities, one coordinator and a release for every supported harness. Overlapping skills were merged and their conflicts resolved, and each capability states what it produces and which checks prove it. At run time the host AI classifies each request by meaning, Python validates the plan, and the steps run one capability at a time, each handing its outputs to the next. Marionette stands in for the 63 skills it absorbed: they are not installed beside it.
+Marionette is an example of how Muro works as a harmonizer. The factory absorbed 16 pinned sources, skills and plugins for web and product design, motion, Office files, explainers, research papers, engineering method and prose, into **one package**: 37 capabilities, one coordinator and a release for every supported harness. Overlapping skills were merged and their conflicts resolved, and each capability states what it produces and which checks prove it. At run time the host AI classifies each request by meaning, Python validates the plan, and the steps run one capability at a time, each handing its outputs to the next. Marionette stands in for the 63 skills it absorbed: they are not installed beside it.
 
 <img src="docs/assets/screenshots/marionette-guide.png" alt="Marionette's offline guide with one example path selected: a landing page with scroll animations goes through Visual Direction, Motion Principles and GSAP ScrollTrigger Implementation, with the outputs each step hands to the next." width="880">
 
@@ -149,7 +171,7 @@ Marionette is an example of how Muro works as a harmonizer. The factory absorbed
 | You ask | Marionette runs |
 | --- | --- |
 | Design a new landing page, define its scroll animations and implement them in our GSAP project | Visual direction → Motion principles → GSAP ScrollTrigger |
-| Design our new product's landing page in Figma; we have no content outline yet | Visual direction → Figma design |
+| Design our new product's landing page in Figma; we have no content outline yet | Visual direction → Canvas design |
 | Convert this Word document to PDF without changing its content | Office files |
 | A clickable prototype of our new app's onboarding, with no brand yet, checked before delivery | Aesthetic direction → UI prototype → Design review |
 | Find the original paper on a method and explain it so that I really understand it | Paper search → HTML explanation |
@@ -157,9 +179,9 @@ Marionette is an example of how Muro works as a harmonizer. The factory absorbed
 | My idea for a shared rate limiter: a brief, the design document, then the plan and its execution | Concept brief → Design document → Implementation plan → Plan execution |
 | Make this email to a client sound natural, adding nothing | Text humanize |
 
-These are 8 of the 25 [reviewed examples](examples/marionette/guide-examples.json) the guide shows. Marionette also carries a session policy made from **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**, plus [one instruction of its owner](examples/marionette/custom-instructions/recap-adhd.md): complete, focused work and replies that are easy to act on. The complete adapter loads it through the host's system or developer channel, before any skill is chosen. A code-change review, a whole-repository audit, a ledger of deliberate shortcuts and an explanation of the working method stay separate tasks you can ask for. See the [integration record](docs/verification/2026-11-12-marionette-ponytail-adhd.md).
+These are 8 of the 26 [reviewed examples](examples/marionette/guide-examples.json) the guide shows. Marionette also carries a session policy made from **[Ponytail v5.3.3](https://github.com/DietrichGebert/ponytail/tree/v5.3.3)** and **[i-have-adhd v0.4.1](https://github.com/ayghri/i-have-adhd/tree/v0.4.1)**, plus [one instruction of its owner](examples/marionette/custom-instructions/recap-adhd.md): complete, focused work and replies that are easy to act on. The complete adapter loads it through the host's system or developer channel, before any skill is chosen. A code-change review, a whole-repository audit, a ledger of deliberate shortcuts and an explanation of the working method stay separate tasks you can ask for. See the [integration record](docs/verification/2026-11-12-marionette-ponytail-adhd.md).
 
-**Install it.** Download `marionette-<version>.zip` and its `.sha256` from the [releases](https://github.com/acaprino/muro/releases), tagged `marionette-v<version>`. Unzip it and follow `INSTALL.md` in the adapter folder of your harness. For Claude Code:
+**Install it.** Download `marionette-<version>.zip` and its `.sha256` from the [releases](https://github.com/acaprino/marionette/releases) of its own repository, tagged `marionette-v<version>` (0.2.0 to 0.4.0 are among [Muro's releases](https://github.com/acaprino/muro/releases)). Unzip it and follow `INSTALL.md` in the adapter folder of your harness. For Claude Code:
 
 ```sh
 claude plugin marketplace add <unzipped folder>/marionette/adapters/claude-code
@@ -340,12 +362,15 @@ python -m pytest -q tests/test_<area>.py
 python muro_build.py --manifest examples/marionette/sources.json --validate
 cargo test -p muro-registry -p muro-desktop-runtime
 npm test
+npx tsc --noEmit
 node apps/desktop/tests/browser.mjs
 ```
 
+The two tests that drive the real executable, `native.mjs` and `native-shell.mjs`, are described in [the desktop app in detail](docs/desktop.md#verification).
+
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
 
-The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release; Marionette releases are published on request.
+The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release. Marionette is released on request: the `Release Marionette` workflow builds it and opens a pull request in [acaprino/marionette](https://github.com/acaprino/marionette), and merging that pull request publishes the release there.
 
 [Routing verification](docs/verification/2026-11-09-ai-owned-routing.md) · [Guide verification](docs/verification/2026-11-10-release-html-guide.md) · [Routing eval and development principles](docs/adr/ADR-0015-design-principles-from-first-real-use.md)
 

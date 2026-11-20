@@ -115,7 +115,7 @@ def test_landing_strategy_runs_before_motion_when_both_are_selected(package, tmp
     assert step["capability"] == "visual-direction"
     assert "offer" in step["required_outputs"]
     assert "page_outline" in step["required_outputs"]
-    assert "the one main action" in step["instructions"]
+    assert "one primary CTA, never competing CTAs above the fold" in step["instructions"]
     assert "Put proof directly beside the claim it supports" in step["instructions"]
 
 
@@ -129,13 +129,13 @@ def test_scroll_request_with_stated_behavior_needs_no_motion_or_design_step(pack
 
 def test_figma_task_uses_figma_capability_without_assuming_mcp(package, tmp_path):
     coordinator = Coordinator(package, tmp_path / "consumer")
-    selected = ["visual-direction", "figma-design"]
+    selected = ["visual-direction", "canvas-design"]
     result = proposed(coordinator, "Design a landing page in Figma", selected)
     assert result["plan"] == selected
     step = coordinator.confirm("Design a landing page in Figma", result["plan"])
     assert step["required_outputs"] == list(PAGE_OUTPUTS)
     nxt = Coordinator(package, tmp_path / "consumer").record(dict(PAGE_OUTPUTS), step["map_id"], step["capability"])
-    assert nxt["capability"] == "figma-design"
+    assert nxt["capability"] == "canvas-design"
     assert "Figma MCP" in nxt["instructions"]
     assert "do not simulate" in nxt["instructions"]
 

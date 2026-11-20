@@ -1,55 +1,138 @@
-import type { Transport, ViewState, Snapshot, Discovered, Plan, Maintenance, Page, Plugin, Target, Job } from './types.ts';
-import { frame, registryRows, found } from './views.ts';
-import { watchLook, saveLook, currentLook, currentTheme, storedLook, storedTheme } from './look.ts';
-import { esc, button, field } from './ui.ts';
-import { pluginForm, targetForm, distributionRow, readPlugin, readTarget } from './forms.ts';
-import { harnessNames } from './model.ts';
+import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
+import type { App, Actions } from './context.ts';
+import { frame, modules } from './views.ts';
+import { dlHead } from './sheets.ts';
+import { watchTheme } from './look.ts';
+import { serial } from './queue.ts';
+import { esc } from './ui.ts';
 
-export function mountApp(root:HTMLElement,request:Transport):()=>void {
- const state:ViewState={page:'registry',snapshot:null,discovered:[],discovering:false,plan:null,selected:null,query:'',filter:'all',busy:null,error:null,discoveryError:null,maintenance:null};
- const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','Edit');document.body.append(dialog);
- const toast=document.createElement('div');toast.className='toast';toast.setAttribute('role','status');toast.setAttribute('aria-live','polite');document.body.append(toast);
- let toastTimer:ReturnType<typeof setTimeout>|undefined,disposed=false,polling=false;
- const notify=(text:string)=>{toast.textContent=text;clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.textContent='',5000);};
- const snapshot=(s:Snapshot)=>{state.snapshot={...s,jobs:s.jobs??state.snapshot?.jobs,data_dir:s.data_dir??state.snapshot?.data_dir};if(!s.registry.plugins.some(p=>p.id===state.selected))state.selected=s.registry.plugins[0]?.id||null;};
- const stopLook=watchLook();
- // A render replaces the page: the control that had the keyboard focus is found again by what it does.
- const focusKey=(el:Element|null)=>{if(!(el instanceof HTMLElement)||!root.contains(el))return '';if(el.id)return '#'+CSS.escape(el.id);return ['page','action','filter','plugin','id'].map(k=>el.dataset[k]?`[data-${k}="${CSS.escape(el.dataset[k]!)}"]`:'').join('');};
- const render=()=>{if(disposed)return;const opened=[...root.querySelectorAll('details[open][id]')].map(d=>d.id),focused=focusKey(document.activeElement);root.innerHTML=frame(state);opened.forEach(id=>document.getElementById(id)?.setAttribute('open',''));if(focused)root.querySelector<HTMLElement>(focused)?.focus();if(state.busy)root.querySelectorAll<HTMLButtonElement>('button[data-action]').forEach(b=>b.disabled=true);if(state.discovering){const b=root.querySelector<HTMLButtonElement>('[data-action=rescan]');if(b)b.disabled=true;}};
- async function run<T>(label:string,work:()=>Promise<T>,after?:(value:T)=>void):Promise<void>{if(state.busy)return;state.busy=label;state.error=null;render();try{const result=await work();after?.(result);}catch(e){state.error=String(e instanceof Error?e.message:e);}finally{state.busy=null;render();}}
- async function reload(){await run('Reading your registry…',()=>request<Snapshot>('snapshot'),snapshot);}
- // Off the Harnesses page only the sidebar count changes: a full render would take the caret out of the search box.
- async function discover(){if(state.discovering)return;state.discovering=true;state.discoveryError=null;render();try{state.discovered=await request<Discovered[]>('discover');}catch(e){state.discoveryError=String(e);}finally{state.discovering=false;if(state.page==='harness')render();else{const count=root.querySelector('#found-count');if(count)count.textContent=found(state);}}};
- const go=(page:Page)=>{state.page=page;render();if(page==='harness'&&!state.discovered.length&&!state.busy)void discover();};
- function open(html:string){dialog.innerHTML=html;if(!dialog.open)dialog.showModal();}
- async function saveForm(action:string,payload:Record<string,unknown>){const form=dialog.querySelector('form');if(!form||form.getAttribute('aria-busy')==='true')return;form.setAttribute('aria-busy','true');form.querySelectorAll<HTMLButtonElement>('button').forEach(b=>b.disabled=true);const error=dialog.querySelector('#form-error');if(error)error.textContent='';try{snapshot(await request<Snapshot>(action,{...payload,revision:state.snapshot!.registry.revision}));state.plan=null;dialog.close();render();notify('Saved');}catch(e){if(error)error.textContent=String(e instanceof Error?e.message:e);}finally{form.removeAttribute('aria-busy');form.querySelectorAll<HTMLButtonElement>('button').forEach(b=>b.disabled=false);}}
- function editPlugin(plugin?:Plugin){open(pluginForm(state.snapshot!,plugin));const form=dialog.querySelector('form')!,policy=form.querySelector<HTMLSelectElement>('[name=policy]')!;policy.onchange=()=>{dialog.querySelector<HTMLElement>('#pinned-field')!.hidden=policy.value!=='pinned';};
-  // A field the browser refuses inside closed Advanced would block Save with nothing to see.
-  form.addEventListener('invalid',e=>(e.target as Element).closest('details')?.setAttribute('open',''),true);dialog.querySelector('form')!.onsubmit=e=>{e.preventDefault();try{void saveForm('save_plugin',{plugin:readPlugin(e.currentTarget as HTMLFormElement,plugin)});}catch(error){dialog.querySelector('#form-error')!.textContent=String(error instanceof Error?error.message:error);}};}
- function editTarget(target?:Target,found?:Discovered){open(targetForm(target,found));dialog.querySelector('form')!.onsubmit=e=>{e.preventDefault();void saveForm('save_target',{target:readTarget(e.currentTarget as HTMLFormElement,target)});};}
- function confirm(title:string,text:string,label:string,work:()=>Promise<void>,danger=false){open(`<h2>${esc(title)}</h2><p>${esc(text)}</p><div class="actions"><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn ${danger?'danger':'primary'}" id="confirm">${esc(label)}</button></div>`);dialog.querySelector<HTMLButtonElement>('#confirm')!.onclick=()=>{dialog.close();void work();};}
- async function calculate(reinstall?:string){state.page='sync';await run('Comparing with what is installed…',()=>request<Plan>('plan',reinstall?{reinstall}:{}),p=>state.plan=p);}
- async function act(action:string,id?:string){const s=state.snapshot;if(!s&&action!=='refresh')return;if(state.busy)return;const plugin=s?.registry.plugins.find(p=>p.id===id),target=s?.registry.targets.find(t=>t.id===id);
- switch(action){case'refresh':await reload();break;case'rescan':await run('Reading installed plugins…',()=>request<Snapshot>('scan'),v=>{snapshot(v);state.plan=null;});await discover();break;case'add-plugin':editPlugin();break;case'edit-plugin':if(plugin)editPlugin(plugin);break;case'add-target':editTarget();break;case'edit-target':if(target)editTarget(target);break;case'discovered-target':editTarget(undefined,state.discovered[Number(id)]);break;
- case'remove-plugin':if(plugin)confirm('Remove from your list',`${plugin.name} leaves your list. Nothing is uninstalled now: the next check in Sync lists what would be removed.`, 'Remove',()=>run('Updating your list…',()=>request<Snapshot>('remove_plugin',{id,revision:s!.registry.revision}),v=>{snapshot(v);state.plan=null;}),true);break;
- case'remove-target':if(target)confirm('Remove harness',`Muro stops managing ${target.name}. Plugins already installed there stay.`, 'Remove',()=>run('Updating harnesses…',()=>request<Snapshot>('remove_target',{id,revision:s!.registry.revision}),v=>{snapshot(v);state.plan=null;}),true);break;
- case'plan':await calculate();break;case'reinstall':await calculate(id);break;case'repair':await calculate(root.querySelector<HTMLSelectElement>('#repair')?.value);break;
- case'apply':if(state.plan&&!state.plan.blockers.length){const plan=state.plan;confirm('Apply changes',`${plan.operations.length} ${plan.operations.length===1?'change':'changes'} on your harnesses. Muro first checks that nothing changed since this check.`, 'Apply',()=>run('Syncing…',()=>request<Snapshot>('apply',{plan_id:plan.id}),v=>{snapshot(v);state.plan=null;notify('Done. Your harnesses are up to date.');}));}break;
- case'resolve':await run('Checking the source…',()=>request<Snapshot>('resolve',{id}),v=>{snapshot(v);state.plan=null;});break;
- case'open-custom-instructions':if(plugin)await run('Opening the instructions folder…',async()=>{await request('open_custom_instructions',{id});snapshot(await request<Snapshot>('snapshot'));state.plan=null;},()=>notify('Folder opened. Edit the Markdown files, reload them, then adapt the plugin again.'));break;
- case'cancel-job':await run('Cancelling…',async()=>{await request('cancel_job',{id});snapshot(await request<Snapshot>('snapshot'));});break;
- case'verify':await run('Verifying…',()=>request<Maintenance>('maintenance',{kind:'verify'}),v=>state.maintenance=v);break;
- case'cleanup':confirm('Clean up unused builds','Only stored builds that nothing uses are deleted.', 'Clean up',()=>run('Cleaning up…',()=>request<Maintenance>('maintenance',{kind:'cleanup'}),v=>state.maintenance=v),true);break;
- case'inventory':if(target){const inv=s!.inventory.find(i=>i.target_id===target.id);open(`<h2>Installed on ${esc(target.name)}</h2>${inv?.error?`<p class="error">${esc(inv.error)}</p>`:''}<div class="inventory-list">${inv?.plugins.map((p,i)=>`<div class="inventory-item"><div><strong>${esc(p.name)}</strong><small>${esc(p.version)} · ${p.managed?'In your list':'Not in your list'}</small><p class="mono break">${esc(p.path)}</p></div>${!p.managed?`<button class="btn" data-import="${i}" data-target="${esc(target.id)}">Add to my list</button>`:''}</div>`).join('')||'<p>No plugins installed here.</p>'}</div><div class="actions"><button class="btn" data-close>Close</button></div>`);}break;
- case'adapt':if(plugin){const needs=s!.custom_instructions?.find(i=>i.plugin_id===plugin.id)?.stale_harnesses[0]??plugin.targets.map(id=>s!.registry.targets.find(t=>t.id===id)?.harness).find(h=>h&&!plugin.distributions.some(d=>d.harness===h));open(`<h2>Adapt ${esc(plugin.name)} with AI</h2><p>Claude Code rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses that harness’s own credentials and spends at most the budget below.</p><p>Your custom instructions are read with the source: the AI decides how to fit them in and records why.</p><form id="adapt-form"><label>For harness<select name="harness">${Object.entries(harnessNames).filter(([h])=>h!=='deepseek').map(([h,n])=>`<option value="${h}" ${h===needs?'selected':''}>${n}</option>`).join('')}</select></label>${field('Maximum budget (USD)','budget','2',{type:'number',required:true})}<div id="form-error" class="error" role="alert"></div><div class="actions"><button class="btn" type="button" data-close>Cancel</button><button class="btn primary">Start</button></div></form>`);dialog.querySelector('form')!.onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget as HTMLFormElement),budget=Number(f.get('budget'));if(!Number.isFinite(budget)||budget<=0){dialog.querySelector('#form-error')!.textContent='Enter a budget above zero.';return;}dialog.close();void run('Starting the AI adaptation…',async()=>{const result=await request<Job>('adapt',{id,harness:String(f.get('harness')),agent:s!.registry.settings.agent,budget_usd:budget});snapshot(await request<Snapshot>('snapshot'));state.plan=null;state.page='activity';return result;},()=>notify('Started. Follow it in Activity.'));};}break;
- }}
- root.addEventListener('click',e=>{const b=(e.target as Element).closest<HTMLButtonElement>('button');if(!b||b.disabled)return;if(b.dataset.page)go(b.dataset.page as Page);else if(b.dataset.filter){state.filter=b.dataset.filter;render();}else if(b.dataset.plugin){state.selected=b.dataset.plugin;render();}else if(b.dataset.action)void act(b.dataset.action,b.dataset.id);});
- root.addEventListener('input',e=>{if((e.target as HTMLElement).id==='search'){state.query=(e.target as HTMLInputElement).value;const rows=root.querySelector('#registry-rows');if(rows)rows.innerHTML=registryRows(state);}});
- root.addEventListener('change',e=>{const id=(e.target as HTMLElement).id;if(id!=='look-select'&&id!=='theme-select')return;const value=(e.target as HTMLSelectElement).value;saveLook(id==='look-select'?storedLook(value):currentLook(),id==='theme-select'?storedTheme(value):currentTheme());render();});
- root.addEventListener('submit',e=>{if((e.target as HTMLElement).id!=='settings-form')return;e.preventDefault();const f=new FormData(e.target as HTMLFormElement),minutes=Number(f.get('interval_minutes'));if(!Number.isInteger(minutes)||minutes<1||minutes>1440){state.error='The interval goes from 1 to 1440 minutes.';render();return;}void run('Saving settings…',()=>request<Snapshot>('settings',{revision:state.snapshot!.registry.revision,settings:{...state.snapshot!.registry.settings,auto_sync:f.has('auto_sync'),interval_minutes:minutes,agent:String(f.get('agent')),python:String(f.get('python')).trim(),factory_path:String(f.get('factory_path')).trim()}}),v=>{snapshot(v);state.plan=null;notify('Settings saved');});});
- dialog.addEventListener('click',e=>{const b=(e.target as Element).closest<HTMLButtonElement>('button');if(!b||b.disabled)return;if(b.hasAttribute('data-close'))dialog.close();else if(b.dataset.action==='add-distribution'){e.preventDefault();dialog.querySelector('#distributions')!.insertAdjacentHTML('beforeend',distributionRow());}else if(b.hasAttribute('data-remove-distribution')){e.preventDefault();b.closest('.distribution-row')!.remove();}else if(b.dataset.action==='remove-target'){e.preventDefault();void act('remove-target',b.dataset.id);}else if(b.dataset.import){const inv=state.snapshot!.inventory.find(i=>i.target_id===b.dataset.target),p=inv?.plugins[Number(b.dataset.import)],t=state.snapshot!.registry.targets.find(t=>t.id===b.dataset.target);if(p&&t)editPlugin({id:crypto.randomUUID(),name:p.name,source:p.path,policy:'pinned',pinned_version:p.version,targets:[t.id],distributions:[{harness:t.harness,path:p.path,version:p.version}]});}});
- const keydown=(e:KeyboardEvent)=>{if(e.key==='/'&&!dialog.open&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName||'')){e.preventDefault();if(state.page!=='registry')go('registry');root.querySelector<HTMLInputElement>('#search')?.focus();}};document.addEventListener('keydown',keydown);
- const jobTimer=setInterval(async()=>{if(polling||state.busy||dialog.open||!state.snapshot?.jobs?.some(j=>j.status==='running'))return;polling=true;try{state.snapshot.jobs=await request<Job[]>('jobs');if(!state.snapshot.jobs.some(j=>j.status==='running'))snapshot(await request<Snapshot>('snapshot'));if(state.page==='activity')render();}catch(e){state.error=String(e);if(state.page==='activity')render();}finally{polling=false;}},3000);
- void reload().then(()=>{if(state.snapshot)void discover();});
- return ()=>{disposed=true;stopLook();clearInterval(jobTimer);clearTimeout(toastTimer);document.removeEventListener('keydown',keydown);dialog.remove();toast.remove();root.replaceChildren();};
+/** How often the open window reads the registry again while it has the focus: the background worker and the tray change it behind the window's back. */
+export const REFRESH_MS=30_000;
+
+/** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
+export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
+ const request=serial(transport,['discover']);
+ const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null};
+ const dialog=document.createElement('dialog');dialog.tabIndex=-1;document.body.append(dialog);
+ const toasts=document.createElement('div');toasts.id='toasts';toasts.setAttribute('role','status');toasts.setAttribute('aria-live','polite');document.body.append(toasts);
+ let disposed=false,polling=false,planning:Promise<void>|null=null,again=false,confirmed:(()=>void)|null=null;
+ // The control that had the keyboard is found again by what it does: `want` is its selector, `sel` the caret of a text box. `opener` is where a dialog was opened from.
+ let want='',sel:[number,number]|null=null,opener='',sticky=false;
+ const message=(e:unknown)=>String(e instanceof Error?e.message:e);
+ const fail=(e:unknown)=>{state.error=message(e);render();};
+ const stopTheme=watchTheme();
+
+ const keyOf=(el:Element|null,within:Element):string=>{
+  if(!(el instanceof HTMLElement)||el===within||!within.contains(el))return '';
+  if(el.id)return '#'+CSS.escape(el.id);
+  const parts=['data-action','data-id','name','value'].filter(a=>el.hasAttribute(a)&&(a!=='value'||/^(radio|checkbox)$/.test((el as HTMLInputElement).type))).map(a=>`[${a}="${CSS.escape(el.getAttribute(a)!)}"]`);
+  return parts.length?el.localName+parts.join(''):'';
+ };
+ function render(){
+  if(disposed)return;
+  const active=document.activeElement;
+  if(!dialog.open){
+   const key=keyOf(active,root);
+   if(sticky)sticky=false;
+   else if(key&&key!=='#main'){want=key;sel=active instanceof HTMLInputElement&&active.selectionStart!==null?[active.selectionStart,active.selectionEnd??active.selectionStart]:null;}
+   else if(key!=='#main')want='';
+  }
+  const opened=[...root.querySelectorAll('details[open][id]')].map(d=>d.id),top=root.querySelector('#main')?.scrollTop||0,across=root.querySelector('.tablewrap')?.scrollLeft||0;
+  root.innerHTML=frame(state);
+  opened.forEach(id=>document.getElementById(id)?.setAttribute('open',''));
+  const main=root.querySelector<HTMLElement>('#main');if(main)main.scrollTop=top;const wrap=root.querySelector('.tablewrap');if(wrap)wrap.scrollLeft=across;
+  if(state.busy)root.querySelectorAll<HTMLButtonElement>('button[data-action]:not([data-action=page])').forEach(b=>b.disabled=true);
+  if(state.discovering)root.querySelectorAll<HTMLButtonElement>('button[data-action=rescan]').forEach(b=>b.disabled=true);
+  if(want&&!dialog.open){
+   // A control that became disabled cannot hold the focus: the page takes it, and gives it back at the next render.
+   const el=root.querySelector<HTMLElement>(want),usable=el&&!(el as HTMLButtonElement).disabled?el:null;
+   (usable||main)?.focus({preventScroll:true});
+   if(usable&&sel&&usable instanceof HTMLInputElement)try{usable.setSelectionRange(sel[0],sel[1]);}catch{/* a box that holds no caret */}
+  }
+ }
+ async function run<T>(label:string,work:()=>Promise<T>,after?:(value:T)=>void|Promise<void>):Promise<void>{
+  if(state.busy)return;state.busy=label;state.error=null;render();
+  try{const value=await work();await after?.(value);}catch(e){state.error=message(e);}finally{state.busy=null;render();}
+ }
+ // The shell sends the jobs and the data folder only with `snapshot`: a snapshot a mutation returns keeps the ones already held.
+ function adopt(s:Snapshot,options?:{replan?:boolean}){
+  const before=state.snapshot;state.snapshot={...s,jobs:s.jobs??before?.jobs,data_dir:s.data_dir??before?.data_dir};
+  if(options?.replan!==false&&before&&before.registry.revision!==s.registry.revision&&state.plan?.revision!==s.registry.revision)void replan();
+ }
+ const reload=()=>run('Reading your registry…',()=>request<Snapshot>('snapshot'),adopt);
+ function replan():Promise<void>{
+  if(planning){again=true;return planning;}
+  planning=(async()=>{try{do{again=false;state.plan=await request<Plan>('plan');}while(again);}catch(e){state.error=message(e);}finally{planning=null;render();}})();
+  return planning;
+ }
+ async function discover(){
+  if(state.discovering)return;state.discovering=true;state.discoveryError=null;render();
+  try{state.discovered=await request<Discovered[]>('discover');}catch(e){state.discoveryError=message(e);}finally{state.discovering=false;render();}
+ }
+ const notify=(text:string,tone?:'good'|'bad')=>{const t=document.createElement('div');t.className='toast '+(tone||'');t.textContent=text;toasts.append(t);setTimeout(()=>t.remove(),5000);};
+ function openDialog(html:string,kind:'dialog'|'sheet'='dialog'):HTMLDialogElement{
+  const was=dialog.open,key=was?keyOf(document.activeElement,dialog):'';
+  if(!was)opener=keyOf(document.activeElement,root);
+  dialog.className=kind==='sheet'?'sheet':'';dialog.innerHTML=html;
+  const heading=dialog.querySelector('h1,h2');
+  if(heading){heading.id||=`dlg-title`;dialog.setAttribute('aria-labelledby',heading.id);dialog.removeAttribute('aria-label');}else{dialog.removeAttribute('aria-labelledby');dialog.setAttribute('aria-label','Dialog');}
+  if(!was)dialog.showModal();
+  else{const same=key?dialog.querySelector<HTMLElement>(key):null,usable=same&&!(same as HTMLButtonElement).disabled?same:null;(usable||dialog.querySelector<HTMLElement>('[autofocus]:not(:disabled)')||dialog).focus();}
+  return dialog;
+ }
+ const closeDialog=()=>{if(dialog.open)dialog.close();};
+ function confirm(title:string,text:string,ok:string,then:()=>void,danger=false){
+  confirmed=then;
+  openDialog(`<div class="dl">${dlHead(title,text)}<footer><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn ${danger?'danger':'primary'}" data-confirm autofocus>${esc(ok)}</button></footer></div>`);
+ }
+ const app:App={state,request,render,run,notify,reload,replan,adopt,discover,openDialog,closeDialog,confirm};
+
+ const go=(page:Page)=>{state.page=page;render();void modules[page].opened?.(app);};
+ const actions:Actions={page:(_app,d)=>{if(d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload()};
+ for(const [name,m] of Object.entries(modules))for(const [action,fn] of Object.entries(m.actions)){if(action in actions)throw new Error(`The action "${action}" of the ${name} page is already declared`);actions[action]=fn;}
+
+ const click=(e:Event)=>{
+  const el=(e.target as Element).closest<HTMLButtonElement>('button');if(!el||el.disabled)return;
+  if(el.hasAttribute('data-close')){closeDialog();return;}
+  if(el.hasAttribute('data-confirm')){const then=confirmed;confirmed=null;closeDialog();try{then?.();}catch(error){fail(error);}return;}
+  const fn=el.dataset.action?actions[el.dataset.action]:undefined;if(!fn)return;
+  e.preventDefault();void Promise.resolve().then(()=>fn(app,el.dataset,el)).catch(fail);
+ };
+ const route=(hook:'input'|'change')=>(e:Event)=>{const el=e.target;if(!(el instanceof HTMLInputElement||el instanceof HTMLSelectElement))return;for(const m of Object.values(modules))if(m[hook]?.(app,el))return;};
+ root.addEventListener('click',click);root.addEventListener('input',route('input'));root.addEventListener('change',route('change'));
+ dialog.addEventListener('click',e=>{if(e.target===dialog&&!state.applying)closeDialog();else click(e);});
+ dialog.addEventListener('input',route('input'));dialog.addEventListener('change',route('change'));
+ // An apply cannot be dismissed half way; any other dialog closes with Escape.
+ dialog.addEventListener('cancel',e=>{if(state.applying)e.preventDefault();});
+ dialog.addEventListener('close',()=>{confirmed=null;want=opener;sticky=true;render();});
+ const keydown=(e:KeyboardEvent)=>{
+  if(e.key!=='/'||e.ctrlKey||e.metaKey||e.altKey||dialog.open||['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName||''))return;
+  e.preventDefault();if(state.page!=='sync')go('sync');root.querySelector<HTMLInputElement>('#search')?.focus();
+ };
+ document.addEventListener('keydown',keydown);
+ // The background worker and the tray move the registry and the sync record while the window is open or hidden. The window reads them again when it gets the focus (it is shown again, or clicked back to) and every REFRESH_MS while it has it, and only when nothing of the person's is under way: no request, no dialog, nothing being typed (a render would put the stored text back in the box). It asks for no plan: the recorded check says what changed, and a plan is made by Check now, Review and Apply all. A hidden window has no focus: WebView2 keeps `visibilityState` "visible" for it, so that says nothing.
+ const typing=()=>{const a=document.activeElement;return !!a&&root.contains(a)&&(a instanceof HTMLSelectElement||a instanceof HTMLTextAreaElement||(a instanceof HTMLInputElement&&!/^(checkbox|radio|button|submit)$/.test(a.type)));};
+ let refreshing=false;
+ async function refreshIfIdle(){
+  if(disposed||refreshing||state.busy||state.checking||state.applying||polling||dialog.open||typing())return;
+  refreshing=true;let changed=false;
+  try{const s=await request<Snapshot>('snapshot');if(disposed)return;changed=JSON.stringify(s)!==JSON.stringify(state.snapshot);adopt(s,{replan:false});}
+  catch{/* the next focus or tick tries again: a refresh nobody asked for shows no error */}
+  finally{refreshing=false;}
+  // A registry that did not move is not painted again: no needless churn every 30 s.
+  if(changed&&!disposed&&!dialog.open&&!typing())render();
+ }
+ const refreshTimer=setInterval(()=>{if(document.hasFocus())void refreshIfIdle();},REFRESH_MS);
+ const focused=()=>void refreshIfIdle();
+ window.addEventListener('focus',focused);
+ // The shell says when it shows the window again: the page gets no focus event then (WebView2). `shown` is the host's way to hear it, and returns how to stop.
+ const stopShown=shown?.(focused);
+ const jobTimer=setInterval(async()=>{
+  if(polling||state.busy||dialog.open||!state.snapshot?.jobs?.some(j=>j.status==='running'))return;
+  polling=true;
+  try{const before=JSON.stringify(state.snapshot.jobs);state.snapshot.jobs=await request<Job[]>('jobs');let changed=false;if(!state.snapshot.jobs.some(j=>j.status==='running')){adopt(await request<Snapshot>('snapshot'));changed=true;}if(changed||JSON.stringify(state.snapshot?.jobs)!==before)render();}
+  catch(e){fail(e);}finally{polling=false;}
+ },3000);
+ void reload().then(()=>{if(state.snapshot){void discover();void modules[state.page].opened?.(app);}});
+ return ()=>{disposed=true;stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();document.removeEventListener('keydown',keydown);dialog.remove();toasts.remove();root.replaceChildren();};
 }

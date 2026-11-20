@@ -3,12 +3,10 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, updating Figma, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
-      "taste-skill",
-      "design-taste-frontend",
       "landing-page-design",
       "figma-designer",
       "motion-design",
@@ -97,52 +95,6 @@
     ]
   },
   "sources": [
-    {
-      "id": "taste-skill",
-      "repo_url": "https://github.com/Leonxlnx/taste-skill.git",
-      "commit": "f6b76575f949707b4e3c37cd86cb44b0b98643e8",
-      "pin": "release",
-      "release": "v2.5.1",
-      "license": "MIT",
-      "copyright": "Copyright (c) 2026 Leonxlnx",
-      "selected_paths": [
-        "skills/taste-skill/**"
-      ],
-      "excluded_paths": [],
-      "media_paths": [
-        "skills/taste-skill/*.jpg",
-        "skills/taste-skill/*.png",
-        "skills/taste-skill/*.webp"
-      ],
-      "notice_paths": [
-        "skills/taste-skill/assets/photos/photos.json",
-        "skills/taste-skill/assets/layout/img/credits.json",
-        "skills/taste-skill/assets/moments/_demo/credits.json",
-        "skills/taste-skill/assets/scenes/_demo/credits.json",
-        "skills/taste-skill/assets/objects/photo-kit/photos.json",
-        "skills/taste-skill/assets/components/fx-photo/meta.json",
-        "skills/taste-skill/assets/ui/icons/icons-credits.json",
-        "skills/taste-skill/assets/icons/demo/icons-credits.json"
-      ],
-      "omissions": [
-        {
-          "paths": [
-            "install.sh"
-          ],
-          "reason": "The upstream installer that links the skill into a host's skills folder. references/gate.md and scripts/moments.mjs name it only to say where an installed copy lives. A capability never installs the skill itself: the release's adapters do (ADR-0007)."
-        },
-        {
-          "paths": [
-            "README.md"
-          ],
-          "reason": "The repository's presentation page. assets/icons/demo.html names it in a link of the icon demo; no step of the method reads it."
-        }
-      ],
-      "runtime_deps": [],
-      "intake": {
-        "goal": "Intake of 2026-11-17, owner correction after a real session built a flat page by hand (\"marionette ha tutto!\"): absorb taste-skill whole, with every file its method uses at run time: the kit under assets/, the hero and moment dealers, the photograph and icon tools, the automated checks and the finish gate, every reference, and the images with their credits. The generated plugin does what the source does (ADR-0015, ADR-0026, ADR-0027)."
-      }
-    },
     {
       "id": "motion-design",
       "repo_url": "https://github.com/LottieFiles/motion-design-skill",
@@ -257,13 +209,13 @@
       ],
       "runtime_deps": [
         {
-          "name": "Figma MCP and figma-use",
+          "name": "A design tool integration of the host: Figma MCP with figma-use, FigCraft's MCP server, or another canvas editor's",
           "license": "External host integration, not bundled by Muro",
           "bundled": false
         }
       ],
       "intake": {
-        "goal": "Understand conversion strategy, content states and Figma token, component and responsive methods from the selected skills. Compare their functional responsibilities with the existing catalog and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Do not simulate Figma MCP or include unrelated installation workflows."
+        "goal": "Understand conversion strategy, content states, the landing page visual system and the design tool token, component and responsive methods from the selected skills. Compare their functional responsibilities with the existing catalog and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Owner decisions of 2026-11-19: taste-skill is no longer a source, so landing-page-design's visual system has no second owner beside it; the design tool step is generic, not bound to Figma. Do not simulate a design tool integration or include unrelated installation workflows."
       }
     },
     {

@@ -15,6 +15,13 @@ fn git(args: &[&str], cwd: Option<&Path>) -> Result<String> {
     )
     .map(|s| s.trim().to_owned())
 }
+/// A drive path, a UNC path or a path starting with `/` or `~`, on any platform: a folder on
+/// this machine, never a Git URL or an owner/repository.
+fn is_local_path(source: &str) -> bool {
+    let b = source.as_bytes();
+    source.starts_with(['/', '\\', '~'])
+        || (b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':')
+}
 fn source_url(input: &str) -> Result<(url::Url, Option<String>)> {
     let raw = if !input.contains("://") && !input.starts_with("git@") {
         format!("https://github.com/{input}")
@@ -120,6 +127,8 @@ fn checkout(root: &Path, plugin: &Value) -> Result<(PathBuf, String, String)> {
         let path = path.canonicalize()?;
         return Ok((path.clone(), tree_hash(&path)?, "local".into()));
     }
+    // A moved or deleted folder must not be looked up as an owner/repository on GitHub.
+    ensure!(!is_local_path(source), "Source folder not found: {source}");
     let (url, sub) = source_url(source)?;
     let source_key = hash(&json!(url.as_str()));
     let repos = root.join("sources");
@@ -267,6 +276,46 @@ mod tests {
         let (u, s) = source_url("org/repo#plugins/demo").unwrap();
         assert_eq!(u.as_str(), "https://github.com/org/repo");
         assert_eq!(s.as_deref(), Some("plugins/demo"));
+    }
+    #[test]
+    fn missing_local_folder_fails_before_any_repository_lookup() {
+        let t = tempfile::tempdir().unwrap();
+        let gone = t.path().join("gone").to_string_lossy().into_owned();
+        for source in [
+            gone.as_str(),
+            "/muro-missing-source",
+            "~/muro-missing-source",
+        ] {
+            let plugin = json!({"id":"gone","source":source,"policy":"head","distributions":[]});
+            let error = resolve(t.path(), &plugin).unwrap_err();
+            assert_eq!(
+                format!("{error:#}"),
+                format!("Source folder not found: {source}")
+            );
+        }
+        assert!(!t.path().join("sources").exists());
+    }
+    #[test]
+    fn local_paths_are_told_from_repositories() {
+        for local in [
+            r"C:\plugins\demo",
+            "d:/plugins/demo",
+            r"\\server\share\demo",
+            "//server/share/demo",
+            "/home/user/demo",
+            "~/demo",
+        ] {
+            assert!(is_local_path(local), "{local}");
+        }
+        for remote in [
+            "org/repo",
+            "org/repo#plugins/demo",
+            "https://github.com/org/repo",
+            "file:///C:/repo",
+            "git@github.com:org/repo",
+        ] {
+            assert!(!is_local_path(remote), "{remote}");
+        }
     }
     #[test]
     fn local_changed_source_invalidates_adaptation() {

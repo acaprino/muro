@@ -92,7 +92,7 @@
         "status": "selected",
         "capabilities": [
           "visual-direction",
-          "figma-design"
+          "canvas-design"
         ]
       },
       "why": "The conditional prerequisite applies: new landing, no outline."
@@ -104,7 +104,7 @@
       "expect": {
         "status": "selected",
         "capabilities": [
-          "figma-design"
+          "canvas-design"
         ]
       },
       "why": "A component edit does not need a landing strategy."
@@ -853,6 +853,18 @@
           "explainer-fact-check"
         ]
       }
+    },
+    {
+      "id": "figcraft-component",
+      "task": "Nel nostro file FigCraft aggiungi le varianti hover e disabled al componente Card. Il server MCP di FigCraft è collegato.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "canvas-design"
+        ]
+      },
+      "why": "The design tool step is not bound to Figma (owner decision of 2026-11-19); a component edit needs no landing strategy."
     }
   ]
 }

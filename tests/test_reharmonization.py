@@ -22,17 +22,28 @@ def test_rules_from_unpinned_taste_copy_are_gone():
     for phrase in ("3 of 20", "no eyebrow labels", "No 01/02/03", "cream-and-terracotta",
                    "one motion accent per view", "honest code drawings"):
         assert phrase not in body, phrase
-    assert "Leonxlnx/taste-skill@f6b76575, release v2.5.1" in CAPS["visual-direction"].body
+    assert "elayadesign/ai-design-skills@456d9e0d" in CAPS["visual-direction"].body
 
 
-def test_taste_stop_hook_is_adopted_since_the_source_travels_whole():
-    # 2026-11-10: recorded and not adopted, because gate.mjs was not among the selected files.
-    # Superseded on 2026-11-17 (ADR-0026): the source travels whole and its finish gate is the
-    # active Stop hook; the step no longer tells the host to leave the source's tools alone.
+def test_taste_skill_is_removed_with_its_gate_and_its_hook():
+    # 2026-11-17 (ADR-0026): taste-skill travelled whole and its finish gate was the active Stop hook.
+    # 2026-11-19, owner decision: the source is removed; the website step follows landing-page-design
+    # alone, whose visual system applies again, and the package registers no hook.
+    import json
     cap = CAPS["visual-direction"]
-    assert [(hook["event"], hook["policy"]) for hook in cap.hooks] == [("Stop", "active")]
-    assert "`Stop` command hook" in cap.body and "gate.mjs" in cap.body
-    assert "Do not call them and do not claim their results" not in cap.body
+    assert cap.hooks == []
+    body = operative("visual-direction")
+    for phrase in ("taste-skill", "gate.mjs", "start.mjs", "<TS>"):
+        assert phrase not in body, phrase
+    assert "Owner decision of 2026-11-19: taste-skill is removed" in cap.body
+    for section in ("B1 to B7", "B11. Tagline reveal section (mandatory)", "Geist, Manrope, Geist Mono, Poppins"):
+        assert section in body, section
+    manifest = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))
+    assert "taste-skill" not in [source["id"] for source in manifest["sources"]]
+    assert not {"taste-skill", "design-taste-frontend"} & set(manifest["plugin"]["replaces"])
+    delivery = json.loads((PACKAGE / "delivery.json").read_text(encoding="utf-8"))
+    assert "hooks" not in delivery
+    assert "taste-skill" not in [decision["source"] for decision in delivery["decisions"]]
 
 
 def test_gsap_capability_drops_claims_absent_from_its_only_selected_file():
@@ -83,7 +94,7 @@ def test_pdf_of_existing_file_has_one_owner():
 def test_reads_declares_the_data_flow_and_is_validated(tmp_path):
     """`reads` is optional data flow: validated against producers, never a prerequisite."""
     from muro import parse_router, validate_capabilities_and_router
-    assert CAPS["figma-design"].reads == ["palette", "typography", "layout", "constraints", "offer", "page_outline",
+    assert CAPS["canvas-design"].reads == ["palette", "typography", "layout", "constraints", "offer", "page_outline",
                                           "aesthetic_direction", "design_tokens", "design_file"]
     assert CAPS["motion-principles"].reads == ["palette", "typography", "layout", "constraints", "aesthetic_direction", "design_file"]
     assert CAPS["gsap-scrolltrigger"].reads == CAPS["css-scroll"].reads == ["motion-spec", "reduced-motion"]

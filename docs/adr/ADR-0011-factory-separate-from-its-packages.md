@@ -65,3 +65,31 @@ of its outputs looked like the same thing.
   gate) was withdrawn the same day and never took effect.
 
 The decisions are the owner's; this wording is not separately approved.
+
+## Amendment: a package is released from its own repository (2026-11-19)
+
+Owner request of 2026-11-19: "dobbiamo portare marionette in una repository
+pubblica a sé, cambiando anche il flow di rilascio in muro quando compila
+marionette, creando PR verso branch marionette". Until then Marionette
+0.2.0 to 0.4.0 were published among Muro's own releases, beside `muro-v*`, and
+`acaprino/marionette` held only its first build, `v0.1.0`.
+
+- Marionette's releases are published from `acaprino/marionette`, public, with
+  the tag `marionette-v<version>` and the same zip layout as before
+  (`marionette-<version>.zip` holding `marionette/`, and its SHA-256).
+- Muro still builds it. The package source stays in `examples/marionette/`:
+  the request names Muro as the place where Marionette is compiled, and the
+  factory's own checks run on it. Moving the source is a separate decision.
+- The `Release Marionette` workflow, still on the owner's request, pushes the
+  build as `marionette/` and its notes as `releases/<tag>.md` to the branch
+  `release/<tag>` of that repository, where a workflow opens the pull request
+  into `main`. Merging it is the release, as a merge into `main` is everywhere
+  else; the repository's `release.yml` then publishes the tag and the assets.
+- It refuses a tag that exists in either repository, so a version published
+  here is never published again there.
+- The push uses a write deploy key of `acaprino/marionette` only (secret
+  `MARIONETTE_DEPLOY_KEY`), not a personal token.
+
+Implementation choices, not the owner's words: the deploy key, the branch
+name, the notes file and the build kept whole in Git (280 MiB, 12,060 files,
+none over 5 MiB, measured on the 0.4.0 build of 2026-11-19).

@@ -12,6 +12,7 @@ use std::{
         mpsc,
     },
     thread,
+    time::{Duration, Instant},
 };
 
 pub fn executable_name(name: &str) -> String {
@@ -131,6 +132,27 @@ pub fn resolve_executable(harness: &str) -> Result<String> {
         .as_str()
         .context("Mukade omitted executable")?
         .into())
+}
+
+/// Whether the registry refused a request because another writer held it. It refuses before it
+/// does anything, so the same request can be sent again.
+pub fn is_busy(error: &anyhow::Error) -> bool {
+    format!("{error:#}").contains(muro_registry::service::BUSY)
+}
+/// Runs `attempt` again, every `step`, while it fails because the registry is busy, for `limit`
+/// at most; then the error is returned as it is. Any other result is returned at once.
+pub fn retry_while_busy<T>(
+    limit: Duration,
+    step: Duration,
+    mut attempt: impl FnMut() -> Result<T>,
+) -> Result<T> {
+    let end = Instant::now() + limit;
+    loop {
+        match attempt() {
+            Err(error) if is_busy(&error) && Instant::now() < end => thread::sleep(step),
+            result => return result,
+        }
+    }
 }
 
 type Reply = std::result::Result<Value, String>;

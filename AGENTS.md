@@ -283,9 +283,11 @@ After a policy upgrade, Hermes needs a new session because resumed sessions may
 retain their persisted prompt. Do not claim refresh from registration alone.
 TokenEconomizer's hooks are still `host-approved` and registered on the user's
 request by its capability: activating them by default is an open delivery
-decision, not yet run live. Marionette's first active source hook is
-taste-skill's finish gate on `Stop` (2026-11-17): it exits at once where no
-build is armed, and was run live on Claude Code, not on Codex. A catalog with
+decision, not yet run live. Marionette's first active source hook was
+taste-skill's finish gate on `Stop` (2026-11-17): it exited at once where no
+build was armed, and was run live on Claude Code, not on Codex. The owner
+removed taste-skill on 2026-11-19 ("la ritengo troppo prescrittiva e
+costrittiva"), and Marionette registers no hook since. A catalog with
 an active hook is refused by the runtime without its `delivery.json`: a test
 fixture that copies a package's capabilities copies that document too
 (`tests/routing_helpers.py`, `copy_delivery`).
@@ -444,7 +446,8 @@ proves packaging; say what was not executed.
 
 ## Releasing
 
-Two products are released from this repository, each with its own tag.
+Two products are released, each with its own tag: Muro from this repository, a package from its own public
+repository (Marionette from `acaprino/marionette`; owner request of 2026-11-19, ADR-0011 amendment).
 
 - The factory and its desktop app, `muro-v<version>` (version in `muro/__init__.py`, `__version__`): released
   at every merge of `develop` into `main` by `.github/workflows/release.yml` (see "Git"). The GitHub Release
@@ -455,14 +458,20 @@ Two products are released from this repository, each with its own tag.
   1. Bump the package version on `develop`. A package changes version whenever its catalog, policy or
      packaged files changed: hosts cache an installed plugin by version.
   2. Write `docs/releases/<tag>.md`: what changed for a user, the verification results, and what was not
-     executed. Without that file GitHub generates the notes from the merged pull requests.
+     executed. Without that file the notes carry only the version and the Muro commit it was built from.
   3. On the commit to release run `python -m pytest -q`, `--validate` and `--check-sources`, and stage a
      fresh build with `--build --out <scratch>`.
   4. Run the `Release Marionette` workflow (GitHub, Actions, "Run workflow", or
-     `gh workflow run release-marionette.yml`). It repeats validation, source checks and the build, creates
-     the tag and publishes the GitHub release with `<slug>-<version>.zip` and its SHA-256. It refuses a tag
-     that already exists: a published release is never replaced, bump the version instead.
-  5. Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
+     `gh workflow run release-marionette.yml --ref develop`). It refuses a tag that already exists here or in
+     `acaprino/marionette` (a published release is never replaced, bump the version instead), repeats the
+     tests, validation, source checks and the build, and pushes the build as `marionette/`, with the notes in
+     `releases/<tag>.md`, to the branch `release/<tag>` of `acaprino/marionette`, which opens the pull request
+     into its `main`. Run again before the merge, it refreshes that pull request. The push uses the secret
+     `MARIONETTE_DEPLOY_KEY`, a write deploy key of that repository only.
+  5. The owner merges the pull request: `acaprino/marionette` then publishes the tag and the GitHub release
+     with `<slug>-<version>.zip` and its SHA-256. `marionette-v0.2.0` to `marionette-v0.4.0` stay among this
+     repository's releases.
+  6. Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
 
 The README header shows `docs/assets/branding/muro-logo.png`. Keep that
 line and that file when rewriting the README.

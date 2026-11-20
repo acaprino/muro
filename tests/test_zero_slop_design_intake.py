@@ -46,7 +46,7 @@ PROCEDURES = {
 }
 RESUMABLE = {"design-file", "design-file-apply", "design-file-integration"}
 # Capabilities that take a look from what exists: a project DESIGN.md comes first and is never rewritten there.
-LOOK_CONSUMERS = ("visual-direction", "design-review", "ui-prototype", "html-deck", "design-options", "figma-design")
+LOOK_CONSUMERS = ("visual-direction", "design-review", "ui-prototype", "html-deck", "design-options", "canvas-design")
 
 
 def read_json(name):
@@ -221,11 +221,10 @@ def test_a_project_design_file_comes_first_and_only_its_owner_writes_it():
     visual = before_sources(caps["visual-direction"])
     assert "counts as the user's explicit instruction" in visual
     assert "This step never rewrites `DESIGN.md`" in visual
-    # A brand alone still is not such an instruction; the router record says the same as the body.
-    assert "A client's brand is not by itself such an instruction" in visual
+    # The source names the user's explicit prompt, not a brand, as what wins over a rule.
+    assert "The user's explicit prompt wins" in visual
     router = (PACKAGE / "ROUTER.md").read_text(encoding="utf-8")
     assert "a client's brand wins over source bans" not in router
-    assert "a brand alone does not" in router
     for name in ("design-file-apply", "design-file-inspection"):
         assert "design-file" in before_sources(caps[name])
     assert "design_file_not_rewritten" in caps["design-file-apply"].checks
@@ -237,8 +236,7 @@ def test_a_project_design_file_comes_first_and_only_its_owner_writes_it():
 def test_the_file_is_followed_as_recorded_and_a_starter_is_not_a_system():
     caps = catalog()
     visual = before_sources(caps["visual-direction"])
-    # `start.mjs brand` derives surface, muted and inverse colours the file does not hold.
-    assert "not through `start.mjs brand`" in visual and "a violet token stays as recorded" in visual
+    assert "its confirmed colour tokens, typefaces, spacing, radius and component values are followed" in visual
     assert "or from the confirmed typography of a project design file" in visual
     assert "or the confirmed values of a project design file" in visual
     # Steps that write source code name what the design code checks reject (references/code-checks.md).
@@ -250,7 +248,7 @@ def test_the_file_is_followed_as_recorded_and_a_starter_is_not_a_system():
         when = caps[name].needs[0]["when"]
         assert "a starter or a reference file does not" in when, name
         assert "A project `DESIGN.md` that is not a starter or a reference comes first" in before_sources(caps[name])
-    assert "comes first" in before_sources(caps["figma-design"])
+    assert "comes first" in before_sources(caps["canvas-design"])
     aesthetic = before_sources(caps["aesthetic-direction"])
     assert "`x-zsd.kind` is `starter` or `reference` holds example data and is not" in aesthetic
     motion = caps["motion-principles"]

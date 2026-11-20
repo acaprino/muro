@@ -44,7 +44,7 @@ Run these commands from the portable folder in PowerShell:
 .\tools\muroctl.exe request scan
 ```
 
-`snapshot` returns the registry, observed inventory and activity as JSON. `registry` reads only the desired configuration. `scan` refreshes plugin inventories; an incomplete inventory remains an error rather than becoming an empty list.
+`snapshot` returns the registry, observed inventory and activity as JSON. `registry` reads only the desired configuration. `status` returns `{"revision":N,"settings":{...},"sync":{...}}` (the registry revision, its settings and the recorded sync state) from `registry.json` and `sync-status.json` alone: it scans nothing and, unlike every other action, it does not take the writer lock, so it answers while a check or a save holds the registry. The tray and the background worker read it; use it to poll. `scan` refreshes plugin inventories; an incomplete inventory remains an error rather than becoming an empty list.
 
 For an isolated registry:
 
@@ -82,6 +82,38 @@ Review the returned operations and blockers. Save the exact returned plan ID in 
 
 Application rechecks the registry revision, inventory and prepared artifacts. If they changed, calculate a new plan. Exclusive targets include removal of plugins outside the configured registry; inspect the plan before applying it. A second unchanged plan should contain no operations.
 
+`plan` also takes `{"target_id":"..."}` to compare only that harness; a plan for one harness records only that harness's `checked` time. An unknown or disabled `target_id` is refused with `Target not found`.
+
+### Check
+
+```powershell
+.\tools\muroctl.exe request check
+```
+
+`check` is what the app's **Check now** sends: it resolves every plugin's source, saves what it found, calculates the plan, and returns `{"snapshot":{...},"plan":{...},"errors":[...]}`. A plugin whose source could not be resolved is listed in `errors` (`{"plugin_id":"...","message":"Source folder not found: ..."}`) and the plan is still calculated. A check that found nothing new leaves the registry revision as it was, so plans and open forms stay valid. It takes the same optional `target_id` as `plan`. Every full check or plan records the sync state, which the next `snapshot` returns as `sync`. A full check also records `errors`, the number of sources it could not resolve (`null` before any check); a plan resolves no source and leaves that count as the last check left it.
+
+### Blockers
+
+A plan lists what cannot be done yet in `blockers`: a harness whose folder or inventory cannot be read, a plugin without a build for its harness. `apply` refuses a plan with blockers unless the payload says `"allow_blocked":true`:
+
+```json
+{"plan_id":"the-id-returned-by-plan","allow_blocked":true}
+```
+
+```powershell
+.\tools\muroctl.exe request apply --input .\apply-blocked.json
+```
+
+The operations that are ready run, and the result is the snapshot plus `left_out`, the blockers that were not applied. On a harness that has a blocker the plan holds no removal at all: a plugin of the registry whose build failed must not be uninstalled as if it were outside the list. `allow_blocked` must be a boolean.
+
+### Sync now
+
+```powershell
+.\tools\muroctl.exe request sync_now --input .\sync.json
+```
+
+`sync_now` is the background worker's step: a `check`, then, when the plan has operations, an `apply` of that plan with `allow_blocked`. `{"apply":false}` only checks; the default is to apply. It returns `{"applied":N,"pending":N,"blockers":[...],"errors":[...]}` and records its outcome in `automation-status.json` for the Activity page: *Automatic sync* when it applied, *Background check* when it only looked; failed, with the blockers as the message, when blockers remain, and failed too when the check could not resolve a source, with the message `Sources not checked: <plugin names>` (a run with both says the sources first, then the blockers, joined by a full stop); what could be applied still is. Called through `muroctl` it has no gate: the registry refuses a second writer while one runs, so wait for it. The desktop app lets one `sync_now` and one `apply` run at a time and makes Quit wait for them. Every other request of the desktop window waits for the sync in progress (10 minutes at most), then tries a busy registry again every 250 ms for 15 seconds before it returns "Registry is busy"; `discover` and `status` do not wait. The app does this in one place, so a client that talks to the shell needs no retry of its own.
+
 Commands accepting structured payloads use `--input` to read a UTF-8 JSON file. For example, save `resolve.json` containing a registry plugin's exact ID:
 
 ```json
@@ -103,16 +135,19 @@ Every action works the same through `request ACTION --input PAYLOAD.json` and th
 | Action | Payload | Effect |
 |---|---|---|
 | `registry` | `{}` | Desired configuration only. |
-| `snapshot` | `{}` | Registry, observed inventory, activity, jobs, custom-instruction state and `data_dir`. |
+| `snapshot` | `{}` | Registry, observed inventory, activity (the last 500 events), jobs, custom-instruction state, `sync` (the recorded sync state: `last_check`, `last_sync`, `pending`, `blockers`, `errors`, the registry `revision` of the last full plan, and `checked` and `synced` for each target) and `data_dir`. A `sync-status.json` that cannot be read is no record: `sync` is then the state before any check, and the next check or sync writes the file again. |
+| `status` | `{}` | `{"revision","settings","sync"}`, read without the writer lock. See [Read the current state](#read-the-current-state). |
 | `scan` | `{}` | Like `snapshot`, after refreshing every target's inventory. |
 | `discover` | `{}` | Mukade harness discovery records. |
-| `save_plugin` | `{"revision":N,"plugin":{...}}` | Adds or replaces a plugin by `id`. |
+| `save_plugin` | `{"revision":N,"plugin":{...}}` or with `"adopt":{"target_id":"...","native_id":"..."}` | Adds or replaces a plugin by `id`. With `adopt`, a plugin that is being added takes over an installation that is already on a harness: the service writes the receipt that binds the plugin to that native installation, with the version and the digest of the copy that is there, as an install by Muro leaves it, so the next plan finds the plugin installed (nothing to do when the copy is the build, an update when it is not) instead of installing a second copy. Refused, and nothing saved, when the harness is not in the registry or cannot be read, when nothing with that `native_id` is installed there, when it already belongs to a plugin of the list, when the plugin is in the list already, or when it does not list the harness. |
 | `save_target` | `{"revision":N,"target":{...}}` | Adds or replaces a target instance by `id`. |
 | `remove_plugin`, `remove_target` | `{"revision":N,"id":"..."}` | Removes it from the desired registry. Uninstalling happens only through a plan. |
-| `settings` | `{"revision":N,"settings":{"auto_sync":bool,"interval_minutes":N,"agent":"...","python":"...","factory_path":"..."}}` | All five fields are required; `interval_minutes` is at least 1. |
+| `settings` | `{"revision":N,"settings":{"auto_sync":bool,"interval_minutes":N,"close_to_tray":bool,"agent":"...","python":"...","factory_path":"..."}}` | All six fields are required; `interval_minutes` is at least 1. `close_to_tray` is required since the desktop shell reads it: a payload without it, or with anything but a boolean, is refused with `close_to_tray must be boolean`, so a client written before it existed reads the settings first and sends them back whole. A settings save keeps the recorded sync state current. |
 | `resolve` | `{"id":"plugin-id"}` | Resolves the source, records upstream metadata and native distributions. |
-| `plan` | `{}` or `{"reinstall":"plugin-id"}` | Calculates a sync plan, or a reinstall plan from the retained verified artifact. |
-| `apply` | `{"plan_id":"..."}` | Applies a saved plan after rechecking its inputs. |
+| `check` | `{}` or `{"target_id":"..."}` | Resolves every source, then plans: `{snapshot, plan, errors}`. See [Check](#check). |
+| `plan` | `{}`, `{"reinstall":"plugin-id"}` or `{"target_id":"..."}` | Calculates a sync plan, a reinstall plan from the retained verified artifact, or a plan for one harness. |
+| `apply` | `{"plan_id":"..."}` or `{"plan_id":"...","allow_blocked":true}` | Applies a saved plan after rechecking its inputs. With `allow_blocked` a plan with blockers applies what is ready and returns `left_out`. See [Blockers](#blockers). |
+| `sync_now` | `{}` or `{"apply":bool}` | A check, then an apply that leaves blockers out; `apply` false only checks. See [Sync now](#sync-now). |
 | `maintenance` | `{"kind":"verify"}` or `{"kind":"cleanup"}` | `verify` rehashes stored artifacts. `cleanup` removes artifacts no receipt references; existing plans must then be recalculated. |
 | `custom_instructions` | `{"id":"plugin-id","create":bool}` | Folder path, Markdown files, digest and stale harnesses. |
 | `open_custom_instructions` | `{"id":"plugin-id"}` | Creates the folder if needed and opens it in the OS file manager. |
@@ -120,7 +155,9 @@ Every action works the same through `request ACTION --input PAYLOAD.json` and th
 | `jobs` | `{}` | Job records. |
 | `cancel_job` | `{"id":"job-id"}` | Requests cancellation. |
 
-`recover_jobs` and `automation_record` are used internally by the desktop app. In `serve`, each request `id` must be an unsigned integer.
+`recover_jobs` and `automation_record` remain for compatibility; the desktop app uses neither (its worker calls `sync_now`). In `serve`, each request `id` must be an unsigned integer.
+
+`autostart` (`{}`: whether Muro starts with Windows) and `set_autostart` (`{"enabled":bool}`) belong to the desktop shell: only it knows its own executable, so only the window's `request` command answers them. `muroctl` and `Muro.exe --request` answer `Unknown registry action: autostart`. The shell reads and writes the per-user Run value described in [Runtime and storage](desktop.md#runtime-and-storage).
 
 At startup, `serve` and `request` point `settings.python` and `settings.factory_path` at the bundled private Python and factory when both are present and the folder is portable (or the registry is new), so a moved portable folder keeps working. Moving the folder also rebases registry, receipt and plan paths that lived inside the old folder; external target roots are left as they are.
 

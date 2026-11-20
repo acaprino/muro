@@ -4,7 +4,7 @@ role: coordinator
 tools: [{"name":"file-access","purpose":"Read the repository, its glossary and ADRs, implement authorized source and test changes, and write local spec and ticket files.","required":true},{"name":"shell","purpose":"Run the project's tests and checks for each built slice.","required":false},{"name":"subagent","purpose":"Run a research item as a background agent with a fresh context, as the source's research skill asks.","required":false}]
 hooks: []
 conflicts: []
-intents: [{"id":"engineering.work-coordination","description":"Implement clear software changes directly; otherwise agree scope, resolve decisions, write a spec and build reviewed vertical slices with evidence.","excludes":["Not a fallback for unknown, ambiguous or non-engineering requests.","Do not add planning ceremony to a task that fits one direct step.","Designing a page, a Figma file, motion, Office files or an explainer is the work of those capabilities, not engineering coordination."]}]
+intents: [{"id":"engineering.work-coordination","description":"Implement clear software changes directly; otherwise agree scope, resolve decisions, write a spec and build reviewed vertical slices with evidence.","excludes":["Not a fallback for unknown, ambiguous or non-engineering requests.","Do not add planning ceremony to a task that fits one direct step.","Designing a page, a design tool's file (Figma, FigCraft), motion, Office files or an explainer is the work of those capabilities, not engineering coordination."]}]
 when: "—"
 after: []
 outputs: ["task_map", "spec", "step_sequence"]

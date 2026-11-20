@@ -153,16 +153,16 @@ def test_duplicate_role_selection_is_rejected_even_if_both_are_compatible(coordi
 
 
 def test_stack_constraints_on_implicit_prerequisites_are_enforced(coordinator):
-    path = coordinator.package_root / "capabilities" / "figma-design.md"
+    path = coordinator.package_root / "capabilities" / "canvas-design.md"
     path.write_text(path.read_text(encoding="utf-8").replace('after: []',
                     'after: ["gsap-scrolltrigger"]'), encoding="utf-8")
     router = coordinator.package_root / "ROUTER.md"
     router.write_text(router.read_text(encoding="utf-8").replace(
-        "| figma-design | figma-design | — | — |",
-        "| figma-design | figma-design | — | gsap-scrolltrigger |"), encoding="utf-8")
+        "| canvas-design | canvas-design | — | — |",
+        "| canvas-design | canvas-design | — | gsap-scrolltrigger |"), encoding="utf-8")
     current = Coordinator(coordinator.package_root, coordinator.project_root)
     with pytest.raises(ValueError, match="[Ii]ncompatible"):
-        proposed(current, "Build the approved design", ["figma-design"])
+        proposed(current, "Build the approved design", ["canvas-design"])
 
 
 def test_legacy_map_can_be_archived_without_interpreting_or_overwriting_it(coordinator):
@@ -185,7 +185,7 @@ def test_changed_classification_cannot_reuse_old_outputs(coordinator):
     coordinator.confirm(task, proposal["plan"])
     before = coordinator.state_path.read_bytes()
     with pytest.raises(ValueError, match="--new"):
-        proposed(coordinator, task, ["figma-design"])
+        proposed(coordinator, task, ["canvas-design"])
     assert coordinator.state_path.read_bytes() == before
 
 
@@ -247,8 +247,8 @@ def test_stack_cli_cannot_smuggle_an_intent_token(coordinator):
 
 def test_catalog_exposes_tool_requirements_and_hook_policy_without_running_them(coordinator):
     result = coordinator.propose("Create a Figma screen")
-    figma = next(item for item in result["catalog"] if item["id"] == "figma-design")
-    assert any(tool["name"] == "figma-mcp" and tool["required"] for tool in figma["tools"])
+    figma = next(item for item in result["catalog"] if item["id"] == "canvas-design")
+    assert any(tool["name"] == "design-canvas" and tool["required"] for tool in figma["tools"])
     assert figma["hooks"] == []
     assert not coordinator.state_dir.exists()
 
@@ -276,12 +276,12 @@ def test_distinct_roles_cannot_claim_the_same_output(coordinator):
 
 
 def test_declared_cross_role_conflict_blocks_before_any_execution(coordinator):
-    path = coordinator.package_root / "capabilities" / "figma-design.md"
+    path = coordinator.package_root / "capabilities" / "canvas-design.md"
     text = path.read_text(encoding="utf-8").replace("conflicts: []", 'conflicts: ["motion-principles"]')
     path.write_text(text, encoding="utf-8")
     current = Coordinator(coordinator.package_root, coordinator.project_root)
     with pytest.raises(ValueError, match="[Cc]onflict"):
-        proposed(current, "Design and animate the screen", ["figma-design", "motion-principles"])
+        proposed(current, "Design and animate the screen", ["canvas-design", "motion-principles"])
     assert not current.state_dir.exists()
 
 
@@ -323,7 +323,7 @@ def test_late_outputs_and_checks_cannot_contaminate_replacement_map(coordinator,
     old_step = coordinator.confirm(task_a, proposal["plan"])
     other = Coordinator(coordinator.package_root, coordinator.project_root)
     task_b = task_a if same_task else "Unrelated Figma task"
-    proposal = proposed(other, task_b, ["visual-direction", "figma-design"], new=True)
+    proposal = proposed(other, task_b, ["visual-direction", "canvas-design"], new=True)
     new_step = other.confirm(task_b, proposal["plan"])
     assert old_step["map_id"] != new_step["map_id"]
     before = other.state_path.read_bytes()
@@ -355,7 +355,7 @@ def test_evidence_requires_exact_active_step_binding(coordinator):
 
 
 def test_active_bodies_deliver_outputs_without_direct_managed_map_writes(coordinator):
-    for name in ("visual-direction", "motion-principles", "gsap-scrolltrigger", "css-scroll", "figma-design"):
+    for name in ("visual-direction", "motion-principles", "gsap-scrolltrigger", "css-scroll", "canvas-design"):
         body = coordinator.capabilities[name].body
         assert "## Output handoff" in body, name
         assert "Do not edit" in body, name
@@ -366,8 +366,8 @@ def test_active_bodies_deliver_outputs_without_direct_managed_map_writes(coordin
 def test_helper_commands_resolve_against_installed_package_not_consumer(coordinator):
     result = coordinator.confirm("Create a page", proposed(coordinator, "Create a page", ["visual-direction"])["plan"])
     assert result["package_root"] == str(coordinator.package_root)
-    assert '<package_root>/scripts/taste-skill/scripts/start.mjs' in result["instructions"]
-    assert 'scripts/taste-skill/start.mjs' not in result["instructions"]
+    assert '<package_root>/scripts/ai-design-skills/skills/landing-page-design' in result["instructions"]
+    assert '<package_root>/skills/ai-design-skills' not in result["instructions"]
 
 
 def test_check_must_belong_to_its_bound_capability(coordinator):
@@ -379,7 +379,7 @@ def test_check_must_belong_to_its_bound_capability(coordinator):
     with pytest.raises(ValueError, match="capability"):
         coordinator.record_check(check, step["map_id"], "motion-principles")
     with pytest.raises(ValueError, match="capability"):
-        coordinator.record_check(check, step["map_id"], "figma-design")
+        coordinator.record_check(check, step["map_id"], "canvas-design")
     with pytest.raises(ValueError, match="map_id"):
         coordinator.record_check(check, "", step["capability"])
     assert coordinator.state_path.read_bytes() == before

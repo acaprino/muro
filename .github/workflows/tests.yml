@@ -34,3 +34,47 @@ jobs:
           python muro_build.py --manifest "$MANIFEST" --validate
           python muro_build.py --manifest "$MANIFEST" --check-sources
           python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
+
+  # The desktop app: the job above builds none of it. Windows, because the app is
+  # Windows-first and its start-with-Windows tests write the per-user Run key.
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: desktop-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+      - name: Rust tests
+        run: cargo test -p muro-registry -p muro-desktop-runtime
+      - name: Frontend unit tests
+        if: always()
+        run: |
+          npm ci
+          npm test
+      - name: Type check
+        if: always()
+        run: npx tsc --noEmit
+      - name: Frontend build
+        if: always()
+        run: npm run build
+      # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
+      # waiting for the registry live. It embeds the frontend build just made, and its resources
+      # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
+      # one stands in.
+      - name: Shell check
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force apps/desktop/src-tauri/resources | Out-Null
+          cargo check -p muro-desktop
+      # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
+      - name: Browser tests
+        if: always()
+        run: node apps/desktop/tests/browser.mjs

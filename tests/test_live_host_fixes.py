@@ -30,7 +30,7 @@ def test_release_never_ships_a_file_named_skill_md_below_a_skill_folder():
             skills = release / "adapters" / host / "skills"
             nested = [p for p in skills.rglob("SKILL.md") if p.parent.parent != skills]
             assert nested == [], (host, [str(p.relative_to(skills)) for p in nested[:5]])
-            assert (skills / "marionette" / "scripts" / "taste-skill" / "SKILL.source.md").is_file()
+            assert (skills / "marionette" / "scripts" / "ai-design-skills" / "skills" / "landing-page-design" / "SKILL.source.md").is_file()
             assert (skills / "marionette" / "scripts" / "ui-ux-pro-max" / ".claude" / "skills" / "ui-ux-pro-max"
                     / "SKILL.source.md").is_file()
         assert not list((release / "scripts").rglob("SKILL.md"))
@@ -44,9 +44,9 @@ def test_capabilities_reference_packaged_source_skills_by_their_packaged_name():
     for cap in caps:
         assert not pattern.search(cap.body), (cap.id, pattern.search(cap.body).group(0))
     body = next(c for c in caps if c.id == "visual-direction").body
-    assert "<TS>/SKILL.source.md" in body
+    assert "<LP>/SKILL.source.md" in body
     # Provenance lines keep the upstream file name.
-    assert "skills/taste-skill/SKILL.md" in body
+    assert "skills/landing-page-design/SKILL.md" in body
 
 
 def test_validation_rejects_a_packaged_reference_to_skill_md(tmp_path):

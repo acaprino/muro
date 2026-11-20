@@ -9,7 +9,7 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | work-map | coordinator | — | — | task_map, spec, step_sequence | engineering.work-coordination |
 | visual-direction | art-direction | — | — | offer, page_outline, palette, typography, layout, constraints, page | ui.visual-direction, ui.landing-strategy |
 | design-guidance | design-guidance | — | — | design_candidates, stack_guidance | ui.design-guidance |
-| figma-design | figma-design | — | — | foundations, component_map, screen_plan | ui.figma-design |
+| canvas-design | canvas-design | — | — | foundations, component_map, screen_plan | ui.canvas-design |
 | aesthetic-direction | aesthetic-direction | — | — | aesthetic_direction, direction_sample | ui.aesthetic-direction |
 | wireframe | lofi-exploration | — | — | wireframe_file, wireframe_decision | ui.wireframe-exploration |
 | ui-prototype | prototype-authoring | — | — | prototype_plan, prototype_file, prototype_verification | ui.interactive-prototype |
@@ -61,22 +61,22 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 ## Harmonization record (re-harmonized 2026-11-10 against the pinned sources)
 
 - No row has a mandatory prerequisite. Consumers start from existing work or stated behavior, reading earlier outputs when recorded; the AI orders selected producers and consumers. Forced edges had made hover timing run a website direction.
-- visual-direction merges taste-skill v2.5.1 (plan, copy, dealt hero, palette, type and moments, build from its kit, its checker and finish gate) and landing-page-design (offer, proof, FAQ, outline):
-  both build the page; taste's brief/copy step is the landing strategy and owns the
-  look. Landing's font list, hero gradient and Tailwind scale are scoped out;
-  the user's explicit instruction wins over source bans and is recorded; a brand alone does not (its colours go through `brand`). 2026-11-17 (ADR-0026, ADR-0027): taste-skill travels whole (1,631 files; until then 11, and the page was written by hand); its Stop hook, the finish gate, is active on Claude Code and Codex.
+- 2026-11-19, owner decision: taste-skill is removed ("troppo prescrittiva e costrittiva"). visual-direction, which had merged it with landing-page-design and let it own the look, now follows landing-page-design alone:
+  Part A is the strategy and copy, Part B the visual system. Its font list, hero gradient, Tailwind scale and tagline reveal had been scoped out
+  only because the two sources contradicted each other; with no collision left they apply as written (ADR-0017). The user's explicit prompt wins over a rule and is recorded.
+  Gone with it: the kit, the dealers, the browser checks, the finish gate and its Stop hook, the package's only active hook. Id, intents and outputs are kept.
 - 2026-11-17, same pass: work-map follows wayfinder's own `research` skill for a research item (selected; the other sibling skills stay inline). motion-design re-pinned to head 2e1f3c05: a request for a rendered animation file is handed to Creator MCP by the source's rules, inside motion-principles; no new role, output or edge.
 - 2026-11-19: motion-design re-pinned to head d77a9fc8; `reference/export-and-render.md` now gives install commands per client and a per-client handoff. No role, output, edge or delivery decision changes.
 - design-guidance (ui-ux-pro-max) is split out: guidance for any interface,
-  app screens included; beside a dealt palette its results are candidates.
-- figma-design keeps a recorded pairing and palette as the user's choice. Its
-  one conditional prerequisite is declared in `needs`: visual-direction, only
+  app screens included; beside a recorded visual system its results are candidates.
+- canvas-design (figma-design until 2026-11-19, owner decision: generic, not bound to Figma) serves Figma, FigCraft or another canvas editor through the host's integration; the source's
+  design rules are unchanged. It keeps a recorded pairing and palette as the user's choice. One conditional prerequisite in `needs`: visual-direction, only
   for a new landing page with no outline; the runtime AI judges it per task.
 - motion-principles follows the source tables; a recorded motion budget overrides
   its three-layer rule. GSAP and CSS scroll are variants of one outcome; only the
   stack differs. css-scroll has no upstream source (Muro-authored).
 - work-map follows wayfinder/to-spec/to-tickets locally, plus build/review; never a fallback.
-- visual-direction is `resumable`: a site build with screenshot rounds gets a map
+- visual-direction is `resumable`: a site built section by section gets a map
   even as the only step (2026-11-11, ADR-0015).
 - Office/explainer roles stay separate from UI; converting to PDF belongs to office-files.
 - open-paper-skills (2026-11-18, owner decision): only paper-search and html-explanation
