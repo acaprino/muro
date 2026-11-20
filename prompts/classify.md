@@ -87,6 +87,12 @@ and `catalog_digest`. Add exactly `status`, `selections`, `reason`, `questions`:
   `"needs": [{"requires": "<capability id>", "applies": true|false, "reason": "<why, for this task>"}]`,
   one entry per declared prerequisite. When `applies` is true, also select the
   required capability, with its own intent and reason, before the dependent one.
+  For `applies: true`, if that prerequisite runs more than once, `requires` must
+  name its exact selected `step_id`, such as `"<capability>#2"`; a bare capability
+  id binds only an unambiguous producer. For `applies: false`, a bare capability
+  id needs no selected producer or ordering. Reference syntax is always validated;
+  an explicit `#<n>` must name an existing selected step, even when `applies` is
+  false, and never falls back to another instance.
   Decide from meaning and context; an already recorded output can make a
   condition false. Omit `needs` for capabilities that declare none.
 - `no_match`: empty selections/questions and a reason explaining the unsupported

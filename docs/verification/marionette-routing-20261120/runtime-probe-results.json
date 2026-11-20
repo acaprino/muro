@@ -1,0 +1,92 @@
+[
+  {
+    "id": "amend_rewrites_changed_completed_work",
+    "expected": "Restart visual-direction because the user explicitly changed its output.",
+    "actual": {
+      "mode": "step",
+      "next": "visual-direction",
+      "recorded_outputs": {}
+    },
+    "passed": true
+  },
+  {
+    "id": "amend_intent_change_preserves_valid_state",
+    "expected": "Rerun office-files under the editing intent; no invalid state written.",
+    "actual": {
+      "next": "office-files",
+      "error": null
+    },
+    "passed": true
+  },
+  {
+    "id": "reject_missing_exact_need_instance",
+    "expected": "Reject applies:true prerequisite whose explicit step instance was never selected.",
+    "actual": {
+      "rejected": "canvas-design needs visual-direction#999 for this task (applies: true): Conditional prerequisite visual-direction#999 is not selected"
+    },
+    "passed": true
+  },
+  {
+    "id": "reject_stale_digest",
+    "expected": "Reject a classification for another catalog, without writing state.",
+    "actual": {
+      "error": "AI classification catalog_digest differs from current context; request a new classification",
+      "state_created": false
+    },
+    "passed": true
+  },
+  {
+    "id": "reject_unknown_intent",
+    "expected": "Reject an invented intent, without writing state.",
+    "actual": {
+      "error": "Unknown intent for capability motion-principles: made.up",
+      "state_created": false
+    },
+    "passed": true
+  },
+  {
+    "id": "reject_unknown_capability",
+    "expected": "Reject an invented capability, without writing state.",
+    "actual": {
+      "error": "Unknown capability in AI classification: made-up",
+      "state_created": false
+    },
+    "passed": true
+  },
+  {
+    "id": "reject_duplicate_step",
+    "expected": "Reject duplicate unqualified capability selections.",
+    "actual": {
+      "error": "Duplicate capability in AI classification: motion-principles; use distinct step_id for repeated steps",
+      "state_created": false
+    },
+    "passed": true
+  },
+  {
+    "id": "stale_evidence_is_atomic",
+    "expected": "Reject old-map output/check submissions, preserving state bytes.",
+    "actual": {
+      "error": "Stale map binding: evidence was produced for map different-map-id, but the active map is c416e43aa32d41868a2f4fe11c55ebad; nothing was recorded",
+      "state_unchanged": true
+    },
+    "passed": true
+  },
+  {
+    "id": "foreign_intent_check_is_atomic",
+    "expected": "Reject a check belonging to a different intent, preserving state bytes.",
+    "actual": {
+      "error": "Check post_edit_check_clean does not apply to step office-files (intent office.content-extraction): its checks are original_preserved, conversion_loss_reported. Nothing was recorded; record a check only on the step it verifies",
+      "state_unchanged": true
+    },
+    "passed": true
+  },
+  {
+    "id": "direct_second_task_executes_again",
+    "expected": "Run direct capability again for a second distinct task.",
+    "actual": {
+      "mode": "direct",
+      "capability": "motion-principles"
+    },
+    "passed": true
+  }
+]

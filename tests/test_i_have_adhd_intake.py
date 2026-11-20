@@ -75,11 +75,11 @@ def test_combined_policy_has_a_bounded_cost_and_reasoned_source_contributions():
     manifest = read_json("sources.json")
     document = read_json("delivery.json")
     policy = document.get("always_on")
-    # Two absorbed sources and one owner Markdown collection contribute to the policy.
-    assert always_on_limit(document) == 3 * ALWAYS_ON_PER_SOURCE
+    # ADHD, Ponytail, scholarly source preferences and the owner's progress guidance.
+    assert always_on_limit(document) == 4 * ALWAYS_ON_PER_SOURCE
     assert isinstance(policy, str) and policy.strip() and len(policy) <= always_on_limit(document)
     contributions = {item["source"] for item in document["decisions"] if item["form"] == "always-on"}
-    assert {SOURCE, "ponytail"} <= contributions
+    assert {SOURCE, "ponytail", "open-paper-skills"} <= contributions
     assert validate_delivery(document, parse_capabilities(PACKAGE / "capabilities"),
                              {source["id"] for source in manifest["sources"]}) == []
 

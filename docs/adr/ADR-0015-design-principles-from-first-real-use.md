@@ -84,8 +84,11 @@ What the evidence showed, in one line each:
      the folder holds files Muro did not write.
    - `--build --out <dir>` stages a release anywhere; `dist/` stays protected.
    - `plan --amend`: when the user refines a request that has an active map, the
-     host classifies the refined request and the runtime starts a new map that
-     carries over every step whose recorded work is still valid. A kept step is
+     host classifies the refined request. The runtime creates a new map and
+     reruns its steps. The host can retain completed steps it has reviewed
+     for the refined request by naming them with `--preserve-completed`.
+     Equal step IDs and populated output fields cannot establish whether a
+     previous answer still addresses the revised task. A kept step is
      stale, and is redone, when an `after` prerequisite, an applying `needs`
      prerequisite or the producer of an output it `reads` is redone. The earlier
      map is archived as before.
@@ -102,8 +105,12 @@ What the evidence showed, in one line each:
    - Routing eval: a package may carry `eval-cases.json` (request, stack tokens,
      expected status and ordered capabilities, including near-misses and
      `no_match`). `--prepare-eval` writes the rules, compact catalog and case
-     contexts for the host AI, never the expectations; `--score-eval` validates
-     each decision with the runtime's rules and compares. Python does not classify.
+     contexts for the host AI. Prepared cases use opaque IDs so that descriptive
+     test names cannot hint at the right answer. Scoring reports the original
+     case name and accepts existing decision files keyed by those names.
+     `--score-eval` validates each decision against the runtime. An authored
+     `expect.selections` also checks the ordered intents and conditional
+     prerequisites. A case may list additional complete acceptable routes.
    - A contract change that touches the host protocol is run once in a real host
      before it is called done, with the recipe in AGENTS.md, and the result goes
      in `docs/verification/` with its cost and sample size.

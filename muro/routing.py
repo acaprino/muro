@@ -25,6 +25,25 @@ def selection_step_id(selection: dict[str, Any]) -> str:
     return selection.get("step_id") or selection["capability"]
 
 
+def _validate_needs_reference(required: str) -> None:
+    capability, separator, instance = required.partition("#")
+    if (not capability.strip() or capability != capability.strip()
+            or separator and not re.fullmatch(r"[1-9][0-9]*", instance)):
+        raise ValueError(f"Invalid conditional prerequisite reference '{required}': use a capability id or capability#<n>")
+
+
+def resolve_needs_step(required: str, order_steps: list[str]) -> str:
+    """Bind a conditional prerequisite to one selected step, never substitute an explicit instance."""
+    _validate_needs_reference(required)
+    matches = ([step for step in order_steps if step == required] if "#" in required
+               else [step for step in order_steps if step_capability(step) == required])
+    if not matches:
+        raise ValueError(f"Conditional prerequisite {required} is not selected")
+    if len(matches) != 1:
+        raise ValueError(f"Conditional prerequisite {required} is ambiguous; use an explicit step_id")
+    return matches[0]
+
+
 def validate_stack(tokens: set[str], conflict_groups: list[list[str]] | None = None) -> None:
     bad = [token for token in tokens
            if not isinstance(token, str) or not re.fullmatch(r"stack:[a-z0-9]+(?:[.-][a-z0-9]+)*", token)]
@@ -88,9 +107,7 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
     seen_steps: set[str] = set()
     bare_seen: set[str] = set()
     instanced_caps: set[str] = set()
-    order_caps = [s.get("capability") for s in selections if isinstance(s, dict)]
-    order_steps = [s.get("step_id") or s.get("capability") for s in selections if isinstance(s, dict)]
-    for idx, selection in enumerate(selections):
+    for selection in selections:
         if (not isinstance(selection, dict) or set(selection) - {"needs", "step_id"} != {"capability", "intent", "reason"}
                 or any(not isinstance(selection[k], str) or not selection[k].strip() for k in ("capability", "intent", "reason"))):
             raise ValueError("Each selection requires capability, intent and reason strings")
@@ -108,8 +125,6 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
                 raise ValueError(f"Cannot mix bare capability and step_id for {identifier}")
             bare_seen.add(identifier)
             step_key = identifier
-        if identifier in capabilities:
-            _validate_needs(selection, capabilities[identifier], order_caps, order_steps, idx)
         if identifier not in capabilities:
             raise ValueError(f"Unknown capability in AI classification: {identifier}")
         if step_key in seen_steps:
@@ -117,10 +132,13 @@ def validate_classification(value: Any, context: dict, capabilities: dict[str, C
         seen_steps.add(step_key)
         if selection["intent"] not in {i["id"] for i in capabilities[identifier].intents}:
             raise ValueError(f"Unknown intent for capability {identifier}: {selection['intent']}")
+    order_steps = [selection_step_id(selection) for selection in selections]
+    for idx, selection in enumerate(selections):
+        _validate_needs(selection, capabilities[selection["capability"]], order_steps, idx)
     return copy.deepcopy(value)
 
 
-def _validate_needs(selection: dict, capability: Capability, order_caps: list, order_steps: list, self_idx: int) -> None:
+def _validate_needs(selection: dict, capability: Capability, order_steps: list[str], self_idx: int) -> None:
     """The AI judged every declared conditional prerequisite; Python only holds it to that judgment."""
     identifier = capability.id
     declared = [need["capability"] for need in capability.needs]
@@ -132,20 +150,19 @@ def _validate_needs(selection: dict, capability: Capability, order_caps: list, o
             or not isinstance(item["requires"], str) or not isinstance(item["applies"], bool)
             or not isinstance(item["reason"], str) or not item["reason"].strip() for item in judged)):
         raise ValueError(f"Each needs judgment for {identifier} requires requires, boolean applies and a reason")
+    for item in judged:
+        _validate_needs_reference(item["requires"])
     if sorted(step_capability(item["requires"]) for item in judged) != sorted(declared):
         raise ValueError(f"Selection {identifier} must judge exactly its declared conditional prerequisites: {declared}")
     for item in judged:
-        if not item["applies"]:
-            continue
         required = item["requires"]
-        req_cap = step_capability(required)
-        if required in order_steps:
-            req_idx = order_steps.index(required)
-        elif req_cap in order_caps:
-            req_idx = order_caps.index(req_cap)
-        else:
-            raise ValueError(f"{identifier} needs {required} for this task (applies: true), but it is not selected")
-        if req_idx > self_idx:
+        if not item["applies"] and "#" not in required:
+            continue
+        try:
+            required_step = resolve_needs_step(required, order_steps)
+        except ValueError as error:
+            raise ValueError(f"{identifier} needs {required} for this task (applies: {str(item['applies']).lower()}): {error}") from error
+        if item["applies"] and order_steps.index(required_step) >= self_idx:
             raise ValueError(f"{identifier} needs {required} first: select {required} before it")
 
 

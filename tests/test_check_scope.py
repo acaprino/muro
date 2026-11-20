@@ -129,7 +129,9 @@ def test_a_direct_step_lists_the_checks_of_its_intent(package, tmp_path):
         result = coordinator.confirm(task, result["plan"], set(), classification=route)
     assert result["intent"] == "ui.landing-strategy"
     assert result["checks"] == ["single_primary_action", "proof_supported"]
-    assert "check_conditions" not in result
+    assert set(result["check_conditions"]) == {"single_primary_action"}
+    assert "landing page" in result["check_conditions"]["single_primary_action"]
+    assert "palette_applied" not in result["checks"]
 
 
 def test_an_after_prerequisite_needs_one_check_scope(package, tmp_path):

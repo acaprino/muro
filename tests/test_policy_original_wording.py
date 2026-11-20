@@ -30,7 +30,8 @@ def read_json(name):
 
 @pytest.fixture(scope="module")
 def originals():
-    wanted = {"i-have-adhd": "skills/i-have-adhd/SKILL.md", "ponytail": ".agents/rules/ponytail.md"}
+    wanted = {"i-have-adhd": "skills/i-have-adhd/SKILL.md", "ponytail": ".agents/rules/ponytail.md",
+              "open-paper-skills": "skills/paper-search/SKILL.md"}
     texts = {}
     for src in read_json("sources.json")["sources"]:
         if src["id"] in wanted:
@@ -39,6 +40,10 @@ def originals():
     assert set(texts) == set(wanted)
     # The frontmatter registers the original as a skill of its own; the body is the policy.
     texts["i-have-adhd"] = texts["i-have-adhd"].split("\n---\n", 1)[1]
+    # Only the cross-route source rule is permanent; searching and managing sources remain on demand.
+    texts["open-paper-skills"] = texts["open-paper-skills"].split(
+        "A source that is off is off on every route.", 1)[1].split("\n\n", 1)[0]
+    texts["open-paper-skills"] = "A source that is off is off on every route." + texts["open-paper-skills"]
     return texts
 
 
@@ -54,6 +59,8 @@ def lines(text):
 def test_every_line_of_both_originals_is_in_the_policy_unchanged(originals, policy):
     carried = set(lines(policy))
     for line in lines(originals["i-have-adhd"]):
+        assert line in carried, line
+    for line in lines(originals["open-paper-skills"]):
         assert line in carried, line
     changed = [line for line in lines(originals["ponytail"]) if line not in carried]
     # Exactly one Ponytail line differs, and only by its last sentence.
@@ -92,7 +99,8 @@ def test_everything_else_in_the_policy_is_marked_as_marionettes(originals, polic
     assert all(MARK in line for line in own[2:]), own[2:]
     # Original three coexistence lines, the distinction between progress and final recaps, and the
     # line that hands an explanation request to the explainer skill (2026-11-18).
-    assert len(own) == 7
+    # Plus the marked scholarly-policy heading and its package-path/delegation binding.
+    assert len(own) == 9
 
 
 def test_an_explanation_request_is_handed_to_the_explainer_skill(policy):
@@ -115,13 +123,15 @@ def test_each_change_is_explained_as_coexistence_in_the_delivery_decisions(polic
     document = read_json("delivery.json")
     assert len(policy) <= always_on_limit(document)
     reasons = {item["source"]: item for item in document["decisions"] if item["form"] == "always-on"}
-    assert set(reasons) == {"ponytail", "i-have-adhd", "custom-instructions/recap-adhd.md"}
+    assert set(reasons) == {"ponytail", "i-have-adhd", "open-paper-skills", "custom-instructions/recap-adhd.md"}
     for item in (reasons["ponytail"], reasons["i-have-adhd"]):
         assert "not altered except for harmonization and coexistence" in item["reason"]
         assert MARK in item["reason"] and "coexistence" in item["reason"]
     assert "i-have-adhd rule 3" in reasons["ponytail"]["reason"]
     assert "artifact" in reasons["i-have-adhd"]["reason"]
     assert "rule 10" in reasons["custom-instructions/recap-adhd.md"]["reason"]
+    assert "scholarly literature retrieval" in reasons["open-paper-skills"]["reason"]
+    assert "[Marionette]" in reasons["open-paper-skills"]["reason"]
     # What the policy now carries is no longer recorded as dropped.
     dropped = [item["content"] for item in document["decisions"]
                if item["source"] == "i-have-adhd" and item["form"] == "dropped"]

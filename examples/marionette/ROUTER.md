@@ -75,14 +75,14 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - motion-principles follows the source tables; a recorded motion budget overrides
   its three-layer rule. GSAP and CSS scroll are variants of one outcome; only the
   stack differs. css-scroll has no upstream source (Muro-authored).
-- work-map follows wayfinder/to-spec/to-tickets locally, plus build/review; never a fallback.
+- work-map handles an engineering request through Wayfinder's local map, spec, tickets, implementation and review. Its grilling, domain-modeling, prototype and implementation procedures are packaged originals. The coordinator never selects work-map as a fallback.
 - visual-direction is `resumable`: a site built section by section gets a map
   even as the only step (2026-11-11, ADR-0015).
 - Office/explainer roles stay separate from UI; converting to PDF belongs to office-files.
 - open-paper-skills (2026-11-18, owner decision): only paper-search and html-explanation
   (explain-anything-html, left out unread on 2026-11-11 as covered by explain-this) stay;
   the wiki, figure, research and handoff roles are removed. html-explanation conflicts
-  with interactive-explainer, one owner per explanation, and `reads` the search findings.
+  with interactive-explainer, one owner per explanation, and `reads` the search findings. Literature source switches apply to scholarly retrieval across capabilities and delegated researchers (delivery.json).
 - tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six
   default hooks are passive `host-approved` entries; registering them is an
   explicit user-requested step of the capability, never done at build or install.

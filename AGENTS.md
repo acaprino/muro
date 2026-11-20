@@ -237,7 +237,9 @@ installation, publication or replacement of existing dist output without request
   examples, no entries and no discoverable SKILL.md. The policy and delivery
   declarations participate in catalog_digest and are supplied to routing evals.
 - `eval-cases.json` (optional): AI-authored requests with expected status and
-  ordered capabilities. `--prepare-eval` gives the host AI rules, catalog and
+  ordered capabilities. Use `expect.selections` to test the actual operation
+  when a capability serves several intents or depends on a conditional prerequisite.
+  `--prepare-eval` gives the host AI rules, catalog and
   contexts without the expectations; `--score-eval <decisions.json>` validates
   and compares. Python never classifies a case (ADR-0015).
 
