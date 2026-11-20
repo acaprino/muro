@@ -243,3 +243,15 @@ Manual note outside the generated index: [ADR-0027 — Binary media travels when
 the intake declares it](ADR-0027-declared-binary-media.md) replaces the refusal
 of images, fonts and video by extension (ADR-0002) with `media_paths`, declared
 by the intake after it read how the source licenses them.
+
+## Desktop projects and sync
+
+Manual note outside the generated index: [ADR-0028 — The desktop app manages
+projects and sync](ADR-0028-desktop-projects-and-sync.md) records the owner's
+decisions of 2026-11-19 for the desktop app: Sync as the page where plugins
+reach the harnesses, with its state always visible, plugins outside the list
+under one visible rule, and a shell that lives in the notification area, starts
+with Windows and keeps the harnesses in sync from the background. Proposed: the
+owner's decisions are recorded, the explanatory text and the implementation
+choices are not separately approved. The part about projects (the `.mp` file,
+decision records, harmonization per project) is not implemented yet.

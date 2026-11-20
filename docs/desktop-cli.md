@@ -82,6 +82,38 @@ Review the returned operations and blockers. Save the exact returned plan ID in 
 
 Application rechecks the registry revision, inventory and prepared artifacts. If they changed, calculate a new plan. Exclusive targets include removal of plugins outside the configured registry; inspect the plan before applying it. A second unchanged plan should contain no operations.
 
+`plan` also takes `{"target_id":"..."}` to compare only that harness; a plan for one harness records only that harness's `checked` time. An unknown or disabled `target_id` is refused with `Target not found`.
+
+### Check
+
+```powershell
+.\tools\muroctl.exe request check
+```
+
+`check` is what the app's **Check now** sends: it resolves every plugin's source, saves what it found, calculates the plan, and returns `{"snapshot":{...},"plan":{...},"errors":[...]}`. A plugin whose source could not be resolved is listed in `errors` (`{"plugin_id":"...","message":"Source folder not found: ..."}`) and the plan is still calculated. A check that found nothing new leaves the registry revision as it was, so plans and open forms stay valid. It takes the same optional `target_id` as `plan`. Every full check or plan records the sync state, which the next `snapshot` returns as `sync`.
+
+### Blockers
+
+A plan lists what cannot be done yet in `blockers`: a harness whose folder or inventory cannot be read, a plugin without a build for its harness. `apply` refuses a plan with blockers unless the payload says `"allow_blocked":true`:
+
+```json
+{"plan_id":"the-id-returned-by-plan","allow_blocked":true}
+```
+
+```powershell
+.\tools\muroctl.exe request apply --input .\apply-blocked.json
+```
+
+The operations that are ready run, and the result is the snapshot plus `left_out`, the blockers that were not applied. On a harness that has a blocker the plan holds no removal at all: a plugin of the registry whose build failed must not be uninstalled as if it were outside the list. `allow_blocked` must be a boolean.
+
+### Sync now
+
+```powershell
+.\tools\muroctl.exe request sync_now --input .\sync.json
+```
+
+`sync_now` is the background worker's step: a `check`, then, when the plan has operations, an `apply` of that plan with `allow_blocked`. `{"apply":false}` only checks; the default is to apply. It returns `{"applied":N,"pending":N,"blockers":[...],"errors":[...]}` and records its outcome in `automation-status.json` for the Activity page: *Automatic sync* when it applied, *Background check* when it only looked; failed, with the blockers as the message, when blockers remain. Called through `muroctl` it has no gate: the registry refuses a second writer while one runs, so wait for it. The desktop app lets one `sync_now` run at a time and makes Quit wait for it.
+
 Commands accepting structured payloads use `--input` to read a UTF-8 JSON file. For example, save `resolve.json` containing a registry plugin's exact ID:
 
 ```json
@@ -103,16 +135,18 @@ Every action works the same through `request ACTION --input PAYLOAD.json` and th
 | Action | Payload | Effect |
 |---|---|---|
 | `registry` | `{}` | Desired configuration only. |
-| `snapshot` | `{}` | Registry, observed inventory, activity, jobs, custom-instruction state and `data_dir`. |
+| `snapshot` | `{}` | Registry, observed inventory, activity, jobs, custom-instruction state, `sync` (the recorded sync state: `last_check`, `last_sync`, `pending`, `blockers`, the registry `revision` of the last full plan, and `checked` and `synced` for each target) and `data_dir`. |
 | `scan` | `{}` | Like `snapshot`, after refreshing every target's inventory. |
 | `discover` | `{}` | Mukade harness discovery records. |
 | `save_plugin` | `{"revision":N,"plugin":{...}}` | Adds or replaces a plugin by `id`. |
 | `save_target` | `{"revision":N,"target":{...}}` | Adds or replaces a target instance by `id`. |
 | `remove_plugin`, `remove_target` | `{"revision":N,"id":"..."}` | Removes it from the desired registry. Uninstalling happens only through a plan. |
-| `settings` | `{"revision":N,"settings":{"auto_sync":bool,"interval_minutes":N,"agent":"...","python":"...","factory_path":"..."}}` | All five fields are required; `interval_minutes` is at least 1. |
+| `settings` | `{"revision":N,"settings":{"auto_sync":bool,"interval_minutes":N,"close_to_tray":bool,"agent":"...","python":"...","factory_path":"..."}}` | All six fields are required; `interval_minutes` is at least 1. A settings save keeps the recorded sync state current. |
 | `resolve` | `{"id":"plugin-id"}` | Resolves the source, records upstream metadata and native distributions. |
-| `plan` | `{}` or `{"reinstall":"plugin-id"}` | Calculates a sync plan, or a reinstall plan from the retained verified artifact. |
-| `apply` | `{"plan_id":"..."}` | Applies a saved plan after rechecking its inputs. |
+| `check` | `{}` or `{"target_id":"..."}` | Resolves every source, then plans: `{snapshot, plan, errors}`. See [Check](#check). |
+| `plan` | `{}`, `{"reinstall":"plugin-id"}` or `{"target_id":"..."}` | Calculates a sync plan, a reinstall plan from the retained verified artifact, or a plan for one harness. |
+| `apply` | `{"plan_id":"..."}` or `{"plan_id":"...","allow_blocked":true}` | Applies a saved plan after rechecking its inputs. With `allow_blocked` a plan with blockers applies what is ready and returns `left_out`. See [Blockers](#blockers). |
+| `sync_now` | `{}` or `{"apply":bool}` | A check, then an apply that leaves blockers out; `apply` false only checks. See [Sync now](#sync-now). |
 | `maintenance` | `{"kind":"verify"}` or `{"kind":"cleanup"}` | `verify` rehashes stored artifacts. `cleanup` removes artifacts no receipt references; existing plans must then be recalculated. |
 | `custom_instructions` | `{"id":"plugin-id","create":bool}` | Folder path, Markdown files, digest and stale harnesses. |
 | `open_custom_instructions` | `{"id":"plugin-id"}` | Creates the folder if needed and opens it in the OS file manager. |
@@ -120,7 +154,9 @@ Every action works the same through `request ACTION --input PAYLOAD.json` and th
 | `jobs` | `{}` | Job records. |
 | `cancel_job` | `{"id":"job-id"}` | Requests cancellation. |
 
-`recover_jobs` and `automation_record` are used internally by the desktop app. In `serve`, each request `id` must be an unsigned integer.
+`recover_jobs` and `automation_record` remain for compatibility; the desktop app uses neither (its worker calls `sync_now`). In `serve`, each request `id` must be an unsigned integer.
+
+`autostart` (`{}`: whether Muro starts with Windows) and `set_autostart` (`{"enabled":bool}`) belong to the desktop shell: only it knows its own executable, so only the window's `request` command answers them. `muroctl` and `Muro.exe --request` answer `Unknown registry action: autostart`. The shell reads and writes the per-user Run value described in [Runtime and storage](desktop.md#runtime-and-storage).
 
 At startup, `serve` and `request` point `settings.python` and `settings.factory_path` at the bundled private Python and factory when both are present and the folder is portable (or the registry is new), so a moved portable folder keeps working. Moving the folder also rebases registry, receipt and plan paths that lived inside the old folder; external target roots are left as they are.
 

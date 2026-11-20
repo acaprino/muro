@@ -111,6 +111,42 @@ Marionette are read from `examples/marionette`.
   (the background worker, and the review sheet after showing what is left
   out). On a harness with a blocker nothing is uninstalled: a plugin of the
   list whose build failed must not be removed as if it were outside the list.
+- **One running Muro for each data directory.** With Start with Windows a second
+  launch is an everyday event, and the backend's own lock on the data directory
+  made it crash. The running Muro holds a named Windows event,
+  `Local\MuroShow-<hash of the data directory>`; a later launch raises it, so
+  the running one shows its window, and ends with exit code 0 and no output (with
+  `--background` it raises nothing). The name is a hash, so no path can bring a
+  character Windows refuses. Another data directory is another Muro.
+- **Quit waits for a running sync, for 60 seconds at most.** A background apply
+  can be running at any Quit, and a process killed halfway leaves a harness
+  half-installed. Quit in the tray, and a close with `close_to_tray` off, start
+  no new sync, show *Finishing the sync…* and exit when the sync ends or after
+  60 seconds. Only `sync_now` is gated; an apply started from the window can
+  still be cut by a Quit.
+- **The Run value is repaired only when its executable is gone.** Repairing at
+  every start would point the owner's value at whatever copy of Muro is
+  launched, a development build included. A value that names another existing
+  executable is left alone, and so is one Muro cannot read as its own command.
+- **A settings save keeps the recorded sync state current.** Settings do not
+  change what a sync would do, and without this every switch in Settings would
+  cost a full inventory scan and the tray would read *Not checked yet* until the
+  next interval. The registry carries the recorded revision forward, and the
+  Settings page tells `adopt` not to replan. Any other registry change makes the
+  recorded state stale.
+- **The page's requests wait for each other.** The service takes its registry
+  lock without waiting and refuses a second request meanwhile; the page sent
+  such a pair itself, a background `plan` after a save and the next step of the
+  first run, found on the real executable and invisible to a fake transport that
+  has no lock. All requests but `discover` (which runs Mukade and takes no
+  registry lock) go through one queue (`apps/desktop/src/queue.ts`). A request
+  from the background worker can still meet a busy registry, and is reported as
+  such.
+- **The shell is tested through its command.** The tray menu is a native menu
+  and no test reaches it. `native-shell.mjs` calls the shell's `request`
+  command from the page and closes the window with `WM_CLOSE`, as Windows does;
+  `native.mjs` drives the interface on the real service. The first is not a
+  proof of the second, and neither is a real sign-in to Windows.
 - **`.mp` container, history and records** are specified with plans 2 and 3.
   Until then a project folder is laid out as a package folder is today.
 
