@@ -40,7 +40,7 @@ ones that still matter on the final tree.
 | 7. Settings saved on change, Activity | 59c376e, c1fb9ac | registry 49 pass; `browser-settings.mjs` passes; `npm test` 119 pass. |
 | 8. The first run | 27d0f2e, e46203e, 23427cb, 638defb | `npm test` 120 pass; `browser-setup.mjs` 17 pass. |
 | 6. Harness sheet, plugin dialog, plugins outside the list | fc559fb | `npm test` 121 pass; `browser-harness.mjs` 17, `browser-sync.mjs` 18. |
-| 9. The real interface, documents, CI | 6eef201, 579bd3a, f4fc717, bca93d7, 5993b97 and the documents commit | below. |
+| 9. The real interface, documents, CI | 6eef201, 579bd3a, f4fc717, bca93d7, 5993b97, dc6857e, f92998d, 7f55d6e and this record | below. |
 
 ## Task 9: the new interface meets the real service
 
