@@ -45,6 +45,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             revision(&registry, &payload)?;
             // The receipt written for an adopted installation, until the registry is saved.
             let mut adopted = None;
+            let mut removed_target = None;
             match action {
                 "save_plugin" => {
                     let p = payload["plugin"].clone();
@@ -117,6 +118,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                         .as_array_mut()
                         .context("targets")?
                         .retain(|t| t["id"] != key);
+                    removed_target = Some(key);
                 }
                 "settings" => {
                     let s = payload["settings"].clone();
@@ -146,6 +148,9 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                     let _ = write(&data_dir.join("receipts.json"), &receipts);
                 }
                 return Err(error);
+            }
+            if let Some(key) = removed_target {
+                sync_status::forget_target(data_dir, key)?;
             }
             if action == "settings" {
                 // Settings do not change what a sync would do: the last plan stays current, so a
@@ -797,6 +802,15 @@ fn plan(
         json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
     )
 }
+/// The inventory read right after an operation must be complete, or nothing can be verified.
+fn observed_complete(observed: &Value) -> Result<()> {
+    ensure!(
+        observed["complete"] == true,
+        "Replacement verification failed: {}",
+        text(&observed["error"])
+    );
+    Ok(())
+}
 fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Result<Value> {
     let pid = str_field(payload, "plan_id")?;
     id(pid)?;
@@ -925,11 +939,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
             }
             if op["kind"] != "remove" {
                 let observed = native::inventory(target, receipts);
-                ensure!(
-                    observed["complete"] == true,
-                    "Replacement verification failed: {}",
-                    observed["error"]
-                );
+                observed_complete(&observed)?;
                 ensure!(
                     observed["plugins"]
                         .as_array()
@@ -1044,7 +1054,7 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
             let inv = inventories(root, reg, receipts, true)?;
             for i in inv.as_array().unwrap() {
                 if i["complete"] != true {
-                    details.push(format!("Inventory error: {}", i["error"]));
+                    details.push(format!("Inventory error: {}", text(&i["error"])));
                 }
             }
             Ok(json!({"message":"Artifact and inventory inspection complete","details":details}))
@@ -1095,6 +1105,15 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_failed_verification_gives_the_error_as_text_not_as_a_json_value() {
+        let observed = json!({"complete":false,"error":r"Target configuration directory does not exist: C:\gone"});
+        assert_eq!(
+            observed_complete(&observed).unwrap_err().to_string(),
+            r"Replacement verification failed: Target configuration directory does not exist: C:\gone"
+        );
+        assert!(observed_complete(&json!({"complete":true,"error":null})).is_ok());
+    }
     #[test]
     fn the_digest_of_an_installed_copy_is_its_folder_hash_or_none_when_there_is_no_folder() {
         let tmp = tempfile::tempdir().unwrap();
