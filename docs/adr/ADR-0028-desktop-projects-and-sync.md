@@ -122,8 +122,8 @@ Marionette are read from `examples/marionette`.
   can be running at any Quit, and a process killed halfway leaves a harness
   half-installed. Quit in the tray, and a close with `close_to_tray` off, start
   no new sync, show *Finishing the sync…* and exit when the sync ends or after
-  60 seconds. Only `sync_now` is gated; an apply started from the window can
-  still be cut by a Quit.
+  60 seconds. Only `sync_now` was gated; an apply started from the window could
+  still be cut by a Quit (changed in the amendment of 2026-11-20 below).
 - **The Run value is repaired only when its executable is gone.** Repairing at
   every start would point the owner's value at whatever copy of Muro is
   launched, a development build included. A value that names another existing
@@ -140,8 +140,8 @@ Marionette are read from `examples/marionette`.
   first run, found on the real executable and invisible to a fake transport that
   has no lock. All requests but `discover` (which runs Mukade and takes no
   registry lock) go through one queue (`apps/desktop/src/queue.ts`). A request
-  from the background worker can still meet a busy registry, and is reported as
-  such.
+  from the background worker could still meet a busy registry and was reported
+  as such (changed in the amendment of 2026-11-20 below).
 - **The shell is tested through its command.** The tray menu is a native menu
   and no test reaches it. `native-shell.mjs` calls the shell's `request`
   command from the page and closes the window with `WM_CLOSE`, as Windows does;
@@ -149,6 +149,58 @@ Marionette are read from `examples/marionette`.
   proof of the second, and neither is a real sign-in to Windows.
 - **`.mp` container, history and records** are specified with plans 2 and 3.
   Until then a project folder is laid out as a package folder is today.
+
+### Amendment of 2026-11-20, after the final review of the plan
+
+The review found the window and the background worker did not yet get along.
+What follows replaces the sentences marked above and adds to the list.
+
+- **A window that holds no plan shows the recorded check.** The strip, the
+  app-bar button and the tab badge read the plan of the registry's revision when
+  the window has one, and otherwise `sync-status.json` when its `revision` is the
+  registry's: the counts, with no breakdown by kind, and the time of that check.
+  A window opened after a background check says what the worker found, as the tray
+  does, and says *Not checked yet* only when nothing was recorded for the registry
+  as it is. Review and Apply all are offered; both plan again before they act. The
+  cells stay derived from the snapshot, and a column with nothing of its own to
+  show says *Check to see the changes*, because the record does not say on which
+  harness the changes are.
+- **A source that could not be resolved is not a success.** `sync-status.json`
+  gets `errors`, the number of sources the last full check could not resolve.
+  `sync_now` records such a run as failed (*Sources not checked: …*), the tray
+  reads *Needs attention*, and the strip says how many sources could not be
+  checked and offers Check now. Counting them as blockers would mislabel them:
+  nothing is blocked, something was not looked at.
+- **The shell waits for the registry, in one place.** The registry refuses a
+  second request while a writer holds its lock, and a check of slow sources holds
+  it for minutes. `Backend::request` makes every request of the window wait for
+  the sync in progress (10 minutes at most; `discover` and `status` do not take
+  the lock and do not wait), then tries a busy registry again every 250 ms for 15
+  seconds. `apply` goes through the same gate as `sync_now`, so Quit waits for it.
+  The tray and the worker read a new action, `status` (revision, settings, sync
+  state), which takes no lock and scans nothing.
+- **A close with `close_to_tray` off quits while the registry is busy.** The
+  shell reads the setting from `status` and keeps the last value it read, used
+  when that cannot be read. Answering "stay" on any error made a close during a
+  sync only hide the window.
+- **The window follows the registry.** It reads the snapshot again when it gets
+  the focus and every 30 seconds while it has the focus, when nothing is under
+  way (no request, no dialog, no text being typed), and asks for no plan. A
+  settings save refused with *Registry revision changed* reads the registry again
+  and sends the same change once more. WebView2 keeps `visibilityState` visible
+  for a hidden window, so the focus is what says the window is looked at.
+- **A plugin added from what is installed adopts the installation.** The
+  `save_plugin` payload may carry `adopt: {target_id, native_id}`; for a new
+  plugin that lists the harness the service writes the receipt that binds the
+  plugin to that installation, with the version and digest of the copy that is
+  there, and refuses a harness it cannot read, an installation that is not there
+  or already belongs to another plugin. The next plan then finds the plugin
+  installed (an update when the copy differs from the build) and does not install
+  a second copy beside the person's own; on an exclusive harness it would also
+  have removed the original. The worker, on by default after the first run, would
+  have done it without anyone looking.
+- **The activity log keeps the last 500 events**, and a `sync-status.json` that
+  cannot be read is no record (it is derived state; the next check writes it).
 
 ## Consequences
 

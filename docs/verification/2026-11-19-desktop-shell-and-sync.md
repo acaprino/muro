@@ -6,8 +6,9 @@ takes `check`, `sync_now`, `apply` with `allow_blocked` and `plan` with `target_
 notification area, starts with Windows and syncs from the background; the window is three tabs (Sync,
 Activity, Settings) with a first run in place of them; settings are saved on change.
 
-The work ran as eleven tasks on `develop` (the plan's ten and a later Task 11), with one whole-branch
-review still to come. Every command below was run on this machine (Windows 11, debug build of the
+The work ran as eleven tasks on `develop` (the plan's ten and a later Task 11), was pushed (`fc559fb..84bf4a3`),
+went through one whole-branch review (verdict: with fixes, no Critical) and then through one fix wave, the last
+section of this record. Every command below was run on this machine (Windows 11, debug build of the
 executable, Microsoft Edge for the browser tests) unless it says otherwise.
 
 ## Real and simulated, apart
@@ -151,21 +152,24 @@ check, an automatic sync) and the three steps of the first run. Old pictures tha
 ### CI
 
 `.github/workflows/tests.yml`, job `desktop`: after the unit tests, `npx tsc --noEmit`, `npm run build`
-and `node apps/desktop/tests/browser.mjs` (Edge through Playwright's `msedge` channel). The job was not run
-after this change: nothing was pushed here. The browser tests took about 17 minutes in one run on this
-machine; the ledger noted about 100 seconds for one file under a lighter load.
+and `node apps/desktop/tests/browser.mjs` (Edge through Playwright's `msedge` channel). The plan was pushed
+(`fc559fb..84bf4a3`) and the `Tests` workflow run 44696011567 on `84bf4a3` is green with every desktop step
+(Rust tests, unit tests, type check, frontend build, browser tests); the browser tests took 3 min 18 s on the
+runner against about 17 minutes in one run on this machine. The fix wave adds a step, *Shell check*
+(`cargo check -p muro-desktop`), because nothing compiled the shell in CI.
 
 ## What was not run, and why
 
 - **The full Python suite locally.** It takes about an hour here and runs on every push in the `Tests`
   workflow. Nothing in this work changes Python.
-- **The `Tests` workflow on the final commits, and the new CI steps on a runner.** Nothing is pushed by this
-  task. Whether the runner's Edge answers Playwright's `msedge` channel is not seen.
+- **The new CI step on a runner.** The `Tests` workflow ran on `84bf4a3`, with the runner's Edge answering
+  Playwright's `msedge` channel; the fix wave's own commits and its *Shell check* step were not pushed by it.
 - **A real sign-in to Windows with the Run key set.** The native tests write a Run value of the test's own
   name, read it back and start the executable with `--background` themselves; Windows never started it.
 - **The tray menu, clicked by hand** (Open Muro, Sync now, Pause automatic sync, Quit Muro), and the state
   line it shows on a real tray. The pure text is unit-tested in `tray.rs`; the native menu is not reachable.
-- **A Quit during a real sync, and the 60-second cut-off.** The gate is unit-tested with a fake sync.
+- **The tray's Quit click, and the 60-second cut-off.** The gate is unit-tested with a fake sync. A close with
+  `close_to_tray` off during a real sync, which takes the same quit path, is run by `native-shell.mjs` (fix wave).
 - **Keyboard focus of the window raised by a second launch**, and a Muro started while another is quitting
   (it is swallowed without a sign).
 - **Any harness other than the OpenCode fixture.** Claude Code, Codex, Pi and Hermes Agent installations
@@ -181,7 +185,6 @@ machine; the ledger noted about 100 seconds for one file under a lighter load.
   `apps/desktop/src-tauri/resources/` was used as it was and not regenerated.
 - **How the window looks with the real acrylic and title bar, and a screen reader.** The pictures come from
   headless Edge; keyboard behaviour was tested with Playwright.
-- **The whole-branch review**, which the owner asked for once at the end.
 - **A data directory shared by a development build and an installed copy** (they count as one Muro).
 
 ## Deferred minors of the ledger (`.superpowers/sdd/2026-11-19-desktop-shell-and-sync/progress.md`)
@@ -190,7 +193,7 @@ Not fixed, by ruling; each names where it lives.
 
 - Task 1: a removed target keeps its times in `sync-status.json` (`sync_status.rs:63`, `service.rs`
   `remove_target`); a corrupt `sync-status.json` makes every action fail although it is derived state
-  (`sync_status.rs:20`); a source starting with `~` is never expanded and reports "Source folder not found"
+  (`sync_status.rs:20`; fixed in the fix wave, F8: it reads as no record); a source starting with `~` is never expanded and reports "Source folder not found"
   (`sources.rs:131`); no test for `check` with an unknown or disabled `target_id` (`tests/service.rs:427`);
   `planned_targets` runs up to three times in one check (`service.rs:131,524,538`).
 - Task 10: the two exclusive-sync tests apply a plan with zero operations (`tests/service.rs:686,709`); a
@@ -201,14 +204,70 @@ Not fixed, by ruling; each names where it lives.
 - Task 5: apply progress is one spinner for all operations; the browser file takes about 100 s under a
   light load.
 - Task 6: the no-harness state of the Sync strip may be unreachable now that the first run shows instead.
-- Task 7: the activity log has no cap and Activity draws every event at each render; a kept plan keeps its
+- Task 7: the activity log has no cap (fixed in the fix wave, F6: the last 500 events) and Activity draws every event at each render; a kept plan keeps its
   old id (safe only while every apply plans again); the running job card has no progress bar.
 - Task 8: a failed `scan` is unit-tested only; a reload at step 2 is not tested in the browser; step 2 has
   no sticky footer.
 - Task 11: a Muro launched while another is quitting is swallowed without a sign; with `close_to_tray` off,
-  a close during a sync only hides the window and the process stays until the tray's Quit; only `sync_now`
-  is gated, so an apply, adapt or settings write started from the window can still be cut by Quit; the Run
+  a close during a sync only hides the window and the process stays until the tray's Quit (fixed in the fix
+  wave, F3); only `sync_now` is gated, so an apply (gated in the fix wave, F2), adapt or settings write started
+  from the window can still be cut by Quit; the Run
   key is read two ways (registry API in `repair`, `reg.exe` elsewhere) and an unquoted Run value is never
   repaired.
 - Task 9 (new): `autostart` and `set_autostart` wait behind a running `check` in the page's queue; the
-  window's strip says "Not checked yet" after opening although a background check was recorded (defect 4).
+  window's strip says "Not checked yet" after opening although a background check was recorded (defect 4;
+  fixed in the fix wave, F1).
+
+## The fix wave after the final review (2026-11-20)
+
+One fixer, on `develop`, from `84bf4a3`, for the findings F1 to F8 of
+`.superpowers/sdd/2026-11-19-desktop-shell-and-sync/fix-wave.md` (the final review's Important 1 to 6 and
+minors, and the strip defect ruled before it). Commits: `5f95674` registry, `42a76fa` runtime and tray,
+`c78394b` shell, `240b2b1` and `c29c62f` frontend, `22d0932` the shell's shown event, then the tests and
+native checks, and the documents, CI and this record.
+
+**The final local run was skipped on the owner's instruction, and CI is the evidence.** After the fix wave's
+code and tests were written the owner asked for no further local test runs and no local builds (no
+`browser.mjs`, `native.mjs`, `native-shell.mjs`, no full `cargo test` or `npm test`, no `npm run build`, no
+shell build); only `npx tsc --noEmit` was kept, and it passes on the final tree. What follows separates what ran
+before that instruction from what did not.
+
+| Finding | Tests | Failed on `84bf4a3` | Green |
+|---|---|---|---|
+| F1 recorded check on open | `model.test.ts` (summary falls back to the record, another revision or none is not a check, a current plan wins, strip text, columns `unseen`); `browser-background.mjs` (recorded, recorded-ok, recorded-unseen) | 13 unit failures in all; browser: the strip stayed "Not checked yet" | `npm test` 135 pass; browser-background pass |
+| F2 waiting, `status`, apply gated | registry `status_*` (2); runtime `a_request_waits_for_the_sync_in_progress_up_to_its_limit`, `a_request_that_finds_the_registry_busy_tries_again_until_it_is_free`, `a_request_during_a_held_registry_lock_succeeds_once_the_lock_is_released`; tray tests moved to `status`; `native-shell.mjs` 8a, 8c, 8d | registry: "Unknown registry action: status"; runtime: `wait_idle` and `retry_while_busy` did not exist (compile errors) | registry and runtime pass; `native-shell.mjs` section 8 written, never run to the end |
+| F3 close with the setting off | `native-shell.mjs` 8e | not run | not run |
+| F4 refresh and retry | `browser-background.mjs` (focus, 30 s with Playwright's clock, nothing under way, retry once and only once, the shell's shown event); `native-shell.mjs` 5a | all failed on the `84bf4a3` sources; `native-shell.mjs` 5a failed on the first real run (a window shown from the tray gives the page no focus event), so the shell now emits `muro-shown` | browser-background pass before the shown-event test was added; that test and 5a on the fixed shell were not run |
+| F5 unresolved sources | registry `check_records_the_sources_it_could_not_resolve...`; runtime `sync_now_records_the_sources_it_could_not_check_as_a_failure` and the tray test; model tests; browser recorded-errors; `native-shell.mjs` 8b | registry: `null` instead of `1`; runtime: `complete` instead of `failed`; tray: "Not checked yet" | registry, runtime, unit, browser pass; 8b not run |
+| F6 activity log | registry `the_activity_log_keeps_the_last_500_events`; `settings-activity.test.ts` Sync filter | registry: 601 events instead of 500; unit failed | pass |
+| F7 adopt | registry `a_plugin_added_from_what_is_installed...`, `an_adopted_installation_that_differs...`, `an_adoption_the_installation_does_not_support...`, `installed_digest`; `setup.test.ts` Finish sends `adopt`; `model.test.ts` `listing`; browser Add to my list; `native.mjs` step 5b | registry: the plan held an install and a removal, and an unknown `adopt` was accepted; unit and browser failed | registry, unit, browser pass; `native.mjs` passed once on the real executable, step 5b included |
+| F8 smaller ones | registry `a_corrupt_sync_status_reads_as_no_record...`; CI step *Shell check*; `docs/desktop-cli.md`; repair on a thread (the native test now waits for the repaired value) | registry: "Invalid JSON: ...sync-status.json" | registry pass; the CI step and the thread were not run |
+
+Commands that ran before the instruction, with their results:
+
+- `cargo test -p muro-registry`: 11 + 4 + 43 pass, 3 ignored (the native round trips). RED run on the
+  `84bf4a3` sources: 9 of the 10 targeted tests failed.
+- `cargo test -p muro-desktop-runtime`: 4 + 46 pass. RED run: 6 of the 16 targeted tests failed, and the three
+  gate and retry tests did not compile.
+- `npm test`: 135 pass (13 of the new or changed tests failed before the code).
+- `npx tsc --noEmit`: clean, also after the last source edit.
+- `node apps/desktop/tests/browser-background.mjs`: 9 tests, all failed on the `84bf4a3` sources and all passed
+  on the fixed ones; `node apps/desktop/tests/browser.mjs`: 5 files pass with the fake transport changes.
+- `npm run build` and `cargo build -p muro-desktop --features custom-protocol` built the executable of the
+  native runs, before the shown event; `node apps/desktop/tests/native.mjs` passed on it (the new check
+  included); `node apps/desktop/tests/native-shell.mjs` failed at 5a on that build, the shown event was added
+  and the rebuilt run was stopped on the owner's instruction.
+
+Not run, because of the instruction: any build after the shown event (the shell, the frontend, the runtime
+tools); `cargo check -p muro-desktop` as the new CI step, whose empty `resources` folder was reasoned from
+`tauri-build`, which refuses a missing one, and not tried on a clean checkout; `native-shell.mjs` sections 5a (on
+the shown event) and 8a to 8e (a launch and a request while the registry is held, the worker's failed run for a
+source that never answers, a request that waits past 15 s for a sync, a close with the setting off in the middle
+of a sync); the shown-event test of `browser-background.mjs`; the final full run of every command of the fix
+wave. Section 8 uses a local server that hangs up after a few seconds as the slow source; it was never seen
+to run, and its timings (6 s and 18 s) are guesses about `git clone` against such a server. The tray's menu,
+the 60-second quit cut-off and a real sign-in are still not run.
+
+Real and simulated, apart: the registry and runtime tests, `native.mjs` and the first `native-shell.mjs` run are
+real (real folders, the real service, the real executable); `npm test`, `browser-background.mjs` and
+`browser.mjs` are simulated (a fake transport with no lock, whose `behind` helper stands in for the worker).

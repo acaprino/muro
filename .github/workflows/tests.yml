@@ -65,6 +65,15 @@ jobs:
       - name: Frontend build
         if: always()
         run: npm run build
+      # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
+      # waiting for the registry live. It embeds the frontend build just made, and its resources
+      # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
+      # one stands in.
+      - name: Shell check
+        if: always()
+        run: |
+          New-Item -ItemType Directory -Force apps/desktop/src-tauri/resources | Out-Null
+          cargo check -p muro-desktop
       # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
       - name: Browser tests
         if: always()
