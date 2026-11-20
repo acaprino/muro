@@ -3,8 +3,9 @@
 
 The first member, stored uncompressed, is `mimetype`. The rest is the package as a folder holds it
 (`sources.json`, `ROUTER.md`, `capabilities/`, ...), `project.json`, `records.json`, `history.json`,
-`CHANGELOG.md`, `inputs/<source id>/...` (each source's selected files and its license at the pinned
-commit) and `release/<slug>/...` (a built release as `--build --out` lays it out).
+`CHANGELOG.md`, `inputs/<source id>/...` (each source's selected files, its license and the NOTICE beside
+it, at the pinned commit) and `release/<slug>/...` (a built release as `--build --out` lays it out).
+`info` is what the desktop's project page shows, with the release guide's data model for the graph.
 
 A `.mp` may come from elsewhere, so reading one is the security-sensitive side: no member is written
 outside its folder (no absolute path, no `..`, no drive letter, no link), and unpacking stops at
@@ -26,9 +27,14 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple
 
-from .core import SLUG_PATTERN
-from .factory import _selected
-from .sources import _validate_source_shape, inspect_source, source_repository, tree_entries
+from .core import SLUG_PATTERN, validate_plugin_identity
+from .custom_instructions import DIRECTORY as CUSTOM_INSTRUCTIONS
+from .delivery import FORMS
+from .entries import entry_description, load_entries, validate_entries
+from .factory import PROMPT_FILES, _selected, prompts_dir
+from .guide import guide_data
+from .sources import (_validate_source_shape, inspect_source, license_files, notice_paths, parse_capabilities,
+                      source_repository, tree_entries)
 
 MIMETYPE = "application/vnd.muro.project+zip"
 MAX_BYTES = 2 * 1024 ** 3
@@ -212,13 +218,128 @@ def default_cache_root() -> Path:
     return base / "muro" / "projects"
 
 
-def info(mp: Path, cache_root: Path) -> dict[str, Any]:
-    """What a project file says about itself. Reads through `cached`; the full view is added with the guide's data."""
-    folder = cached(mp, cache_root)
-    path = folder / "project.json"
+def _member(folder: Path, name: str) -> Path:
+    path = folder / name
     if not path.is_file():
-        raise ValueError(f"{_NOT_A_PROJECT}: project.json is missing")
-    return {"project": json.loads(path.read_text(encoding="utf-8")), "digest": folder.name}
+        raise ValueError(f"{_NOT_A_PROJECT}: {name} is missing")
+    return path
+
+
+def _day(moment: str) -> str:
+    return datetime.fromisoformat(moment.replace("Z", "+00:00")).date().isoformat()
+
+
+def _count(number: int, one: str, many: str | None = None) -> str:
+    return f"{number} {one if number == 1 else many or one + 's'}"
+
+
+_FIRST = "Written by the first harmonization"
+
+
+def _file_rows(identity: dict[str, Any], meta: dict[str, Any], *, inputs: int, decisions: int, capabilities: int,
+               entries: int | None, examples: int, instructions: list[str], runs: int, records: int,
+               built: bool) -> list[dict[str, str]]:
+    """The list under "What this project file holds": each part, the files it lives in and what it holds now.
+
+    Counts only: nothing here judges what a part means.
+    """
+    repository = meta["repository"]
+    result = (f"{_count(capabilities, 'capability', 'capabilities')}"
+              + (f" in {_count(entries, 'entry', 'entries')}" if entries is not None else "")
+              + f", the router and {_count(examples, 'documented request')}") if capabilities or decisions else _FIRST
+    rows = [
+        ("Identity", "sources.json · plugin",
+         f"The final plugin: {identity['name']}, installed as {identity['slug']}, version {identity['version']}"),
+        ("Author and dates", "project.json · author, created, changed",
+         f"{meta['author']} · created {_day(meta['created'])} · last changed {_day(meta['changed'])}"),
+        ("Repository", "project.json · repository",
+         f"{repository['url']} · branch {repository['branch']} · releases tagged {repository['tag_prefix']}<version>"
+         if repository else "None set: the project lives on this computer only"),
+        ("Inputs", "sources.json · sources",
+         f"{_count(inputs, 'plugin or skill set', 'plugins and skill sets')} compose{'s' if inputs == 1 else ''} it: "
+         "repository, pin, license, selected paths"),
+        ("Choices", "delivery.json",
+         f"{_count(decisions, 'decision')}: what each part of each input became, and why" if decisions else _FIRST),
+        ("Result", "capabilities/ · ROUTER.md · entries.json · guide-examples.json", result),
+        ("Your instructions", f"{CUSTOM_INSTRUCTIONS}/", ", ".join(instructions) or "None yet"),
+        ("History", "history.json",
+         f"{_count(runs, 'run')}: date, version, the pins it used, its prompt and its result"),
+        ("Changelog", "CHANGELOG.md",
+         "One entry per version. Muro writes it at each harmonization from what changed in inputs, choices and "
+         "capabilities; you can edit it."),
+        ("Decision records", "records.json",
+         f"{_count(records, 'record')}: why the project is the way it is. The AI writes them, you can edit them "
+         "or add your own" if records else _FIRST),
+        ("Input copies", "inputs/",
+         "Every input as it was at its pin, with its license and notices, so the project rebuilds without the network"),
+        ("Built plugin", "release/",
+         "Ready to install on every harness, with its guide" if built else "Built by the first harmonization"),
+    ]
+    return [{"part": part, "path": path, "detail": detail} for part, path, detail in rows]
+
+
+def info(mp: Path, cache_root: Path) -> dict[str, Any]:
+    """Everything the project page shows of a project file, read through `cached` (unpacked once per content).
+
+    The graph is `guide_data`'s, computed on the package as the file holds it (not on the built release it
+    may carry, which can be absent or older), with the package's own prompts or else the factory's. A file
+    that lacks a member the page reads, or holds one that is not what its name says, is refused.
+    """
+    folder = cached(mp, cache_root)
+    meta = json.loads(_member(folder, "project.json").read_text(encoding="utf-8"))
+    manifest = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))
+    plugin = manifest.get("plugin") if isinstance(manifest, dict) else None
+    sources = manifest.get("sources") if isinstance(manifest, dict) else None
+    if not isinstance(plugin, dict) or not isinstance(sources, list) or not all(isinstance(s, dict) for s in sources):
+        raise ValueError("sources.json must hold a plugin and a list of sources")
+    errors = validate_plugin_identity(plugin)
+    if errors:
+        raise ValueError("Invalid plugin: " + "; ".join(errors))
+    for src in sources:
+        _validate_source_shape(src)
+    problem = _project_json_errors(meta, plugin["slug"])
+    if problem:
+        raise ValueError(f"project.json is not valid: {problem}")
+    records = _listed(_member(folder, "records.json"), "records.json")
+    runs = _listed(_member(folder, "history.json"), "history.json")
+    changelog = _member(folder, "CHANGELOG.md").read_text(encoding="utf-8")
+
+    data = guide_data(folder, plugin, sources, packaged=False)
+    delivery = data["delivery"]
+    decisions = delivery["decisions"] if delivery else []
+    entries_doc = load_entries(folder)
+    if entries_doc is not None:
+        errors = validate_entries(entries_doc, parse_capabilities(folder / "capabilities"), plugin)
+        if errors:
+            raise ValueError("Invalid discovery entries: " + "; ".join(errors))
+    entries = [{"name": entry["name"], "description": entry_description(entry), "capabilities": entry["capabilities"]}
+               for entry in entries_doc["entries"]] if entries_doc else []
+    paths = {src["id"]: src["selected_paths"] for src in sources}
+    inputs = [{"id": shown["id"], "url": shown.get("repo_url"), "pin": shown["pin"], "release": shown.get("release"),
+               "commit": shown["commit"], "license": shown["license"], "paths": paths[shown["id"]],
+               "became": {form: sum(1 for d in decisions if d["source"] == shown["id"] and d["form"] == form)
+                          for form in FORMS}}
+              for shown in data["sources"]]
+    kept = ((delivery or {}).get("custom_instructions") or {}).get("files", {})
+    prompts_folder = prompts_dir(folder)
+    return {
+        "project": meta,
+        "plugin": {"name": plugin["name"], "slug": plugin["slug"], "version": plugin["version"],
+                   "description": plugin.get("description", "")},
+        "inputs": inputs,
+        "decisions": decisions,
+        "records": records,
+        "history": runs,
+        "changelog": changelog,
+        "prompts": [{"file": name, "text": (prompts_folder / name).read_text(encoding="utf-8")} for name in PROMPT_FILES],
+        "graph": {"entries": entries, "capabilities": data["capabilities"], "examples": data["examples"]},
+        "files": _file_rows(
+            plugin, meta, inputs=len(sources), decisions=len(decisions), capabilities=len(data["capabilities"]),
+            entries=len(entries) if entries_doc else None, examples=len(data["examples"]),
+            instructions=[name.removeprefix(f"{CUSTOM_INSTRUCTIONS}/") for name in sorted(kept)], runs=len(runs),
+            records=len(records), built=(folder / "release" / plugin["slug"]).is_dir()),
+        "digest": folder.name,
+    }
 
 
 # --- writing ----------------------------------------------------------------------------------------
@@ -277,6 +398,17 @@ def _project_json_errors(data: Any, slug: str) -> str | None:
     return None
 
 
+def _listed(path: Path, name: str) -> list:
+    """The list inside `records.json` or `history.json`: an object holding it under one key."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:       # not JSON, or not UTF-8
+        raise ValueError(f"{name} is not valid JSON ({exc})") from exc
+    if not isinstance(document, dict) or not isinstance(document.get(_ROOT_KEY[name]), list):
+        raise ValueError(f"{name} must be an object with a list under {_ROOT_KEY[name]!r}")
+    return document[_ROOT_KEY[name]]
+
+
 def _package_members(package: Path, manifest: dict[str, Any]) -> dict[str, _Member]:
     """The package's own files, project.json first checked: refuse a project that has none."""
     path = package / "project.json"
@@ -296,12 +428,7 @@ def _package_members(package: Path, manifest: dict[str, Any]) -> dict[str, _Memb
             raise ValueError(f"{path} is a link: a project file carries no links")
         if path.is_file():
             if name in _ROOT_KEY:
-                try:
-                    document = json.loads(path.read_text(encoding="utf-8"))
-                except (ValueError, UnicodeError) as exc:
-                    raise ValueError(f"{name} is not valid JSON ({exc})") from exc
-                if not isinstance(document, dict) or not isinstance(document.get(_ROOT_KEY[name]), list):
-                    raise ValueError(f"{name} must be an object with a list under {_ROOT_KEY[name]!r}")
+                _listed(path, name)
             members[name] = _Member(path, False)
         elif name in _EMPTY:
             members[name] = _Member(_EMPTY[name], False)
@@ -336,12 +463,14 @@ def _store(destination: Path, snapshot: dict[str, _Member]) -> None:
 
 
 def _source_snapshot(src: dict[str, Any], package: Path, cache: Path | None) -> dict[str, _Member]:
-    """A source's selected files and its license at the pinned commit, from the cache or from the pin.
+    """A source's selected files, its license and the NOTICE beside it at the pinned commit, from the cache or the pin.
 
     The pin is fetched and checked as `--check-sources` and `--build` do (the license gate, the coverage
-    gate, the pin's release or HEAD), through the same functions; a source already in the cache is not
-    fetched again. The cache is a folder per source id and commit, holding the files as `inputs/<id>/`
-    does.
+    gate, the pin's release or HEAD), through the same functions, and the files that gate carries with the
+    source travel here too: the license (`license_files`), the NOTICE beside it (Apache-2.0 asks for it to
+    travel) and the files `notice_paths` declares, which are selected files. A source already in the cache
+    is not fetched again. The cache is a folder per source id and commit, holding the files as
+    `inputs/<id>/` does, so one filled before the NOTICE travelled lacks it.
     """
     _validate_source_shape(src)
     source_id, commit = src["id"], src["commit"]
@@ -350,16 +479,22 @@ def _source_snapshot(src: dict[str, Any], package: Path, cache: Path | None) -> 
         snapshot: dict[str, _Member] = {}
         _add_tree(snapshot, kept, "")
     else:
-        license_bytes, _notice = inspect_source(src, package, coverage=True)
+        license_bytes, notice = inspect_source(src, package, coverage=True)
         with source_repository(src, package) as repo:
             tree = tree_entries(repo, commit)
             files = _selected(repo, commit, src["selected_paths"], tree)
         snapshot = {name: _Member(data, tree[name][0] == "100755") for name, data in files.items()}
-        snapshot.setdefault(src.get("license_path", "LICENSE"), _Member(license_bytes, False))
+        license_path, notice_path = license_files(src)
+        snapshot.setdefault(license_path, _Member(license_bytes, False))
+        if notice is not None:
+            snapshot.setdefault(notice_path, _Member(notice, False))
         for relative in snapshot:
             _check_name(relative)
         if kept is not None:
             _store(kept, snapshot)
+    missing = [path for path in notice_paths(src) if path not in snapshot]
+    if missing:
+        raise ValueError(f"notice_paths names {', '.join(missing)}, which the source's files do not hold")
     return snapshot
 
 

@@ -343,6 +343,17 @@ def _license_matches(data: bytes, license_type: str) -> bool:
     return hashlib.sha256(" ".join(text.split()).encode("utf-8")).hexdigest() == expected
 
 
+def license_files(src: dict[str, Any]) -> tuple[str, str]:
+    """The file that licenses a source's folder and the NOTICE that travels with it: the one beside it.
+
+    The root pair unless `license_path` names a license deeper in the repository. The one rule for the
+    build and for the project file; a malformed `license_path` is for the caller's own check to refuse.
+    """
+    license_path = src.get("license_path", "LICENSE")
+    scope = PurePosixPath(str(license_path)).parent
+    return license_path, "NOTICE" if str(scope) == "." else str(scope / "NOTICE")
+
+
 def inspect_source(src: dict[str, Any], base_dir: Path, *, coverage: bool = False) -> tuple[bytes, bytes | None]:
     """Validate the pinned snapshot and return its actual LICENSE and optional NOTICE.
 
@@ -364,7 +375,7 @@ def inspect_source(src: dict[str, Any], base_dir: Path, *, coverage: bool = Fals
     omission_patterns(src)
     # The license is the root LICENSE unless the source declares the file that
     # licenses its own folder; that file then covers only what lies under it.
-    license_path = src.get("license_path", "LICENSE")
+    license_path, notice_path = license_files(src)
     if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
         raise ValueError("license_path must be a plain repository-relative file path")
     scope = PurePosixPath(license_path).parent
@@ -431,8 +442,6 @@ def inspect_source(src: dict[str, Any], base_dir: Path, *, coverage: bool = Fals
         problem = _coverage_errors(src, blobs, file_sizes(tree)) if coverage else None
         if problem:
             raise ValueError(problem)
-        # The NOTICE that travels with a license is the one beside it.
-        notice_path = "NOTICE" if rooted else str(scope / "NOTICE")
         notice = _blob(repo, commit, notice_path) if notice_path in entries else None
         return license_bytes, notice
 

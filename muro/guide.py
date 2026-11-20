@@ -11,6 +11,7 @@ import re
 
 from .core import parse_router, validate_capabilities_and_router
 from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
+from .factory import prompts_dir
 from .routing import (catalog_digest, catalog_entries, resolve_selection, selection_step_id, step_capability,
                       validate_classification, validate_stack)
 from .sources import parse_capabilities
@@ -524,17 +525,21 @@ def _examples_html(examples: list[dict], tr: dict[str, str]) -> str:
     return '\n'.join(parts)
 
 
-def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
-    """Read the actual packaged artifacts, then generate the mandatory GUIDE.html."""
-    lang = plugin.get('language', 'en')
-    if lang not in _I18N:
-        raise ValueError(f"Unsupported guide language: {lang}")
-    tr = _I18N[lang]
-    graph_library, graph_script = _graph_library()
+def guide_data(dist: Path, plugin: dict, sources: list[dict], *, packaged: bool = True) -> dict:
+    """What the guide shows of a package, read from its actual files; the one data model of the release guide
+    and of the project view (`muro project info`).
+
+    `dist` is a built release (`packaged`, the default) or a package folder (its delivery document is then
+    checked against the owner Markdown folder, and the prompts are the package's own, else the factory's).
+    Returns the catalog (each capability with its title, body, checks and check scope), the public side of each
+    source, the catalog digest, the resolved illustrative examples and the delivery document the catalog was
+    checked against (None without one). The time a page was generated is the page's, not part of this.
+    Validates as the build does and raises ValueError on an invalid catalog.
+    """
     capabilities = parse_capabilities(dist / 'capabilities')
     rows = parse_router(dist / 'ROUTER.md')
     source_ids = {source['id'] for source in sources}
-    delivery = load_delivery(dist, packaged=True)
+    delivery = load_delivery(dist, packaged=packaged)
     errors = (unregistered_active_hooks(capabilities) if delivery is None
               else validate_delivery(delivery, capabilities, source_ids))
     if errors:
@@ -547,7 +552,7 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         raise ValueError('Invalid guide catalog: ' + '; '.join(errors))
     by_id = {cap.id: cap for cap in capabilities}
     catalog = catalog_entries(rows, by_id)
-    prompt = (dist / 'prompts' / 'classify.md').read_text(encoding='utf-8')
+    prompt = ((dist / 'prompts' if packaged else prompts_dir(dist)) / 'classify.md').read_text(encoding='utf-8')
     digest = catalog_digest(catalog, by_id, prompt, delivery)
     manifest_file = dist / 'sources.json'
     stack_conflicts = None
@@ -563,12 +568,31 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         entry['checks'] = list(cap.checks)
         entry['intent_checks'] = {key: list(names) for key, names in cap.intent_checks.items()}
         entry['check_conditions'] = dict(cap.check_conditions)
-    public_sources = [_public_source(source) for source in sources]
-    data = {
+    return {
         'plugin': {key: plugin[key] for key in ('name', 'slug', 'command', 'version')},
         'capabilities': catalog,
-        'sources': public_sources,
+        'sources': [_public_source(source) for source in sources],
         'catalog_digest': digest,
+        'examples': examples,
+        'delivery': delivery,
+    }
+
+
+def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
+    """Read the actual packaged artifacts, then generate the mandatory GUIDE.html."""
+    lang = plugin.get('language', 'en')
+    if lang not in _I18N:
+        raise ValueError(f"Unsupported guide language: {lang}")
+    tr = _I18N[lang]
+    graph_library, graph_script = _graph_library()
+    shown = guide_data(dist, plugin, sources)
+    delivery, catalog, examples = shown['delivery'], shown['capabilities'], shown['examples']
+    public_sources = shown['sources']
+    data = {
+        'plugin': shown['plugin'],
+        'capabilities': catalog,
+        'sources': public_sources,
+        'catalog_digest': shown['catalog_digest'],
         'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'examples': examples,
         'graph_library': graph_library,

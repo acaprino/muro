@@ -300,7 +300,7 @@ everything about a unified plugin. Its first member, stored uncompressed, is `mi
 | `project.json` | `{schema: 1, name, slug, version, author, created, changed, repository: {url, branch, tag_prefix} \| null, builtin}`; times ISO 8601 in UTC; `slug` is the plugin's slug in `sources.json` |
 | the package | `sources.json`, `delivery.json`, `ROUTER.md`, `entries.json`, `guide-examples.json`, `eval-cases.json` (each when present), `capabilities/`, `custom-instructions/` and `prompts/` (when the package has its own); nothing else in the folder travels |
 | `records.json`, `history.json`, `CHANGELOG.md` | `{records: [...]}`, `{runs: [...]}` and the release notes; a package without them gets empty ones |
-| `inputs/<source id>/…` | each source's selected paths (media and notice paths included) and its license file, at the pinned commit |
+| `inputs/<source id>/…` | each source's selected paths (media and `notice_paths` files included), its license file and the `NOTICE` beside it (the files the build's license gate carries with a source; Apache-2.0 asks for the NOTICE to travel), at the pinned commit |
 | `release/<slug>/…` | a built release, as `build --out` lays it out |
 
 `pack` reads the package named by `--manifest` (its folder is the package) and refuses a package that does not
@@ -310,7 +310,8 @@ functions `check-sources` and `build` use (license gate, coverage gate, the pin'
 `check-sources`, it needs the network unless the source is local or already in `--sources-cache`. That folder
 keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
 holds them): `pack` reads a snapshot it finds there without fetching, and stores the one it fetched. The
-cache is trusted as written; keep it yours. `--release` is the `--out` folder of a build (`<DIR>/<slug>/…`);
+cache is trusted as written; keep it yours (a snapshot stored before the NOTICE travelled lacks it: delete it to
+fetch the source again). `--release` is the `--out` folder of a build (`<DIR>/<slug>/…`);
 without it the file carries no release. The file is written whole or not at all, and the same project packs
 to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
 
@@ -322,9 +323,26 @@ uncompressed or 50,000 members (`MAX_BYTES`, `MAX_MEMBERS` in `muro/project.py`;
 
 `info` prints JSON on stdout. It unpacks the file once per SHA-256 of its content into `--cache` (default: a
 per-user folder, `%LOCALAPPDATA%\muro\projects` on Windows, else `$XDG_CACHE_HOME/muro/projects` or
-`~/.cache/muro/projects`; nothing prunes it) and reads it from there. For now it answers
-`{"project": <project.json>, "digest": <sha-256>}`. `pack` and `unpack` print the path they wrote. Exit `0`
-on success, `1` with the reason on stderr otherwise.
+`~/.cache/muro/projects`; nothing prunes it) and reads it from there. It answers everything the project page
+shows:
+
+| Key | What it holds |
+| --- | --- |
+| `project` | `project.json` as it is |
+| `plugin` | `{name, slug, version, description}` of `sources.json` |
+| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, dropped}` |
+| `decisions` | the decisions of `delivery.json` as they are (empty without one) |
+| `records`, `history`, `changelog` | `records.json`'s records, `history.json`'s runs, `CHANGELOG.md` as text |
+| `prompts` | `[{file, text}]`: `intake.md`, `harmonizer.md`, `delivery.md` and `classify.md`, the package's own folder or else the factory's (`prompts_dir`, as the build resolves them) |
+| `graph` | `{entries, capabilities, examples}`: `entries` are the discovery entries `{name, description, capabilities}` (the description as a host reads it, with the sentence naming what the entry absorbs; empty without `entries.json`); `capabilities` and `examples` are the release guide's own data (`muro.guide.guide_data`: each capability with its title, body, intents, needs, conflicts, outputs, checks and check scope, and each example resolved to its steps), computed on the package as the file holds it, not on a release it may carry |
+| `files` | `[{part, path, detail}]`: the list "What this project file holds", with the project's own counts |
+| `digest` | the SHA-256 of the file |
+
+A file that lacks `project.json`, `sources.json`, `records.json`, `history.json` or `CHANGELOG.md`, or holds one
+that is not what its name says (a `project.json` that fails the rules above, a plugin that fails the build's
+identity check, a catalog, delivery document or entries file that fails the build's validation), is refused with
+the reason. `pack` and `unpack` print the path they wrote. Exit `0` on success, `1` with the reason on stderr
+otherwise.
 
 ```sh
 muro build --manifest examples/marionette/sources.json --out /tmp/stage

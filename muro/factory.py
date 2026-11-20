@@ -49,6 +49,9 @@ FACTORY_ROOT = Path(__file__).resolve().parent.parent
 
 PACKAGED_SKILL_NAME = "SKILL.source.md"
 
+# The AI prompts a package is built and run with, in the order its work goes: intake, harmonization, delivery, routing.
+PROMPT_FILES = ("intake.md", "harmonizer.md", "delivery.md", "classify.md")
+
 
 def prompts_dir(project_root: Path) -> Path:
     """The factory's prompts, unless the package directory carries its own copy."""

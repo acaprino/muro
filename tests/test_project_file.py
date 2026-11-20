@@ -4,6 +4,7 @@ A `.mp` from elsewhere is untrusted input, so most of these tests are about what
 """
 import json
 import os
+import shutil
 import stat
 import subprocess
 import zipfile
@@ -11,11 +12,16 @@ from pathlib import Path
 
 import pytest
 
-from muro import project
+from muro import guide, project
 from muro.cli import main
-from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts
+from muro.core import parse_router
+from muro.entries import entry_description
+from muro.factory import PROMPT_FILES
+from routing_helpers import INTENTS, ROOT, ROUTER_HEADER, copy_prompts
+from test_apache_notice_gate import filled
 from test_custom_instructions import deliver
 from test_regressions import MIT
+from test_release_guide import read_guide
 
 SLUG = "tester"
 PROJECT_JSON = {
@@ -26,7 +32,8 @@ PROJECT_JSON = {
 }
 # What a package folder holds that travels in a `.mp`, and what it must not take along.
 CARRIED = ["sources.json", "delivery.json", "ROUTER.md", "project.json", "records.json", "history.json", "CHANGELOG.md",
-           "guide-examples.json", "capabilities/x.md", "custom-instructions/rules.md", "prompts/intake.md"]
+           "guide-examples.json", "capabilities/x.md", "custom-instructions/rules.md",
+           *[f"prompts/{name}" for name in PROMPT_FILES]]
 LEFT_OUT = ["notes.txt", ".muro/factory/PROMPT.md", "dist/old.txt"]
 
 
@@ -62,8 +69,8 @@ def make_package(pkg, root, commit):
         "## Sources\nSource: demo\n", encoding="utf-8")
     (pkg / "ROUTER.md").write_text(ROUTER_HEADER + "| x | testing | — | — | x | testing.verify |\n", encoding="utf-8")
     copy_prompts(pkg)
-    for stale in sorted((pkg / "prompts").iterdir()):
-        if stale.name != "intake.md":
+    for stale in sorted((pkg / "prompts").iterdir()):      # a package that builds has the prompts it is built with
+        if stale.name not in PROMPT_FILES:
             stale.unlink()
     (pkg / "custom-instructions").mkdir()
     (pkg / "custom-instructions" / "rules.md").write_bytes(b"Owner rules\r\nwith CRLF kept\r\n")
@@ -172,6 +179,61 @@ def test_inputs_hold_the_selected_files_and_the_license_at_the_pinned_commit(tmp
     assert (folder / "inputs" / "demo" / "SKILL.md").read_text(encoding="utf-8") == "# Skill\n"
     assert (folder / "inputs" / "demo" / "LICENSE").read_text(encoding="utf-8") == MIT
     assert not (folder / "inputs" / "demo" / "unselected.md").exists()
+
+
+def make_apache_upstream(root, *, nested):
+    """An Apache-2.0 repository with a NOTICE beside its license: at the root, or in the folder the license covers.
+
+    With `nested` the root holds another NOTICE, which the folder's license does not cover.
+    """
+    base = root / "skills" / "demo" if nested else root
+    (base / "references").mkdir(parents=True)
+    git(root, "init", "-q")
+    (base / "LICENSE").write_bytes(filled("Copyright 2026 Mainfunc, Inc."))
+    (base / "NOTICE").write_text("Demo\nThis product includes software developed at Mainfunc, Inc.\n", encoding="utf-8")
+    (base / "SKILL.md").write_text("# Skill\n", encoding="utf-8")
+    (base / "references" / "guide.md").write_text("A reference.\n", encoding="utf-8")
+    if nested:
+        (root / "NOTICE").write_text("The repository's own notice\n", encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "apache")
+    return root, git(root, "rev-parse", "HEAD")
+
+
+def repin(package, **changes):
+    """Change the package's one source in sources.json."""
+    path = package / "sources.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["sources"][0].update(changes)
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_inputs_carry_the_license_and_the_notice_the_build_carries(tmp_path, nested):
+    # Apache-2.0 asks for the NOTICE to travel with the license: a shared .mp redistributes the sources.
+    root, commit = make_apache_upstream(tmp_path / "upstream", nested=nested)
+    package = make_package(tmp_path / "pkg", root, commit)
+    prefix = "skills/demo/" if nested else ""
+    repin(package, license="Apache-2.0", selected_paths=[prefix + "SKILL.md", prefix + "references"],
+          **({"license_path": "skills/demo/LICENSE"} if nested else {}))
+    folder = project.unpack(project.pack(package, tmp_path / "t.mp"), tmp_path / "out")
+    inputs = {p.relative_to(folder / "inputs" / "demo").as_posix() for p in (folder / "inputs" / "demo").rglob("*")
+              if p.is_file()}
+    assert inputs == {prefix + name for name in ("LICENSE", "NOTICE", "SKILL.md", "references/guide.md")}
+    assert (folder / "inputs" / "demo" / (prefix + "NOTICE")).read_text(encoding="utf-8").startswith("Demo\nThis product")
+    assert "The repository's own notice" not in "".join(
+        p.read_text(encoding="utf-8") for p in (folder / "inputs").rglob("*") if p.is_file())
+
+
+def test_inputs_carry_the_files_a_source_declares_as_notices(tmp_path):
+    root, _ = make_upstream(tmp_path / "upstream")
+    (root / "references" / "NOTICES.md").write_text("# Third-party notices\n", encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "notices")
+    package = make_package(tmp_path / "pkg", root, git(root, "rev-parse", "HEAD"))
+    repin(package, notice_paths=["references/NOTICES.md"])
+    folder = project.unpack(project.pack(package, tmp_path / "t.mp"), tmp_path / "out")
+    assert (folder / "inputs" / "demo" / "references" / "NOTICES.md").read_text(encoding="utf-8") == "# Third-party notices\n"
 
 
 def test_mimetype_is_the_first_member_and_stored(tmp_path, package, cache):
@@ -289,6 +351,21 @@ def test_pack_takes_a_prepared_cache_for_a_source_it_cannot_reach(tmp_path, pack
     (snapshot / "LICENSE").write_text(MIT, encoding="utf-8")
     folder = project.unpack(project.pack(package, tmp_path / "t.mp", sources_cache=tmp_path / "cache"), tmp_path / "out")
     assert (folder / "inputs" / "demo" / "SKILL.md").read_text(encoding="utf-8") == "# Prepared\n"
+
+
+def test_pack_refuses_a_cached_source_that_lacks_a_file_it_declares_as_a_notice(tmp_path, package):
+    manifest = json.loads((package / "sources.json").read_text(encoding="utf-8"))
+    manifest["sources"][0].pop("repo_path")
+    manifest["sources"][0].update(repo_url="https://invalid.invalid/never-fetched.git",
+                                  notice_paths=["references/NOTICES.md"])
+    (package / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
+    snapshot = tmp_path / "cache" / "demo" / manifest["sources"][0]["commit"]
+    (snapshot / "references").mkdir(parents=True)
+    (snapshot / "SKILL.md").write_text("# Prepared\n", encoding="utf-8")
+    (snapshot / "LICENSE").write_text(MIT, encoding="utf-8")
+    with pytest.raises(ValueError, match=r"demo.*references/NOTICES\.md"):
+        project.pack(package, tmp_path / "t.mp", sources_cache=tmp_path / "cache")
+    assert not (tmp_path / "t.mp").exists()
 
 
 def test_pack_refuses_a_source_that_fails_its_check(tmp_path, package):
@@ -480,14 +557,255 @@ def test_the_default_cache_root_is_per_user(monkeypatch, tmp_path):
     assert str(root).startswith(str(tmp_path / ("local" if os.name == "nt" else "xdg")))
 
 
-# --- info (what Task 2 extends) ---------------------------------------------------------------------
+# --- info: everything the project page shows ---------------------------------------------------------
+
+INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "graph", "files",
+             "digest"}
+FILE_PARTS = ["Identity", "Author and dates", "Repository", "Inputs", "Choices", "Result", "Your instructions", "History",
+              "Changelog", "Decision records", "Input copies", "Built plugin"]
+RUN = {"id": "run-1", "time": "2026-11-12T10:00:00Z", "version": "0.1.0", "status": "completed", "budget_usd": None,
+       "engine": None, "pins": {"demo": "a" * 40}, "changelog": "First harmonization."}
+ENTRY = {"name": "tester-main", "description": "Use when testing the tester.", "capabilities": ["x"],
+         "absorbs": ["old-tester"]}
+EXAMPLE = {"title": "Verify a test artifact", "task": "Verify the requested test artifact", "stack_tokens": [],
+           "status": "selected", "reason": "The request asks for the one capability.", "questions": [],
+           "selections": [{"capability": "x", "intent": "testing.verify", "reason": "It verifies the artifact."}]}
+
+
+@pytest.fixture
+def described(tmp_path, upstream):
+    """The fixture package with what a project page shows of one: entries, a documented request, more choices, a run."""
+    pkg = make_package(tmp_path / "pkg", *upstream)
+    manifest = json.loads((pkg / "sources.json").read_text(encoding="utf-8"))
+    manifest["plugin"].update(description="A plugin for the tests.", replaces=["old-tester"])
+    (pkg / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (pkg / "entries.json").write_text(json.dumps({"entries": [ENTRY]}), encoding="utf-8")
+    (pkg / "guide-examples.json").write_text(json.dumps({"examples": [EXAMPLE]}), encoding="utf-8")
+    delivery = json.loads((pkg / "delivery.json").read_text(encoding="utf-8"))
+    delivery["decisions"] += [
+        {"source": "demo", "content": "The guide", "form": "dropped", "targets": [], "reason": "Not needed at run time."},
+        {"source": "demo", "content": "The notes", "form": "dropped", "targets": [], "reason": "Evidence only."},
+        {"source": "demo", "content": "A rule", "form": "always-on", "targets": [], "reason": "Applies throughout."}]
+    (pkg / "delivery.json").write_text(json.dumps(delivery), encoding="utf-8")
+    (pkg / "history.json").write_text(json.dumps({"runs": [RUN]}), encoding="utf-8")
+    return pkg
+
+
+def info_of(tmp_path, package, cache, **options):
+    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache, **options)
+    return project.info(mp, tmp_path / "kept"), mp
+
 
 def test_info_reads_the_project_through_the_cache(tmp_path, package, cache):
-    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache)
-    result = project.info(mp, tmp_path / "kept")
+    result, mp = info_of(tmp_path, package, cache)
     assert result["project"] == PROJECT_JSON
     assert result["digest"] == project.digest(mp)
     assert (tmp_path / "kept" / result["digest"] / "project.json").is_file()
+
+
+def test_info_has_everything_the_project_page_shows(tmp_path, described, cache):
+    result, mp = info_of(tmp_path, described, cache)
+    assert set(result) == INFO_KEYS
+    assert result["plugin"] == {"name": "Tester", "slug": SLUG, "version": "0.1.0", "description": "A plugin for the tests."}
+    assert result["records"] == json.loads((described / "records.json").read_text(encoding="utf-8"))["records"]
+    assert result["history"] == [RUN]
+    assert result["changelog"] == "# Changelog\n"
+    assert result["decisions"] == json.loads((described / "delivery.json").read_text(encoding="utf-8"))["decisions"]
+
+
+def test_info_of_a_package_without_delivery_choices_has_none(tmp_path, package, cache):
+    (package / "delivery.json").unlink()
+    (package / "custom-instructions" / "rules.md").unlink()
+    result, _ = info_of(tmp_path, package, cache)
+    assert result["decisions"] == []
+    assert result["inputs"][0]["became"] == {"capability": 0, "always-on": 0, "hook": 0, "dropped": 0}
+
+
+def test_each_input_says_what_it_became_by_the_delivery_document(tmp_path, described, cache):
+    result, _ = info_of(tmp_path, described, cache)
+    delivery = json.loads((described / "delivery.json").read_text(encoding="utf-8"))
+    (entry,) = result["inputs"]
+    commit = json.loads((described / "sources.json").read_text(encoding="utf-8"))["sources"][0]["commit"]
+    assert entry == {"id": "demo", "url": None, "pin": "head", "release": None, "commit": commit, "license": "MIT",
+                     "paths": ["SKILL.md", "references"],
+                     "became": {"capability": 1, "always-on": 1, "hook": 0, "dropped": 2}}
+    for item in result["inputs"]:
+        counted = {form: sum(1 for d in delivery["decisions"] if d["source"] == item["id"] and d["form"] == form)
+                   for form in ("capability", "always-on", "hook", "dropped")}
+        assert item["became"] == counted        # and no field carries the local checkout path: the entry is exactly the above
+
+
+def test_an_input_from_a_public_repository_shows_its_address_and_release(tmp_path, described, cache):
+    manifest = json.loads((described / "sources.json").read_text(encoding="utf-8"))
+    manifest["sources"][0].pop("repo_path")
+    manifest["sources"][0].update(repo_url="https://example.invalid/demo.git", pin="release", release="v1.2.0")
+    (described / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
+    result, _ = info_of(tmp_path, described, cache)
+    assert result["inputs"][0]["url"] == "https://example.invalid/demo.git"
+    assert (result["inputs"][0]["pin"], result["inputs"][0]["release"]) == ("release", "v1.2.0")
+
+
+def test_the_graph_is_the_guides_data_not_a_second_computation(tmp_path, described, cache):
+    result, mp = info_of(tmp_path, described, cache)
+    folder = project.cached(mp, tmp_path / "kept")
+    manifest = json.loads((folder / "sources.json").read_text(encoding="utf-8"))
+    data = guide.guide_data(folder, manifest["plugin"], manifest["sources"], packaged=False)
+    assert result["graph"]["capabilities"] == data["capabilities"]
+    assert result["graph"]["examples"] == data["examples"]
+    (capability,) = result["graph"]["capabilities"]
+    assert capability["id"] == "x" and capability["title"] == "x"        # no heading in the body: the id
+    assert [intent["id"] for intent in capability["intents"]] == ["testing.verify"]
+    assert capability["checks"] == ["ok"] and capability["outputs"] == ["x"] and "Source: demo" in capability["body"]
+    (example,) = result["graph"]["examples"]
+    assert example["path"] == ["x"] and example["steps"] == [{"step": "x", "capability": "x", "intent": "testing.verify"}]
+
+
+def test_the_graph_names_its_entries_with_what_they_absorb(tmp_path, described, cache):
+    result, _ = info_of(tmp_path, described, cache)
+    (entry,) = result["graph"]["entries"]
+    assert entry["name"] == "tester-main" and entry["capabilities"] == ["x"]
+    assert entry["description"] == entry_description(ENTRY)               # what a host reads, built the way the build does
+    assert entry["description"].startswith("Use when testing the tester.") and "old-tester" in entry["description"]
+
+
+def test_a_package_without_entries_has_none(tmp_path, package, cache):
+    result, _ = info_of(tmp_path, package, cache)
+    assert result["graph"]["entries"] == []
+    assert [item["id"] for item in result["graph"]["capabilities"]] == ["x"]
+    assert result["graph"]["examples"][0]["status"] == "no_match" and result["graph"]["examples"][0]["steps"] == []
+
+
+def test_the_prompts_are_the_packages_own_and_else_the_factorys(tmp_path, described, cache):
+    own = (described / "prompts" / "harmonizer.md")
+    own.write_text(own.read_text(encoding="utf-8") + "\nA line only this package has.\n", encoding="utf-8")
+    result, _ = info_of(tmp_path, described, cache)
+    assert [item["file"] for item in result["prompts"]] == list(PROMPT_FILES)
+    assert {item["file"]: item["text"] for item in result["prompts"]} == {
+        name: (described / "prompts" / name).read_text(encoding="utf-8") for name in PROMPT_FILES}
+    assert "A line only this package has." in result["prompts"][1]["text"]
+
+    shutil.rmtree(described / "prompts")
+    (tmp_path / "t.mp").unlink()
+    result, _ = info_of(tmp_path, described, cache)
+    assert {item["file"]: item["text"] for item in result["prompts"]} == {
+        name: (ROOT / "prompts" / name).read_text(encoding="utf-8") for name in PROMPT_FILES}
+
+
+def test_info_of_a_package_with_a_partial_prompts_folder_says_which_is_missing(tmp_path, package, cache):
+    (package / "prompts" / "classify.md").unlink()
+    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache)     # packing does not build, so it packs
+    with pytest.raises(OSError, match="classify.md"):
+        project.info(mp, tmp_path / "kept")
+
+
+def test_the_file_list_follows_the_mockup_with_the_projects_numbers(tmp_path, described, cache, release):
+    result, _ = info_of(tmp_path, described, cache, release_dir=release)
+    rows = {row["part"]: row for row in result["files"]}
+    assert list(rows) == FILE_PARTS and all(set(row) == {"part", "path", "detail"} for row in result["files"])
+    detail = {part: row["detail"] for part, row in rows.items()}
+    assert detail["Identity"] == "The final plugin: Tester, installed as tester, version 0.1.0"
+    assert detail["Author and dates"] == "someone · created 2026-11-10 · last changed 2026-11-20"
+    assert detail["Repository"] == ("https://example.invalid/tester · branch main · releases tagged tester-v<version>")
+    assert detail["Inputs"].startswith("1 plugin or skill set composes it: ")
+    assert detail["Choices"].startswith("5 decisions: ")        # demo: 1 capability, 1 always-on, 2 dropped; rules.md: 1
+    assert detail["Result"] == "1 capability in 1 entry, the router and 1 documented request"
+    assert detail["Your instructions"] == "rules.md"
+    assert detail["History"].startswith("1 run: ")
+    assert detail["Decision records"].startswith("1 record: ")
+    assert detail["Built plugin"] == "Ready to install on every harness, with its guide"
+    assert rows["Identity"]["path"] == "sources.json · plugin"
+    assert rows["Result"]["path"] == "capabilities/ · ROUTER.md · entries.json · guide-examples.json"
+    assert rows["Built plugin"]["path"] == "release/" and rows["Input copies"]["path"] == "inputs/"
+    assert rows["Choices"]["path"] == "delivery.json" and rows["History"]["path"] == "history.json"
+    assert rows["Changelog"]["path"] == "CHANGELOG.md" and rows["Decision records"]["path"] == "records.json"
+    assert rows["Author and dates"]["path"] == "project.json · author, created, changed"
+    assert rows["Repository"]["path"] == "project.json · repository"
+
+
+def test_the_file_list_of_a_project_not_yet_harmonized_or_built_says_so(tmp_path, package, cache):
+    (package / "delivery.json").unlink()
+    (package / "custom-instructions" / "rules.md").unlink()
+    (package / "records.json").write_text('{"records": []}', encoding="utf-8")
+    repository_free = json.loads((package / "project.json").read_text(encoding="utf-8"))
+    repository_free["repository"] = None
+    (package / "project.json").write_text(json.dumps(repository_free), encoding="utf-8")
+    result, _ = info_of(tmp_path, package, cache)
+    detail = {row["part"]: row["detail"] for row in result["files"]}
+    assert detail["Repository"] == "None set: the project lives on this computer only"
+    assert detail["Choices"] == detail["Decision records"] == "Written by the first harmonization"
+    assert detail["Built plugin"] == "Built by the first harmonization"
+    assert detail["Your instructions"] == "None yet"
+    assert detail["History"].startswith("0 runs: ")
+
+
+def without(mp, name, out):
+    """The project file with one member left out, as a stranger's incomplete one."""
+    with zipfile.ZipFile(mp) as source, zipfile.ZipFile(out, "w") as target:
+        for info in source.infolist():
+            if info.filename != name:
+                target.writestr(info, source.read(info.filename))
+    return out
+
+
+@pytest.mark.parametrize("member", ["project.json", "records.json", "history.json", "CHANGELOG.md", "sources.json"])
+def test_info_refuses_a_project_file_that_lacks_a_member_the_page_reads(tmp_path, package, cache, member):
+    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache)
+    with pytest.raises((ValueError, OSError), match=member):
+        project.info(without(mp, member, tmp_path / "x.mp"), tmp_path / "kept")
+
+
+def test_info_refuses_a_project_file_that_does_not_describe_itself_right(tmp_path, package, cache):
+    (package / "records.json").write_text('{"records": []}', encoding="utf-8")
+    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache)
+    with zipfile.ZipFile(mp) as source:
+        members = {info.filename: source.read(info.filename) for info in source.infolist() if info.filename != "mimetype"}
+
+    def stranger(**changes):
+        data = {**members, **{name: value.encode("utf-8") for name, value in changes.items()}}
+        path = tmp_path / f"s{len(list(tmp_path.glob('s*.mp')))}.mp"
+        return crafted(path, [(name, value) for name, value in data.items()])
+
+    bad_project = json.dumps({**PROJECT_JSON, "schema": 2})
+    with pytest.raises(ValueError, match="project.json is not valid"):
+        project.info(stranger(**{"project.json": bad_project}), tmp_path / "k1")
+    with pytest.raises(ValueError, match="records.json"):
+        project.info(stranger(**{"records.json": '{"records": 3}'}), tmp_path / "k2")
+    with pytest.raises(ValueError, match="history.json"):
+        project.info(stranger(**{"history.json": "[]"}), tmp_path / "k3")
+    manifest = json.loads(members["sources.json"])
+    manifest["plugin"]["version"] = ""
+    with pytest.raises(ValueError, match=r"Invalid plugin.*plugin.version"):
+        project.info(stranger(**{"sources.json": json.dumps(manifest)}), tmp_path / "k4")
+    manifest = json.loads(members["sources.json"])
+    manifest["sources"][0]["license"] = "GPL-3.0"
+    with pytest.raises(ValueError, match="license must be MIT or Apache-2.0"):
+        project.info(stranger(**{"sources.json": json.dumps(manifest)}), tmp_path / "k5")
+
+
+# --- the guide's data model: one function, used by the page and by the project view ---------------------
+
+def test_the_guide_page_carries_exactly_the_data_guide_data_returns(portable_project):
+    manifest = json.loads((portable_project / "sources.json").read_text(encoding="utf-8"))
+    data = guide.guide_data(portable_project, manifest["plugin"], manifest["sources"])
+    _, parsed = read_guide(guide.write_release_guide(portable_project, manifest["plugin"], manifest["sources"]))
+    payload = parsed.payload
+    for key in ("plugin", "capabilities", "sources", "catalog_digest", "examples"):
+        assert payload[key] == data[key], key
+    assert "generated_at" in payload and "generated_at" not in data      # the time belongs to the rendered page
+    assert "delivery" not in payload and "i18n" in payload and "graph_library" in payload
+    assert data["capabilities"][0]["title"] == "x" and data["capabilities"][0]["body"]
+    assert data["delivery"] is None                                      # this fixture declares no delivery
+
+
+def test_guide_data_reads_the_real_marionette_package_as_a_package_folder():
+    package = ROOT / "examples" / "marionette"
+    manifest = json.loads((package / "sources.json").read_text(encoding="utf-8"))
+    data = guide.guide_data(package, manifest["plugin"], manifest["sources"], packaged=False)
+    assert [cap["id"] for cap in data["capabilities"]] == [row.id for row in parse_router(package / "ROUTER.md")]
+    assert data["delivery"] == json.loads((package / "delivery.json").read_text(encoding="utf-8"))
+    assert len(data["examples"]) == len(json.loads((package / "guide-examples.json").read_text(encoding="utf-8"))["examples"])
+    assert [source["id"] for source in data["sources"]] == [source["id"] for source in manifest["sources"]]
+    assert all("repo_path" not in source for source in data["sources"])
 
 
 # --- the subcommands --------------------------------------------------------------------------------
@@ -504,7 +822,9 @@ def test_project_subcommands_pack_unpack_and_info(tmp_path, package, release, ca
     assert (tmp_path / "un" / "release" / SLUG / "GUIDE.html").is_file()
 
     assert main(["project", "info", str(mp), "--cache", str(tmp_path / "cache")]) == 0
-    assert json.loads(capsys.readouterr().out)["project"]["slug"] == SLUG
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["project"]["slug"] == SLUG and set(shown) == INFO_KEYS
+    assert [cap["id"] for cap in shown["graph"]["capabilities"]] == ["x"]
 
 
 def test_project_subcommands_report_failures_on_stderr_with_exit_1(tmp_path, package, capsys):
