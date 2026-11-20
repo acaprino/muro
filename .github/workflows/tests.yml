@@ -34,6 +34,16 @@ jobs:
           python muro_build.py --manifest "$MANIFEST" --validate
           python muro_build.py --manifest "$MANIFEST" --check-sources
           python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
+      # The default project, packed from its real sources (fetched at their pins) with the release just built,
+      # on every push: a release of Marionette must not be the first time it is packed (ADR-0028). The size of
+      # the file and what reading it costs (the first read unpacks it, the second finds it unpacked) are printed.
+      - name: Pack the default project
+        if: always()
+        run: |
+          python -m muro project pack --manifest "$MANIFEST" --out "$RUNNER_TEMP/marionette.mp" --sources-cache "$RUNNER_TEMP/sources-cache" --release "$RUNNER_TEMP/stage"
+          echo "marionette.mp: $(stat -c %s "$RUNNER_TEMP/marionette.mp") bytes"
+          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache"
+          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache" > /dev/null
 
   # The desktop app: the job above builds none of it. Windows, because the app is
   # Windows-first and its start-with-Windows tests write the per-user Run key.
