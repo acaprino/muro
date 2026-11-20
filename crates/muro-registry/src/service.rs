@@ -4,12 +4,23 @@ use fs2::FileExt;
 use serde_json::{Value, json};
 use std::{fs, path::Path};
 
+/// How a request that met another writer starts its error: the text a client looks for to try
+/// again. The refusal comes before the request did anything, so trying again is safe.
+pub const BUSY: &str = "Registry is busy";
+/// The events of the activity log that are kept: the oldest go first.
+const ACTIVITY_LIMIT: usize = 500;
+
 pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
     fs::create_dir_all(data_dir)?;
     ensure!(
         !data_dir.is_symlink(),
         "Registry directory must not be a symbolic link"
     );
+    // A read of two small files that are only ever replaced whole: it waits for no writer, so a
+    // check that lasts minutes does not blind the tray and the background worker.
+    if action == "status" {
+        return status(data_dir);
+    }
     let lock = fs::OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -17,7 +28,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
         .write(true)
         .open(data_dir.join("writer.lock"))?;
     lock.try_lock_exclusive()
-        .context("Registry is busy; wait for the running operation")?;
+        .context(format!("{BUSY}; wait for the running operation"))?;
     let mut registry = load_registry(data_dir)?;
     let mut receipts = optional(&data_dir.join("receipts.json"))?;
     match action {
@@ -32,6 +43,8 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
         }
         "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings" => {
             revision(&registry, &payload)?;
+            // The receipt written for an adopted installation, until the registry is saved.
+            let mut adopted = None;
             match action {
                 "save_plugin" => {
                     let p = payload["plugin"].clone();
@@ -62,6 +75,15 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                                 "Changing source requires clearing resolved upstream metadata"
                             );
                         }
+                    }
+                    if let Some(adopt) = payload.get("adopt").filter(|a| !a.is_null()) {
+                        adopted = Some(adopt_installation(
+                            data_dir,
+                            &registry,
+                            &mut receipts,
+                            &p,
+                            adopt,
+                        )?);
                     }
                     upsert(&mut registry["plugins"], p)?;
                 }
@@ -115,7 +137,16 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 _ => unreachable!(),
             }
             let from = registry["revision"].as_u64().context("revision")?;
-            save_registry(data_dir, &mut registry)?;
+            if let Err(error) = save_registry(data_dir, &mut registry) {
+                // The plugin was not saved: the installation is not its own.
+                if let Some(key) = adopted {
+                    if let Some(all) = receipts.as_object_mut() {
+                        all.remove(&key);
+                    }
+                    let _ = write(&data_dir.join("receipts.json"), &receipts);
+                }
+                return Err(error);
+            }
             if action == "settings" {
                 // Settings do not change what a sync would do: the last plan stays current, so a
                 // switch does not cost a new inventory scan and the shell does not read "not checked".
@@ -131,6 +162,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             &receipts,
             payload["reinstall"].as_str(),
             only_target(&payload)?,
+            None,
         ),
         "check" => {
             let only = only_target(&payload)?;
@@ -154,7 +186,7 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             } else {
                 save_registry(data_dir, &mut registry)?;
             }
-            let plan = check_plan(data_dir, &registry, &receipts, None, only)?;
+            let plan = check_plan(data_dir, &registry, &receipts, None, only, Some(errors.len()))?;
             if errors.is_empty() {
                 log(
                     data_dir,
@@ -244,6 +276,89 @@ fn receipt_for<'a>(receipts: &'a Value, target_id: &str, plugin_id: &str) -> Opt
         .as_object()?
         .values()
         .find(|r| r["target_id"] == target_id && r["plugin_id"] == plugin_id)
+}
+/// The digest of the copy a person already has: its folder, hashed as Muro hashes the build it
+/// installs. A harness that reports no folder (Codex) gives none, and the plan then takes the
+/// copy for an older one and updates it.
+fn installed_digest(entry: &Value) -> String {
+    entry["path"]
+        .as_str()
+        .map(Path::new)
+        .filter(|path| path.is_dir())
+        .and_then(|path| tree_hash(path).ok())
+        .unwrap_or_default()
+}
+/// The installation a new plugin of the list takes over (`adopt`: `target_id` and `native_id`):
+/// the receipt that binds the plugin to it, written as an install by Muro leaves it, with the
+/// version and digest of the copy that is there. The next plan then finds the plugin installed:
+/// nothing to do when the copy is the build, an update when it is not, never a second copy.
+/// Refused when the target is not in the registry or cannot be read, when nothing with that id
+/// is installed there, when it belongs to a plugin of the list already, or when the plugin is
+/// not a new one that lists the target. Returns the receipt's key; the caller saves the plugin.
+fn adopt_installation(
+    root: &Path,
+    registry: &Value,
+    receipts: &mut Value,
+    plugin: &Value,
+    adopt: &Value,
+) -> Result<String> {
+    ensure!(
+        adopt.is_object(),
+        "adopt must be an object with target_id and native_id"
+    );
+    let target_id = str_field(adopt, "target_id")?;
+    let native_id = str_field(adopt, "native_id")?;
+    let plugin_id = str_field(plugin, "id")?;
+    ensure!(
+        !registry["plugins"]
+            .as_array()
+            .context("plugins")?
+            .iter()
+            .any(|p| p["id"] == plugin["id"]),
+        "An installation is adopted by a plugin that is being added; {plugin_id} is in the list already"
+    );
+    let target = registry["targets"]
+        .as_array()
+        .context("targets")?
+        .iter()
+        .find(|t| t["id"] == target_id)
+        .context("Target not found")?;
+    let name = text(&target["name"]);
+    ensure!(
+        plugin["targets"]
+            .as_array()
+            .context("targets")?
+            .contains(&json!(target_id)),
+        "The plugin must list {name} to adopt an installation there"
+    );
+    let inventory = native::inventory(target, receipts);
+    ensure!(
+        inventory["complete"] == true,
+        "{name} could not be read: {}",
+        text(&inventory["error"])
+    );
+    let entry = inventory["plugins"]
+        .as_array()
+        .context("inventory plugins")?
+        .iter()
+        .find(|i| i["id"] == native_id)
+        .with_context(|| format!("{native_id} is not installed on {name}"))?;
+    ensure!(
+        entry["managed"] != true,
+        "{native_id} already belongs to {} on {name}",
+        text(&entry["registry_id"])
+    );
+    let receipt = json!({"target_id":target_id,"plugin_id":plugin_id,"native_id":native_id,
+        "version":entry["version"],"digest":installed_digest(entry),"path":entry["path"],
+        "custom_instructions_digest":instructions::read(root, plugin)?.digest(),
+        "adopted":true});
+    let key = receipt_key(target_id, plugin_id);
+    let all = receipts.as_object_mut().context("receipts")?;
+    // A legacy delimiter key for this pair goes, as at an install.
+    all.retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id);
+    all.insert(key.clone(), receipt);
+    write(&root.join("receipts.json"), receipts)?;
+    Ok(key)
 }
 /// Plugin entries as a check compares them: the time of the check itself is not a change.
 fn without_check_times(plugins: &Value) -> Value {
@@ -390,6 +505,14 @@ fn snapshot(root: &Path, reg: &Value, receipts: &Value, fresh: bool) -> Result<V
                "custom_instructions":instructions::states(root,reg),"sync":sync_status::load(root)?}),
     )
 }
+/// The revision, the settings and the sync state: what the tray and the worker need to know, and
+/// nothing a full `snapshot` scans for.
+fn status(root: &Path) -> Result<Value> {
+    let registry = load_registry(root)?;
+    Ok(
+        json!({"revision":registry["revision"],"settings":registry["settings"],"sync":sync_status::load(root)?}),
+    )
+}
 fn log(root: &Path, action: &str, status: &str, message: &str) -> Result<()> {
     let path = root.join("activity.json");
     let mut events = if path.exists() {
@@ -399,6 +522,9 @@ fn log(root: &Path, action: &str, status: &str, message: &str) -> Result<()> {
     };
     let list = events.as_array_mut().context("Invalid activity log")?;
     list.push(event(action, status, message));
+    if list.len() > ACTIVITY_LIMIT {
+        list.drain(..list.len() - ACTIVITY_LIMIT);
+    }
     write(&path, &events)
 }
 fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
@@ -530,13 +656,15 @@ fn planned_targets<'a>(reg: &'a Value, only: Option<&str>) -> Result<Vec<&'a Val
     ensure!(target["enabled"] == true, "Target is disabled");
     Ok(vec![target])
 }
-/// Calculates a plan, stores it for `apply` and records the check.
+/// Calculates a plan, stores it for `apply` and records the check. `errors` is the number of
+/// sources the `check` behind it could not resolve; a plan alone has none to report.
 fn check_plan(
     root: &Path,
     reg: &Value,
     receipts: &Value,
     reinstall: Option<&str>,
     only: Option<&str>,
+    errors: Option<usize>,
 ) -> Result<Value> {
     let plan = plan(root, reg, receipts, reinstall, only)?;
     write(
@@ -549,7 +677,7 @@ fn check_plan(
         .into_iter()
         .map(|t| str_field(t, "id"))
         .collect::<Result<Vec<_>>>()?;
-    sync_status::record_check(root, &plan, &checked, only.is_none())?;
+    sync_status::record_check(root, &plan, &checked, only.is_none(), errors)?;
     Ok(plan)
 }
 /// A value as a person reads it in a message: a string without its JSON quotes.
@@ -599,7 +727,11 @@ fn plan(
             let absent = Value::Null;
             let receipt = receipt_for(receipts, tid, pid).unwrap_or(&absent);
             let artifact =
-                match if reinstall == Some(pid) && previous.is_some() && !receipt.is_null() {
+                match if reinstall == Some(pid)
+                    && previous.is_some()
+                    && !receipt.is_null()
+                    && receipt["adopted"] != true
+                {
                     instructions::ensure_distribution(root, plugin, receipt)
                         .and_then(|_| retained_artifact(root, receipt, h))
                 } else {
@@ -963,6 +1095,18 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn the_digest_of_an_installed_copy_is_its_folder_hash_or_none_when_there_is_no_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("SKILL.md"), "INSTALLED").unwrap();
+        let digest = tree_hash(tmp.path()).unwrap();
+        assert_eq!(installed_digest(&json!({"path":tmp.path()})), digest);
+        // Codex reports no folder, a folder that is gone is none either: the plan then updates.
+        for path in [json!(""), json!(null), json!(tmp.path().join("gone"))] {
+            assert_eq!(installed_digest(&json!({"path":path})), "");
+        }
+        assert_eq!(installed_digest(&json!({})), "");
+    }
     #[test]
     fn reinstall_check_compares_installed_files_with_the_artifact() {
         let tmp = tempfile::tempdir().unwrap();

@@ -366,7 +366,7 @@ fn snapshot_carries_an_empty_sync_state_before_any_check() {
     plugin(&r, &a);
     assert_eq!(
         snapshot(&r)["sync"],
-        json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"targets":{}})
+        json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"errors":null,"targets":{}})
     );
     assert!(!r.join("sync-status.json").exists());
 }
@@ -858,6 +858,276 @@ fn a_settings_save_before_any_check_records_nothing() {
     let saved = save_setting(&r, "auto_sync", json!(true));
     assert!(saved["sync"]["revision"].is_null());
     assert!(!r.join("sync-status.json").exists());
+}
+
+// ---------- the fix wave after the final review ----------
+
+#[test]
+fn status_is_the_revision_the_settings_and_the_sync_state_and_needs_no_lock() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    request(&r, "plan", json!({})).unwrap();
+    let full = snapshot(&r);
+    // A check or a save that holds the writer lock for minutes must not blind the tray and the worker.
+    let held = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(r.join("writer.lock"))
+        .unwrap();
+    fs2::FileExt::try_lock_exclusive(&held).unwrap();
+    let status = request(&r, "status", json!({})).unwrap();
+    assert_eq!(
+        status,
+        json!({"revision":full["registry"]["revision"],"settings":full["registry"]["settings"],"sync":full["sync"]})
+    );
+    assert!(
+        request(&r, "snapshot", json!({}))
+            .unwrap_err()
+            .to_string()
+            .contains("Registry is busy")
+    );
+}
+
+#[test]
+fn status_of_a_registry_never_written_is_the_default_one() {
+    let (_t, r, _p, _a) = fixture();
+    let status = request(&r, "status", json!({})).unwrap();
+    assert_eq!(status["revision"], 0);
+    assert_eq!(status["settings"]["close_to_tray"], true);
+    assert_eq!(status["sync"], snapshot(&r)["sync"]);
+    assert!(!r.join("registry.json").exists(), "a read writes nothing");
+}
+
+#[test]
+fn check_records_the_sources_it_could_not_resolve_and_a_clean_check_clears_them() {
+    let (t, r, p, a) = fixture();
+    let gone = t.path().join("gone");
+    fs::create_dir_all(&gone).unwrap();
+    target(&r, &p);
+    plugin_as(&r, &gone, "broken", &[]);
+    plugin(&r, &a);
+    fs::remove_dir_all(&gone).unwrap();
+    assert!(snapshot(&r)["sync"]["errors"].is_null(), "no check yet");
+    let out = request(&r, "check", json!({})).unwrap();
+    assert_eq!(out["errors"].as_array().unwrap().len(), 1, "{out}");
+    assert_eq!(out["snapshot"]["sync"]["errors"], 1);
+    assert_eq!(snapshot(&r)["sync"]["errors"], 1);
+    // A plan resolves no source: it neither clears the count nor invents one.
+    request(&r, "plan", json!({})).unwrap();
+    assert_eq!(snapshot(&r)["sync"]["errors"], 1);
+    // The source is back: the next check resolves it, and the count is zero, not missing.
+    fs::create_dir_all(&gone).unwrap();
+    let out = request(&r, "check", json!({})).unwrap();
+    assert_eq!(out["errors"], json!([]), "{out}");
+    assert_eq!(snapshot(&r)["sync"]["errors"], 0);
+}
+
+#[test]
+fn the_activity_log_keeps_the_last_500_events() {
+    let (_t, r, p, _a) = fixture();
+    target(&r, &p);
+    let old: Vec<Value> = (0..600)
+        .map(|n| json!({"id":format!("e{n}"),"time":"1000000000","action":"check","status":"complete","message":""}))
+        .collect();
+    fs::write(r.join("activity.json"), serde_json::to_vec(&old).unwrap()).unwrap();
+    save_setting(&r, "auto_sync", json!(true));
+    let activity = snapshot(&r)["activity"].as_array().unwrap().clone();
+    assert_eq!(activity.len(), 500);
+    assert_eq!(activity[0]["id"], "e101", "the oldest go first");
+    assert_eq!(activity[498]["id"], "e599");
+    assert_eq!(activity[499]["action"], "settings", "the new event is kept");
+    // Under the limit nothing is dropped.
+    save_setting(&r, "auto_sync", json!(false));
+    assert_eq!(snapshot(&r)["activity"].as_array().unwrap().len(), 500);
+}
+
+#[test]
+fn a_corrupt_sync_status_reads_as_no_record_and_the_next_check_rewrites_it() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let none = json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"errors":null,"targets":{}});
+    for broken in ["{broken", "[]", r#"{"targets":3}"#, ""] {
+        fs::write(r.join("sync-status.json"), broken).unwrap();
+        assert_eq!(snapshot(&r)["sync"], none, "{broken:?}");
+        assert_eq!(request(&r, "status", json!({})).unwrap()["sync"], none);
+    }
+    request(&r, "plan", json!({})).unwrap();
+    assert_eq!(snapshot(&r)["sync"]["pending"], 1);
+    serde_json::from_slice::<Value>(&fs::read(r.join("sync-status.json")).unwrap()).unwrap();
+    // A sync that follows a damaged record records itself on a fresh one.
+    let plan = request(&r, "plan", json!({})).unwrap();
+    fs::write(r.join("sync-status.json"), "{broken").unwrap();
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    assert!(snapshot(&r)["sync"]["last_sync"].is_string());
+    // A record written before `errors` existed still reads with it, empty.
+    let old = json!({"last_check":"1000","last_sync":null,"revision":3,"pending":0,"blockers":0,"targets":{}});
+    fs::write(r.join("sync-status.json"), serde_json::to_vec(&old).unwrap()).unwrap();
+    let sync = snapshot(&r)["sync"].clone();
+    assert!(sync["errors"].is_null(), "{sync}");
+    assert_eq!(sync["last_check"], "1000");
+}
+
+/// An `opencode.json` that lists `entries` as its plugins, the way a person's own installation does.
+fn list_plugins(profile: &Path, entries: &[&Path]) {
+    let list: Vec<String> = entries
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+    fs::write(
+        profile.join("opencode.json"),
+        serde_json::to_vec(&json!({"plugins":list})).unwrap(),
+    )
+    .unwrap();
+}
+/// What "Add to my list" saves: the plugin's own folder is its source and its one build.
+fn listed(id: &str, folder: &Path, version: &str, targets: &[&str]) -> Value {
+    json!({"id":id,"name":id,"source":folder,"policy":"pinned","pinned_version":version,"targets":targets,
+           "distributions":[{"harness":"opencode","path":folder,"version":version}]})
+}
+fn adopting(root: &Path, plugin: Value, adopt: Value) -> anyhow::Result<Value> {
+    let revision = snapshot(root)["registry"]["revision"].clone();
+    request(
+        root,
+        "save_plugin",
+        json!({"revision":revision,"plugin":plugin,"adopt":adopt}),
+    )
+}
+fn native_id(folder: &Path) -> Value {
+    json!(folder.to_string_lossy())
+}
+fn receipts(root: &Path) -> Value {
+    fs::read(root.join("receipts.json"))
+        .ok()
+        .map_or(json!({}), |bytes| serde_json::from_slice(&bytes).unwrap())
+}
+
+#[test]
+fn a_plugin_added_from_what_is_installed_is_found_installed_by_the_next_plan() {
+    let (_t, r, p, a) = fixture();
+    list_plugins(&p, &[&a]);
+    target(&r, &p);
+    adopting(
+        &r,
+        listed("example", &a, "1.0.0", &["oc"]),
+        json!({"target_id":"oc","native_id":native_id(&a)}),
+    )
+    .unwrap();
+    // The harness is exclusive: a plan that did not know the installation would install a second
+    // copy and remove the person's own.
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!(plan["operations"], json!([]), "{plan}");
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    let s = snapshot(&r);
+    let entry = &s["inventory"][0]["plugins"][0];
+    assert_eq!(entry["managed"], true, "{entry}");
+    assert_eq!(entry["registry_id"], "example");
+    // The receipt is the one an install by Muro leaves, for the installed copy.
+    let all = receipts(&r);
+    assert_eq!(all.as_object().unwrap().len(), 1, "{all}");
+    let receipt = &all[serde_json::to_string(&["oc", "example"]).unwrap()];
+    assert_eq!(receipt["target_id"], "oc");
+    assert_eq!(receipt["plugin_id"], "example");
+    assert_eq!(receipt["native_id"], native_id(&a));
+    assert_eq!(receipt["version"], "1.0.0");
+    assert_eq!(receipt["path"], native_id(&a));
+    let digest = receipt["digest"].as_str().unwrap();
+    assert!(digest.len() == 64 && digest.chars().all(|c| c.is_ascii_hexdigit()), "{receipt}");
+    assert!(receipt["custom_instructions_digest"].is_string(), "{receipt}");
+    // A reinstall has no retained build to restore from: it builds from the list's own.
+    let reinstall = request(&r, "plan", json!({"reinstall":"example"})).unwrap();
+    assert_eq!(reinstall["blockers"], json!([]), "{reinstall}");
+    assert_eq!(reinstall["operations"][0]["kind"], "reinstall", "{reinstall}");
+}
+
+#[test]
+fn an_adopted_installation_that_differs_from_the_build_is_updated_in_place() {
+    let (t, r, p, a) = fixture();
+    let installed = t.path().join("installed");
+    fs::create_dir_all(&installed).unwrap();
+    fs::copy(a.join("package.json"), installed.join("package.json")).unwrap();
+    fs::copy(a.join("index.js"), installed.join("index.js")).unwrap();
+    list_plugins(&p, &[&installed]);
+    // The list holds a newer build of the same plugin than the copy the person has.
+    fs::write(
+        a.join("package.json"),
+        r#"{"name":"example","version":"1.1.0","type":"module","main":"index.js"}"#,
+    )
+    .unwrap();
+    target(&r, &p);
+    adopting(
+        &r,
+        listed("example", &a, "1.1.0", &["oc"]),
+        json!({"target_id":"oc","native_id":native_id(&installed)}),
+    )
+    .unwrap();
+    let plan = request(&r, "plan", json!({})).unwrap();
+    let ops = plan["operations"].as_array().unwrap();
+    assert_eq!(ops.len(), 1, "an update, no install and no removal: {plan}");
+    assert_eq!(ops[0]["kind"], "update");
+    assert_eq!(ops[0]["from_version"], "1.0.0");
+    assert_eq!(ops[0]["to_version"], "1.1.0");
+    assert_eq!(ops[0]["previous_id"], native_id(&installed));
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let config: Value = serde_json::from_slice(&fs::read(p.join("opencode.json")).unwrap()).unwrap();
+    assert_eq!(config["plugins"].as_array().unwrap().len(), 1, "{config}");
+    assert_eq!(
+        request(&r, "plan", json!({})).unwrap()["operations"],
+        json!([])
+    );
+}
+
+#[test]
+fn an_adoption_the_installation_does_not_support_is_refused_and_saves_nothing() {
+    let (t, r, p, a) = fixture();
+    let other = t.path().join("other");
+    fs::create_dir_all(&other).unwrap();
+    fs::copy(a.join("package.json"), other.join("package.json")).unwrap();
+    list_plugins(&p, &[&a, &other]);
+    target(&r, &p);
+    let revision = snapshot(&r)["registry"]["revision"].clone();
+    let refused = |plugin: Value, adopt: Value, expected: &str| {
+        let error = adopting(&r, plugin, adopt).unwrap_err().to_string();
+        assert!(error.contains(expected), "{expected:?} not in {error:?}");
+        assert_eq!(snapshot(&r)["registry"]["revision"], revision, "nothing saved");
+        assert_eq!(snapshot(&r)["registry"]["plugins"], json!([]));
+        assert_eq!(receipts(&r), json!({}), "no receipt");
+    };
+    let example = || listed("example", &a, "1.0.0", &["oc"]);
+    refused(example(), json!({"target_id":"oc","native_id":"not-installed"}), "is not installed on");
+    refused(example(), json!({"target_id":"nowhere","native_id":native_id(&a)}), "Target not found");
+    refused(example(), json!({"target_id":"oc"}), "native_id");
+    refused(example(), json!({"native_id":native_id(&a)}), "target_id");
+    refused(example(), json!("oc"), "adopt must be");
+    refused(listed("example", &a, "1.0.0", &[]), json!({"target_id":"oc","native_id":native_id(&a)}), "must list");
+    fs::write(p.join("opencode.json"), "{broken").unwrap();
+    refused(example(), json!({"target_id":"oc","native_id":native_id(&a)}), "could not be read");
+    list_plugins(&p, &[&a, &other]);
+
+    // One installation belongs to one plugin of the list.
+    adopting(&r, example(), json!({"target_id":"oc","native_id":native_id(&a)})).unwrap();
+    let revision = snapshot(&r)["registry"]["revision"].clone();
+    let error = adopting(
+        &r,
+        listed("second", &a, "1.0.0", &["oc"]),
+        json!({"target_id":"oc","native_id":native_id(&a)}),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("already belongs to"), "{error}");
+    assert_eq!(snapshot(&r)["registry"]["revision"], revision);
+    assert_eq!(receipts(&r).as_object().unwrap().len(), 1);
+    // And only a plugin that is being added adopts: one that is in the list already is not rebound.
+    let error = adopting(
+        &r,
+        listed("example", &a, "1.0.0", &["oc"]),
+        json!({"target_id":"oc","native_id":native_id(&other)}),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(error.contains("being added"), "{error}");
+    assert_eq!(snapshot(&r)["registry"]["revision"], revision);
 }
 
 #[test]

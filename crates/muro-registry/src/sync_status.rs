@@ -1,7 +1,7 @@
 //! When the registry last compared the installed plugins with the desired ones, and when it last
 //! brought a target in line: `<data>/sync-status.json`, read into every snapshot as `sync`.
 //! The overall fields describe the last full plan; a plan for one target moves only that
-//! target's `checked`.
+//! target's `checked`. `errors` counts the sources the last full check could not resolve.
 use crate::storage::{event, read, write};
 use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
@@ -9,27 +9,39 @@ use std::path::Path;
 
 const FILE: &str = "sync-status.json";
 
-/// The recorded state, or the state before any check when nothing was recorded yet.
+/// The state before any check, and what a record that cannot be read stands for.
+fn unrecorded() -> Value {
+    json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"errors":null,"targets":{}})
+}
+
+/// The recorded state, or the state before any check when nothing was recorded yet. The record
+/// is derived state: a file that cannot be read or does not have the shape is no record at all,
+/// never an error that stops every action, and the next check or sync writes it again.
 pub fn load(root: &Path) -> Result<Value> {
-    let path = root.join(FILE);
-    if !path.exists() {
-        return Ok(
-            json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"targets":{}}),
-        );
+    let Ok(mut state) = read(&root.join(FILE)) else {
+        return Ok(unrecorded());
+    };
+    if !state["targets"].is_object() {
+        return Ok(unrecorded());
     }
-    let state = read(&path)?;
-    ensure!(
-        state["targets"].is_object(),
-        "Corrupt sync status: {}",
-        path.display()
-    );
+    // A record written before `errors` existed has none: that is not a count of zero.
+    if state.get("errors").is_none() {
+        state["errors"] = Value::Null;
+    }
     Ok(state)
 }
 
 /// Records a calculated plan: the targets it compared get its time as `checked`; a full plan
 /// (`full`, every enabled target) also sets the overall time, revision, and operation and
-/// blocker counts.
-pub fn record_check(root: &Path, plan: &Value, checked: &[&str], full: bool) -> Result<()> {
+/// blocker counts. `errors` is the number of sources a `check` could not resolve; a plan
+/// resolves none, so it passes `None` and the count stays as the last check left it.
+pub fn record_check(
+    root: &Path,
+    plan: &Value,
+    checked: &[&str],
+    full: bool,
+    errors: Option<usize>,
+) -> Result<()> {
     let mut state = load(root)?;
     let time = plan["created"].clone();
     ensure!(time.is_string(), "Plan has no creation time");
@@ -38,6 +50,9 @@ pub fn record_check(root: &Path, plan: &Value, checked: &[&str], full: bool) -> 
         state["revision"] = plan["revision"].clone();
         state["pending"] = json!(plan["operations"].as_array().context("operations")?.len());
         state["blockers"] = json!(plan["blockers"].as_array().context("blockers")?.len());
+        if let Some(errors) = errors {
+            state["errors"] = json!(errors);
+        }
     }
     for id in checked {
         target(&mut state, id)["checked"] = time.clone();
