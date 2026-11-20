@@ -335,11 +335,9 @@ it('a new project opens on its first step, with no filter', () => {
 });
 
 // ---------- the steps Tasks 7 and 8 build: until then each says so ----------
-test('Graph & simulator is a placeholder that says it comes in this version, and owns no action yet (Harmonize is built: tests/project-harmonize.test.ts)', () => {
-  const state = opened({}, 'graph');
-  assert.match(graph.view(state, info()), /Graph &amp; simulator<\/strong><span>Coming in this version/);
-  assert.deepEqual(Object.keys(graph.actions), []);
-  assert.match(projects.view(opened({}, 'graph')), /Coming in this version/, 'the page shows the module of the step');
+test('Graph & simulator is built (tests/project-graph.test.ts): the page shows the module of the step, and no step is a placeholder any more', () => {
+  assert.match(projects.view(opened({}, 'graph')), /<div class="two"><div class="sim">/, 'the page shows the module of the step');
+  assert.doesNotMatch(projects.view(opened({}, 'graph')), /Coming in this version/);
   assert.doesNotMatch(projects.view(opened({}, 'harmonize')), /Coming in this version/, 'Harmonize is no placeholder any more');
 });
 test('what a simulation keeps survives a reload through the graph module, and a run in progress does not', () => {

@@ -466,4 +466,304 @@ await test('Harmonize in the light theme stays readable', 'projects', { colorSch
   await page.screenshot({ path: shots + '/project-harmonize-light.png' });
 });
 
+// ---------- Plan 2, Task 8: step 3, the graph and the simulator ----------
+// The fake service answers `simulate` from flags (fake-transport.js): it never reads the words of a request, so these tests prove how the page shows and keeps what the AI decided, not what an AI decides.
+const squash = async locator => (await locator.innerText()).replace(/\s+/g, ' ').trim();
+const activeAttr = (page, attribute) => page.evaluate(a => document.activeElement?.getAttribute(a), attribute);
+const graphTab = async page => { await openMarionette(page); await tab(page, 'Graph').click(); await page.locator('.two svg.graph').waitFor(); };
+const gnode = (page, id) => page.locator(`button.gnode[data-id="${id}"]`);
+const litNodes = page => page.locator('button.gnode.on');
+const simulateButton = page => page.locator('button[data-action="graph-simulate"]');
+const requestBox = page => page.locator('textarea[name="simtask"]');
+const simulations = async app => (await app.calls()).filter(c => c.action === 'simulate');
+const nameFits = page => page.locator('button.gnode').evaluateAll(nodes => nodes.every(b => { const name = b.querySelector('.gname').getBoundingClientRect(), box = b.getBoundingClientRect(); return name.left >= box.left && name.right <= box.right - 1; }));
+const unnamedIn = (page, scope) => page.evaluate(s => [...document.querySelectorAll(`${s} button, ${s} textarea, ${s} [tabindex]`)].filter(e => !(e.getAttribute('aria-label') || e.textContent.trim())).length, scope);
+
+await test('Graph & simulator: one labelled drawing, every capability a named button, conditions and conflicts drawn, and nothing simulated until asked', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  assert.equal(await page.getByRole('tabpanel').getAttribute('aria-labelledby'), 'step-tab-graph');
+  const svg = page.locator('svg.graph');
+  assert.deepEqual([await svg.getAttribute('role'), await svg.getAttribute('aria-label')], ['group', 'Decision graph: entries on the left, capabilities on the right']);
+  assert.deepEqual(await page.locator('button.gnode').evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Capability design-taste, entry design', 'Capability design-review, entry design', 'Capability office-docs, entry office', 'Capability office-pdf, entry office']);
+  assert.deepEqual(await page.locator('svg.graph g.n.ent').evaluateAll(g => g.map(x => x.textContent.trim())), ['Use when designing an interface.design', 'Use when producing Word files.office'], 'the entries, without the plugin\'s prefix, each with its "Use when" as the tooltip');
+  assert.match(await squash(page.locator('.legend')), /entry → capability needs, on a condition never together 2 entries · 4 capabilities$/);
+  assert.equal(await svg.locator('path.e.need').count(), 1);
+  assert.equal(await svg.locator('path.e.conf').count(), 1);
+  assert.equal(await litNodes(page).count(), 0);
+  assert.equal(await page.locator('.simres').count(), 0, 'no result before there is one');
+  assert.equal((await simulations(app)).length, 0);
+  assert.equal(await nameFits(page), true, 'every name is inside its node');
+  assert.equal(await page.getByRole('heading', { name: 'Documented examples' }).count(), 1);
+  assert.equal(await page.locator('.exlist button').count(), 2);
+  await page.screenshot({ path: shots + '/project-graph.png' });
+});
+
+await test('Graph & simulator: the nodes are reached with the keyboard, in order, with a visible focus', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await gnode(page, 'design-taste').focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await activeAttr(page, 'data-id'), 'design-review');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'a focus ring on the node');
+  await page.keyboard.press('Shift+Tab');
+  assert.equal(await activeAttr(page, 'data-id'), 'design-taste');
+  await page.keyboard.press('Space');
+  await page.getByRole('dialog', { name: 'design-taste' }).waitFor();
+});
+
+await test('Documented examples: one lights its branch in order with no call, again clears it, another replaces it', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  const example = name => page.locator('.exlist button', { hasText: name });
+  await example('A landing page').click();
+  assert.equal(await example('A landing page').getAttribute('aria-pressed'), 'true');
+  const card = page.locator('.simres');
+  assert.equal(await card.getAttribute('role'), 'status', 'the result is announced');
+  const text = await squash(card);
+  for (const part of [/2 steps/, /Documented example/, /With stack:react/, /“Design a landing page”/, /1 design-taste design-taste-intent It designs a page\./, /2 design-review design-review-intent A finished design is checked\./, /Design first, then review\./]) assert.match(text, part);
+  assert.doesNotMatch(text, /Asked /, 'no engine answered a documented example');
+  assert.equal(await litNodes(page).count(), 2);
+  assert.deepEqual(await page.locator('.gnum').allTextContents(), ['1', '2']);
+  assert.equal(await page.locator('svg.graph.sim').count(), 1, 'what is not lit is dimmed');
+  assert.match(await squash(page.locator('.legend')), /activated, in order/);
+  assert.equal(await gnode(page, 'design-review').getAttribute('aria-label'), 'Capability design-review, entry design, step 2');
+  assert.equal((await simulations(app)).length, 0, 'a documented example calls nothing');
+  await page.screenshot({ path: shots + '/project-graph-example.png' });
+  await example('A letter').click();
+  assert.deepEqual([await example('A landing page').getAttribute('aria-pressed'), await example('A letter').getAttribute('aria-pressed')], ['false', 'true']);
+  assert.match(await squash(card), /1 office-pdf Prerequisite A prerequisite the plugin declares, added before the step that needs it\. 2 office-docs office-docs-intent It makes the Word file\./);
+  assert.match(await gnode(page, 'office-pdf').innerText(), /office-pdf\s*1/);
+  assert.match(await gnode(page, 'office-docs').innerText(), /office-docs\s*2/);
+  assert.equal(await gnode(page, 'design-taste').evaluate(b => b.classList.contains('on')), false);
+  await example('A letter').click();
+  assert.equal(await page.locator('.simres').count(), 0);
+  assert.equal(await litNodes(page).count(), 0);
+  await example('A letter').click();
+  await page.getByRole('button', { name: 'Clear' }).click();
+  assert.equal(await page.locator('.simres').count(), 0);
+  assert.equal(await activeAttr(page, 'name'), 'simtask', 'the keyboard goes to the request after Clear');
+  assert.equal((await simulations(app)).length, 0);
+});
+
+await test('Simulate: an empty request is refused in place, the note names the engine and the cost once, asking shows the engine, and the answer lights the branch in order', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  assert.match(await squash(page.locator('#sim-note')), /^Free-text requests use Claude Code on this computer, with its own credentials\. Each costs up to \$0\.50 a request\. Documented examples run no AI\. Change this in Settings\.$/);
+  assert.equal(await page.locator('#sim-note').getByRole('button', { name: 'Settings' }).count(), 1);
+  assert.match(await requestBox(page).getAttribute('aria-describedby'), /sim-note/);
+  await simulateButton(page).click();
+  assert.equal(await squash(page.locator('#err-simtask')), 'Write a request first.');
+  assert.equal(await requestBox(page).getAttribute('aria-invalid'), 'true');
+  assert.equal(await activeAttr(page, 'name'), 'simtask', 'the keyboard is in the box');
+  assert.equal((await simulations(app)).length, 0);
+  assert.equal(await page.locator('#sim-note').count(), 1, 'a refused request is no request: the note stays');
+  await page.keyboard.type('Write a letter as a Word file');
+  await page.waitForFunction(() => document.querySelector('#err-simtask').textContent === '');
+  await app.flags({ simulateDelay: 700 });
+  await simulateButton(page).click();
+  await page.getByRole('button', { name: 'Asking Claude Code…' }).waitFor();
+  assert.equal(await simulateButton(page).getAttribute('aria-busy'), 'true');
+  assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 1);
+  assert.equal(await page.locator('#sim-note').count(), 0, 'said once: it is gone as the first request starts');
+  const card = page.locator('.simres');
+  await card.waitFor();
+  const text = await squash(card);
+  for (const part of [/2 steps/, /“Write a letter as a Word file”/, /1 office-pdf Prerequisite/, /2 office-docs office-docs-intent The request asks for a Word file\./, /Classified "Write a letter as a Word file" as a document\./, /Asked Claude Code · \$0\.12 · 4\.2 s/]) assert.match(text, part);
+  assert.doesNotMatch(text, /Documented example/);
+  assert.equal(await card.getAttribute('role'), 'status');
+  assert.deepEqual(await page.locator('.gnum').allTextContents(), ['2', '1'], 'in the order of the decision (the graph lists office-docs first)');
+  assert.deepEqual((await simulations(app)).map(c => c.payload), [{ id: 'marionette', task: 'Write a letter as a Word file' }]);
+  assert.equal(await activeAttr(page, 'data-action'), 'graph-simulate', 'the keyboard is still on the button');
+  assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 0);
+  await page.screenshot({ path: shots + '/project-graph-simulation.png' });
+  await app.flags({ simulateDelay: 0 });
+  await simulateButton(page).click();
+  await page.waitForFunction(() => document.querySelectorAll('.simres').length === 1 && !document.querySelector('[aria-busy=true]'));
+  assert.equal((await simulations(app)).length, 2);
+  assert.equal(await page.locator('#sim-note').count(), 0, 'and not said again');
+});
+
+await test('Simulate: Cancel stops waiting, and the answer that comes later is not shown', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await app.flags({ simulateDelay: 1200 });
+  await requestBox(page).fill('Write a letter');
+  await simulateButton(page).click();
+  await page.getByRole('button', { name: 'Asking Claude Code…' }).waitFor();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('button[data-action="graph-simulate"]', { hasText: 'Simulate' }).waitFor();
+  await page.locator('.toast', { hasText: 'Stopped waiting for the answer.' }).waitFor();
+  assert.equal(await activeAttr(page, 'data-action'), 'graph-simulate', 'the keyboard goes to Simulate');
+  assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 0);
+  await page.waitForTimeout(1500);
+  assert.equal(await page.locator('.simres').count(), 0, 'nobody is waiting for it');
+  assert.equal(await litNodes(page).count(), 0);
+  await app.flags({ simulateDelay: 0 });
+  await simulateButton(page).click();
+  await page.locator('.simres', { hasText: '2 steps' }).waitFor();
+});
+
+await test('Simulate: a call that fails, an answer that is not a valid decision, no match and a question are each shown as what they are', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await requestBox(page).fill('Write a letter');
+  const ask = async (flags, expected) => {
+    await app.flags({ simulateError: '', ...flags });
+    await simulateButton(page).click();
+    const card = page.locator('.simres', { hasText: expected });
+    await card.waitFor();
+    return card;
+  };
+  const failed = await ask({ simulateError: 'No API key: the environment variable named by --api-key-env is not set' }, 'The simulation could not run');
+  assert.equal(await failed.getAttribute('role'), 'alert');
+  assert.match(await squash(failed), /No API key: the environment variable named by --api-key-env is not set Check the AI engine in Settings\./);
+  assert.equal(await litNodes(page).count(), 0);
+  assert.equal(await page.locator('.banner').count(), 0, 'the failure is the simulator\'s, not the app\'s');
+  const invalid = await ask({ simulate: 'invalid' }, 'The AI\'s answer was not a valid decision');
+  assert.deepEqual(await invalid.locator('li.q').allTextContents(), ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason']);
+  assert.equal(await invalid.locator('ol, button[data-action="open-capability"]').count(), 0, 'no step comes of an invalid answer');
+  assert.equal(await litNodes(page).count(), 0);
+  assert.match(await squash(invalid), /Asked Claude Code · \$0\.12 · 4\.2 s/);
+  const none = await ask({ simulate: 'no_match' }, 'No match');
+  assert.match(await squash(none), /Nothing here is work for the plugin\./);
+  assert.equal(await litNodes(page).count(), 0);
+  const unclear = await ask({ simulate: 'clarify' }, 'Needs clarification');
+  assert.deepEqual(await unclear.locator('li.q').allTextContents(), ['Is it a web page or a document?', 'Who is it for?']);
+  await app.flags({ simulateError: 'The harness claude was not found on this computer' });
+  await simulateButton(page).click();
+  const again = page.locator('.simres', { hasText: 'was not found' });
+  await again.waitFor();
+  await again.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  await page.locator('.simres', { hasText: 'was not found' }).waitFor();
+});
+
+await test('Simulate with an API engine names the model and the provider, and shows no cost it does not know', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await page.evaluate(() => window.behind.settings({ ai: { engine: 'api', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://example.test/v1', model: 'gpt-test', api_key_env: 'MURO_API_KEY' } }));
+  await page.evaluate(() => window.shown());
+  const note = page.locator('#sim-note', { hasText: 'gpt-test' });
+  await note.waitFor();
+  assert.match(await squash(note), /^Free-text requests are sent to gpt-test through https:\/\/example\.test\/v1 and billed by your API provider\. Documented examples run no AI\. Change this in Settings\.$/);
+  await requestBox(page).fill('Write a letter');
+  await app.flags({ simulateDelay: 500 });
+  await simulateButton(page).click();
+  await page.getByRole('button', { name: 'Asking gpt-test…' }).waitFor();
+  const card = page.locator('.simres');
+  await card.waitFor();
+  assert.match(await squash(card), /Asked gpt-test · 4\.2 s/);
+  assert.doesNotMatch(await squash(card), /\$/);
+});
+
+await test('A capability opens a sheet from the graph, from a step of the result and from Harmonize; the keyboard goes in and comes back to the control that opened it', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await gnode(page, 'design-review').click();
+  const sheet = page.getByRole('dialog', { name: 'design-review' });
+  await sheet.waitFor();
+  assert.equal(await sheet.evaluate(d => d.classList.contains('sheet')), true, 'a sheet, on the right');
+  const text = await squash(sheet);
+  for (const part of [/Role worker/, /Entry marionette-design Use when designing an interface\./, /Comes from —/, /Activates when the request means design-review-intent Review a finished design Not for: Building one/, /Branches Runs design-taste first, on a condition A design exists/]) assert.match(text, part);
+  assert.doesNotMatch(text, /Produces/);
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('dialog')?.querySelector('footer .btn') === document.activeElement), true, 'the keyboard is on Close, in the sheet');
+  await page.screenshot({ path: shots + '/project-graph-sheet.png' });
+  await page.keyboard.press('Escape');
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await activeAttr(page, 'id'), 'gnode-design-review', 'the keyboard is back on the node');
+  await gnode(page, 'design-taste').click();
+  const taste = await squash(page.getByRole('dialog', { name: 'design-taste' }));
+  assert.match(taste, /Comes from taste-skill/);
+  assert.match(taste, /Produces design-brief/);
+  assert.doesNotMatch(taste, /Branches/);
+  await page.getByRole('dialog', { name: 'design-taste' }).locator('footer .btn').click();
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await activeAttr(page, 'id'), 'gnode-design-taste');
+  await page.locator('.exlist button', { hasText: 'A landing page' }).click();
+  await page.locator('#sim-step-2').click();
+  await page.getByRole('dialog', { name: 'design-review' }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await activeAttr(page, 'id'), 'sim-step-2', 'back on the step that was used, not on the node of the same capability');
+  await tab(page, 'Inputs').click();
+  await page.locator('button[data-action="decisions-of"]').first().click();
+  const link = page.locator('button[data-action="open-capability"]').first();
+  const id = await link.getAttribute('data-id');
+  await link.click();
+  await page.getByRole('dialog', { name: id }).waitFor();
+  await page.keyboard.press('Escape');
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  assert.equal(await activeAttr(page, 'data-action'), 'open-capability', 'Harmonize\'s link gets the keyboard back too');
+});
+
+await test('A graph the size of Marionette (37 capabilities, 15 entries) scrolls inside its card; no long name leaves its node and nothing widens the page', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ bigGraph: true });
+  await graphTab(page);
+  assert.equal(await page.locator('button.gnode').count(), 37);
+  assert.equal(await page.locator('svg.graph g.n.ent').count(), 15);
+  assert.equal(await page.locator('.graphcard').evaluate(c => c.scrollHeight > c.clientHeight), true, 'the card scrolls, not the page');
+  assert.ok(await sideways(page) <= 0);
+  assert.equal(await nameFits(page), true, 'every name, the long one too, is inside its node');
+  const widths = await page.locator('button.gnode').evaluateAll(b => b.map(x => Math.round(x.getBoundingClientRect().width)));
+  assert.ok(Math.max(...widths) - Math.min(...widths) <= 2, 'the column is as wide as its longest name: the estimate of the width holds');
+  assert.match(await squash(page.locator('.legend')), /15 entries · 37 capabilities$/);
+  await page.locator('button.gnode').last().focus();
+  assert.ok(await page.locator('.graphcard').evaluate(c => c.scrollTop) > 0, 'the node focused is scrolled into view inside the card');
+  await page.locator('.exlist button', { hasText: 'Two of many' }).click();
+  assert.equal(await litNodes(page).count(), 2);
+  assert.ok(await sideways(page) <= 0);
+  await page.screenshot({ path: shots + '/project-graph-large.png' });
+});
+
+await test('What was typed and the last answer survive leaving the step and a reload, and the note does not come back', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await requestBox(page).click();
+  await page.keyboard.type('Write a letter as a Word file');
+  await tab(page, 'Install').click();
+  await tab(page, 'Graph').click();
+  assert.equal(await requestBox(page).inputValue(), 'Write a letter as a Word file', 'what was typed is not lost by a paint');
+  await simulateButton(page).click();
+  await page.locator('.simres', { hasText: '2 steps' }).waitFor();
+  const kept = await page.evaluate(() => JSON.parse(sessionStorage.getItem('muro.project')).sim);
+  assert.deepEqual([kept.task, kept.run, kept.error, kept.result?.kind], ['Write a letter as a Word file', null, '', 'decision']);
+  await page.reload();
+  await page.locator('nav').waitFor();
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  await page.locator('.two svg.graph').waitFor();
+  assert.equal(await requestBox(page).inputValue(), 'Write a letter as a Word file');
+  assert.match(await squash(page.locator('.simres')), /2 steps .*1 office-pdf Prerequisite/);
+  assert.equal(await litNodes(page).count(), 2);
+  assert.equal(await page.locator('#sim-note').count(), 0, 'the session already had its note');
+  assert.equal(await simulateButton(page).count(), 1);
+  assert.equal(await page.locator('[aria-busy=true]').count(), 0, 'a request in progress is never brought back');
+});
+
+await test('The simulator at 760px: one column, the graph card scrolls inside itself, no sideways scroll, every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
+  const { page } = app;
+  await app.flags({ bigGraph: true });
+  await graphTab(page);
+  assert.equal(await page.locator('.two').evaluate(t => getComputedStyle(t).gridTemplateColumns.split(' ').length), 1);
+  assert.ok(await sideways(page) <= 0, 'the step');
+  await page.locator('.exlist button', { hasText: 'Another two' }).click();
+  assert.ok(await sideways(page) <= 0, 'an example lit');
+  await requestBox(page).fill('Write a letter');
+  await simulateButton(page).click();
+  await page.locator('.simres', { hasText: 'Asked Claude Code' }).waitFor();
+  assert.ok(await sideways(page) <= 0, 'a result');
+  assert.equal(await unnamedIn(page, '#step-panel'), 0);
+  assert.equal(await nameFits(page), true);
+  await page.screenshot({ path: shots + '/project-graph-760.png' });
+});
+
+await test('The graph and the simulator in the light theme stay readable', 'projects', { colorScheme: 'light' }, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await page.locator('.exlist button', { hasText: 'A landing page' }).click();
+  await page.screenshot({ path: shots + '/project-graph-light.png' });
+});
+
 console.log('PASS: ' + done.join('; '));

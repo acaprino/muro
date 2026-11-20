@@ -334,3 +334,49 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .set .row .seg{max-width:100%;flex-wrap:wrap}
 .row small .line{display:block}
 .row input:disabled{opacity:.55;cursor:default}
+/* Project step 3: the simulator on the left, the decision graph on the right. The graph card scrolls inside itself, so 37 capabilities and a long name never widen the page. */
+.two{display:grid;grid-template-columns:340px minmax(0,1fr);gap:16px;align-items:start}
+.sim{display:grid;gap:12px;min-width:0}
+.simbox{display:grid;gap:6px}
+.simbox .acts{margin-top:2px}
+.simnote{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--wash);color:var(--muted)}
+.simres{padding:12px 14px;display:grid;gap:8px;min-width:0}
+.simres strong,.simask,.simreason{overflow-wrap:anywhere}
+.simtags{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.simres ol li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.simres ol li>div{min-width:0;overflow-wrap:anywhere}
+.simres ol b{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:11px;line-height:20px;text-align:center}
+.simlist{display:grid;gap:4px;padding-left:18px;list-style:disc;overflow-wrap:anywhere}
+.simwho{color:var(--muted)}
+.exlist{max-height:420px;overflow:auto}
+.exlist button{display:grid;gap:1px;width:100%;padding:9px 12px;border-bottom:1px solid var(--line)}
+.exlist li:last-child button{border-bottom:0}
+.exlist button:hover{background:var(--wash)}
+.exlist button[aria-pressed="true"]{background:var(--raised);box-shadow:inset 2px 0 0 var(--accent)}
+.exlist small{overflow-wrap:anywhere}
+.graphcard{padding:12px 14px;overflow:auto;max-height:calc(100vh - 300px);min-height:320px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:22px;border-top:2px solid var(--line-strong);vertical-align:middle;margin-right:6px}
+.legend i.need{border-top-style:dashed;border-color:var(--warn)}
+.legend i.conf{border-top-style:dotted;border-color:var(--bad)}
+.legend i.on{border-color:var(--accent)}
+svg.graph{display:block}
+.graph foreignObject{overflow:visible}
+.graph .e{fill:none;stroke:var(--line-strong);stroke-width:1.2;opacity:.55}
+.graph .e.need{stroke:var(--warn);stroke-dasharray:5 4;opacity:.9}
+.graph .e.conf{stroke:var(--bad);stroke-dasharray:1.5 4;stroke-linecap:round;opacity:.9}
+.graph .n rect{fill:var(--raised);stroke:var(--line);stroke-width:1}
+.graph .n text{fill:var(--text);font:12px "Segoe UI Variable Text","Segoe UI",system-ui,sans-serif}
+.graph .n.ent text{font-weight:600}
+.graph.sim .e:not(.on),.graph.sim .n:not(.on){opacity:.22}
+.graph.sim .n:focus-within{opacity:1}
+.graph .e.on{stroke:var(--accent);stroke-width:2;opacity:1}
+.graph .n.ent.on rect{stroke:var(--accent);stroke-width:1.6;fill:color-mix(in srgb,var(--accent) 16%,var(--panel))}
+.dl .kv dd{min-width:0;overflow-wrap:anywhere}
+.dl .kv dd.stack{display:grid}
+.gnode{position:relative;display:flex;align-items:center;box-sizing:border-box;min-width:100%;width:max-content;height:22px;padding:0 32px 0 10px;border:1px solid var(--line);border-radius:6px;background:var(--raised);color:var(--text);font-size:12px;white-space:nowrap}
+.gnode:hover{border-color:var(--line-strong)}
+.gnode.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 16%,var(--panel))}
+.gnum{position:absolute;right:5px;top:50%;margin-top:-8px;width:16px;height:16px;border-radius:50%;background:var(--primary);color:var(--on-primary);font-size:11px;font-weight:700;line-height:16px;text-align:center}
+@media (max-width:980px){.two{grid-template-columns:minmax(0,1fr)}.graphcard{max-height:70vh}}
+@media (forced-colors:active){.graph .e{stroke:CanvasText}.graph .n rect{stroke:CanvasText;fill:Canvas}.graph .n text{fill:CanvasText}.gnode{border-color:CanvasText}.gnode.on{outline:2px solid Highlight}}

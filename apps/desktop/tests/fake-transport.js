@@ -12,6 +12,10 @@
 //   Projects: pickPath           what the shell's file dialog answers (a path, or null for a cancelled dialog)
 //             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
 //             rejectInstall      install_project fails ("no build for <harness>"); installAssigns: it also sets the harness as a target of the plugin
+//             simulate           what `simulate` answers: 'selected' (a prerequisite and a chosen step), 'no_match', 'clarify' (needs_clarification, with its questions) or
+//                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
+//                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
+//             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name (set it before opening the project)
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
@@ -46,7 +50,9 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     { id: 'genoffice', url: 'https://github.com/example/genoffice', pin: 'head', release: null, commit: '0123456789abcdef', license: 'Apache-2.0', paths: ['skills'] },
     { id: 'superpowers', url: 'https://github.com/example/superpowers', pin: 'static', release: null, commit: 'fedcba9876543210', license: 'MIT', paths: ['skills'] },
   ].map(i => ({ ...i, became: became(i.id) }));
-  const capability = (id, title) => ({ id, title, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: title, excludes: '' }], needs: [], conflicts: [] });
+  const capability = (id, title, extra = {}) => ({ id, title, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: title, excludes: '' }], needs: [], conflicts: [], ...extra });
+  const need = (capability, label) => ({ capability, label, when: label, reason: 'It reads what the other makes.' });
+  const pick = (capability, reason) => ({ capability, intent: capability + '-intent', reason });
   return {
     project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' } : null, builtin },
     plugin: { name, slug, version: '0.5.0', description: `${name}, one plugin` },
@@ -56,8 +62,12 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     changelog: '## 0.5.0\n\nMoved taste-skill to v1.2.0.\n', prompts: ['intake.md', 'harmonizer.md', 'delivery.md', 'classify.md'].map(file => ({ file, text: `# ${file}\n\nThe prompt.` })),
     graph: {
       entries: [{ name: `${slug}-design`, description: 'Use when designing an interface.', capabilities: ['design-taste', 'design-review'] }, { name: `${slug}-office`, description: 'Use when producing Word files.', capabilities: ['office-docs', 'office-pdf'] }],
-      capabilities: [capability('design-taste', 'Design taste'), capability('design-review', 'Design review'), capability('office-docs', 'Office documents'), capability('office-pdf', 'Office PDF')],
-      examples: [{ id: 'ex-1', title: 'A landing page', task: 'Design a landing page', status: 'selected' }, { id: 'ex-2', title: 'A letter', task: 'Write a letter as a Word file', status: 'selected' }],
+      capabilities: [capability('design-taste', 'Design taste', { outputs: ['design-brief'] }), capability('design-review', 'Design review', { needs: [need('design-taste', 'A design exists')], intents: [{ id: 'design-review-intent', description: 'Review a finished design', excludes: 'Building one' }] }), capability('office-docs', 'Office documents', { after: ['office-pdf'], conflicts: ['design-review'] }), capability('office-pdf', 'Office PDF')],
+      // As the guide's data model resolves a documented example: its own decision (`selections`) and the steps the runtime gives it (`steps`: a prerequisite has no intent).
+      examples: [
+        { id: 'ex-1', title: 'A landing page', task: 'Design a landing page', stack_tokens: ['stack:react'], status: 'selected', selections: [pick('design-taste', 'It designs a page.'), pick('design-review', 'A finished design is checked.')], reason: 'Design first, then review.', questions: [], path: ['design-taste', 'design-review'], steps: [{ step: 'design-taste', capability: 'design-taste', intent: 'design-taste-intent' }, { step: 'design-review', capability: 'design-review', intent: 'design-review-intent' }] },
+        { id: 'ex-2', title: 'A letter', task: 'Write a letter as a Word file', stack_tokens: [], status: 'selected', selections: [pick('office-docs', 'It makes the Word file.')], reason: 'A single document.', questions: [], path: ['office-pdf', 'office-docs'], steps: [{ step: 'office-pdf', capability: 'office-pdf', intent: null }, { step: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent' }] },
+      ],
     },
     files: [
       { part: 'Identity', path: 'sources.json · plugin', detail: `The final plugin: ${name}, installed as ${slug}, version 0.5.0` },
@@ -67,6 +77,15 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     ],
     digest: 'sha256:' + slug.padEnd(8, '0'),
   };
+}
+// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and two documented examples.
+function withBigGraph(info) {
+  const ids = Array.from({ length: 37 }, (_, i) => i === 5 ? 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30) : `capability-${String(i + 1).padStart(2, '0')}-design-system`);
+  const entries = Array.from({ length: 15 }, (_, e) => ({ name: `${info.plugin.slug}-group-${e + 1}`, description: `Use when group ${e + 1} applies.`, capabilities: ids.filter((_, i) => i % 15 === e) }));
+  const capabilities = ids.map((id, i) => ({ id, title: `Capability ${i + 1}`, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: `Capability ${i + 1}`, excludes: '' }], needs: i % 7 === 1 ? [{ capability: ids[i - 1], label: 'It reads the first', when: 'It reads the first', reason: 'Because.' }] : [], conflicts: i % 11 === 3 ? [ids[i + 1]] : [] }));
+  const pick = id => ({ capability: id, intent: id + '-intent', reason: 'Fits.' });
+  const example = (title, chosen) => ({ id: title, title, task: title, stack_tokens: [], status: 'selected', selections: chosen.map(pick), reason: 'Both.', questions: [], path: chosen, steps: chosen.map(id => ({ step: id, capability: id, intent: id + '-intent' })) });
+  return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]])] } };
 }
 const summaryOf = (id, path, info) => ({ id, path, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
@@ -82,7 +101,7 @@ function scenarioData(scenario) {
     case 'recorded-ok': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0) };
     case 'recorded-errors': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0, { errors: 1 }) };
     case 'recorded-unseen': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] }, sync: recorded(1) };
-    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Marionette', 'marionette', { builtin: true }) }] };
+    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Marionette', 'marionette', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
@@ -111,7 +130,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installAssigns: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installAssigns: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -180,6 +199,21 @@ export function createTransport(scenario = 'default') {
     return { plugin_id: made.id };
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
+  // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
+  async function simulate({ id, task }) {
+    projectOf(id);
+    if (flags.simulateDelay) await new Promise(done => setTimeout(done, flags.simulateDelay));
+    if (flags.simulateError) throw new Error(flags.simulateError);
+    const ai = reg.settings.ai ?? { engine: 'harness', harness: reg.settings.agent }, api = ai.engine === 'api';
+    const who = { engine: api ? 'api' : 'harness', ...(api ? { model: ai.model } : { harness: ai.harness }), cost_usd: api ? null : 0.1234, duration_ms: 4200 };
+    const step = (step_id, capability, intent, reason, added_as_prerequisite = false) => ({ step_id, capability, intent, reason, added_as_prerequisite });
+    switch (flags.simulate) {
+      case 'no_match': return { valid: true, status: 'no_match', steps: [], reason: 'Nothing here is work for the plugin.', questions: [], ...who };
+      case 'clarify': return { valid: true, status: 'needs_clarification', steps: [], reason: 'The request does not say what to make.', questions: ['Is it a web page or a document?', 'Who is it for?'], ...who };
+      case 'invalid': return { valid: false, errors: ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason'], ...who };
+      default: return { valid: true, status: 'selected', steps: [step('office-pdf', 'office-pdf', null, null, true), step('office-docs', 'office-docs', 'office-docs-intent', 'The request asks for a Word file.')], reason: `Classified "${task}" as a document.`, questions: [], ...who };
+    }
+  }
   async function apply(payload) {
     if (flags.applyDelay) await new Promise(done => setTimeout(done, flags.applyDelay));
     if (flags.rejectApply) throw new Error('The harness refused the change');
@@ -218,7 +252,7 @@ export function createTransport(scenario = 'default') {
       }
       case 'apply': return apply(payload);
       case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info));
-      case 'project': return structuredClone(projectOf(payload.id).info);
+      case 'project': return structuredClone(flags.bigGraph ? withBigGraph(projectOf(payload.id).info) : projectOf(payload.id).info);
       case 'open_project': {
         if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
         const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();
@@ -229,6 +263,7 @@ export function createTransport(scenario = 'default') {
         return summaryOf(id, added.path, info);
       }
       case 'install_project': return installProject(payload);
+      case 'simulate': return simulate(payload);
       case 'pick_file': { unknownShellAction(action); return { path: flags.pickPath }; }
       case 'open_folder': { unknownShellAction(action); return { opened: true }; }
       case 'save_plugin': {
