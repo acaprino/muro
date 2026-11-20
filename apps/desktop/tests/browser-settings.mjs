@@ -468,8 +468,10 @@ for (const width of [1100, 760]) {
 
 // ---- Settings, section AI (plan 2, Task 9): the engine, its fields, the variable that holds the key ----
 // The radios of the engine are saved by the service before the page shows the new engine, so they are clicked (a click states no expectation of its state), never `check`ed.
+// A segmented control lays its radio over its label (`.seg input{position:absolute;inset:0;opacity:0}`), so a click aimed at the label's text lands on the radio, as a person's does:
+// the radio is the element to click, with `force` because Playwright refuses a target that something else covers (the other files do the same, see `check({ force: true })`).
 const KEY = 'Key from the environment variable';
-const useEngine = (page, label) => page.getByRole('radiogroup', { name: 'Use', exact: true }).getByText(label, { exact: true }).click();
+const useEngine = (page, label) => page.getByRole('radiogroup', { name: 'Use', exact: true }).getByRole('radio', { name: label, exact: true }).click({ force: true });
 /** The request of the n-th save was sent. The page shows the stored value until the answer comes back: wait for `boxIs` before reading a box after a save. */
 const saved = (page, n) => page.waitForFunction(count => window.calls.filter(c => c.action === 'settings').length === count, n);
 const boxIs = (page, name, value) => page.waitForFunction(([n, v]) => document.querySelector(`input[name=${n}]`)?.value === v, [name, value]);

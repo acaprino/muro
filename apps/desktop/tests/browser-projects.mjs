@@ -117,12 +117,16 @@ await test('the steps are a tablist with arrow keys: the keyboard goes with the 
   assert.equal(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle), 'solid', 'the focused tab has a visible focus');
 });
 
-await test('Graph & simulator is the step its own task fills: it says so (Harmonize is built, see its section below)', 'projects', {}, async app => {
+await test('Graph & simulator opens in its tab panel with the simulator and the graph, not a placeholder (its sections are below)', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   await tab(page, 'Graph').click();
-  assert.equal(await page.getByRole('tabpanel').getAttribute('aria-labelledby'), 'step-tab-graph');
-  await page.getByText('Coming in this version').waitFor();
+  const panel = page.getByRole('tabpanel');
+  assert.equal(await panel.getAttribute('aria-labelledby'), 'step-tab-graph');
+  await panel.getByRole('heading', { name: 'Simulate a request', level: 2 }).waitFor();
+  assert.equal(await panel.locator('svg.graph').count(), 1, 'the decision graph');
+  assert.equal(await panel.locator('textarea[name="simtask"]').count(), 1, 'the request box');
+  assert.equal(await page.getByText('Coming in this version').count(), 0, 'no placeholder is left');
 });
 
 await test('Install: a switch per harness calls install_project with that harness; what waits is reviewed in the sheet of Sync and applied there', 'projects', {}, async app => {
