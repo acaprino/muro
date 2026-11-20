@@ -49,6 +49,8 @@ def _context_errors(context: Any, material: ClassifierMaterial) -> list[str]:
     if (not isinstance(context, dict) or set(context) != _CONTEXT_KEYS or not isinstance(context["task"], str)
             or not isinstance(context["stack_tokens"], list)):
         return ["the context must be exactly what prepare returned: task, stack_tokens and catalog_digest"]
+    if any(not isinstance(token, str) for token in context["stack_tokens"]):
+        return ["the context's stack_tokens must be a list of text tokens such as stack:css-only"]
     try:
         expected = request_context(context["task"], context["stack_tokens"], material.digest, material.conflicts)
     except ValueError as exc:

@@ -39,6 +39,12 @@ from .sources import (_validate_source_shape, inspect_source, license_files, not
 MIMETYPE = "application/vnd.muro.project+zip"
 MAX_BYTES = 2 * 1024 ** 3
 MAX_MEMBERS = 50_000
+# What `info` reads of a project file, whole and into memory: no one member larger than MAX_TEXT, and
+# MAX_READ for all of them in one call. A project file of anyone may carry a member of any size.
+MAX_TEXT = 16 * 1024 ** 2
+MAX_READ = 256 * 1024 ** 2
+# What `verify` says of a release that is not the build of the package beside it.
+MISMATCH = "The plugin inside this project does not match the project: it was not built from it"
 
 # What a package folder carries into a project file; anything else in the folder stays out.
 _PACKAGE_FILES = ("sources.json", "delivery.json", "ROUTER.md", "entries.json", "guide-examples.json",
@@ -51,6 +57,9 @@ _ROOT_KEY = {"records.json": "records", "history.json": "runs"}
 _EPOCH = (1980, 1, 1, 0, 0, 0)        # the zip format's earliest time: the same project packs to the same bytes
 _CHUNK = 1024 * 1024
 _DRIVE = re.compile(r"^[A-Za-z]:")
+# A name Windows reads as a device, with or without an extension: `CON`, `aux.txt`, `COM1.tar.gz`.
+_DEVICE = re.compile(r"(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])")
+_FORBIDDEN = frozenset('<>"|?*')
 _NOT_A_PROJECT = "Not a Muro project file"
 
 
@@ -71,6 +80,8 @@ def _unsafe_name(name: str) -> str | None:
         return "absolute path"
     if _DRIVE.match(name):
         return "drive letter"
+    if any(ord(char) < 32 or ord(char) == 127 or char in _FORBIDDEN for char in name):
+        return "a control character or one of < > \" | ? *"
     for part in (name[:-1] if name.endswith("/") else name).split("/"):
         if part in ("", ".", ".."):
             return "empty, . or .. segment"
@@ -78,6 +89,8 @@ def _unsafe_name(name: str) -> str | None:
             return "colon in a name"
         if part.endswith((".", " ")):
             return "name ends in a dot or a space"
+        if _DEVICE.fullmatch(part.split(".", 1)[0]):
+            return "a device name on Windows"
     return None
 
 
@@ -225,6 +238,34 @@ def _member(folder: Path, name: str) -> Path:
     return path
 
 
+def _mib(size: int) -> str:
+    return f"{size // 1024 ** 2} MiB"
+
+
+def _check_read_sizes(folder: Path) -> None:
+    """Refuse a project whose package members `info` would read are too large to read into memory.
+
+    `info` reads the package's own files whole (`_PACKAGE_FILES`, and what is under `_PACKAGE_FOLDERS`): the
+    inputs and the release are carried, never read here. No member may be larger than `MAX_TEXT`, and all of
+    them together at most `MAX_READ`, so a hostile file cannot make one call hold gigabytes. Sizes only: nothing is read.
+    """
+    members = [(name, folder / name) for name in _PACKAGE_FILES]
+    for name in _PACKAGE_FOLDERS:
+        root = folder / name
+        if root.is_dir():
+            members.extend((f"{name}/{relative}", path) for relative, path in _walk(root))
+    total = 0
+    for name, path in members:
+        if not path.is_file():
+            continue
+        size = path.stat().st_size
+        if size > MAX_TEXT:
+            raise ValueError(f"{name} is larger than {_mib(MAX_TEXT)}")
+        total += size
+        if total > MAX_READ:
+            raise ValueError(f"The project's files add up to more than {_mib(MAX_READ)}")
+
+
 def _day(moment: str) -> str:
     return datetime.fromisoformat(moment.replace("Z", "+00:00")).date().isoformat()
 
@@ -286,6 +327,7 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
     that lacks a member the page reads, or holds one that is not what its name says, is refused.
     """
     folder = cached(mp, cache_root)
+    _check_read_sizes(folder)
     meta = json.loads(_member(folder, "project.json").read_text(encoding="utf-8"))
     manifest = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))
     plugin = manifest.get("plugin") if isinstance(manifest, dict) else None
@@ -368,6 +410,62 @@ def summary(mp: Path, cache_root: Path) -> dict[str, Any]:
         "runs": len(full["history"]),
         "digest": full["digest"],
     }
+
+
+# --- the release and the package it was built from --------------------------------------------------
+
+def _identity(folder: Path) -> tuple[str, str, frozenset[str]]:
+    """The plugin a folder is: the slug and the version its `sources.json` names, and the ids of its capabilities."""
+    plugin = json.loads((folder / "sources.json").read_text(encoding="utf-8"))["plugin"]
+    slug, version = plugin["slug"], plugin["version"]
+    if not isinstance(slug, str) or not isinstance(version, str):
+        raise ValueError("the plugin's slug and version must be text")
+    return slug, version, frozenset(capability.id for capability in parse_capabilities(folder / "capabilities"))
+
+
+def check_release(package: Path, built: Path) -> None:
+    """Refuse a release that is not the build of the package: another plugin, another version, other capabilities.
+
+    `package` is a folder that holds the package's `sources.json` and `capabilities/` (a package folder, or the
+    unpacked project), `built` the folder of the release (`<out>/<slug>`, a build copies both from the package).
+    What the release carries beyond them (adapters, guide, notices) is the build's own and is not compared.
+    The one check for `pack`, which will not carry another release, and for `verify`, which a project file
+    from anyone gets before its plugin is installed.
+    """
+    try:
+        wanted, found = _identity(package), _identity(built)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        raise ValueError(f"{MISMATCH} (the release cannot be compared: {type(exc).__name__}: {exc})") from None
+    if found == wanted:
+        return
+    differences = []
+    if found[0] != wanted[0]:
+        differences.append(f"it is the plugin {found[0]}, the project's is {wanted[0]}")
+    if found[1] != wanted[1]:
+        differences.append(f"it is version {found[1]}, the project's is {wanted[1]}")
+    if found[2] != wanted[2]:
+        extra, missing = sorted(found[2] - wanted[2]), sorted(wanted[2] - found[2])
+        differences.append("its capabilities differ" + (f", extra: {', '.join(extra)}" if extra else "")
+                           + (f", missing: {', '.join(missing)}" if missing else ""))
+    raise ValueError(f"{MISMATCH} ({'; '.join(differences)})")
+
+
+def verify(mp: Path, cache_root: Path) -> None:
+    """Check, as `check_release` does, the plugin a project file carries against the package it carries.
+
+    Read through `cached`, so it is the very file the digest names. A project that carries no release for its
+    plugin has nothing to disagree with: installing it is refused where the release is looked for.
+    """
+    folder = cached(mp, cache_root)
+    try:
+        slug = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))["plugin"]["slug"]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"{MISMATCH} (the project's plugin cannot be read: {type(exc).__name__}: {exc})") from None
+    if not isinstance(slug, str) or not SLUG_PATTERN.fullmatch(slug):   # it names a folder: never a path
+        raise ValueError(f"{MISMATCH} (the project's plugin slug is not a kebab-case slug)")
+    built = folder / "release" / slug
+    if built.is_dir():
+        check_release(folder, built)
 
 
 # --- writing ----------------------------------------------------------------------------------------
@@ -499,27 +597,69 @@ def _store(destination: Path, snapshot: dict[str, _Member]) -> None:
         raise
 
 
+# What picks the files a cached copy of a source holds, and what it was fetched and checked for.
+_STAMPED = ("selected_paths", "media_paths", "notice_paths", "license_path", "excluded_paths", "license")
+
+
+def _stamp(src: dict[str, Any]) -> str:
+    """The digest of what a cached copy of `src` was made for: its commit and what selects its files.
+
+    A copy fetched for another selection (a path added, a notice declared, a license changed) is not the copy
+    this source asks for, however the commit matches. Where the source is fetched from, and its goal, pick no file.
+    """
+    document = {key: src.get(key) for key in _STAMPED}
+    document["commit"] = src["commit"]
+    return hashlib.sha256(json.dumps(document, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def _entry(cache: Path, src: dict[str, Any]) -> tuple[Path, Path]:
+    """A source's cache entry: the folder of its files, and the stamp file beside it (not inside: the folder is the files)."""
+    return cache / src["id"] / src["commit"], cache / src["id"] / f"{src['commit']}.stamp"
+
+
+def _seal(cache: Path, src: dict[str, Any]) -> None:
+    """Mark the entry as made for `src`'s selection: the stamp appears whole or not at all, after the files are in place."""
+    stamp = _entry(cache, src)[1]
+    temporary = stamp.parent / f".{stamp.name}.{secrets.token_hex(4)}.tmp"
+    try:
+        temporary.write_text(_stamp(src), encoding="ascii")
+        os.replace(temporary, stamp)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _current(cache: Path, src: dict[str, Any]) -> bool:
+    """Whether the cache holds an entry made for exactly this source. An entry without a stamp (made before
+    entries carried one) or with another is not: it is fetched again."""
+    folder, stamp = _entry(cache, src)
+    try:
+        return folder.is_dir() and stamp.read_text(encoding="ascii") == _stamp(src)
+    except (OSError, ValueError):
+        return False
+
+
 def _source_snapshot(src: dict[str, Any], package: Path, cache: Path | None) -> dict[str, _Member]:
     """A source's selected files, its license and the NOTICE beside it at the pinned commit, from the cache or the pin.
 
     The pin is fetched and checked as `--check-sources` and `--build` do (the license gate, the coverage
     gate, the pin's release or HEAD), through the same functions, and the files that gate carries with the
     source travel here too: the license (`license_files`), the NOTICE beside it (Apache-2.0 asks for it to
-    travel) and the files `notice_paths` declares, which are selected files. A source already in the cache
-    is not fetched again. The cache is a folder per source id and commit, holding the files as
-    `inputs/<id>/` does, so one filled before the NOTICE travelled lacks it.
+    travel) and the files `notice_paths` declares, which are selected files. A source already in the cache,
+    made for this very selection (`_stamp`), is not fetched again; an entry made for another, or with no stamp,
+    is replaced. The cache is a folder per source id and commit, holding the files as `inputs/<id>/` does,
+    with its stamp beside it.
     """
     _validate_source_shape(src)
-    source_id, commit = src["id"], src["commit"]
-    kept = cache / source_id / commit if cache else None
-    if kept is not None and kept.is_dir():
+    kept = _entry(cache, src)[0] if cache else None
+    if cache is not None and _current(cache, src):
         snapshot: dict[str, _Member] = {}
         _add_tree(snapshot, kept, "")
     else:
         license_bytes, notice = inspect_source(src, package, coverage=True)
         with source_repository(src, package) as repo:
-            tree = tree_entries(repo, commit)
-            files = _selected(repo, commit, src["selected_paths"], tree)
+            tree = tree_entries(repo, src["commit"])
+            files = _selected(repo, src["commit"], src["selected_paths"], tree)
         snapshot = {name: _Member(data, tree[name][0] == "100755") for name, data in files.items()}
         license_path, notice_path = license_files(src)
         snapshot.setdefault(license_path, _Member(license_bytes, False))
@@ -528,7 +668,11 @@ def _source_snapshot(src: dict[str, Any], package: Path, cache: Path | None) -> 
         for relative in snapshot:
             _check_name(relative)
         if kept is not None:
+            _entry(cache, src)[1].unlink(missing_ok=True)       # nobody trusts the old entry while it is replaced
+            if kept.exists():
+                shutil.rmtree(kept)
             _store(kept, snapshot)
+            _seal(cache, src)
     missing = [path for path in notice_paths(src) if path not in snapshot]
     if missing:
         raise ValueError(f"notice_paths names {', '.join(missing)}, which the source's files do not hold")
@@ -572,7 +716,9 @@ def pack(package_dir: Path, out: Path, *, sources_cache: Path | None = None,
 
     Refuses a package that does not validate (as `--validate` does), a missing or malformed project.json,
     a source that fails its check, and anything unpacking would refuse. `release_dir` is the `--out`
-    folder of a build (`<release_dir>/<slug>/...`); without one the project file carries no release.
+    folder of a build (`<release_dir>/<slug>/...`); without one the project file carries no release. A
+    release that is not the build of this package (`check_release`) is refused, so the plugin a project
+    file shows is the plugin it carries.
     The file is written whole or not at all.
     """
     from .cli import _captured, _run_validate
@@ -592,6 +738,7 @@ def pack(package_dir: Path, out: Path, *, sources_cache: Path | None = None,
         built = Path(release_dir) / slug
         if not built.is_dir():
             raise ValueError(f"{built} is missing: release_dir is the --out folder of a build of {slug}")
+        check_release(package, built)
     cache = Path(sources_cache) if sources_cache else None
     for src in manifest.get("sources", []):
         if not isinstance(src, dict):

@@ -291,6 +291,23 @@ def test_a_context_that_is_not_the_one_prepared_here_is_invalid(package):
     assert simulate.check(package, two, decision(two, ids=["x"]))["valid"] is True
 
 
+def test_a_stack_token_that_is_not_text_makes_the_context_invalid_instead_of_crashing(package, tmp_path, capsys):
+    context = simulate.prepare(package, "Verify the artifact", [])["context"]
+    for token in (1, None, ["a"], {"a": 1}, True, 1.5):
+        broken = {**context, "stack_tokens": ["stack:gsap", token]}
+        result = simulate.check(package, broken, decision(context, ids=["x"]))
+        assert result["valid"] is False and "stack_tokens" in result["errors"][0], token
+        assert set(result) == {"valid", "errors"}
+    # through the command line: a result and exit 0, never a traceback
+    (tmp_path / "answer.json").write_text(json.dumps(decision(context, ids=["x"])), encoding="utf-8")
+    for token in (1, None, ["a"], {"a": 1}):
+        (tmp_path / "context.json").write_text(json.dumps({**context, "stack_tokens": [token]}), encoding="utf-8")
+        code, out, err = run(capsys, "project", "simulate-check", "--manifest", str(package / "sources.json"),
+                             "--context", str(tmp_path / "context.json"), "--answer", str(tmp_path / "answer.json"))
+        assert code == 0 and err == "" and json.loads(out)["valid"] is False, (token, err)
+        assert "Traceback" not in out + err
+
+
 def test_a_catalog_that_changed_since_the_context_was_prepared_is_invalid(package):
     context = simulate.prepare(package, "Verify the artifact", [])["context"]
     path = package / "capabilities" / "x.md"
@@ -502,3 +519,95 @@ def test_a_harness_can_simulate_through_the_stdio_server(package):
     assert by_id[4]["result"]["isError"] is False
     checked = json.loads(by_id[4]["result"]["content"][0]["text"])
     assert checked["valid"] is True and [s["step_id"] for s in checked["steps"]] == ["x", "y"]
+
+
+# --- the allow-list of the MCP server (the text a harness is given may come from a project file of anyone) ----
+
+SIMULATE_TOOLS = ["simulate_prepare", "simulate_check"]
+
+
+def mcp_session(requests, *options, manifest=None):
+    """One stdio session of `muro mcp`: the exit code, the stderr and the replies by id."""
+    command = [sys.executable, "-m", "muro", "mcp", *([] if manifest is None else ["--manifest", str(manifest)]), *options]
+    done = subprocess.run(command, input="".join(json.dumps(r) + "\n" for r in requests), capture_output=True,
+                          text=True, cwd=ROOT, timeout=120)
+    replies = {r["id"]: r for r in map(json.loads, filter(str.strip, done.stdout.splitlines()))}
+    return done.returncode, done.stderr, done.stdout, replies
+
+
+def listing(request_id=1):
+    return {"jsonrpc": "2.0", "id": request_id, "method": "tools/list"}
+
+
+def calling(request_id, name, arguments):
+    return {"jsonrpc": "2.0", "id": request_id, "method": "tools/call", "params": {"name": name, "arguments": arguments}}
+
+
+def test_the_definitions_and_calls_are_limited_to_the_named_tools(tmp_path, package):
+    manifest = package / "sources.json"
+    assert [t["name"] for t in tool_definitions(SIMULATE_TOOLS)] == SIMULATE_TOOLS
+    assert [t["name"] for t in tool_definitions(["simulate_check"])] == ["simulate_check"]
+    everything = [t["name"] for t in tool_definitions()]
+    assert {"install_adapter", "init_package", "check_sources", "build", "prepare_intake", "validate"} <= set(everything)
+    allowed = frozenset(SIMULATE_TOOLS)
+    # A tool that is not named does not run: nothing it would have written exists afterwards.
+    scaffolded, built, home = tmp_path / "scaffolded", tmp_path / "built", tmp_path / "home"
+    for name, arguments in (
+            ("init_package", {"directory": str(scaffolded), "repo_url": "https://example.invalid/x.git",
+                              "license": "MIT", "goal": "g", "select": ["SKILL.md"]}),
+            ("build", {"manifest": str(manifest), "out": str(built)}),
+            ("install_adapter", {"adapter_dir": str(tmp_path), "harness": "codex", "home": str(home)}),
+            ("check_sources", {"manifest": str(manifest)}),
+            ("prepare_intake", {"manifest": str(manifest), "source_id": "demo"}),
+            ("validate", {"manifest": str(manifest)}),
+            ("no-such-tool", {})):
+        code, text = call_tool(name, arguments, manifest, allowed)
+        assert code == 1 and name in text, name
+    assert not scaffolded.exists() and not built.exists() and not home.exists()
+    assert not (package / ".muro").exists(), "no workbench was prepared"
+    # The named tools run as before.
+    code, text = call_tool("simulate_prepare", {"task": "Verify the artifact"}, manifest, allowed)
+    assert code == 0 and json.loads(text) == simulate.prepare(package, "Verify the artifact", [])
+
+
+def test_a_server_started_with_tools_serves_and_runs_only_those(tmp_path, package):
+    manifest = package / "sources.json"
+    scaffolded = tmp_path / "scaffolded"
+    prepared = simulate.prepare(package, "Synthesize the evidence", [])
+    code, err, stdout, replies = mcp_session([
+        {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}},
+        listing(1),
+        calling(2, "simulate_prepare", {"task": "Synthesize the evidence"}),
+        calling(3, "simulate_check", {"context": prepared["context"], "answer": decision(prepared["context"], ids=["y"])}),
+        calling(4, "install_adapter", {"adapter_dir": str(tmp_path), "harness": "codex", "home": str(tmp_path / "home")}),
+        calling(5, "init_package", {"directory": str(scaffolded), "repo_url": "https://example.invalid/x.git",
+                                    "license": "MIT", "goal": "g", "select": ["SKILL.md"]}),
+        calling(6, "validate", {"manifest": str(manifest)}),
+        calling(7, "check_sources", {"manifest": str(manifest)}),
+    ], "--tools", ",".join(SIMULATE_TOOLS), manifest=manifest)
+    assert code == 0, err
+    assert [t["name"] for t in replies[1]["result"]["tools"]] == SIMULATE_TOOLS
+    assert replies[2]["result"]["isError"] is False
+    assert json.loads(replies[2]["result"]["content"][0]["text"]) == prepared
+    assert replies[3]["result"]["isError"] is False
+    assert json.loads(replies[3]["result"]["content"][0]["text"])["valid"] is True
+    for request_id, name in ((4, "install_adapter"), (5, "init_package"), (6, "validate"), (7, "check_sources")):
+        assert replies[request_id]["result"]["isError"] is True, name
+        assert name in replies[request_id]["result"]["content"][0]["text"], name
+    assert not scaffolded.exists() and not (tmp_path / "home").exists()
+
+
+def test_a_server_without_the_option_serves_every_tool_as_before(package):
+    code, err, _, replies = mcp_session([listing(1)], manifest=package / "sources.json")
+    assert code == 0, err
+    assert [t["name"] for t in replies[1]["result"]["tools"]] == [t["name"] for t in tool_definitions()]
+
+
+@pytest.mark.parametrize("option", ["simulate_prepare,nope", "nope", "", " ", "simulate_prepare,,simulate_check", ",",
+                                    "SIMULATE_PREPARE"])
+def test_a_tool_name_the_server_does_not_have_is_refused_at_start(package, option):
+    code, err, stdout, _ = mcp_session([listing(1)], "--tools", option, manifest=package / "sources.json")
+    assert code == 1 and stdout == "", "nothing is served"
+    assert "--tools" in err and "Traceback" not in err
+    if option.strip(", ") and "nope" in option:
+        assert "nope" in err

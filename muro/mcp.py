@@ -30,7 +30,28 @@ _MANIFEST = {"manifest": {"type": "string", "description": "Path to the package'
 _PROJECT = {"project": {"type": "string", "description": "Path to a .mp project file, instead of a manifest"}, **_MANIFEST}
 
 
-def tool_definitions() -> list[dict[str, Any]]:
+def tool_definitions(allowed: frozenset[str] | set[str] | list[str] | None = None) -> list[dict[str, Any]]:
+    """The tools the server lists: all of them, or only the named ones (`muro mcp --tools`)."""
+    return [tool for tool in _all_definitions() if allowed is None or tool["name"] in allowed]
+
+
+def parse_tools(text: str) -> frozenset[str]:
+    """The tools `--tools` names: a comma-separated list of names this server has, none empty.
+
+    A host agent is given the server for one job (the desktop's simulator gives it two tools), and the
+    text it works from may come from anyone: a tool it was not given must not be there to call.
+    """
+    names = [name.strip() for name in text.split(",")]
+    if not text.strip() or not all(names):
+        raise ValueError("--tools takes a comma-separated list of tool names, none of them empty")
+    known = [tool["name"] for tool in _all_definitions()]
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        raise ValueError(f"--tools names {', '.join(unknown)}, which this server does not have (it has {', '.join(known)})")
+    return frozenset(names)
+
+
+def _all_definitions() -> list[dict[str, Any]]:
     return [
         _tool("validate", "Validate the package's capabilities, ROUTER.md, entries and delivery.", _MANIFEST, []),
         _tool("check_sources", "Verify pinned sources, licenses and plugin identity (contacts the pinned remotes).",
@@ -78,9 +99,13 @@ def tool_definitions() -> list[dict[str, Any]]:
     ]
 
 
-def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path) -> tuple[int, str]:
+def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path,
+              allowed: frozenset[str] | None = None) -> tuple[int, str]:
+    """Run one tool. With `allowed` (the server's `--tools`) a tool outside it is refused before anything runs."""
     from . import cli
 
+    if allowed is not None and name not in allowed:
+        return 1, f"This server does not serve the tool {name}"
     _captured = cli._captured  # the one capture helper, exception net included
     manifest_arg = Path(arguments.get("manifest") or default_manifest)
 
@@ -146,8 +171,8 @@ def _write(message: dict[str, Any]) -> None:
     sys.stdout.flush()
 
 
-def serve(default_manifest: Path) -> int:
-    """Serve MCP on stdio until stdin closes."""
+def serve(default_manifest: Path, tools: frozenset[str] | None = None) -> int:
+    """Serve MCP on stdio until stdin closes: every tool, or only `tools` (listed and callable alike)."""
     for line in sys.stdin:
         line = line.strip()
         if not line:
@@ -174,14 +199,14 @@ def serve(default_manifest: Path) -> int:
             _write({"jsonrpc": "2.0", "id": msg_id, "result": {}})
             continue
         if method == "tools/list":
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tool_definitions()}})
+            _write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tool_definitions(tools)}})
             continue
         if method == "tools/call":
             params = message.get("params") or {}
             name = params.get("name", "")
             arguments = params.get("arguments") or {}
             try:
-                code, text = call_tool(name, arguments, default_manifest)
+                code, text = call_tool(name, arguments, default_manifest, tools)
             except Exception as exc:  # a tool bug must not kill the server
                 code, text = 1, f"{type(exc).__name__}: {exc}"
             _write({"jsonrpc": "2.0", "id": msg_id, "result": {

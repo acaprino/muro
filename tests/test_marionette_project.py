@@ -1,11 +1,12 @@
 """Marionette ships with every Muro as the default project (ADR-0028, decision 5).
 
 `examples/marionette/` carries the project's own files beside the package: `project.json`, `records.json`,
-`history.json` and `CHANGELOG.md`. What they contain is checked for consistency with its sources (a run with
-its release note, a changelog entry with its note, a record's date with its own text); never for completeness,
-so a release made by someone else, a note without a run or an edited bullet of the router fails nothing here.
+`history.json` and `CHANGELOG.md`. What they contain is checked for consistency (a run has its release note, a
+changelog entry a title and a text, a record's date is its own text's); never for completeness and never for
+equality with what the package or a note says now, so a release made by someone else, a note without a run, an
+edited note or router bullet, a removed source or capability fails nothing here: they are history.
 The version lives once, in `sources.json`: `muro project pack` writes it into the packed `project.json`.
-The subjects of a record are an AI judgment, only checked to name things the package has.
+The subjects of a record are an AI judgment and may name what the package no longer has.
 The staging step in `scripts/desktop_resources.py` packs the project with the sources it can fetch; its tests run
 the step with a recording stand-in for the two commands, because a real run needs the network and a build.
 """
@@ -113,11 +114,28 @@ def test_a_record_that_states_a_date_has_that_date():
             assert record["date"] == stated.group(), record["id"]
 
 
-def test_every_record_subject_is_a_capability_or_a_source_of_the_package():
-    known = {row.id for row in parse_router(PACKAGE / "ROUTER.md")} | {source["id"] for source in manifest()["sources"]}
-    assert len(known) > 40
+def record_errors(record):
+    """What makes a record not a record: its shape. What its subjects name is not part of it."""
+    errors = []
+    if set(record) != {"id", "date", "subjects", "text", "author", "binding"}:
+        errors.append("fields")
+    elif not (isinstance(record["subjects"], list) and all(isinstance(s, str) and s for s in record["subjects"])
+              and len(set(record["subjects"])) == len(record["subjects"])):
+        errors.append("subjects must be distinct names")
+    return errors
+
+
+def test_a_record_may_name_a_capability_or_a_source_the_package_no_longer_has():
+    """A record is history: the package moves on (a source is removed, a capability is replaced) and what
+    it decided then stays true of that time. Nothing here compares its subjects with the package."""
     for record in load("records.json")["records"]:
-        assert set(record["subjects"]) <= known, (record["id"], sorted(set(record["subjects"]) - known))
+        assert record_errors(record) == [], record["id"]
+    historic = {**load("records.json")["records"][0], "subjects": ["a-capability-removed-since", "a-source-removed-since"]}
+    assert record_errors(historic) == []
+    known = {row.id for row in parse_router(PACKAGE / "ROUTER.md")} | {source["id"] for source in manifest()["sources"]}
+    assert not set(historic["subjects"]) & known          # they are no ids of the package, and that is accepted
+    assert record_errors({**historic, "subjects": ["x", "x"]}) == ["subjects must be distinct names"]
+    assert record_errors({**historic, "subjects": [""]}) == ["subjects must be distinct names"]
 
 
 # --- history.json and CHANGELOG.md -------------------------------------------------------------------
@@ -135,26 +153,31 @@ def test_each_history_run_matches_its_release_note_and_runs_are_newest_first():
         assert set(run) == {"id", "time", "version", "status", "budget_usd", "engine", "pins", "changelog"}
         assert run["id"] == f"marionette-v{run['version']}"
         assert run["version"] in paragraphs, f"{run['id']} has no docs/releases note"
-        assert run["changelog"] == paragraphs[run["version"]], run["id"]
+        # the text is the note's as it was when the run was written: present, not equal to the note as it reads now
+        assert isinstance(run["changelog"], str) and run["changelog"].strip(), run["id"]
         assert UTC_TIME.fullmatch(run["time"]), run["id"]
         assert (run["status"], run["budget_usd"], run["engine"]) == ("completed", None, None), run["id"]
         assert run["pins"] and all(COMMIT.fullmatch(commit) for commit in run["pins"].values()), run["id"]
         assert all(isinstance(source_id, str) and source_id for source_id in run["pins"]), run["id"]
 
 
-def test_each_changelog_entry_is_a_release_notes_title_and_first_paragraph_newest_first():
-    notes = {title: (version, paragraph) for version, title, paragraph in release_notes()}
+def test_the_changelog_is_a_list_of_titled_entries_newest_first():
+    """Entries are history, written from a note when the version was released: each has a title and a text, and
+    those that still match a note's title come newest first. A note edited later is that note's own matter."""
+    notes = {title: version for version, title, _paragraph in release_notes()}
     text = (PACKAGE / "CHANGELOG.md").read_text(encoding="utf-8")
     entries = re.split(r"(?m)^# ", text)
     assert entries[0] == "" and len(entries) > 1, "CHANGELOG.md is a list of '# <note title>' entries"
-    seen = []
+    seen, titles = [], []
     for entry in entries[1:]:
         title, _, rest = entry.partition("\n\n")
-        assert title in notes, f"{title!r} is not the title of a docs/releases note"
-        version, paragraph = notes[title]
-        assert rest.rstrip("\n") == paragraph, title
-        seen.append(version_key(version))
+        assert title.strip() and rest.strip(), f"{title!r} has no text"
+        titles.append(title)
+        if title in notes:
+            seen.append(version_key(notes[title]))
+    assert len(set(titles)) == len(titles), "an entry twice"
     assert seen == sorted(set(seen), reverse=True)                      # newest first, none twice
+    assert seen, "at least one entry is a published note's"
 
 
 # --- the package as a project ------------------------------------------------------------------------
@@ -172,6 +195,7 @@ def fake_sources_cache(root):
             target = snapshot / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(f"{src['id']}: stand-in for a pinned file\n", encoding="utf-8")
+        project._seal(root, src)          # an entry nobody sealed is fetched again: this one stands in for a fetch
     return root
 
 

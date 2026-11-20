@@ -188,7 +188,7 @@ def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
 
 
 def _run_project(args: argparse.Namespace) -> int:
-    """`muro project pack|unpack|info`: the `.mp` file (muro/project.py)."""
+    """`muro project pack|unpack|info|verify`: the `.mp` file (muro/project.py)."""
     from . import project
     try:
         if args.project_command == "pack":
@@ -200,6 +200,9 @@ def _run_project(args: argparse.Namespace) -> int:
                                release_dir=args.release))
         elif args.project_command == "unpack":
             print(project.unpack(args.mp, args.out))
+        elif args.project_command == "verify":
+            project.verify(args.mp, args.cache or project.default_cache_root())
+            _print_json({"verified": True})
         else:
             read = project.summary if args.summary else project.info
             print(json.dumps(read(args.mp, args.cache or project.default_cache_root()),
@@ -472,8 +475,11 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--harness", required=True, choices=("claude-code", "codex", "opencode", "pi"))
     p.add_argument("--home", required=True, type=Path,
                    help="The harness home to install into (e.g. resolved through Mukade's scan)")
-    sub.add_parser("mcp", parents=[common],
-                   help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
+    p = sub.add_parser("mcp", parents=[common],
+                       help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
+    p.add_argument("--tools", metavar="NAME[,NAME...]",
+                   help="Serve only these tools (listed and callable; a name the server does not have is refused "
+                        "at start). Without it every tool is served: give a host agent only what its job needs")
     p = sub.add_parser("agent", parents=[common],
                        help="Run an AI-owned step through an OpenAI-compatible endpoint "
                             "(key from an environment variable, never an argument)")
@@ -512,7 +518,7 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("decisions", type=Path, help="The host AI's decisions JSON")
     p = sub.add_parser("project", help="The .mp project file: one zip with a package, its inputs and its release")
     project_sub = p.add_subparsers(dest="project_command", required=True,
-                                   metavar="pack|unpack|info|simulate|simulate-prepare|simulate-check")
+                                   metavar="pack|unpack|info|verify|simulate|simulate-prepare|simulate-check")
     p = project_sub.add_parser("pack", parents=[common],
                                help="Pack a package, its sources at their pins and a built release into a .mp")
     p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
@@ -528,6 +534,11 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--summary", action="store_true",
                    help="Only the identity, the counts and the digest; a missing or invalid file is "
                         "an \"error\" in the JSON, with exit 0")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
+    p = project_sub.add_parser("verify", help="Check that the plugin a .mp carries was built from the package it "
+                                              "carries (release slug, version and capability ids); exit 1 when not")
+    p.add_argument("mp", type=Path, help="The .mp file")
     p.add_argument("--cache", type=Path, metavar="DIR",
                    help="Where unpacked projects are kept (default: a per-user cache folder)")
     # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
@@ -576,8 +587,13 @@ def _modern_main(argv: list[str]) -> int:
                            api_base=args.api_base, model=args.model,
                            api_key_env=args.api_key_env, rounds=args.rounds, out=args.out)
     if args.command == "mcp":
-        from .mcp import serve
-        return serve(args.manifest)
+        from .mcp import parse_tools, serve
+        try:
+            tools = None if args.tools is None else parse_tools(args.tools)
+        except ValueError as e:
+            print(f"mcp failed: {e}", file=sys.stderr)
+            return 1
+        return serve(args.manifest, tools)
 
     loaded = _read_manifest(args.manifest)
     if loaded is None:

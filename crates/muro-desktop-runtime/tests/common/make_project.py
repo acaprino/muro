@@ -38,7 +38,7 @@ def main(repository: Path, out: Path, variant: str) -> None:
     package = work / f"package-{variant}"
     fixtures.make_package(package, upstream, commit)
     (package / "CHANGELOG.md").write_text(f"# Changelog\n\n{variant}\n", encoding="utf-8")
-    staged = work / f"release-{variant}"
+    staged = fixtures.build_release(work / f"release-{variant}")     # the build's sources.json and capabilities, as `pack` checks
     adapters = staged / fixtures.SLUG / "adapters"
     (adapters / "opencode").mkdir(parents=True)
     (adapters / "opencode" / "package.json").write_text(
