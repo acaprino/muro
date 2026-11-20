@@ -497,7 +497,8 @@ await test('Adapt with AI with Codex as the coding agent says what is needed bef
   // Settings, AI: Codex as the coding agent (the paragraph changes once the save is kept)
   await page.locator('nav button', { hasText: 'Settings' }).click();
   await page.getByRole('combobox', { name: 'Coding agent' }).selectOption('codex');
-  await page.getByText('Codex simulates requests; adapting needs Claude Code.', { exact: true }).waitFor();
+  // The sentence is the end of the section's lead paragraph, not an element of its own.
+  await page.getByText('How Muro reaches an AI when it needs one. Codex simulates requests; adapting needs Claude Code.', { exact: true }).waitFor();
   await page.locator('nav button', { hasText: 'Sync' }).click();
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
