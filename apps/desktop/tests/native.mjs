@@ -155,6 +155,29 @@ try {
   assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 1, 'still one plugin: a second plan changed nothing');
   checks.push('a second Check shows "Everything is in sync" with Last check and the harness\'s checked time moved, and Last sync as it was');
 
+  // 5b. A plugin the person installed by hand before Muro knew it (listed in the profile): Add to my list takes the installation
+  // over, so the next check finds it installed instead of planning a second copy beside it (and, on an exclusive harness, the
+  // removal of the person's own).
+  const own = join(root, 'installed-by-hand');
+  await mkdir(own);
+  await writeFile(join(own, 'package.json'), JSON.stringify({ name: 'muro-native-own', version: '2.0.0', type: 'module', main: 'index.js' }));
+  await writeFile(join(own, 'index.js'), 'export default async () => ({});\n');
+  const profileConfig = await json(join(profile, 'opencode.json'));
+  await writeFile(join(profile, 'opencode.json'), JSON.stringify({ ...profileConfig, plugins: [...profileConfig.plugins, own] }));
+  await page.reload();
+  await page.getByText('Installed, not in your list').waitFor();
+  await page.getByRole('button', { name: 'Add to my list' }).click();
+  await page.locator('#toasts').getByText('added to your list.').waitFor();
+  const adopted = Object.values(await json(join(data, 'receipts.json'))).filter(r => r.native_id === own);
+  assert.equal(adopted.length, 1, 'the service wrote one receipt for the installation that was there');
+  assert.deepEqual([adopted[0].version, adopted[0].path, adopted[0].adopted], ['2.0.0', own, true]);
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
+  assert.doesNotMatch(await page.locator('#rows').textContent(), /Install\b/, 'the plugin is not planned for installation');
+  assert.deepEqual((await json(join(profile, 'opencode.json'))).plugins.length, 2, 'no second copy was installed');
+  assert.equal((await status()).pending, 0);
+  checks.push('a plugin installed by hand is added with Add to my list: the service binds it, and the next check finds it in sync, not as an install');
+
   // 6. Settings, through the real service: saved on change; the interface and the registry agree.
   await page.locator('nav').getByRole('button', { name: /^Settings/ }).click();
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
@@ -181,9 +204,9 @@ try {
   await sheet.getByRole('button', { name: 'Stop managing', exact: true }).click();
   await page.locator('#toasts').getByText(/Muro no longer manages/).waitFor();
   registry = await json(join(data, 'registry.json'));
-  assert.deepEqual([registry.targets.length, registry.plugins.length, registry.plugins[0].targets.length], [0, 1, 0], 'the harness is gone and the plugin kept its place in the list');
-  assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 1, 'the plugin stays installed in the profile');
-  checks.push('Stop managing takes the harness off its plugin and removes it; the profile keeps the installed plugin');
+  assert.deepEqual([registry.targets.length, registry.plugins.length, registry.plugins.flatMap(p => p.targets).length], [0, 2, 0], 'the harness is gone and the plugins kept their place in the list');
+  assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 2, 'the plugins stay installed in the profile');
+  checks.push('Stop managing takes the harness off its plugins and removes it; the profile keeps the installed plugins');
 
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'pass', test: 'native WebView2 + real Tauri IPC: first run, add a plugin, check, apply, check again', checks, screenshot: 'apps/desktop/tests/artifacts/native-sync.png' }));

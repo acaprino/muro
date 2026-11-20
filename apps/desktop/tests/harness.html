@@ -1,9 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Muro UI test fixture</title><link rel="stylesheet" href="/src/styles.css"></head><body><div id="app"></div><script type="module">
 // The app on the fake transport (fake-transport.js). ?scenario=<name> picks the data; window.calls lists every request
-// and window.flags holds the knobs a test turns (blockPlan, rejectSave, rejectSettings, autostartUnsupported...).
+// and window.flags holds the knobs a test turns (blockPlan, rejectSave, rejectSettings, autostartUnsupported...);
+// window.behind changes the registry the way the background worker does, without telling the page.
 import {mountApp} from '/src/app.ts';
 import {createTransport} from './fake-transport.js';
-const {request,calls,flags}=createTransport(new URLSearchParams(location.search).get('scenario')||'default');
-window.calls=calls;window.flags=flags;
-mountApp(document.querySelector('#app'),request);
+const {request,calls,flags,behind}=createTransport(new URLSearchParams(location.search).get('scenario')||'default');
+window.calls=calls;window.flags=flags;window.behind=behind;
+// The host's way to say the window was shown again (the shell's muro-shown event): a test calls window.shown().
+mountApp(document.querySelector('#app'),request,wake=>{window.shown=wake;return ()=>{};});
 </script></body></html>

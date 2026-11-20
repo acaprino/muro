@@ -1,6 +1,7 @@
 // Shared by every browser-*.mjs: one Vite dev server on MURO_UI_PORT (default 1422) and one headless Edge for the whole
 // process, however many pages a file opens. open(scenario, options) returns {page, errors, calls, flags, close};
 // close() ends the page and the last close ends the browser and the server, and it fails the run when the page raised an error.
+// options.clock installs Playwright's clock before the page loads: page.clock.fastForward(ms) then runs its timers (the 30 s refresh).
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -28,6 +29,7 @@ export async function open(scenario = 'default', options = {}) {
   refs++;
   try { await (starting ||= start()); } catch (e) { refs--; await stop(); throw e; }
   const page = await browser.newPage({ viewport: options.viewport || { width: 1512, height: 982 }, colorScheme: options.colorScheme || 'dark', reducedMotion: options.reducedMotion || 'no-preference' });
+  if (options.clock) await page.clock.install();
   const errors = [];
   page.on('pageerror', e => { errors.push(e.message); console.error('page error:', e.message); });
   await page.goto(`${base}/tests/harness.html?scenario=${encodeURIComponent(scenario)}${options.query || ''}`);
