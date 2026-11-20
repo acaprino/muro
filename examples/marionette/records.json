@@ -1,0 +1,262 @@
+{
+  "records": [
+    {
+      "id": "harmonization-01",
+      "date": "2026-11-10",
+      "subjects": [],
+      "text": "No row has a mandatory prerequisite. Consumers start from existing work or stated behavior, reading earlier outputs when recorded; the AI orders selected producers and consumers. Forced edges had made hover timing run a website direction.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-02",
+      "date": "2026-11-19",
+      "subjects": [
+        "visual-direction",
+        "ai-design-skills"
+      ],
+      "text": "2026-11-19, owner decision: taste-skill is removed (\"troppo prescrittiva e costrittiva\"). visual-direction, which had merged it with landing-page-design and let it own the look, now follows landing-page-design alone: Part A is the strategy and copy, Part B the visual system. Its font list, hero gradient, Tailwind scale and tagline reveal had been scoped out only because the two sources contradicted each other; with no collision left they apply as written (ADR-0017). The user's explicit prompt wins over a rule and is recorded. Gone with it: the kit, the dealers, the browser checks, the finish gate and its Stop hook, the package's only active hook. Id, intents and outputs are kept.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-03",
+      "date": "2026-11-17",
+      "subjects": [
+        "work-map",
+        "wayfinder",
+        "motion-design",
+        "motion-principles"
+      ],
+      "text": "2026-11-17, same pass: work-map follows wayfinder's own `research` skill for a research item (selected; the other sibling skills stay inline). motion-design re-pinned to head 2e1f3c05: a request for a rendered animation file is handed to Creator MCP by the source's rules, inside motion-principles; no new role, output or edge.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-04",
+      "date": "2026-11-19",
+      "subjects": [
+        "motion-design",
+        "motion-principles"
+      ],
+      "text": "2026-11-19: motion-design re-pinned to head d77a9fc8; `reference/export-and-render.md` now gives install commands per client and a per-client handoff. No role, output, edge or delivery decision changes.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-05",
+      "date": "2026-11-10",
+      "subjects": [
+        "design-guidance",
+        "ui-ux-pro-max"
+      ],
+      "text": "design-guidance (ui-ux-pro-max) is split out: guidance for any interface, app screens included; beside a recorded visual system its results are candidates.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-06",
+      "date": "2026-11-19",
+      "subjects": [
+        "canvas-design",
+        "ai-design-skills",
+        "visual-direction"
+      ],
+      "text": "canvas-design (figma-design until 2026-11-19, owner decision: generic, not bound to Figma) serves Figma, FigCraft or another canvas editor through the host's integration; the source's design rules are unchanged. It keeps a recorded pairing and palette as the user's choice. One conditional prerequisite in `needs`: visual-direction, only for a new landing page with no outline; the runtime AI judges it per task.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-07",
+      "date": "2026-11-10",
+      "subjects": [
+        "motion-principles",
+        "motion-design",
+        "gsap-scrolltrigger",
+        "css-scroll"
+      ],
+      "text": "motion-principles follows the source tables; a recorded motion budget overrides its three-layer rule. GSAP and CSS scroll are variants of one outcome; only the stack differs. css-scroll has no upstream source (Muro-authored).",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-08",
+      "date": "2026-11-10",
+      "subjects": [
+        "work-map",
+        "wayfinder"
+      ],
+      "text": "work-map follows wayfinder/to-spec/to-tickets locally, plus build/review; never a fallback.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-09",
+      "date": "2026-11-11",
+      "subjects": [
+        "visual-direction"
+      ],
+      "text": "visual-direction is `resumable`: a site built section by section gets a map even as the only step (2026-11-11, ADR-0015).",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-10",
+      "date": "2026-11-10",
+      "subjects": [
+        "office-deck",
+        "office-authoring",
+        "office-files",
+        "interactive-explainer",
+        "explainer-fact-check"
+      ],
+      "text": "Office/explainer roles stay separate from UI; converting to PDF belongs to office-files.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-11",
+      "date": "2026-11-18",
+      "subjects": [
+        "open-paper-skills",
+        "paper-search",
+        "html-explanation",
+        "interactive-explainer",
+        "explain-this"
+      ],
+      "text": "open-paper-skills (2026-11-18, owner decision): only paper-search and html-explanation (explain-anything-html, left out unread on 2026-11-11 as covered by explain-this) stay; the wiki, figure, research and handoff roles are removed. html-explanation conflicts with interactive-explainer, one owner per explanation, and `reads` the search findings.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-12",
+      "date": "2026-11-11",
+      "subjects": [
+        "tokeneconomizer",
+        "token-economy"
+      ],
+      "text": "tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six default hooks are passive `host-approved` entries; registering them is an explicit user-requested step of the capability, never done at build or install.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-13",
+      "date": "2026-11-12",
+      "subjects": [
+        "claude-design-system-prompt",
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "html-deck",
+        "design-review",
+        "design-system-extract",
+        "visual-direction",
+        "office-deck",
+        "motion-principles",
+        "design-guidance"
+      ],
+      "text": "claude-design-system-prompt (2026-11-12, head 3c3ddb07): a system prompt of twenty chapters and fourteen skills become seven roles loaded on demand. No text or hook from this source is session-wide (`delivery.json`): its persona, non-disclosure and chat-conduct lines and its own skill routing are dropped, its domain rules live in the bodies and the prompt file is not shipped. Merged: the five review skills into design-review (polish runs the other four on one file); variations/tweak panel into design-options; both extracts into design-system-extract; questions into briefs. aesthetic-direction conflicts with visual-direction (two owners of palette and type) and is a `needs` of ui-prototype and html-deck only when nothing gives a look. html-deck and office-deck differ by wanted format; unspecified stays office-deck. A motion-spec overrides the transition band; design-guidance stays lookup/report. Eval: 32 of 33 historically; db-migration was later corrected as in scope.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-14",
+      "date": "2026-11-12",
+      "subjects": [
+        "ponytail",
+        "i-have-adhd",
+        "work-map",
+        "engineering-review",
+        "engineering-debt",
+        "engineering-guidance"
+      ],
+      "text": "ponytail v5.3.3 and i-have-adhd v0.4.1 (2026-11-12): one permanent policy that carries both in their own words; three marked lines let them coexist with the catalog. Ponytail enriches work-map; review/audit share engineering-review; shortcut ledgers use engineering-debt; method/benchmark explanations use engineering-guidance. No forced prerequisite or duplicate output owner. i-have-adhd adds no procedure. delivery.json explains exclusions of source mode controls, UI and telemetry. Originals carried as text are intake-only; the benchmark travels. Native policy needs the complete adapter, acts before classification and creates no step for style alone.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-15",
+      "date": "2026-11-13",
+      "subjects": [
+        "i-have-adhd"
+      ],
+      "text": "2026-11-13: multi-intent roles declare `intent_checks`, 14 checks `check_conditions` (from their bodies, ADR-0018); entries declare `absorbs`, i-have-adhd being policy only (ADR-0019).",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-16",
+      "date": "2026-11-14",
+      "subjects": [
+        "egm",
+        "concept-brief",
+        "design-doc",
+        "fresh-review",
+        "codebase-contracts",
+        "design-drift",
+        "work-map"
+      ],
+      "text": "egm v0.1.1 (2026-11-14, trial intake): five on-demand `docs.*` roles, nothing session-wide. Review, loop and resolution are one role (one thread in the source); bootstrap's drift offer is design-drift's step; design-doc and work-map's spec keep separate owners.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-17",
+      "date": "2026-11-14",
+      "subjects": [
+        "superpowers",
+        "egm",
+        "impl-plan",
+        "plan-execution",
+        "design-doc",
+        "concept-brief",
+        "work-map",
+        "engineering-review",
+        "fresh-review"
+      ],
+      "text": "superpowers v7.0.2 (2026-11-14): the planning chain in symbiosis with EGM — a design-doc or brief is the spec impl-plan argues from; the two executors are one role (plan-execution; the source shares their workspace and ledger) with the required method texts packaged as the step's files. using-superpowers, its SessionStart hook and brainstorming are dropped or evidence-only: self-activating routing competes with the coordinator and concept-brief owns the idea stage (`delivery.json`). work-map keeps plan-less implementation; engineering-review keeps standalone code review; fresh-review reviews the plan as a document.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-18",
+      "date": "2026-11-17",
+      "subjects": [
+        "zero-slop-design",
+        "design-file",
+        "design-file-apply",
+        "design-file-inspection",
+        "design-file-integration",
+        "design-drift",
+        "visual-direction",
+        "ponytail",
+        "plan-execution"
+      ],
+      "text": "zero-slop-design v0.2.1 (2026-11-17): fourteen skills, four on-demand roles, nothing session-wide. design-file is the only writer of the brief and `DESIGN.md`; apply, inspection (report-only; its drift output is not `drift_report`) and integration (token export, code checks in CI) read it; no forced chain. Look authority, owner decision: the user's request in the turn, then a project `DESIGN.md` that is not a starter or a reference (minus `unresolved` and `proposed`), then tokens or a Master in the repository, then a direction recorded in the plan; candidates stay proposals. For visual-direction such a file is the user's explicit instruction; no building or reviewing step rewrites it. Its ban on unrequested tests governs interface checks in its steps; Ponytail's self-check for new logic and plan-execution's TDD stand.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-19",
+      "date": "2026-11-17",
+      "subjects": [
+        "text-humanizer",
+        "text-humanize"
+      ],
+      "text": "text-humanizer 2.0.0 (2026-11-17, head c4d8276c: no release upstream): one on-demand role, text-humanize; nothing session-wide, since as policy its rules would rewrite every reply. The skill, its editor agent and three references are one procedure; the editor is an optional subagent with the packaged agent file, or inline by the source's own fallback. The command and trigger lines are dropped as routing; a file is written only on the user's choice.",
+      "author": "muro",
+      "binding": false
+    },
+    {
+      "id": "harmonization-20",
+      "date": "2026-11-15",
+      "subjects": [
+        "i-have-adhd"
+      ],
+      "text": "2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.",
+      "author": "muro",
+      "binding": false
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# Marionette 0.5.0
+
+taste-skill is no longer part of Marionette, and the Figma step now works in
+any design tool with a canvas. The catalog is 37 capabilities from 16 sources.
+
+# Marionette 0.4.1
+
+Marionette has its own public repository,
+[acaprino/marionette](https://github.com/acaprino/marionette): this release and
+the next ones are published there. The catalog is the one of 0.4.0, 37
+capabilities from 17 sources.
+
+# Marionette 0.4.0
+
+Marionette now carries taste-skill whole and answers a request to explain
+something with an HTML page. Five research capabilities leave the package. The
+catalog goes from 41 to 37 capabilities; the sources stay 17.
+
+# Marionette 0.3.0
+
+Marionette absorbs two more sources. The catalog goes from 36 to 41 capabilities
+and from 15 to 17 sources; nothing new acts in every session.
+
+# Marionette 0.2.1
+
+Marionette now gives brief ADHD progress updates while waiting for agents or long
+operations, making important changes, and taking autonomous decisions. Updates
+state what is done, what remains and the next step; autonomous decisions include
+their reason. Existing ADHD mode controls and the rule against redundant closing
+recaps remain in effect.
+
+# Marionette 0.2.0
+
+- New sources: open-paper-skills, TokenEconomizer, claude-design-system-prompt, Ponytail v5.3.3 and i-have-adhd v0.4.1. The catalog has 29 capabilities.
+- Permanent policy: Ponytail and i-have-adhd in their own words, delivered natively on Claude Code, Codex, OpenCode, Pi and Hermes.
+- Every capability was re-read against its pinned original. Rules that had been lost or softened are back; a body is an entry prompt that points to the packaged original, by file and section, for what a task needs.
+- Nine source files the plugin does not need are no longer packaged.
+- No limit of the package's own on what an absorbed command sends off the machine: the source's statement, the host's permissions and the user decide.
