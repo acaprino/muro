@@ -316,6 +316,9 @@ pub fn serve(data: &Path) -> Result<()> {
         .try_lock_exclusive()
         .context("A Muro CLI server already owns this data directory")?;
     initialize(data)?;
+    // The project cache and the simulations' folders are tidied once, when the server starts: what no project
+    // and no installed build needs, and what a process that ended in the middle left behind.
+    crate::projects::sweep(data);
     crate::jobs::recover(data)?;
     let stdout = Arc::new(Mutex::new(std::io::stdout()));
     let mut workers = vec![];

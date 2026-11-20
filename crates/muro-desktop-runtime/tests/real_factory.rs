@@ -6,7 +6,7 @@
 //! what its summary holds. A source checkout, Python and Git are needed; without them it returns at once.
 mod common;
 
-use muro_desktop_runtime::request;
+use muro_desktop_runtime::{factory::Factory, request, simulate};
 use muro_registry::projects as registry_projects;
 use serde_json::{Value, json};
 use std::{
@@ -111,8 +111,9 @@ fn a_real_project_is_listed_read_installed_made_stale_and_simulated() {
     fs::create_dir_all(&profile).unwrap();
     call("save_target", json!({"revision":call("registry", json!({})).unwrap()["revision"],"target":{
         "id":"oc","harness":"opencode","name":"OpenCode","root":profile,"executable":"","exclusive":true,"enabled":true}})).unwrap();
-    let done = call("install_project", json!({"id":"tester","harnesses":["opencode","claude-code"]})).unwrap();
-    assert_eq!(done["unmanaged"], json!(["claude-code"]), "no Claude Code target is registered");
+    // (the real `muro project verify` runs here: the release in the file is the build of the package beside it)
+    let done = call("install_project", json!({"id":"tester","targets":["oc"]})).unwrap();
+    assert_eq!((done["harnesses"].clone(), done["targets"].clone()), (json!(["opencode"]), json!(["oc"])));
     let plugin = &done["plugin"];
     assert_eq!(plugin["targets"], json!(["oc"]));
     assert_eq!(plugin["distributions"][0]["version"], "0.1.0");
@@ -127,9 +128,31 @@ fn a_real_project_is_listed_read_installed_made_stale_and_simulated() {
     let blocked = call("plan", json!({})).unwrap()["blockers"][0].as_str().unwrap().to_owned();
     assert!(blocked.ends_with("Project file changed: open the project again"), "{blocked}");
     assert_eq!(call("projects", json!({})).unwrap()[0]["digest"], json!(second));
-    call("install_project", json!({"id":"tester","harnesses":["opencode"]})).unwrap();
+    call("install_project", json!({"id":"tester","targets":["oc"]})).unwrap();
     assert_eq!(call("plan", json!({})).unwrap()["blockers"], json!([]));
     assert_eq!(call("registry", json!({})).unwrap()["plugins"][0]["distributions"][0]["project_digest"], json!(second));
+    assert_eq!(fs::read_dir(muro_desktop_runtime::projects::cache_dir(&data)).unwrap().count(), 1, "only the unpack of the file as it is, which the build holds");
+
+    // the harness engine's two factory calls, with the real factory: the context it prepares for the request
+    // and the validation of an answer against it (no harness runs here)
+    let factory = Factory::from_settings(&call("registry", json!({})).unwrap()["settings"]).unwrap();
+    let manifest = projects_cache(&data, &second).join("sources.json");
+    let context = simulate::prepared_context(&factory, &manifest, "Verify the artifact", &["stack:rust".to_owned()], &|| false).unwrap();
+    assert_eq!((context["task"].as_str(), context["stack_tokens"].clone()), (Some("Verify the artifact"), json!(["stack:rust"])));
+    let work = temp.path().join("work");
+    fs::create_dir_all(&work).unwrap();
+    let mut classified = context.clone();
+    classified["status"] = json!("selected");
+    classified["reason"] = json!("The request is to verify.");
+    classified["questions"] = json!([]);
+    classified["selections"] = json!([{"capability":"x","intent":"testing.verify","reason":"It verifies."}]);
+    let judged = simulate::judge(&factory, &manifest, &context, &classified, &work, &|| false).unwrap();
+    assert_eq!((judged["valid"].as_bool(), judged["steps"][0]["capability"].as_str()), (Some(true), Some("x")), "{judged}");
+    // an answer for another request is judged against the request that was asked, and is invalid
+    let mut other = classified.clone();
+    other["task"] = json!("Another request");
+    let judged = simulate::judge(&factory, &manifest, &context, &other, &work, &|| false).unwrap();
+    assert_eq!(judged["valid"], false, "{judged}");
 
     // a request through an endpoint on this machine: the key reaches it from the environment, never
     // an argument; its answer is not a classification, so it is an invalid result, not an error

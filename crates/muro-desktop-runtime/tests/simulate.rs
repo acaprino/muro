@@ -53,14 +53,18 @@ fn codex_gets_the_server_for_the_call_through_config_overrides_and_no_budget_it_
     assert_eq!(args[9], "-c");
     assert_eq!(args[10], format!("mcp_servers.muro.command={}", json!(common::python())));
     assert_eq!(args[11], "-c");
-    assert_eq!(args[12], format!("mcp_servers.muro.args={}", json!(["-X", "utf8", launcher, "mcp"])));
-    assert_eq!(args[13], "THE PROMPT");
-    assert_eq!(args.len(), 14);
+    // the server is started serving the two simulate tools and no other (the text it is given may be anyone's) ...
+    assert_eq!(args[12], format!("mcp_servers.muro.args={}", json!(["-X", "utf8", launcher, "mcp", "--tools", "simulate_prepare,simulate_check"])));
+    // ... and Codex is told, in its own allow-list for the server, to offer the model only those two
+    assert_eq!(args[13], "-c");
+    assert_eq!(args[14], r#"mcp_servers.muro.enabled_tools=["simulate_prepare","simulate_check"]"#);
+    assert_eq!(args[15], "THE PROMPT");
+    assert_eq!(args.len(), 16);
     assert!(!args.iter().any(|a| a.contains("budget") || a.contains("dangerously")));
 }
 
 #[test]
-fn the_mcp_server_is_the_factory_launcher_run_by_its_python_in_utf8_mode() {
+fn the_mcp_server_is_the_factory_launcher_run_by_its_python_in_utf8_mode_serving_only_the_simulate_tools() {
     let temp = tempfile::tempdir().unwrap();
     let factory = factory(temp.path());
     let config = simulate::mcp_config(&factory);
@@ -69,8 +73,27 @@ fn the_mcp_server_is_the_factory_launcher_run_by_its_python_in_utf8_mode() {
     assert_eq!(server["command"], common::python());
     let args: Vec<&str> = server["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap()).collect();
     assert_eq!(&args[..2], ["-X", "utf8"]);
-    assert!(args[2].ends_with("muro_build.py") && args[3] == "mcp", "{args:?}");
+    assert!(args[2].ends_with("muro_build.py"), "{args:?}");
+    assert_eq!(&args[3..], ["mcp", "--tools", "simulate_prepare,simulate_check"], "no other tool of the factory is there to call");
     assert_eq!(config["mcpServers"].as_object().unwrap().len(), 1, "no other server");
+}
+
+#[test]
+fn a_harness_runs_without_the_variable_the_ai_key_is_read_from() {
+    let ai = json!({"engine":"harness","harness":"claude-code","budget_usd":0.5,"api_base":"","model":"","api_key_env":"MURO_TEST_HARNESS_KEY"});
+    let command = simulate::harness_command("claude", vec!["-p".into(), "x".into()], Path::new("C:/work"), &ai);
+    let envs: Vec<(String, Option<String>)> = command
+        .get_envs()
+        .map(|(key, value)| (key.to_string_lossy().into_owned(), value.map(|v| v.to_string_lossy().into_owned())))
+        .collect();
+    assert_eq!(envs, [("MURO_TEST_HARNESS_KEY".to_owned(), None)], "removed for the child, set to nothing else");
+    assert_eq!(command.get_args().collect::<Vec<_>>(), ["-p", "x"]);
+    assert_eq!(command.get_current_dir(), Some(Path::new("C:/work")));
+    // another name is another variable
+    let other = simulate::harness_command("codex", vec![], Path::new("."), &json!({"api_key_env":"OPENAI_API_KEY"}));
+    assert_eq!(other.get_envs().map(|(key, _)| key.to_string_lossy().into_owned()).collect::<Vec<_>>(), ["OPENAI_API_KEY"]);
+    let none = simulate::harness_command("codex", vec![], Path::new("."), &json!({}));
+    assert_eq!(none.get_envs().count(), 0);
 }
 
 #[test]
@@ -84,6 +107,10 @@ fn the_prompt_carries_the_request_and_the_manifest_as_json_so_neither_reads_as_a
     assert!(prompt.contains(&json!("C:/cache/abc/sources.json").to_string()));
     assert!(prompt.contains("never by matching words"), "the AI decides the classification");
     assert!(prompt.contains("do not repair"), "an invalid answer is reported as it is");
+    assert!(
+        prompt.contains("exactly the JSON object you gave simulate_check as the answer") && prompt.contains("not the text simulate_check returned"),
+        "the last message is the answer, which the runtime has validated: never a result the model relays"
+    );
 }
 
 // --- reading what a harness printed ---------------------------------------------------------------------
@@ -106,76 +133,137 @@ fn closing(text: &str, is_error: bool, cost: f64) -> Value {
     json!({"type":"result","subtype":if is_error {"error_max_budget_usd"} else {"success"},"is_error":is_error,"result":text,"total_cost_usd":cost})
 }
 
+/// What a classification looks like to the stand-in factory: it copies the context and selects capabilities.
+fn classification(context: &Value, capabilities: &[&str]) -> Value {
+    let selections: Vec<Value> = capabilities.iter().map(|c| json!({"capability":c,"intent":"x.y","reason":"r"})).collect();
+    let mut answer = context.clone();
+    answer["status"] = json!("selected");
+    answer["selections"] = json!(selections);
+    answer["reason"] = json!("r");
+    answer["questions"] = json!([]);
+    answer
+}
+
 #[test]
-fn the_check_is_what_the_tool_returned_not_what_the_model_says_it_returned() {
-    let verdict = json!({"valid":false,"errors":["Capability x is not in the catalog"]});
+fn the_answer_is_the_json_object_the_last_message_holds_and_nothing_a_tool_returned() {
+    let given = json!({"task":"Write a letter","stack_tokens":[],"catalog_digest":"d","status":"selected","selections":[],"reason":"r","questions":[]});
     let text = stream(&[
         json!({"type":"system","subtype":"init"}),
         call("t1", "mcp__muro__simulate_prepare"),
         answer("t1", json!([{"type":"text","text":"{\"context\":{},\"prompt\":\"p\"}"}]), false),
         call("t2", CHECK),
-        answer("t2", json!([{"type":"text","text":verdict.to_string()}]), false),
-        json!({"type":"assistant","message":{"content":[{"type":"text","text":"{\"valid\":true,\"steps\":[]}"}]}}),
-        closing("{\"valid\":true,\"steps\":[]}", false, 0.25),
+        // a result the tool returned, and valid: not what is read
+        answer("t2", json!([{"type":"text","text":"{\"valid\":true,\"steps\":[]}"}]), false),
+        json!({"type":"assistant","message":{"content":[{"type":"text","text":"working"}]}}),
+        closing(&format!("Here it is:\n```json\n{given}\n```"), false, 0.25),
     ]);
     let harvest = simulate::claude_result(&text).unwrap();
-    assert_eq!(harvest.check, verdict, "the model's own last message claimed valid: the tool said otherwise");
+    assert_eq!(harvest.answer, given, "the answer is the last message's first JSON object, wrapped as it may be");
     assert_eq!(harvest.cost_usd, Some(0.25));
+    assert_eq!(simulate::claude_result(&stream(&[closing(&given.to_string(), false, 0.0)])).unwrap().cost_usd, Some(0.0));
 }
 
 #[test]
-fn a_tool_result_may_be_plain_text_and_the_last_check_wins() {
-    let first = json!({"valid":false,"errors":["e"]});
-    let second = json!({"valid":true,"steps":[{"capability":"x"}]});
-    let text = stream(&[
-        call("a", CHECK), answer("a", json!(first.to_string()), false),
-        call("b", CHECK), answer("b", json!([{"type":"text","text":second.to_string()}]), false),
-        closing("ok", false, 0.0),
-    ]);
-    assert_eq!(simulate::claude_result(&text).unwrap().check, second);
-}
-
-#[test]
-fn a_run_that_never_got_a_check_or_ended_in_error_is_an_error_with_the_harnesss_words() {
-    let never = stream(&[call("t1", "mcp__muro__simulate_prepare"), answer("t1", json!("{}"), false), closing("Done.", false, 0.1)]);
-    assert!(simulate::claude_result(&never).unwrap_err().to_string().contains("without calling simulate_check"));
+fn a_run_without_an_answer_or_ended_in_error_is_an_error_with_the_harnesss_words() {
+    for last in ["", "Done.", "I could not call the tool", "{unterminated", "[1,2,3]", "{not json}"] {
+        let error = simulate::claude_result(&stream(&[call("t1", CHECK), closing(last, false, 0.1)])).unwrap_err().to_string();
+        assert_eq!(error, "The agent gave no answer", "{last:?}");
+        assert_eq!(simulate::codex_answer(last).unwrap_err().to_string(), "The agent gave no answer", "{last:?}");
+    }
+    assert_eq!(simulate::NO_ANSWER, "The agent gave no answer");
     let budget = stream(&[closing("Reached the maximum budget", true, 0.5)]);
     assert!(simulate::claude_result(&budget).unwrap_err().to_string().contains("Reached the maximum budget"));
-    let denied = stream(&[call("t1", CHECK), answer("t1", json!("Permission to use mcp__muro__simulate_check was denied"), true), closing("x", false, 0.0)]);
-    assert!(simulate::claude_result(&denied).unwrap_err().to_string().contains("was denied"));
-    let garbled = stream(&[call("t1", CHECK), answer("t1", json!("not json at all"), false)]);
-    assert!(simulate::claude_result(&garbled).unwrap_err().to_string().contains("did not return a result"));
     assert!(simulate::claude_result("").unwrap_err().to_string().contains("printed no result"));
-    assert!(simulate::claude_result("not json\n{broken").is_err());
-    // a result for a call that was not simulate_check is never taken as the check
-    let other = stream(&[call("t1", "mcp__muro__validate"), answer("t1", json!("{\"valid\":true}"), false), closing("x", false, 0.0)]);
-    assert!(simulate::claude_result(&other).is_err());
+    assert!(simulate::claude_result("not json\n{broken").unwrap_err().to_string().contains("printed no result"));
 }
 
 #[test]
-fn a_called_check_whose_answer_is_not_in_the_stream_is_taken_from_the_relay_and_marked_but_never_when_it_was_not_called() {
-    let relay = "{\"valid\":true,\"steps\":[]}";
-    let called = stream(&[call("t1", CHECK), closing(relay, false, 0.3)]);
-    let harvest = simulate::claude_result(&called).unwrap();
-    assert!(harvest.relayed && harvest.check["valid"] == true);
-    // a model that printed a verdict without ever calling the validator has no verdict
-    let invented = stream(&[call("t1", "mcp__muro__simulate_prepare"), closing(relay, false, 0.3)]);
-    assert!(simulate::claude_result(&invented).unwrap_err().to_string().contains("without calling simulate_check"));
-    let nothing_to_read = stream(&[call("t1", CHECK), closing("It worked.", false, 0.3)]);
-    assert!(simulate::claude_result(&nothing_to_read).unwrap_err().to_string().contains("was not in the stream"));
-    // and a result that is in the stream is never replaced by the relay
-    let real = stream(&[call("t1", CHECK), answer("t1", json!("{\"valid\":false,\"errors\":[\"e\"]}"), false), closing(relay, false, 0.3)]);
-    let harvest = simulate::claude_result(&real).unwrap();
-    assert!(!harvest.relayed && harvest.check["valid"] == false);
+fn codexs_last_message_is_its_answer() {
+    let given = json!({"task":"t","stack_tokens":[],"catalog_digest":"d","status":"no_match","selections":[],"reason":"r","questions":[]});
+    assert_eq!(simulate::codex_answer(&format!("Here is the answer:\n```json\n{given}\n```\n")).unwrap(), given);
+    assert_eq!(simulate::codex_answer(&given.to_string()).unwrap(), given);
+    assert!(simulate::codex_answer("I could not call the tool").is_err());
+    assert!(simulate::codex_answer("").is_err());
+}
+
+// --- what the page shows of a harness's run: the factory's validation of its answer -----------------------
+
+struct Run {
+    _temp: tempfile::TempDir,
+    factory: Factory,
+    folder: PathBuf,
+    manifest: PathBuf,
+    work: PathBuf,
+}
+
+fn run() -> Run {
+    let temp = tempfile::tempdir().unwrap();
+    let (folder, settings) = install(temp.path());
+    let work = temp.path().join("work");
+    fs::create_dir_all(&work).unwrap();
+    let manifest = temp.path().join("unpacked").join("sources.json");
+    Run { factory: Factory::from_settings(&settings).unwrap(), folder, manifest, work, _temp: temp }
+}
+
+fn nobody_cancels() -> bool {
+    false
 }
 
 #[test]
-fn codexs_last_message_is_the_relayed_result_and_must_be_one() {
-    let relayed = "Here is the check:\n```json\n{\"valid\":true,\"steps\":[{\"capability\":\"x\"}]}\n```\n";
-    assert_eq!(simulate::codex_result(relayed).unwrap(), json!({"valid":true,"steps":[{"capability":"x"}]}));
-    assert!(simulate::codex_result("{\"steps\":[]}").is_err(), "an object without `valid` is not a check");
-    assert!(simulate::codex_result("I could not call the tool").is_err());
-    assert!(simulate::codex_result("").is_err());
+fn the_context_is_what_the_factory_prepares_for_the_request_not_what_the_harness_names() {
+    let run = run();
+    let stack = vec!["stack:rust".to_owned(), "--odd".to_owned()];
+    let context = simulate::prepared_context(&run.factory, &run.manifest, "--task looks like an option", &stack, &nobody_cancels).unwrap();
+    assert_eq!(context, json!({"task":"--task looks like an option","stack_tokens":["--odd","stack:rust"],"catalog_digest":"d".repeat(64)}));
+    let made = calls(&run.folder);
+    assert_eq!(made.len(), 1);
+    assert_eq!(&made[0][..2], ["project", "simulate-prepare"]);
+    assert_eq!(made[0][made[0].iter().position(|a| a == "--manifest").unwrap() + 1], run.manifest.to_string_lossy());
+    for wanted in ["--task=--task looks like an option", "--stack=stack:rust", "--stack=--odd"] {
+        assert!(made[0].contains(&wanted.to_owned()), "{wanted} in {:?}", made[0]);
+    }
+}
+
+#[test]
+fn an_answer_is_judged_by_the_factory_against_the_context_it_prepared_and_both_are_written_to_the_run() {
+    let run = run();
+    let context = simulate::prepared_context(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap();
+    let given = classification(&context, &["write-letter", "proofread"]);
+    let result = simulate::judge(&run.factory, &run.manifest, &context, &given, &run.work, &nobody_cancels).unwrap();
+    assert_eq!(result["valid"], true);
+    assert_eq!(result["steps"], json!([{"step_id":"write-letter","capability":"write-letter"},{"step_id":"proofread","capability":"proofread"}]));
+    assert!(result.get("relayed").is_none(), "nothing the harness relayed is part of a result");
+    assert_eq!(serde_json::from_slice::<Value>(&fs::read(run.work.join("context.json")).unwrap()).unwrap(), context);
+    assert_eq!(serde_json::from_slice::<Value>(&fs::read(run.work.join("answer.json")).unwrap()).unwrap(), given);
+    let made = calls(&run.folder);
+    let line = made.last().unwrap();
+    assert_eq!(&line[..2], ["project", "simulate-check"]);
+    assert_eq!(line[line.iter().position(|a| a == "--context").unwrap() + 1], run.work.join("context.json").to_string_lossy());
+    assert_eq!(line[line.iter().position(|a| a == "--answer").unwrap() + 1], run.work.join("answer.json").to_string_lossy());
+}
+
+#[test]
+fn a_harness_that_relays_a_valid_result_instead_of_an_answer_is_shown_invalid() {
+    let run = run();
+    let context = simulate::prepared_context(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap();
+    // Claude Code: the tool said valid (it was handed a context of the model's choosing) and the last message
+    // relays "valid" with steps; the answer the model gave is for another request than the one asked
+    let invented = json!({"task":"Something the harness chose","stack_tokens":[],"catalog_digest":"d".repeat(64)});
+    let answer_given = classification(&invented, &["write-letter"]);
+    let text = stream(&[
+        call("t2", CHECK),
+        answer("t2", json!([{"type":"text","text":"{\"valid\":true,\"steps\":[{\"capability\":\"write-letter\"}]}"}]), false),
+        closing(&answer_given.to_string(), false, 0.1),
+    ]);
+    let harvest = simulate::claude_result(&text).unwrap();
+    let shown = simulate::judge(&run.factory, &run.manifest, &context, &harvest.answer, &run.work, &nobody_cancels).unwrap();
+    assert_eq!(shown["valid"], false, "judged against the request that was asked: {shown}");
+    assert!(shown["errors"][0].as_str().unwrap().contains("copy the context"), "{shown}");
+    // Codex: its last message is a relayed verdict, no answer at all: the object is judged as the answer it is
+    let relayed = "{\"valid\":true,\"steps\":[{\"capability\":\"write-letter\"}]}";
+    let shown = simulate::judge(&run.factory, &run.manifest, &context, &simulate::codex_answer(relayed).unwrap(), &run.work, &nobody_cancels).unwrap();
+    assert_eq!(shown["valid"], false, "{shown}");
+    assert!(shown.get("relayed").is_none() && shown.get("steps").is_none());
 }
 
 #[test]

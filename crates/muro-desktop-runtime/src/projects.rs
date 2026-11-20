@@ -4,17 +4,17 @@
 //! list and the plugins; this module connects them and decides nothing about what a project means.
 use crate::factory::Factory;
 use anyhow::{Context, Result, bail, ensure};
-use muro_registry::projects::{self as list, same_file};
+use muro_registry::projects::{self as list, DEFAULT_ID, same_file};
 use serde_json::{Value, json};
 use std::{
+    collections::HashSet,
     io::Write,
     path::{Path, PathBuf},
+    time::{Duration, SystemTime},
 };
 
 /// The harness kinds the factory builds an adapter for.
 pub const HARNESSES: [&str; 5] = ["claude-code", "codex", "opencode", "pi", "hermes"];
-/// The project every Muro ships, and the name of its file.
-const DEFAULT_ID: &str = "marionette";
 
 /// Where the factory unpacks each project file once, named by the file's digest. Inside the data
 /// directory, so a portable Muro keeps it with its data.
@@ -73,6 +73,13 @@ fn update(
     unreachable!("the last attempt returns")
 }
 
+/// Whether a listed project is the one Muro ships: the default project's id AND the copy Muro put in its
+/// own data directory. This is the only way a project is "Included with Muro": the `builtin` field a
+/// project file carries about itself is anyone's to write, and no foreign file may wear the badge.
+pub fn is_included(data: &Path, id: &str, path: &str) -> bool {
+    id == DEFAULT_ID && same_file(path) == same_file(&default_file(data).to_string_lossy())
+}
+
 /// The summary of one listed file as the page shows it: its id and path, and what `info --summary` says,
 /// or the reason it cannot be read. A file that is gone is not worth a factory run.
 fn summary(factory: &Factory, data: &Path, id: &str, path: &str) -> Result<Value> {
@@ -86,6 +93,7 @@ fn summary(factory: &Factory, data: &Path, id: &str, path: &str) -> Result<Value
     let mut shown = read;
     shown["id"] = json!(id);
     shown["path"] = json!(path);
+    shown["included"] = json!(is_included(data, id, path));
     Ok(shown)
 }
 
@@ -108,11 +116,33 @@ pub fn projects(data: &Path) -> Result<Value> {
     Ok(json!(shown))
 }
 
-/// `project {id}`: the full `info` of a listed project, for its page.
+/// `project {id}`: the full `info` of a listed project, for its page. A file the factory refuses leaves
+/// no unpack of it in the cache.
 pub fn project(data: &Path, payload: &Value) -> Result<Value> {
+    let id = payload["id"].as_str().unwrap_or("");
     let current = registry(data)?;
-    let file = listed_file(&current, payload["id"].as_str().unwrap_or(""))?;
-    Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false)
+    let file = listed_file(&current, id)?;
+    match Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false) {
+        Ok(mut info) => {
+            info["included"] = json!(is_included(data, id, &file.to_string_lossy()));
+            Ok(info)
+        }
+        Err(error) => {
+            discard_unpack(data, &current, &file);
+            Err(error)
+        }
+    }
+}
+
+/// The unpack of a file the factory refused is deleted: a hostile file is no reason for the cache to hold
+/// what it unpacked. Kept when a plugin made from those very bytes is installed from it: that build is
+/// what the harnesses were given, whatever the factory says of the file now.
+fn discard_unpack(data: &Path, registry: &Value, file: &Path) {
+    let Ok(digest) = list::file_digest(file) else { return };
+    if distribution_digests(registry).contains(&digest) {
+        return;
+    }
+    let _ = std::fs::remove_dir_all(cache_dir(data).join(digest));
 }
 
 /// `open_project {path}`: a project file from anywhere. The factory reads it first; a file that is not a
@@ -125,8 +155,15 @@ pub fn open(data: &Path, payload: &Value) -> Result<Value> {
     ensure!(Path::new(path).is_file(), "{}", missing(path));
     let current = registry(data)?;
     let factory = Factory::from_settings(&current["settings"])?;
-    let read = factory.project_info(Path::new(path), &cache_dir(data), true)?;
+    let read = match factory.project_info(Path::new(path), &cache_dir(data), true) {
+        Ok(read) => read,
+        Err(error) => {
+            discard_unpack(data, &current, Path::new(path));
+            return Err(error);
+        }
+    };
     if let Some(error) = read["error"].as_str() {
+        discard_unpack(data, &current, Path::new(path));
         bail!("{error}");
     }
     let slug = read["plugin"]["slug"].as_str().context("The project names no plugin")?.to_owned();
@@ -140,7 +177,7 @@ pub fn open(data: &Path, payload: &Value) -> Result<Value> {
         }
         if let Some(taken) = items.iter().find(|p| p["id"] == slug.as_str()) {
             bail!(
-                "A project named {slug} is already in your list ({}); remove it or open the other file",
+                "A project for {slug} is already listed: remove it from the list first, or open that one ({})",
                 taken["path"].as_str().unwrap_or("")
             );
         }
@@ -150,39 +187,60 @@ pub fn open(data: &Path, payload: &Value) -> Result<Value> {
         next.push(json!({"id":slug,"path":path}));
         Ok(Some(("save_projects", json!({"projects":next}))))
     })?;
+    shown["included"] = json!(is_included(data, shown["id"].as_str().unwrap_or(""), path));
+    sweep_cache(data);
     Ok(shown)
 }
 
 /// The harness kinds a request names: a nonempty list of known kinds, each once.
-fn kinds(payload: &Value) -> Result<Vec<String>> {
-    let named = payload["harnesses"].as_array().context("Name the harnesses to install on")?;
-    let mut kinds: Vec<String> = vec![];
-    for kind in named {
-        let kind = kind.as_str().context("A harness is its name")?;
+/// The targets a request names, each a managed one (a target of the registry that is switched on), each
+/// once and in the order named, with the harness kinds they are of, each once in the order they first
+/// appear: the distributions to make, one for each kind.
+fn named_targets(registry: &Value, payload: &Value) -> Result<(Vec<String>, Vec<String>)> {
+    let named = payload["targets"].as_array().context("Name the targets to install on")?;
+    let (mut ids, mut kinds): (Vec<String>, Vec<String>) = (vec![], vec![]);
+    for item in named {
+        let id = item.as_str().context("A target is its id")?;
+        let target = registry["targets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|target| target["id"] == id)
+            .with_context(|| format!("No harness is managed under the id {id}"))?;
+        let name = target["name"].as_str().unwrap_or(id);
+        ensure!(target["enabled"] == true, "{name} is paused: switch it on in Sync first");
+        let kind = target["harness"].as_str().unwrap_or("");
         ensure!(HARNESSES.contains(&kind), "No Muro adapter for the harness {kind}");
+        if !ids.iter().any(|known| known == id) {
+            ids.push(id.to_owned());
+        }
         if !kinds.iter().any(|known| known == kind) {
             kinds.push(kind.to_owned());
         }
     }
-    ensure!(!kinds.is_empty(), "Name at least one harness to install on");
-    Ok(kinds)
+    ensure!(!ids.is_empty(), "Name at least one target to install on");
+    Ok((ids, kinds))
 }
 
 fn plugin_of<'a>(registry: &'a Value, id: &str) -> Option<&'a Value> {
     registry["plugins"].as_array()?.iter().find(|p| p["id"] == id)
 }
 
-/// `install_project {id, harnesses}`: puts the project's built plugin on the harnesses named, from the
-/// release inside the file as it is now. In one place it saves the registry plugin `<slug>` (its field
-/// `project` is the project's id) with one distribution for each kind named, taken from the cached
-/// unpack of the file and recording the file's digest, and sets the plugin's targets: every enabled
-/// target of each kind named, and none of a kind left out. The next plan installs it, and a plan finds
-/// the builds stale when the file changes (`Project file changed: open the project again`). A plugin
+/// `install_project {id, targets}`: puts the project's built plugin on the targets named (ids of the
+/// registry's managed harnesses), from the release inside the file as it is now. In one place it saves the
+/// registry plugin `<slug>` (its field `project` is the project's id) with one distribution for each
+/// harness kind of those targets, taken from the cached unpack of the file and recording the file's digest,
+/// and sets the plugin's targets to exactly those ids. A target not named is not made a target, and
+/// stays what it was: switching one harness on never turns on another of its kind. (A target that is
+/// paused and already the plugin's stays: the page shows no switch for it, so a request cannot speak for it.)
+/// The plugin inside the file is first checked against the package beside it (`muro project verify`): a
+/// file whose plugin was not built from its own package is refused. The next plan installs it, and a plan
+/// finds the builds stale when the file changes (`Project file changed: open the project again`). A plugin
 /// of that name that is not this project's is never touched.
 pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
-    let kinds = kinds(payload)?;
     let current = registry(data)?;
+    let (target_ids, kinds) = named_targets(&current, payload)?;
     let file = listed_file(&current, id)?;
     let factory = Factory::from_settings(&current["settings"])?;
     let read = factory.project_info(&file, &cache_dir(data), true)?;
@@ -198,6 +256,7 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     let root = cache_dir(data).join(digest);
     let release = root.join("release").join(slug);
     ensure!(release.is_dir(), "This project has no built plugin yet: it is built when the project is harmonized");
+    factory.project_verify(&file, &cache_dir(data))?;
     let mut builds = vec![];
     for kind in &kinds {
         let adapter = release.join("adapters").join(kind);
@@ -239,31 +298,23 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         })?;
         muro_registry::service::request(data, "resolve", json!({"id":id}))?;
     }
-    let mut unmanaged = vec![];
     let saved = update(data, |reg| {
         let mut plugin = plugin_of(reg, id).cloned().context("The plugin disappeared")?;
         let revision = plugin["upstream_revision"].as_str().context("The project's folder was not resolved")?.to_owned();
-        let held: Vec<&Value> = plugin["targets"].as_array().into_iter().flatten().collect();
-        let (mut targets, mut distributions) = (vec![], vec![]);
-        unmanaged = vec![];
-        for kind in &kinds {
-            let mut of_kind = false;
-            for target in reg["targets"].as_array().into_iter().flatten().filter(|t| t["harness"] == kind.as_str()) {
-                // Every enabled target of a kind named; a disabled one only where the plugin already is.
-                if target["enabled"] == true || held.contains(&&target["id"]) {
-                    targets.push(target["id"].clone());
-                }
-                of_kind |= target["enabled"] == true;
-            }
-            if !of_kind {
-                unmanaged.push(kind.clone());
+        let mut targets: Vec<Value> = target_ids.iter().map(|target| json!(target)).collect();
+        for held in plugin["targets"].as_array().into_iter().flatten() {
+            let paused = reg["targets"].as_array().into_iter().flatten().any(|t| t["id"] == *held && t["enabled"] != true);
+            if paused && !targets.contains(held) {
+                targets.push(held.clone());
             }
         }
-        for (kind, adapter, version) in &builds {
-            distributions.push(json!({
-                "harness":kind,"path":adapter.to_string_lossy(),"version":version,"origin":"muro",
-                "source_revision":revision,"project_digest":digest}));
-        }
+        let distributions: Vec<Value> = builds
+            .iter()
+            .map(|(kind, adapter, version)| {
+                json!({"harness":kind,"path":adapter.to_string_lossy(),"version":version,"origin":"muro",
+                       "source_revision":revision,"project_digest":digest})
+            })
+            .collect();
         plugin["distributions"] = json!(distributions);
         plugin["targets"] = json!(targets);
         Ok(Some(("save_plugin", json!({"plugin":plugin}))))
@@ -273,7 +324,8 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         .and_then(|snapshot| plugin_of(&snapshot["registry"], id))
         .cloned()
         .context("The plugin was not saved")?;
-    Ok(json!({"id":id,"plugin":plugin,"digest":digest,"harnesses":kinds,"unmanaged":unmanaged}))
+    sweep_cache(data);
+    Ok(json!({"id":id,"plugin":plugin,"digest":digest,"harnesses":kinds,"targets":target_ids}))
 }
 
 // --- the project Muro ships ------------------------------------------------------------------
@@ -290,19 +342,76 @@ pub enum DefaultProject {
     IdTaken,
     /// Copied into the data directory and listed.
     Installed,
+    /// The copy Muro put there, which the person never changed, was replaced by the newer one this Muro ships.
+    Updated,
 }
 
 /// The mark that the default project was put in this data directory once: a project the person
-/// removed or deleted is not brought back at every start.
+/// removed or deleted is not brought back at every start. It holds the SHA-256 of the file Muro copied
+/// (nothing when the file there is the person's own): the copy is Muro's to replace only while it still
+/// has that digest.
 fn installed_mark(data: &Path) -> PathBuf {
     projects_dir(data).join(".default-installed")
+}
+
+/// Where the default project's copy lives: `<data>/projects/marionette.mp`.
+fn default_file(data: &Path) -> PathBuf {
+    projects_dir(data).join(format!("{DEFAULT_ID}.mp"))
+}
+
+/// Writes `bundled` beside `target`, whole and flushed, and puts it in place: replacing `target` when
+/// `replace`, else only where nothing is. Returns whether it was put there.
+fn put_copy(bundled: &Path, target: &Path, replace: bool) -> Result<bool> {
+    let folder = target.parent().context("The project folder")?;
+    let mut copy = tempfile::NamedTempFile::new_in(folder)?;
+    std::io::copy(&mut std::fs::File::open(bundled)?, &mut copy)?;
+    copy.flush()?;
+    copy.as_file().sync_all()?;
+    if replace {
+        copy.persist(target).map_err(|error| error.error)?;
+        return Ok(true);
+    }
+    match copy.persist_noclobber(target) {
+        Ok(_) => Ok(true),
+        Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+        Err(error) => Err(error.error.into()),
+    }
+}
+
+/// A later start: the project Muro ships replaces the copy it put in this data directory when, and only
+/// when, that copy still is exactly the file Muro copied (its digest is the mark's) and the shipped
+/// one differs. A file with any other digest is the person's, edited or newer, and is never touched;
+/// so is a link, and a mark that records nothing. The new file is written beside and then put in place,
+/// and the mark moves last: a start that ended in between finds the shipped file already there and only
+/// moves the mark.
+fn refresh_default(bundled: &Path, target: &Path, mark: &Path) -> Result<DefaultProject> {
+    let recorded = std::fs::read_to_string(mark).unwrap_or_default();
+    let recorded = recorded.trim();
+    let plain = std::fs::symlink_metadata(target).is_ok_and(|meta| meta.file_type().is_file());
+    if recorded.is_empty() || !plain {
+        return Ok(DefaultProject::AlreadyThere);
+    }
+    let (shipped, held) = (list::file_digest(bundled)?, list::file_digest(target)?);
+    if held == shipped {
+        if recorded != shipped {
+            std::fs::write(mark, &shipped)?;
+        }
+        return Ok(DefaultProject::AlreadyThere);
+    }
+    if held != recorded {
+        return Ok(DefaultProject::AlreadyThere);
+    }
+    put_copy(bundled, target, true)?;
+    std::fs::write(mark, &shipped)?;
+    Ok(DefaultProject::Updated)
 }
 
 /// First start: the project Muro ships (`<resources>/projects/marionette.mp`) is copied to
 /// `<data>/projects/marionette.mp` and listed, once. An existing file there is never replaced, changed
 /// or listed again: it is the person's own, which may be newer or edited. The entry is listed before
-/// the file is copied and the mark is written last, so a start that ended in between is finished by the
-/// next one, and the file only ever appears whole.
+/// the file is copied and the mark is written last, with the digest of the copy, so a start that ended in
+/// between is finished by the next one, and the file only ever appears whole. At a later start the copy
+/// is replaced by a newer shipped one only while it is still the file Muro copied (`refresh_default`).
 pub fn install_default(data: &Path, resources: &Path) -> Result<DefaultProject> {
     let bundled = resources.join("projects").join(format!("{DEFAULT_ID}.mp"));
     if !bundled.is_file() {
@@ -310,10 +419,10 @@ pub fn install_default(data: &Path, resources: &Path) -> Result<DefaultProject> 
     }
     let folder = projects_dir(data);
     let mark = installed_mark(data);
+    let target = default_file(data);
     if mark.exists() {
-        return Ok(DefaultProject::AlreadyThere);
+        return refresh_default(&bundled, &target, &mark);
     }
-    let target = folder.join(format!("{DEFAULT_ID}.mp"));
     std::fs::create_dir_all(&folder)?;
     if std::fs::symlink_metadata(&target).is_ok() {
         std::fs::write(&mark, b"")?;
@@ -338,17 +447,98 @@ pub fn install_default(data: &Path, resources: &Path) -> Result<DefaultProject> 
         std::fs::write(&mark, b"")?;
         return Ok(DefaultProject::IdTaken);
     }
-    let mut copy = tempfile::NamedTempFile::new_in(&folder)?;
-    std::io::copy(&mut std::fs::File::open(&bundled)?, &mut copy)?;
-    copy.flush()?;
-    copy.as_file().sync_all()?;
-    let result = match copy.persist_noclobber(&target) {
-        Ok(_) => DefaultProject::Installed,
-        Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => DefaultProject::AlreadyThere,
-        Err(error) => return Err(error.error.into()),
-    };
-    std::fs::write(&mark, b"")?;
+    if !put_copy(&bundled, &target, false)? {
+        std::fs::write(&mark, b"")?;
+        return Ok(DefaultProject::AlreadyThere);
+    }
+    std::fs::write(&mark, list::file_digest(&target)?)?;
+    Ok(DefaultProject::Installed)
+}
+
+// --- removing a project, and keeping the cache to what is used ----------------------------------------
+
+/// `remove_project {id}`: the project leaves the list (never its file; the default project stays: the
+/// registry refuses it) and the cache folders nothing needs any more are removed.
+pub fn remove(data: &Path, payload: &Value) -> Result<Value> {
+    let result = muro_registry::service::request(data, "remove_project", payload.clone())?;
+    sweep_cache(data);
     Ok(result)
+}
+
+/// How old a leftover must be before a start removes it: an unpack or a simulation of a day ago did not
+/// outlive its process.
+const STALE: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// The digests of the builds the registry's plugins carry: the unpack that holds one is what the
+/// harnesses were given, so it stays however its project file has changed since.
+fn distribution_digests(registry: &Value) -> HashSet<String> {
+    registry["plugins"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|plugin| plugin["distributions"].as_array().into_iter().flatten())
+        .filter_map(|distribution| distribution["project_digest"].as_str().map(str::to_owned))
+        .collect()
+}
+
+/// The digests of the unpacks the cache keeps: that of each listed project's file as it is now, and
+/// those of the builds installed.
+fn kept_digests(registry: &Value) -> HashSet<String> {
+    let mut kept = distribution_digests(registry);
+    for project in listed(registry) {
+        if let Some(digest) = project["path"].as_str().and_then(|path| list::file_digest(Path::new(path)).ok()) {
+            kept.insert(digest);
+        }
+    }
+    kept
+}
+
+/// The name of a cache folder the factory made for a file: the SHA-256 of its bytes. Any other name is
+/// not this module's to remove.
+fn is_digest(name: &str) -> bool {
+    name.len() == 64 && name.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Removes the cache folders named by a digest that is neither a listed project's current file nor an
+/// installed build's. Best effort: a folder that cannot be removed now is tried at the next sweep, and a
+/// registry that cannot be read leaves the cache as it is.
+pub fn sweep_cache(data: &Path) {
+    let Ok(current) = registry(data) else { return };
+    let kept = kept_digests(&current);
+    let Ok(entries) = std::fs::read_dir(cache_dir(data)) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if is_digest(&name) && !kept.contains(&name) && entry.path().is_dir() {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+/// Removes what in `folder` is older than a day at `now` and whose name `named` accepts.
+fn remove_stale(folder: &Path, named: impl Fn(&str) -> bool, now: SystemTime) {
+    let Ok(entries) = std::fs::read_dir(folder) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let old = entry.metadata().and_then(|meta| meta.modified()).is_ok_and(|time| now.duration_since(time).is_ok_and(|age| age > STALE));
+        if named(&name) && old {
+            let path = entry.path();
+            let _ = if path.is_dir() { std::fs::remove_dir_all(&path) } else { std::fs::remove_file(&path) };
+        }
+    }
+}
+
+/// At start: the unpack staging folders the factory left (`.muro-unpack-*`, a process that ended in the
+/// middle of an unpack) and the simulations' work folders (`simulations/<run>`) older than a day are
+/// removed, and so is every cache folder no project and no build needs (`sweep_cache`).
+pub fn sweep(data: &Path) {
+    sweep_at(data, SystemTime::now());
+}
+
+/// `sweep` as of `now`.
+pub fn sweep_at(data: &Path, now: SystemTime) {
+    remove_stale(&cache_dir(data), |name| name.starts_with(".muro-unpack-"), now);
+    remove_stale(&data.join("simulations"), |_| true, now);
+    sweep_cache(data);
 }
 
 // --- small actions -----------------------------------------------------------------------------

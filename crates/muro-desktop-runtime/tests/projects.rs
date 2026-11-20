@@ -10,7 +10,11 @@ use muro_desktop_runtime::{
 };
 use muro_registry::{ai, projects as registry_projects};
 use serde_json::{Value, json};
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::{Duration, SystemTime},
+};
 
 struct Home {
     _temp: tempfile::TempDir,
@@ -182,7 +186,10 @@ fn another_file_with_the_same_slug_is_refused_and_so_is_anything_that_is_not_a_p
     home.call("open_project", json!({"path":first})).unwrap();
     let second = home.file("two.mp", json!({"plugin":plugin("Same","same")}));
     let refused = error_of(home.call("open_project", json!({"path":second})));
-    assert!(refused.contains("already in your list") && refused.contains("one.mp"), "{refused}");
+    assert!(
+        refused.starts_with("A project for same is already listed: remove it from the list first, or open that one") && refused.contains("one.mp"),
+        "{refused}"
+    );
     let invalid = home.file("invalid.mp", json!({"error":"Not a Muro project file: it is not a zip archive"}));
     assert_eq!(error_of(home.call("open_project", json!({"path":invalid}))), "Not a Muro project file: it is not a zip archive");
     let cases = [
@@ -218,13 +225,13 @@ fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
     home.target("pi-off", "pi", false);
     home.target("oc", "opencode", true);
     let (file, digest) = built(&home, "demo", &["pi", "opencode", "claude-code"]);
-    let done = home.call("install_project", json!({"id":"demo","harnesses":["pi","opencode"]})).unwrap();
+    let done = home.call("install_project", json!({"id":"demo","targets":["pi-main","oc"]})).unwrap();
     assert_eq!((done["id"].as_str(), done["digest"].as_str()), (Some("demo"), Some(digest.as_str())));
-    assert_eq!(done["unmanaged"], json!([]));
+    assert_eq!((done["targets"].clone(), done["harnesses"].clone()), (json!(["pi-main", "oc"]), json!(["pi", "opencode"])));
     let installed = home.plugin("demo");
     assert_eq!(installed["project"], "demo");
     assert_eq!(installed["name"], "Demo");
-    // every enabled target of each kind named, none of a kind left out, no disabled one
+    // exactly the targets named: another of a kind named (here a disabled one) is not made one
     assert_eq!(installed["targets"], json!(["pi-main", "oc"]));
     let builds = installed["distributions"].as_array().unwrap();
     assert_eq!(builds.iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["pi", "opencode"]);
@@ -239,64 +246,82 @@ fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
     assert_eq!(plan["blockers"], json!([]));
     assert_eq!(plan["operations"].as_array().unwrap().iter().map(|o| o["kind"].as_str().unwrap()).collect::<Vec<_>>(), ["install"]);
     // a second call is the same plugin, not a second one
-    home.call("install_project", json!({"id":"demo","harnesses":["pi","opencode"]})).unwrap();
+    home.call("install_project", json!({"id":"demo","targets":["pi-main","oc"]})).unwrap();
     assert_eq!(home.plugin("demo")["targets"], json!(["pi-main", "oc"]));
     assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 2);
     assert!(file.is_file());
 }
 
 #[test]
-fn a_kind_left_out_loses_its_target_for_that_plugin_and_one_added_gains_it() {
+fn only_the_targets_named_are_the_plugins_and_a_target_not_named_is_not_touched_by_a_later_call() {
     let home = Home::new();
-    home.target("pi-main", "pi", true);
+    // Two targets of one kind (the page switches targets, not kinds) and one of another.
+    home.target("pi-a", "pi", true);
+    home.target("pi-b", "pi", true);
     home.target("oc", "opencode", true);
     built(&home, "demo", &["pi", "opencode"]);
-    home.call("install_project", json!({"id":"demo","harnesses":["pi"]})).unwrap();
-    assert_eq!(home.plugin("demo")["targets"], json!(["pi-main"]));
-    home.call("install_project", json!({"id":"demo","harnesses":["pi","opencode"]})).unwrap();
-    assert_eq!(home.plugin("demo")["targets"], json!(["pi-main", "oc"]));
-    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 2);
-    home.call("install_project", json!({"id":"demo","harnesses":["opencode"]})).unwrap();
+    // two of a kind, one switched on: only that one is a target (the whole kind used to be)
+    let done = home.call("install_project", json!({"id":"demo","targets":["pi-a"]})).unwrap();
+    assert_eq!(home.plugin("demo")["targets"], json!(["pi-a"]));
+    assert_eq!(done["harnesses"], json!(["pi"]));
+    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 1);
+    // switching another kind on, the page names the ones that are on: the target of the first kind that was
+    // switched off stays off
+    home.call("install_project", json!({"id":"demo","targets":["pi-a","oc"]})).unwrap();
+    let plugin = home.plugin("demo");
+    assert_eq!(plugin["targets"], json!(["pi-a", "oc"]), "pi-b was switched off and stays off");
+    assert_eq!(plugin["distributions"].as_array().unwrap().iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["pi", "opencode"]);
+    // a distribution is made for each distinct kind of the targets, once
+    home.call("install_project", json!({"id":"demo","targets":["pi-b","pi-a","pi-b"]})).unwrap();
+    let plugin = home.plugin("demo");
+    assert_eq!(plugin["targets"], json!(["pi-b", "pi-a"]), "exactly those named, each once, in the order named");
+    assert_eq!(plugin["distributions"].as_array().unwrap().len(), 1, "one build for the one kind");
+    // naming only the other kind leaves the first kind's targets and build out
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
     let kept = home.plugin("demo");
     assert_eq!(kept["targets"], json!(["oc"]));
     assert_eq!(kept["distributions"].as_array().unwrap().iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["opencode"]);
 }
 
 #[test]
-fn a_kind_without_a_target_is_reported_and_a_disabled_target_that_holds_the_plugin_stays() {
+fn a_paused_target_that_already_holds_the_plugin_stays_though_the_page_cannot_name_it() {
     let home = Home::new();
+    home.target("pi-main", "pi", true);
     home.target("pi-off", "pi", false);
-    built(&home, "demo", &["pi", "claude-code"]);
-    let done = home.call("install_project", json!({"id":"demo","harnesses":["pi","claude-code"]})).unwrap();
-    assert_eq!(done["unmanaged"], json!(["pi", "claude-code"]));
-    assert_eq!(home.plugin("demo")["targets"], json!([]), "a disabled target is not added");
-    // the person turns it on for this plugin by hand: a later install keeps it while the kind is named
+    built(&home, "demo", &["pi"]);
+    home.call("install_project", json!({"id":"demo","targets":["pi-main"]})).unwrap();
+    assert_eq!(home.plugin("demo")["targets"], json!(["pi-main"]), "a paused target is not added");
+    // the person set it on this plugin by hand while it is paused: a later install does not drop it
     let current = home.registry();
     let mut held = home.plugin("demo");
-    held["targets"] = json!(["pi-off"]);
+    held["targets"] = json!(["pi-main", "pi-off"]);
     request(&home.data, "save_plugin", json!({"revision":current["revision"],"plugin":held})).unwrap();
-    home.call("install_project", json!({"id":"demo","harnesses":["pi"]})).unwrap();
-    assert_eq!(home.plugin("demo")["targets"], json!(["pi-off"]));
-    home.call("install_project", json!({"id":"demo","harnesses":["claude-code"]})).unwrap();
-    assert_eq!(home.plugin("demo")["targets"], json!([]), "a kind left out loses it, disabled or not");
+    home.call("install_project", json!({"id":"demo","targets":["pi-main"]})).unwrap();
+    assert_eq!(home.plugin("demo")["targets"], json!(["pi-main", "pi-off"]));
+    // but a paused target cannot be named: it is not managed until it is switched on
+    let error = error_of(home.call("install_project", json!({"id":"demo","targets":["pi-off"]})));
+    assert!(error.contains("paused") && error.contains("pi-off"), "{error}");
 }
 
 #[test]
 fn install_refuses_what_it_cannot_do_and_changes_nothing() {
     let home = Home::new();
     home.target("oc", "opencode", true);
+    home.target("oc-off", "opencode", false);
     built(&home, "demo", &["claude-code"]);
     let before = home.registry();
     let cases = [
-        ("no harnesses key", json!({"id":"demo"}), "Name the harnesses"),
-        ("not a list", json!({"id":"demo","harnesses":"claude-code"}), "Name the harnesses"),
-        ("an empty list", json!({"id":"demo","harnesses":[]}), "at least one harness"),
-        ("not a name", json!({"id":"demo","harnesses":[1]}), "A harness is its name"),
-        ("an unknown harness", json!({"id":"demo","harnesses":["vim"]}), "No Muro adapter for the harness vim"),
-        ("a path as a harness", json!({"id":"demo","harnesses":["../claude-code"]}), "No Muro adapter"),
-        ("a build that is not in the file", json!({"id":"demo","harnesses":["codex"]}), "no adapter for codex"),
-        ("an unlisted project", json!({"id":"other","harnesses":["claude-code"]}), "not in your list"),
-        ("a bad id", json!({"id":"../demo","harnesses":["claude-code"]}), "not in your list"),
+        ("no targets key", json!({"id":"demo"}), "Name the targets"),
+        ("the old key", json!({"id":"demo","harnesses":["opencode"]}), "Name the targets"),
+        ("not a list", json!({"id":"demo","targets":"oc"}), "Name the targets"),
+        ("an empty list", json!({"id":"demo","targets":[]}), "at least one target"),
+        ("not an id", json!({"id":"demo","targets":[1]}), "A target is its id"),
+        ("a target nobody manages", json!({"id":"demo","targets":["vim"]}), "No harness is managed under the id vim"),
+        ("a path as a target", json!({"id":"demo","targets":["../oc"]}), "No harness is managed"),
+        ("a paused target", json!({"id":"demo","targets":["oc-off"]}), "paused"),
+        ("a build that is not in the file", json!({"id":"demo","targets":["oc"]}), "no adapter for opencode"),
+        ("an unlisted project", json!({"id":"other","targets":["oc"]}), "not in your list"),
+        ("a bad id", json!({"id":"../demo","targets":["oc"]}), "not in your list"),
     ];
     for (why, payload, reason) in cases {
         let error = error_of(home.call("install_project", payload));
@@ -308,21 +333,43 @@ fn install_refuses_what_it_cannot_do_and_changes_nothing() {
 #[test]
 fn a_project_whose_file_has_no_built_plugin_cannot_be_installed() {
     let home = Home::new();
+    home.target("oc", "opencode", true);
     let file = home.file("nobuild.mp", json!({"plugin":plugin("No Build","nobuild")}));
     home.list(&[("nobuild", &file)]);
     // the fake factory unpacks an empty release folder: nothing under adapters/
-    let error = error_of(home.call("install_project", json!({"id":"nobuild","harnesses":["claude-code"]})));
-    assert!(error.contains("no adapter for claude-code"), "{error}");
+    let error = error_of(home.call("install_project", json!({"id":"nobuild","targets":["oc"]})));
+    assert!(error.contains("no adapter for opencode"), "{error}");
     assert_eq!(home.plugin("nobuild"), Value::Null);
 }
 
 #[test]
 fn a_file_that_now_holds_another_plugin_is_not_installed_under_the_old_id() {
     let home = Home::new();
-    let (file, _) = built(&home, "demo", &["claude-code"]);
-    project_file(&file, json!({"plugin":plugin("Renamed","renamed"),"build":{"claude-code":"1.0.0"}}));
-    let error = error_of(home.call("install_project", json!({"id":"demo","harnesses":["claude-code"]})));
+    home.target("oc", "opencode", true);
+    let (file, _) = built(&home, "demo", &["opencode"]);
+    project_file(&file, json!({"plugin":plugin("Renamed","renamed"),"build":{"opencode":"1.0.0"}}));
+    let error = error_of(home.call("install_project", json!({"id":"demo","targets":["oc"]})));
     assert!(error.contains("renamed") && error.contains("open the project again"), "{error}");
+}
+
+#[test]
+fn a_project_whose_plugin_was_not_built_from_its_own_package_is_refused_at_install() {
+    let home = Home::new();
+    home.target("oc", "opencode", true);
+    let file = home.file("demo.mp", json!({"plugin":plugin("Demo","demo"),"build":{"opencode":"1.0.0"},"mismatch":true}));
+    home.list(&[("demo", &file)]);
+    let before = home.registry();
+    let error = error_of(home.call("install_project", json!({"id":"demo","targets":["oc"]})));
+    assert!(error.starts_with("The plugin inside this project does not match the project: it was not built from it"), "{error}");
+    assert!(!error.contains("Project verify failed"), "the command's own prefix is not the page's");
+    let verifies: Vec<_> = calls(&home.factory).into_iter().filter(|c| c[..2] == ["project", "verify"]).collect();
+    assert_eq!(verifies.len(), 1);
+    assert_eq!(verifies[0][2], file.to_string_lossy());
+    assert_eq!(home.registry(), before, "nothing was saved, no plugin was made");
+    // the same file whose plugin is the package's is installed, after the same check
+    project_file(&file, json!({"plugin":plugin("Demo","demo"),"build":{"opencode":"1.0.0"}}));
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
+    assert_eq!(home.plugin("demo")["targets"], json!(["oc"]));
 }
 
 #[test]
@@ -333,9 +380,10 @@ fn a_plugin_of_the_same_name_that_is_not_the_projects_is_never_touched() {
     fs::write(own.join("package.json"), r#"{"name":"demo","version":"1.0.0"}"#).unwrap();
     request(&home.data, "save_plugin", json!({"revision":home.registry()["revision"],"plugin":{
         "id":"demo","name":"My own","source":own,"policy":"head","pinned_version":"","targets":[],"distributions":[]}})).unwrap();
-    built(&home, "demo", &["claude-code"]);
+    home.target("oc", "opencode", true);
+    built(&home, "demo", &["opencode"]);
     let before = home.plugin("demo");
-    let error = error_of(home.call("install_project", json!({"id":"demo","harnesses":["claude-code"]})));
+    let error = error_of(home.call("install_project", json!({"id":"demo","targets":["oc"]})));
     assert!(error.contains("not this project's"), "{error}");
     assert_eq!(home.plugin("demo"), before);
 }
@@ -345,7 +393,7 @@ fn a_changed_file_makes_the_installed_build_stale_until_the_project_is_installed
     let home = Home::new();
     home.target("oc", "opencode", true);
     let (file, first) = built(&home, "demo", &["opencode"]);
-    home.call("install_project", json!({"id":"demo","harnesses":["opencode"]})).unwrap();
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
     assert_eq!(home.call("plan", json!({})).unwrap()["blockers"], json!([]));
     project_file(&file, json!({"plugin":plugin("Demo","demo"),"build":{"opencode":"1.1.0"}}));
     let second = registry_projects::file_digest(&file).unwrap();
@@ -353,7 +401,7 @@ fn a_changed_file_makes_the_installed_build_stale_until_the_project_is_installed
     let blockers = home.call("plan", json!({})).unwrap()["blockers"].clone();
     assert!(blockers[0].as_str().unwrap().ends_with("Project file changed: open the project again"), "{blockers}");
     // installing again takes the file as it is now: a new unpack, a new source, the same plugin
-    home.call("install_project", json!({"id":"demo","harnesses":["opencode"]})).unwrap();
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
     let plugin = home.plugin("demo");
     assert_eq!(plugin["distributions"][0]["project_digest"], json!(second));
     assert_eq!(plugin["distributions"][0]["version"], "1.1.0");
@@ -459,7 +507,7 @@ fn env_present_says_whether_a_variable_is_set_and_never_what_it_holds() {
     assert_eq!(home.call("env_present", json!({"name":"MURO_TEST_KEY_SET"})).unwrap(), json!({"set":true}));
     assert_eq!(home.call("env_present", json!({"name":"MURO_TEST_KEY_EMPTY"})).unwrap(), json!({"set":false}));
     assert_eq!(home.call("env_present", json!({"name":"MURO_TEST_KEY_UNSET"})).unwrap(), json!({"set":false}));
-    for pasted in [secret, "has space", "", "1ABC", "a=b"] {
+    for pasted in [secret, "has space", "", "1ABC", "a=b", "gsk_abc123", "hf_xyz", "Zk3dQp9RtLm2NvXw8YbHc5JfGs7AaE1uOi4TyP6e", "key2", "lower_case"] {
         let error = error_of(home.call("env_present", json!({"name":pasted})));
         assert_eq!(error, ai::KEY_REFUSED);
         assert!(pasted.is_empty() || !error.contains(pasted));
@@ -514,4 +562,274 @@ fn the_folder_to_open_is_the_folder_of_a_listed_project_and_nothing_else() {
     }
     assert!(error_of(home.call("open_folder", json!({"path":sibling}))).contains("Only the folder of a project in your list"));
     assert!(error_of(home.call("open_folder", json!({}))).contains("Only the folder of a project in your list"));
+}
+
+// --- the shipped project is updated while it is still the one Muro copied ---------------------------------
+
+fn digest_of(path: &Path) -> String {
+    registry_projects::file_digest(path).unwrap()
+}
+
+fn ships(home: &Home, content: &[u8]) -> PathBuf {
+    let file = home.files.join("resources").join("projects").join("marionette.mp");
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, content).unwrap();
+    file
+}
+
+fn mark(home: &Home) -> String {
+    fs::read_to_string(projects::projects_dir(&home.data).join(".default-installed")).unwrap()
+}
+
+#[test]
+fn the_default_project_records_the_digest_of_the_file_it_copied() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Installed);
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    assert_eq!(mark(&home), digest_of(&kept));
+    assert_eq!(mark(&home), digest_of(&bundled.join("projects").join("marionette.mp")));
+}
+
+#[test]
+fn a_newer_shipped_project_replaces_the_copy_nobody_changed_and_moves_the_mark() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    let revision = home.registry()["revision"].clone();
+    // an unchanged shipped file changes nothing
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    // a new Muro ships a newer project
+    ships(&home, b"the project Muro ships, newer");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
+    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships, newer");
+    assert_eq!(mark(&home), digest_of(&kept), "the recorded digest moved with it");
+    assert_eq!(home.registry()["revision"], revision, "it was listed already: the list is not saved again");
+    let mut names: Vec<String> = fs::read_dir(projects::projects_dir(&home.data)).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+    names.sort();
+    assert_eq!(names, [".default-installed", "marionette.mp"], "written beside and put in place: nothing is left over");
+    // a start again changes nothing; the next newer one is taken in the same way
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    ships(&home, b"newer still");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
+    assert_eq!(fs::read(&kept).unwrap(), b"newer still");
+}
+
+#[test]
+fn a_copy_the_person_changed_is_never_replaced_by_a_newer_shipped_one() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    let copied = mark(&home);
+    fs::write(&kept, b"the person's own version").unwrap();
+    ships(&home, b"the project Muro ships, newer");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    assert_eq!(fs::read(&kept).unwrap(), b"the person's own version");
+    assert_eq!(mark(&home), copied, "the record is not moved for a file that is not Muro's");
+    // and a person who then restores the very bytes Muro copied gets the newer project, as an unchanged copy does
+    fs::write(&kept, b"the project Muro ships").unwrap();
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
+    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships, newer");
+}
+
+#[test]
+fn a_start_that_ended_after_replacing_the_file_finds_it_and_moves_the_mark() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    let newer = ships(&home, b"the project Muro ships, newer");
+    fs::copy(&newer, &kept).unwrap();         // the replacement happened, the mark did not move
+    assert_ne!(mark(&home), digest_of(&kept));
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    assert_eq!(mark(&home), digest_of(&kept));
+    ships(&home, b"and a later one");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated, "the mark is Muro's again");
+}
+
+#[test]
+fn a_copy_without_a_recorded_digest_or_that_is_gone_is_not_replaced_or_brought_back() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    // a mark that records nothing (a file of the person's own, or one made before digests were recorded)
+    fs::write(projects::projects_dir(&home.data).join(".default-installed"), b"").unwrap();
+    ships(&home, b"the project Muro ships, newer");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships");
+    // a copy the person deleted stays deleted
+    fs::write(projects::projects_dir(&home.data).join(".default-installed"), digest_of(&kept)).unwrap();
+    fs::remove_file(&kept).unwrap();
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    assert!(!kept.exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_link_in_place_of_the_copy_is_never_replaced() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    let theirs = home.files.join("theirs.mp");
+    fs::copy(&kept, &theirs).unwrap();
+    fs::remove_file(&kept).unwrap();
+    std::os::unix::fs::symlink(&theirs, &kept).unwrap();
+    ships(&home, b"the project Muro ships, newer");
+    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
+    assert!(fs::symlink_metadata(&kept).unwrap().file_type().is_symlink());
+    assert_eq!(fs::read(&theirs).unwrap(), b"the project Muro ships");
+}
+
+// --- removing a project from the list ---------------------------------------------------------------------
+
+#[test]
+fn a_project_is_removed_from_the_list_through_the_runtime_and_its_file_stays() {
+    let home = Home::new();
+    let kept = home.file("marionette.mp", json!({"plugin":plugin("Marionette","marionette")}));
+    let notes = home.file("notes.mp", json!({"plugin":plugin("Notes","notes")}));
+    home.list(&[("marionette", &kept), ("notes", &notes)]);
+    home.call("project", json!({"id":"notes"})).unwrap();
+    let cache = projects::cache_dir(&home.data);
+    assert!(cache.join(digest_of(&notes)).is_dir(), "its unpack is in the cache");
+    let revision = home.registry()["revision"].clone();
+    let removed = home.call("remove_project", json!({"id":"notes","revision":revision})).unwrap();
+    assert_eq!(removed["registry"]["projects"], json!([{"id":"marionette","path":kept}]));
+    assert!(notes.is_file(), "the file is the person's");
+    assert!(!cache.join(digest_of(&notes)).exists(), "nothing needs its unpack any more");
+    // the default project stays, and the refusal changes nothing
+    let before = home.registry();
+    let refused = error_of(home.call("remove_project", json!({"id":"marionette","revision":before["revision"]})));
+    assert_eq!(refused, "The default project stays in the list");
+    assert_eq!(home.registry(), before);
+}
+
+// --- the cache is kept to what is used ----------------------------------------------------------------------
+
+fn in_cache(home: &Home) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(projects::cache_dir(&home.data))
+        .map(|dir| dir.map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect())
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_file_the_factory_refuses_leaves_no_unpack_in_the_cache() {
+    let home = Home::new();
+    let bad = home.file("bad.mp", json!({"error":"Not a Muro project file: it is hostile","unpacks":true}));
+    let error = error_of(home.call("open_project", json!({"path":bad})));
+    assert_eq!(error, "Not a Muro project file: it is hostile");
+    assert_eq!(calls(&home.factory).len(), 1, "the factory did unpack it ...");
+    assert_eq!(in_cache(&home), Vec::<String>::new(), "... and the runtime removed the unpack");
+    assert_eq!(home.registry()["projects"], json!([]));
+    // the page of a listed project that the factory now refuses: the same
+    home.list(&[("bad", &bad)]);
+    assert_eq!(error_of(home.call("project", json!({"id":"bad"}))), "Not a Muro project file: it is hostile");
+    assert_eq!(in_cache(&home), Vec::<String>::new());
+    // a file that is fine keeps its unpack: it is what the next read reuses
+    let good = home.file("good.mp", json!({"plugin":plugin("Good","good")}));
+    home.call("open_project", json!({"path":good})).unwrap();
+    assert_eq!(in_cache(&home), [digest_of(&good)]);
+}
+
+#[test]
+fn the_cache_keeps_the_unpack_of_each_listed_file_and_of_each_installed_build_and_nothing_else() {
+    let home = Home::new();
+    home.target("oc", "opencode", true);
+    let (file, first) = built(&home, "demo", &["opencode"]);
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
+    assert_eq!(in_cache(&home), [first.clone()]);
+    // the file changes: the list's file is now another digest, and the installed build still holds the first
+    project_file(&file, json!({"plugin":plugin("Demo","demo"),"build":{"opencode":"1.1.0"}}));
+    let second = digest_of(&file);
+    home.call("project", json!({"id":"demo"})).unwrap();
+    let cache = projects::cache_dir(&home.data);
+    let stranger = "f".repeat(64);
+    fs::create_dir_all(cache.join(&stranger)).unwrap();
+    fs::create_dir_all(cache.join("not-a-digest")).unwrap();
+    fs::create_dir_all(cache.join("A".repeat(64))).unwrap();     // not a digest of ours: capitals
+    projects::sweep_cache(&home.data);
+    let mut wanted = vec![first.clone(), second.clone(), "A".repeat(64), "not-a-digest".to_owned()];
+    wanted.sort();
+    assert_eq!(in_cache(&home), wanted, "the installed build's, the listed file's, and names that are not a digest's");
+    // installing again takes the new file's build: the first is not needed and goes with that action
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
+    let mut wanted = vec![second.clone(), "A".repeat(64), "not-a-digest".to_owned()];
+    wanted.sort();
+    assert_eq!(in_cache(&home), wanted);
+    // opening a file is an action that tidies too
+    fs::create_dir_all(cache.join(&stranger)).unwrap();
+    let other = home.file("other.mp", json!({"plugin":plugin("Other","other")}));
+    home.call("open_project", json!({"path":other})).unwrap();
+    assert!(!cache.join(&stranger).exists());
+    assert!(cache.join(digest_of(&other)).is_dir() && cache.join(&second).is_dir());
+}
+
+#[test]
+fn a_start_removes_the_leftovers_older_than_a_day_and_nothing_younger() {
+    let home = Home::new();
+    let file = home.file("demo.mp", json!({"plugin":plugin("Demo","demo")}));
+    home.list(&[("demo", &file)]);
+    home.call("projects", json!({})).unwrap();
+    let cache = projects::cache_dir(&home.data);
+    let (staging, other) = (cache.join(".muro-unpack-1a2b3c4d"), cache.join(".keep-me"));
+    for folder in [&staging, &other] {
+        fs::create_dir_all(folder).unwrap();
+        fs::write(folder.join("x"), b"x").unwrap();
+    }
+    let simulations = home.data.join("simulations");
+    for run in ["run-1", "run-2"] {
+        fs::create_dir_all(simulations.join(run)).unwrap();
+        fs::write(simulations.join(run).join("cancel"), b"").unwrap();
+    }
+    let stranger = cache.join("e".repeat(64));
+    fs::create_dir_all(&stranger).unwrap();
+    // now, and a few hours on: nothing is old enough, only the stranger's unpack (nobody needs it) goes
+    projects::sweep_at(&home.data, SystemTime::now() + Duration::from_secs(23 * 3600));
+    assert!(staging.is_dir() && other.is_dir() && simulations.join("run-1").is_dir() && simulations.join("run-2").is_dir());
+    assert!(!stranger.exists());
+    // more than a day on: the staging folder and the runs go, a folder that is no staging of the factory's stays
+    projects::sweep_at(&home.data, SystemTime::now() + Duration::from_secs(25 * 3600));
+    assert!(!staging.exists() && !simulations.join("run-1").exists() && !simulations.join("run-2").exists());
+    assert!(other.is_dir(), "only `.muro-unpack-*` is the factory's staging");
+    assert!(cache.join(digest_of(&file)).is_dir(), "the listed file's unpack is kept at any age");
+    // the same start, as the server makes it, is harmless where there is nothing
+    projects::sweep(&home.data);
+    let empty = Home::new();
+    projects::sweep(&empty.data);
+}
+
+// --- Included with Muro comes from the runtime ----------------------------------------------------------------
+
+#[test]
+fn only_the_copy_muro_put_in_its_own_folder_is_included_whatever_a_file_says_of_itself() {
+    let home = Home::new();
+    let bundled = resources(&home);
+    projects::install_default(&home.data, &bundled).unwrap();
+    let kept = projects::projects_dir(&home.data).join("marionette.mp");
+    // a stand-in factory reads the descriptor from the file: the shipped bytes here are no descriptor, so write one
+    project_file(&kept, json!({"plugin":plugin("Marionette","marionette"),"builtin":false}));
+    let foreign = home.file("foreign.mp", json!({"plugin":plugin("Foreign","foreign"),"builtin":true}));
+    let current = home.registry();
+    let mut all = current["projects"].as_array().unwrap().clone();
+    all.push(json!({"id":"foreign","path":foreign}));
+    request(&home.data, "save_projects", json!({"revision":current["revision"],"projects":all})).unwrap();
+    let shown = home.call("projects", json!({})).unwrap();
+    assert_eq!((shown[0]["id"].as_str(), shown[0]["included"].as_bool()), (Some("marionette"), Some(true)), "{}", shown[0]);
+    assert_eq!(shown[0]["project"].get("builtin"), None, "what the file says of itself is not what decides");
+    assert_eq!((shown[1]["id"].as_str(), shown[1]["included"].as_bool()), (Some("foreign"), Some(false)));
+    assert_eq!(shown[1]["project"]["builtin"], true, "it claims it, and is not believed");
+    assert_eq!(home.call("project", json!({"id":"marionette"})).unwrap()["included"], true);
+    assert_eq!(home.call("project", json!({"id":"foreign"})).unwrap()["included"], false);
+    let opened = home.call("open_project", json!({"path":home.file("opened.mp", json!({"plugin":plugin("Opened","opened"),"builtin":true}))})).unwrap();
+    assert_eq!(opened["included"], false);
+    // a project of the person's own that holds the id marionette elsewhere is not the shipped one
+    let mine = home.file("mine.mp", json!({"plugin":plugin("Mine","marionette")}));
+    assert!(!projects::is_included(&home.data, "marionette", &mine.to_string_lossy()));
+    assert!(projects::is_included(&home.data, "marionette", &kept.to_string_lossy()));
+    assert!(!projects::is_included(&home.data, "other", &kept.to_string_lossy()), "the id counts too");
 }

@@ -4,10 +4,13 @@
 //! answers `project info [--summary]` and `project simulate` from a descriptor held in the `.mp` file
 //! (a JSON file here, not a zip), so a test says what a project "holds" in one line.
 //!
-//! The descriptor: `{"plugin":{"name","slug","version"}, "error": "...", "build": {"<harness>": "<version>"},
-//! "result": {...}}`. `error` is what `info` answers for an invalid project; `build` is the release the
-//! unpack gets; `result` is what `project simulate` prints. Every call is appended to `calls.ndjson` beside
-//! the script as `{"args": [...]}`.
+//! The descriptor: `{"plugin":{"name","slug","version"}, "error": "...", "unpacks": true, "build":
+//! {"<harness>": "<version>"}, "mismatch": true, "result": {...}}`. `error` is what `info` answers for an
+//! invalid project (with `unpacks`, after leaving an unpack of it in the cache); `build` is the release the
+//! unpack gets; `mismatch` makes `verify` refuse; `result` is what `project simulate` prints. The stand-in
+//! also prepares a request (`simulate-prepare`) and validates an answer against a context (`simulate-check`)
+//! in the one way a test needs: the answer must copy the context. Every call is appended to `calls.ndjson`
+//! beside the script as `{"args": [...]}`.
 #![allow(dead_code)]
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -44,6 +47,10 @@ if args[:2] == ["project", "info"]:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
     if held.get("error"):
+        if held.get("unpacks"):
+            # a file the factory unpacked and then refused: the unpack stays behind until the runtime removes it
+            (cache / hashlib.sha256(data).hexdigest()).mkdir(parents=True, exist_ok=True)
+            (cache / hashlib.sha256(data).hexdigest() / "sources.json").write_text("{}", encoding="utf-8")
         if "--summary" in args:
             print(json.dumps({"error": held["error"]}))
             sys.exit(0)
@@ -68,12 +75,33 @@ if args[:2] == ["project", "info"]:
         else:
             (adapter / "package.json").write_text(json.dumps({"name": held["plugin"]["slug"], "version": version}))
             (adapter / "index.js").write_text("export default async () => ({})")
-    shown = {"project": {"schema": 1}, "plugin": held["plugin"], "digest": digest}
+    shown = {"project": {"schema": 1, **({"builtin": True} if held.get("builtin") else {})}, "plugin": held["plugin"], "digest": digest}
     if "--summary" in args:
         shown.update(inputs=1, capabilities=2, entries=3, examples=4, records=5, runs=6)
     else:
         shown.update(inputs=[], decisions=[], records=[], history=[], changelog="", prompts=[], graph={}, files=[])
     print(json.dumps(shown, ensure_ascii=False))
+elif args[:2] == ["project", "verify"]:
+    held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
+    if held.get("mismatch"):
+        print("Project verify failed: The plugin inside this project does not match the project: it was not built from it (it is version 9.9.9, the project's is 1.0.0)", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"verified": True}))
+elif args[:2] == ["project", "simulate-prepare"]:
+    # what the real factory prepares: the request's context (stack tokens sorted) and the prompt that carries it
+    tokens = sorted(item[len("--stack="):] for item in args if item.startswith("--stack="))
+    print(json.dumps({"context": {"task": option("--task"), "stack_tokens": tokens, "catalog_digest": "d" * 64}, "prompt": "the prompt"}))
+elif args[:2] == ["project", "simulate-check"]:
+    # a minimal stand-in for the validation: the answer must copy the context; a selected one gets its steps
+    context = json.loads(Path(option("--context")).read_text(encoding="utf-8"))
+    answer = json.loads(Path(option("--answer")).read_text(encoding="utf-8"))
+    if not all(answer.get(key) == context[key] for key in ("task", "stack_tokens", "catalog_digest")):
+        print(json.dumps({"valid": False, "errors": ["the answer must copy the context exactly"]}))
+    elif answer.get("status") != "selected":
+        print(json.dumps({"valid": True, "status": answer.get("status"), "steps": []}))
+    else:
+        steps = [{"step_id": s["capability"], "capability": s["capability"]} for s in answer["selections"]]
+        print(json.dumps({"valid": True, "status": "selected", "steps": steps}))
 elif args[:2] == ["project", "simulate"]:
     held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
     if option("--task") == "sleep":

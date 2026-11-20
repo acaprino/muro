@@ -65,6 +65,19 @@ impl Factory {
         serde_json::from_str(done.stdout.trim()).with_context(|| format!("{what} did not print JSON"))
     }
 
+    /// `muro project verify FILE`: the plugin the file carries was built from the package it carries.
+    /// The factory's reason is the error, without the command's own prefix.
+    pub fn project_verify(&self, file: &Path, cache: &Path) -> Result<()> {
+        let args = vec!["project".to_owned(), "verify".into(), file.to_string_lossy().into_owned(), "--cache".into(), cache.to_string_lossy().into_owned()];
+        match self.json(&args, "Checking the project's plugin", &|| false, READ_LIMIT) {
+            Ok(_) => Ok(()),
+            Err(error) => {
+                let reason = format!("{error:#}");
+                bail!("{}", reason.strip_prefix("Project verify failed: ").unwrap_or(&reason))
+            }
+        }
+    }
+
     /// `muro project info FILE --summary` (or the full info) through the cache folder.
     pub fn project_info(&self, file: &Path, cache: &Path, summary: bool) -> Result<Value> {
         let mut args = vec!["project".to_owned(), "info".to_owned(), file.to_string_lossy().into_owned()];
