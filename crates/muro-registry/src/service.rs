@@ -1,4 +1,4 @@
-use crate::{instructions, native, sources, storage::*, sync_status};
+use crate::{ai, instructions, native, projects, sources, storage::*, sync_status};
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use serde_json::{Value, json};
@@ -41,7 +41,8 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 .find(|p| p["id"] == key).context("Plugin not found")?;
             instructions::info(data_dir, plugin, payload["create"] == true)
         }
-        "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings" => {
+        "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings"
+        | "save_projects" => {
             revision(&registry, &payload)?;
             // The receipt written for an adopted installation, until the registry is saved.
             let mut adopted = None;
@@ -134,7 +135,12 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                     for k in ["agent", "python", "factory_path"] {
                         str_field(&s, k)?;
                     }
+                    let mut s = s;
+                    ai::apply(&mut s, &registry["settings"])?;
                     registry["settings"] = s;
+                }
+                "save_projects" => {
+                    registry["projects"] = projects::validate_list(&payload["projects"])?;
                 }
                 _ => unreachable!(),
             }
@@ -258,11 +264,17 @@ fn load_registry(root: &Path) -> Result<Value> {
         );
         v
     } else {
-        json!({"schema":1,"revision":0,"plugins":[],"targets":[],"settings":{"auto_sync":false,"interval_minutes":60,"agent":"claude-code","python":"python","factory_path":""}})
+        json!({"schema":1,"revision":0,"plugins":[],"targets":[],"projects":[],"settings":{"auto_sync":false,"interval_minutes":60,"agent":"claude-code","python":"python","factory_path":""}})
     };
     // A setting added after registries were first written starts at its default.
     if v["settings"].get("close_to_tray").is_none() {
         v["settings"]["close_to_tray"] = json!(true);
+    }
+    // The AI engine: an older registry has only `agent`, which becomes its harness. The list of
+    // projects starts empty. Neither is written until the next save.
+    ai::migrate(&mut v["settings"]);
+    if !v["projects"].is_array() {
+        v["projects"] = json!([]);
     }
     Ok(v)
 }
@@ -699,6 +711,7 @@ fn plan(
     let targets = planned_targets(reg, only_target)?;
     let instruction_bindings = instructions::bindings(root, reg)?;
     let invs = inventories(root, reg, receipts, true)?;
+    let currency = projects::Currency::new(reg);
     let mut ops = vec![];
     let mut blockers = vec![];
     for target in targets {
@@ -731,8 +744,9 @@ fn plan(
             let previous = installed.iter().find(|i| i["registry_id"] == pid);
             let absent = Value::Null;
             let receipt = receipt_for(receipts, tid, pid).unwrap_or(&absent);
+            // A build made from a project file that has changed since is stale, whatever else holds.
             let artifact =
-                match if reinstall == Some(pid)
+                match currency.check(plugin, h).and_then(|()| if reinstall == Some(pid)
                     && previous.is_some()
                     && !receipt.is_null()
                     && receipt["adopted"] != true
@@ -741,7 +755,7 @@ fn plan(
                         .and_then(|_| retained_artifact(root, receipt, h))
                 } else {
                     prepare(root, plugin, h)
-                } {
+                }) {
                     Ok(a) => a,
                     Err(e) => {
                         blockers.push(format!(
