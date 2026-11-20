@@ -60,8 +60,9 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
 /// `check`, then, when `apply` (default true) and the plan has operations, an `apply` of that
 /// plan that leaves its blockers out. With `apply` false it only checks. The outcome is
 /// recorded for the Activity page: an `Automatic sync` when it applies, a `Background check`
-/// when it only checks; failed with the error, or with the blockers as the message (they are a
-/// result, not an error), else complete with what was applied or is waiting.
+/// when it only checks; failed with the error, or with the sources that could not be resolved
+/// and the blockers as the message (they are a result, not an error), else complete with what
+/// was applied or is waiting.
 fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
     let apply = match &payload["apply"] {
         Value::Null => true,
@@ -70,23 +71,30 @@ fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
     let outcome = check_and_apply(data, apply);
     let (failed, message) = match &outcome {
         Err(e) => (true, format!("{e:#}")),
-        Ok(result) => {
+        Ok((result, unchecked)) => {
             let blockers: Vec<&str> = result["blockers"]
                 .as_array()
                 .into_iter()
                 .flatten()
                 .filter_map(Value::as_str)
                 .collect();
-            if blockers.is_empty() {
+            let mut problems = vec![];
+            if !unchecked.is_empty() {
+                problems.push(format!("Sources not checked: {}", unchecked.join(", ")));
+            }
+            if !blockers.is_empty() {
+                problems.push(blockers.join("; "));
+            }
+            if problems.is_empty() {
                 (false, summary(apply, result))
             } else {
-                (true, blockers.join("; "))
+                (true, problems.join(". "))
             }
         }
     };
     let action = if apply { "Automatic sync" } else { "Background check" };
     let recorded = record(data, action, failed, &message);
-    let result = outcome?;
+    let (result, _) = outcome?;
     recorded?;
     Ok(result)
 }
@@ -107,8 +115,25 @@ fn summary(apply: bool, result: &Value) -> String {
     }
 }
 
-fn check_and_apply(data: &Path, apply: bool) -> Result<Value> {
+/// The result of one sync, and the names of the plugins whose source could not be resolved.
+fn check_and_apply(data: &Path, apply: bool) -> Result<(Value, Vec<String>)> {
     let checked = muro_registry::service::request(data, "check", json!({}))?;
+    let unchecked = checked["errors"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|error| error["plugin_id"].as_str())
+        .map(|id| {
+            checked["snapshot"]["registry"]["plugins"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|plugin| plugin["id"] == id)
+                .and_then(|plugin| plugin["name"].as_str())
+                .unwrap_or(id)
+                .to_owned()
+        })
+        .collect();
     let plan = &checked["plan"];
     let operations = plan["operations"]
         .as_array()
@@ -121,8 +146,11 @@ fn check_and_apply(data: &Path, apply: bool) -> Result<Value> {
     } else {
         0
     };
-    Ok(json!({"applied":applied,"pending":operations - applied,
-              "blockers":plan["blockers"],"errors":checked["errors"]}))
+    Ok((
+        json!({"applied":applied,"pending":operations - applied,
+               "blockers":plan["blockers"],"errors":checked["errors"]}),
+        unchecked,
+    ))
 }
 
 pub fn record_automation(data: &Path, error: Option<&str>) -> Result<()> {

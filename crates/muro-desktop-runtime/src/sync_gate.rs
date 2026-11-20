@@ -50,6 +50,18 @@ impl SyncGate {
         Some(sync())
     }
 
+    /// Waits, for `limit` at most, until no sync is running: a request of the window that the
+    /// registry would refuse while a sync holds it waits here for the sync to end, and only
+    /// the one in progress is waited for, never one queued behind it. Returns whether none is
+    /// running at the end; `false` is the limit running out.
+    pub fn wait_idle(&self, limit: Duration) -> bool {
+        let (state, _) = self
+            .changed
+            .wait_timeout_while(self.lock(), limit, |state| state.running)
+            .unwrap_or_else(PoisonError::into_inner);
+        !state.running
+    }
+
     /// Whether `quit` has begun.
     pub fn is_quitting(&self) -> bool {
         self.lock().quitting

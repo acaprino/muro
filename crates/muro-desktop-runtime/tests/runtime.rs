@@ -509,6 +509,47 @@ fn sync_now_records_a_failure_and_returns_it() {
     assert_eq!(status["message"], format!("{error:#}"));
 }
 
+/// A source that could not be resolved (offline, the repository gone) is not a clean run: it is
+/// recorded as failed with the names of the plugins, whether the run applied or only checked,
+/// and what could be applied still is.
+#[test]
+fn sync_now_records_the_sources_it_could_not_check_as_a_failure() {
+    let registry = Registry::new();
+    let profile = registry.harness("oc", "{}");
+    registry.plugin(&["oc"]);
+    let gone = registry.temp.path().join("gone");
+    fs::create_dir_all(&gone).unwrap();
+    let broken = json!({"id":"broken","name":"Broken plugin","source":gone,"policy":"pinned","pinned_version":"1.0.0",
+                        "targets":[],"distributions":[{"harness":"opencode","path":gone,"version":"1.0.0"}]});
+    registry.save("save_plugin", "plugin", broken);
+    fs::remove_dir_all(&gone).unwrap();
+
+    let out = registry.sync(json!({"apply":false}));
+    assert_eq!(out["errors"].as_array().unwrap().len(), 1, "{out}");
+    let status = registry.automation();
+    assert_eq!(status["action"], "Background check", "{status}");
+    assert_eq!(status["status"], "failed", "{status}");
+    assert_eq!(status["message"], "Sources not checked: Broken plugin", "{status}");
+    assert_eq!(plugins_in(&profile), 0);
+
+    let out = registry.sync(json!({}));
+    assert_eq!(out["applied"], 1, "{out}");
+    let status = registry.automation();
+    assert_eq!(status["action"], "Automatic sync", "{status}");
+    assert_eq!(status["status"], "failed", "{status}");
+    assert_eq!(status["message"], "Sources not checked: Broken plugin", "{status}");
+    assert_eq!(plugins_in(&profile), 1);
+
+    // Blockers too: both are said, the sources first.
+    fs::write(profile.join("opencode.json"), "{broken").unwrap();
+    let out = registry.sync(json!({"apply":false}));
+    let blocker = out["blockers"][0].as_str().unwrap().to_owned();
+    assert_eq!(
+        registry.automation()["message"],
+        format!("Sources not checked: Broken plugin. {blocker}")
+    );
+}
+
 #[test]
 fn sync_now_refuses_an_apply_that_is_not_a_boolean() {
     let registry = Registry::new();
@@ -521,9 +562,10 @@ fn sync_now_refuses_an_apply_that_is_not_a_boolean() {
     assert!(!registry.data().join("automation-status.json").exists());
 }
 
-/// A snapshot with the registry at `revision` and the sync state the last full check left.
+/// The registry's `status` at `revision` with the sync state the last full check left: all the
+/// tray reads.
 fn checked(revision: u64, sync: Value) -> Value {
-    json!({"registry":{"revision":revision,"settings":{"auto_sync":true}},"sync":sync})
+    json!({"revision":revision,"settings":{"auto_sync":true},"sync":sync})
 }
 
 /// The clock of a test: the epoch second itself, so a line shows which time it was given.
@@ -535,7 +577,7 @@ fn seconds(epoch: u64) -> Option<String> {
 fn tray_state_line_reads_the_last_check_of_this_revision() {
     let line = |sync: Value| tray::state_line(&checked(7, sync), seconds);
     let sync = |pending: u64, blockers: u64| {
-        json!({"last_check":"1000","last_sync":null,"revision":7,"pending":pending,"blockers":blockers,"targets":{}})
+        json!({"last_check":"1000","last_sync":null,"revision":7,"pending":pending,"blockers":blockers,"errors":0,"targets":{}})
     };
     assert_eq!(line(sync(0, 0)), "In sync · checked t1000");
     assert_eq!(line(sync(1, 0)), "1 change waiting · checked t1000");
@@ -546,9 +588,24 @@ fn tray_state_line_reads_the_last_check_of_this_revision() {
     assert_eq!(line(sync(0, 2)), "Needs attention · checked t1000");
 }
 
+/// A source that could not be resolved is never in sync, whatever the plan says: the line reads
+/// like a blocker, and a record from before `errors` existed (or one with none) reads as before.
+#[test]
+fn tray_state_line_needs_attention_for_sources_that_could_not_be_checked() {
+    let line = |pending: u64, blockers: u64, errors: Value| {
+        let sync = json!({"last_check":"1000","last_sync":null,"revision":7,"pending":pending,"blockers":blockers,"errors":errors,"targets":{}});
+        tray::state_line(&checked(7, sync), seconds)
+    };
+    assert_eq!(line(0, 0, json!(1)), "Needs attention · checked t1000");
+    assert_eq!(line(0, 2, json!(3)), "Needs attention · checked t1000");
+    assert_eq!(line(2, 0, json!(1)), "2 changes waiting · checked t1000");
+    assert_eq!(line(0, 0, json!(0)), "In sync · checked t1000");
+    assert_eq!(line(0, 0, Value::Null), "In sync · checked t1000");
+}
+
 #[test]
 fn tray_state_line_does_not_trust_a_check_of_another_revision() {
-    let never = json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"targets":{}});
+    let never = json!({"last_check":null,"last_sync":null,"revision":null,"pending":null,"blockers":null,"errors":null,"targets":{}});
     assert_eq!(tray::state_line(&checked(7, never), seconds), "Not checked yet");
     let old = json!({"last_check":"1000","revision":6,"pending":0,"blockers":0,"targets":{}});
     assert_eq!(tray::state_line(&checked(7, old), seconds), "Not checked yet");
@@ -556,20 +613,20 @@ fn tray_state_line_does_not_trust_a_check_of_another_revision() {
     let one = json!({"last_check":null,"revision":null,"pending":null,"blockers":null,"targets":{"a":{"checked":"1000","synced":null}}});
     assert_eq!(tray::state_line(&checked(7, one), seconds), "Not checked yet");
     // A snapshot without the sync field, or a time that is not epoch seconds.
-    assert_eq!(tray::state_line(&json!({"registry":{"revision":7}}), seconds), "Not checked yet");
+    assert_eq!(tray::state_line(&json!({"revision":7}), seconds), "Not checked yet");
     let odd = json!({"last_check":"yesterday","revision":7,"pending":0,"blockers":0,"targets":{}});
     assert_eq!(tray::state_line(&checked(7, odd), seconds), "Not checked yet");
 }
 
-/// The tray reads what `sync_now` and the registry really leave in a snapshot: the check of
-/// this revision, then nothing once the registry changes.
+/// The tray reads what `sync_now` and the registry really leave in `status`: the check of this
+/// revision, then nothing once the registry changes.
 #[test]
 fn tray_state_line_follows_a_real_sync_and_a_registry_change() {
     let registry = Registry::new();
     registry.harness("oc", "{}");
     let line = || {
-        let snapshot = muro_desktop_runtime::request(&registry.data(), "snapshot", json!({})).unwrap();
-        tray::state_line(&snapshot, seconds)
+        let status = muro_desktop_runtime::request(&registry.data(), "status", json!({})).unwrap();
+        tray::state_line(&status, seconds)
     };
     assert_eq!(line(), "Not checked yet");
     registry.sync(json!({"apply":false}));
@@ -590,10 +647,10 @@ fn tray_state_line_says_no_time_when_the_clock_has_none() {
 
 #[test]
 fn tray_pause_item_offers_the_opposite_of_the_setting() {
-    let with = |auto: Value| json!({"registry":{"settings":{"auto_sync":auto}}});
+    let with = |auto: Value| json!({"settings":{"auto_sync":auto}});
     assert_eq!(tray::pause_label(&with(json!(true))), "Pause automatic sync");
     assert_eq!(tray::pause_label(&with(json!(false))), "Resume automatic sync");
-    assert_eq!(tray::pause_label(&json!({"registry":{"settings":{}}})), "Resume automatic sync");
+    assert_eq!(tray::pause_label(&json!({"settings":{}})), "Resume automatic sync");
 }
 
 /// The local clock is the machine's, so the test cannot name an hour: it checks the shape, and
@@ -829,4 +886,77 @@ fn a_sync_that_panics_does_not_hold_the_gate() {
     assert!(panicked.is_err());
     assert_eq!(gate.run(|| 3), Some(3));
     assert!(gate.quit(Duration::from_secs(5), || panic!("no sync to finish")));
+}
+
+#[test]
+fn a_request_waits_for_the_sync_in_progress_up_to_its_limit() {
+    let gate = Arc::new(SyncGate::new());
+    assert!(gate.wait_idle(Duration::from_millis(10)), "nothing runs: no wait");
+    let (release, sync) = held_sync(&gate);
+    let started = std::time::Instant::now();
+    assert!(!gate.wait_idle(Duration::from_millis(200)), "the sync was still running");
+    assert!(started.elapsed() >= Duration::from_millis(200));
+    let waiter = {
+        let gate = gate.clone();
+        thread::spawn(move || gate.wait_idle(Duration::from_secs(30)))
+    };
+    thread::sleep(Duration::from_millis(200));
+    assert!(!waiter.is_finished(), "the request did not wait for the sync");
+    release.send(()).unwrap();
+    assert!(waiter.join().unwrap(), "the request saw the sync end");
+    assert_eq!(sync.join().unwrap(), Some(7));
+}
+
+#[test]
+fn a_request_that_finds_the_registry_busy_tries_again_until_it_is_free() {
+    use muro_desktop_runtime::cli::retry_while_busy;
+    let step = Duration::from_millis(10);
+    let busy = || anyhow::anyhow!("Registry is busy; wait for the running operation: os error 33");
+    let mut attempts = 0;
+    let out = retry_while_busy(Duration::from_secs(5), step, || {
+        attempts += 1;
+        if attempts < 4 { Err(busy()) } else { Ok(attempts) }
+    });
+    assert_eq!(out.unwrap(), 4);
+    // Another error is the answer at once.
+    let mut attempts = 0;
+    let out: anyhow::Result<()> = retry_while_busy(Duration::from_secs(5), step, || {
+        attempts += 1;
+        Err(anyhow::anyhow!("Registry revision changed; refresh before saving"))
+    });
+    assert_eq!((attempts, out.unwrap_err().to_string().contains("revision changed")), (1, true));
+    // A registry that stays busy returns its own error once the limit is spent.
+    let started = std::time::Instant::now();
+    let out: anyhow::Result<()> = retry_while_busy(Duration::from_millis(300), step, || Err(busy()));
+    assert!(format!("{:#}", out.unwrap_err()).contains("Registry is busy"));
+    assert!(started.elapsed() >= Duration::from_millis(300));
+}
+
+/// The real refusal: another process holds `writer.lock` for a moment, and the request that met
+/// it succeeds once it lets go.
+#[test]
+fn a_request_during_a_held_registry_lock_succeeds_once_the_lock_is_released() {
+    use fs2::FileExt;
+    let registry = Registry::new();
+    registry.harness("oc", "{}");
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(registry.data().join("writer.lock"))
+        .unwrap();
+    lock.try_lock_exclusive().unwrap();
+    let data = registry.data();
+    assert!(muro_desktop_runtime::request(&data, "snapshot", json!({})).unwrap_err().to_string().contains("Registry is busy"));
+    let release = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(400));
+        drop(lock);
+    });
+    let started = std::time::Instant::now();
+    let snapshot = muro_desktop_runtime::cli::retry_while_busy(Duration::from_secs(10), Duration::from_millis(50), || {
+        muro_desktop_runtime::request(&data, "snapshot", json!({}))
+    })
+    .unwrap();
+    assert!(started.elapsed() >= Duration::from_millis(300), "it did not wait for the lock");
+    assert_eq!(snapshot["registry"]["targets"].as_array().unwrap().len(), 1);
+    release.join().unwrap();
 }

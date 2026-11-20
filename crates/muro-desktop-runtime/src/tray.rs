@@ -1,25 +1,29 @@
-//! The lines the notification-area menu shows, read from a registry `snapshot`.
+//! The lines the notification-area menu shows, read from the registry's `status`: its
+//! `revision`, its `settings` and the `sync` state, which is all they need.
 
 use serde_json::Value;
 
 /// The state line: `In sync · checked HH:MM`, `N changes waiting · checked HH:MM`, or
 /// `Not checked yet` when the registry has never been checked or has changed since (the
-/// recorded `sync.revision` is not the registry's). A check that left only blockers reads
-/// `Needs attention`: a harness that cannot be read is not in sync. `clock` turns the time of
-/// the last check, in epoch seconds, into the text shown; without one the line says no time.
-pub fn state_line(snapshot: &Value, clock: impl Fn(u64) -> Option<String>) -> String {
-    let sync = &snapshot["sync"];
+/// recorded `sync.revision` is not the registry's). A check that left only blockers, or sources
+/// it could not resolve, reads `Needs attention`: a harness that cannot be read and a source
+/// that could not be checked are not in sync. `clock` turns the time of the last check, in
+/// epoch seconds, into the text shown; without one the line says no time.
+pub fn state_line(status: &Value, clock: impl Fn(u64) -> Option<String>) -> String {
+    let sync = &status["sync"];
     let checked = sync["last_check"]
         .as_str()
         .and_then(|time| time.parse().ok());
     let (Some(checked), Some(pending)) = (checked, sync["pending"].as_u64()) else {
         return "Not checked yet".into();
     };
-    if sync["revision"].is_null() || sync["revision"] != snapshot["registry"]["revision"] {
+    if sync["revision"].is_null() || sync["revision"] != status["revision"] {
         return "Not checked yet".into();
     }
     let state = match pending {
-        0 if sync["blockers"].as_u64().unwrap_or(0) > 0 => "Needs attention".into(),
+        0 if sync["blockers"].as_u64().unwrap_or(0) + sync["errors"].as_u64().unwrap_or(0) > 0 => {
+            "Needs attention".into()
+        }
         0 => "In sync".to_string(),
         1 => "1 change waiting".into(),
         n => format!("{n} changes waiting"),
@@ -34,8 +38,8 @@ pub fn state_line(snapshot: &Value, clock: impl Fn(u64) -> Option<String>) -> St
 pub const FINISHING: &str = "Finishing the sync…";
 
 /// The menu item that turns automatic sync off, or back on when it is off.
-pub fn pause_label(snapshot: &Value) -> &'static str {
-    if snapshot["registry"]["settings"]["auto_sync"] == true {
+pub fn pause_label(status: &Value) -> &'static str {
+    if status["settings"]["auto_sync"] == true {
         "Pause automatic sync"
     } else {
         "Resume automatic sync"
