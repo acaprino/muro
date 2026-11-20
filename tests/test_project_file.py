@@ -843,3 +843,57 @@ def test_project_subcommands_report_failures_on_stderr_with_exit_1(tmp_path, pac
                  "--out", str(tmp_path / "t.mp")]) == 1
     assert "Manifest not found" in capsys.readouterr().err
     assert not (tmp_path / "t.mp").exists()
+
+
+# --- info --summary: what the projects list shows, without the capability bodies ----------------------
+
+SUMMARY_KEYS = {"project", "plugin", "counts", "digest"}
+
+
+def test_summary_is_the_identity_and_the_counts_and_none_of_the_content(tmp_path, described, cache):
+    full, mp = info_of(tmp_path, described, cache)
+    shown = project.summary(mp, tmp_path / "kept")
+    assert set(shown) == SUMMARY_KEYS
+    assert shown["project"] == PROJECT_JSON
+    assert shown["plugin"] == {"name": "Tester", "slug": SLUG, "version": "0.1.0"}
+    assert shown["counts"] == {"inputs": 1, "capabilities": 1, "entries": 1, "examples": 1, "records": 1, "runs": 1}
+    assert shown["digest"] == project.digest(mp) == full["digest"]
+    # the counts are the full info's own, not a second computation
+    assert shown["counts"] == {"inputs": len(full["inputs"]), "capabilities": len(full["graph"]["capabilities"]),
+                               "entries": len(full["graph"]["entries"]), "examples": len(full["graph"]["examples"]),
+                               "records": len(full["records"]), "runs": len(full["history"])}
+    assert "Source: demo" not in json.dumps(shown)        # a capability body is what makes the full info large
+
+
+def test_summary_of_a_project_without_entries_counts_none(tmp_path, package, cache):
+    shown = project.summary(project.pack(package, tmp_path / "t.mp", sources_cache=cache), tmp_path / "kept")
+    assert shown["counts"]["entries"] == 0 and shown["counts"]["capabilities"] == 1
+
+
+def test_summary_of_a_file_that_is_missing_or_invalid_is_an_error_not_a_failure(tmp_path, package, cache):
+    stranger = tmp_path / "stranger.mp"
+    stranger.write_bytes(b"not a zip")
+    mp = project.pack(package, tmp_path / "t.mp", sources_cache=cache)
+    cases = {
+        "missing": tmp_path / "none.mp",
+        "not a zip": stranger,
+        "lacks a member": without(mp, "records.json", tmp_path / "incomplete.mp"),
+    }
+    for what, path in cases.items():
+        shown = project.summary(path, tmp_path / "kept")
+        assert set(shown) == {"error"}, what
+        assert isinstance(shown["error"], str) and shown["error"], what
+    assert "records.json" in project.summary(cases["lacks a member"], tmp_path / "kept")["error"]
+    assert "Not a Muro project file" in project.summary(stranger, tmp_path / "kept")["error"]
+
+
+def test_summary_subcommand_prints_the_summary_and_exits_0_even_for_a_bad_file(tmp_path, described, cache, capsys):
+    mp = project.pack(described, tmp_path / "t.mp", sources_cache=cache)
+    assert main(["project", "info", str(mp), "--summary", "--cache", str(tmp_path / "c")]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert set(shown) == SUMMARY_KEYS and shown["plugin"]["slug"] == SLUG
+    assert main(["project", "info", str(tmp_path / "none.mp"), "--summary", "--cache", str(tmp_path / "c")]) == 0
+    assert set(json.loads(capsys.readouterr().out)) == {"error"}
+    # without --summary a bad file still fails with its reason on stderr
+    assert main(["project", "info", str(tmp_path / "none.mp"), "--cache", str(tmp_path / "c")]) == 1
+    assert capsys.readouterr().err.strip()

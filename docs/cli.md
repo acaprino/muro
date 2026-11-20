@@ -245,7 +245,11 @@ layout, removal, runtime retention and a complete Marionette example.
   is refused except on localhost.
 - `--api-key-env`: the environment variable holding the key. Default:
   `MURO_API_KEY`, then `OPENAI_API_KEY`. The key is **never** a command-line
-  argument and is never written anywhere.
+  argument and is never written anywhere. The value must be a variable name
+  (`[A-Za-z_][A-Za-z0-9_]*`, 128 characters at most); anything else is refused with "The key
+  setting must name an environment variable, not hold a key", without repeating it, so a key
+  pasted there by mistake is not echoed (`muro absorb` and `muro project simulate` read the
+  same option through `read_api_key`).
 - `--rounds`: attempts, default 2 — a rejected or invalid answer gets the
   errors fed back once.
 - `source-id`: required with `intake` only.
@@ -289,7 +293,7 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
-### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--cache DIR]`
+### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]`
 
 The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
 everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
@@ -343,6 +347,12 @@ that is not what its name says (a `project.json` that fails the rules above, a p
 identity check, a catalog, delivery document or entries file that fails the build's validation), is refused with
 the reason. `pack` and `unpack` print the path they wrote. Exit `0` on success, `1` with the reason on stderr
 otherwise.
+
+`info --summary` is what a list of projects shows: `{project, plugin: {name, slug, version}, counts: {inputs,
+capabilities, entries, examples, records, runs}, digest}` and none of the capability bodies that make the full
+`info` large (610 KB for Marionette). The counts are the full `info`'s own. A file that is missing or invalid is
+`{"error": reason}` on stdout with exit `0`, so one bad file never hides the others from a list (the desktop
+runs it once per listed project and reads the full `info` only for the project it opens).
 
 ```sh
 muro build --manifest examples/marionette/sources.json --out /tmp/stage

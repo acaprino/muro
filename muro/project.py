@@ -342,6 +342,31 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
     }
 
 
+def summary(mp: Path, cache_root: Path) -> dict[str, Any]:
+    """What a list of projects shows of one, without the capability bodies that make `info` large.
+
+    `project.json`, the plugin's name, slug and version, the counts of inputs, capabilities, entries,
+    examples, records and runs, and the digest: all taken from `info`, so the counts are its own. A file
+    that is missing or invalid is `{"error": reason}` rather than a failure, so one bad file never hides
+    the others from a list.
+    """
+    try:
+        full = info(mp, cache_root)
+    except (OSError, ValueError) as exc:
+        return {"error": str(exc) or type(exc).__name__}
+    except Exception as exc:        # a hostile structure the validators do not cover: still one bad file, not a crash
+        return {"error": f"{type(exc).__name__}: {exc}"}
+    graph = full["graph"]
+    return {
+        "project": full["project"],
+        "plugin": {key: full["plugin"][key] for key in ("name", "slug", "version")},
+        "counts": {"inputs": len(full["inputs"]), "capabilities": len(graph["capabilities"]),
+                   "entries": len(graph["entries"]), "examples": len(graph["examples"]),
+                   "records": len(full["records"]), "runs": len(full["history"])},
+        "digest": full["digest"],
+    }
+
+
 # --- writing ----------------------------------------------------------------------------------------
 
 def _walk(root: Path) -> Iterator[tuple[str, Path]]:

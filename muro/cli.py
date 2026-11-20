@@ -201,7 +201,8 @@ def _run_project(args: argparse.Namespace) -> int:
         elif args.project_command == "unpack":
             print(project.unpack(args.mp, args.out))
         else:
-            print(json.dumps(project.info(args.mp, args.cache or project.default_cache_root()),
+            read = project.summary if args.summary else project.info
+            print(json.dumps(read(args.mp, args.cache or project.default_cache_root()),
                              ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError) as e:
@@ -524,6 +525,9 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--out", type=Path, required=True, help="A new folder")
     p = project_sub.add_parser("info", help="Print what a .mp holds, as JSON (unpacked once per file content)")
     p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--summary", action="store_true",
+                   help="Only the identity, the counts and the digest; a missing or invalid file is "
+                        "an \"error\" in the JSON, with exit 0")
     p.add_argument("--cache", type=Path, metavar="DIR",
                    help="Where unpacked projects are kept (default: a per-user cache folder)")
     # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
