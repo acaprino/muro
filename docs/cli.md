@@ -458,6 +458,14 @@ its own file tools, calls `validate` until clean, then `build` and
 **Fully unattended (API).** `muro absorb … --model …` with the key in
 `MURO_API_KEY`.
 
+**Make a project file and ask it something.** `muro build --manifest PKG/sources.json
+--out DIR`, then `muro project pack --manifest PKG/sources.json --out FILE.mp --release
+DIR` (needs the network once, for the inputs; `--sources-cache` keeps them), `muro
+project info FILE.mp` to read what the desktop's project page shows, and `muro
+project simulate FILE.mp --task "…" --model M` (or `simulate-prepare` and
+`simulate-check` from a host that does the classifying) to see which capabilities a
+request activates. The desktop app opens the same file under Projects.
+
 **Keep a package current.** Poll `muro baseline --json` (exit 1 = something
 moved); before re-pinning, run `muro review` and follow AGENTS.md "Adding or
 re-pinning a source"; after re-pinning, re-run intake for that source,

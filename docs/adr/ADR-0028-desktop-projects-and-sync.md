@@ -220,6 +220,37 @@ What follows replaces the sentences marked above and adds to the list.
 - **The activity log keeps the last 500 events**, and a `sync-status.json` that
   cannot be read is no record (it is derived state; the next check writes it).
 
+### Amendment of 2026-11-20, plan 2 (Projects, read side)
+
+Implementation choices of the second plan, none separately approved. They replace
+two sentences above: the page's queue and the "`.mp` container" line.
+
+- **The page's queue lets three requests go beside it**: `discover`, `simulate`
+  and `cancel_simulation` (`ALONE` in `apps/desktop/src/queue.ts`, the one list).
+  A free-text simulation lasts as long as the AI takes and holds no registry lock
+  while it works; in the queue it froze every other action of the window and made
+  Cancel wait behind the run it should stop. The shell still holds a `simulate`
+  back while a sync runs, and lets `cancel_simulation` and `env_present` through.
+- **A `.mp` is the container of decisions 3 and 12**, specified in
+  `docs/cli.md` (`muro project pack`, `unpack`, `info`). The desktop reads a file
+  only through the factory. A project opened by the person stays where it is
+  (`registry.projects`, `{id, path}`); the default project is copied once, to
+  `data/projects/`. A project file that changes after its plugin was built makes
+  the build stale in a plan (the installed copy stays).
+- **`settings.ai`** (`engine`, `harness`, `budget_usd`, `api_base`, `model`,
+  `api_key_env`) is the one place the engine of every AI job is chosen (decision
+  10); the old `agent` setting stays equal to `ai.harness`. The key is never a
+  setting: `api_key_env` names the environment variable it is read from, and a
+  value that is not a variable name is refused without being echoed. Adapting a
+  plugin still runs a coding agent whichever engine answers the simulator, and
+  the Adapt with AI dialog reads the harness and the budget it starts from here.
+- **`install_project` sets a project's builds and its targets in one request**;
+  the page saves nothing of the plugin itself.
+- **The simulator's harness engines are headless calls with the factory's
+  `muro mcp`** (Claude Code with `--setting-sources project,local`, so the
+  person's own plugins do not load; Codex read-only). Neither was run against a
+  real harness (see the verification record).
+
 ## Consequences
 
 - The Harnesses and Plugins pages disappear: a harness is a column of the Sync

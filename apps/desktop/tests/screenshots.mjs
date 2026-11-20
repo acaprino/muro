@@ -3,7 +3,7 @@
 // MURO_UI_PORT moves the dev server when 1422 is taken; MURO_SHOTS_OUT=<folder> writes somewhere else;
 // MURO_GUIDE=<path of a release's GUIDE.html> also captures Marionette's offline guide.
 // The pages: Sync with changes (dark and light), Sync in sync, the review sheet, the harness sheet, the plugin dialog's
-// Adapt with AI, Settings, Activity and the three steps of the first run.
+// Adapt with AI, Settings, Activity, the Projects list, a project's Inputs and Graph & simulator steps and a simulation result, and the three steps of the first run.
 import { chromium } from '@playwright/test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { mkdir } from 'node:fs/promises';
@@ -65,6 +65,28 @@ await demo('demo-activity', 'dark', async page => {
   await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
   await page.locator('ul.act li').first().waitFor();
   await shot(page, 'activity');
+});
+
+// The Projects tab, from the `projects` scenario (Marionette as the default project, one plugin installed as published): the list, the Inputs and the Graph & simulator
+// steps with a documented example lit, and a free-text request answered. The selectors are those of browser-projects.mjs.
+await demo('projects', 'dark', async page => {
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor();
+  await page.locator('li.go', { hasText: 'Marionette' }).waitFor();
+  await shot(page, 'projects');
+  await page.getByRole('button', { name: /Marionette/ }).click();
+  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.locator('#step-panel table').first().waitFor();
+  await shot(page, 'project-inputs');
+  await page.getByRole('tab', { name: /^Graph/ }).click();
+  await page.locator('.two svg.graph').waitFor();
+  await page.locator('.exlist button').first().click();
+  await page.locator('.simres').waitFor();
+  await shot(page, 'project-graph');
+  await page.locator('textarea[name="simtask"]').fill('Write a letter as a Word file');
+  await page.locator('button[data-action="graph-simulate"]').click();
+  await page.locator('.simres', { hasText: 'Asked' }).waitFor();
+  await shot(page, 'project-simulation');
 });
 
 // The first run: step 1 with a harness ticked, step 2 with what is installed on it, step 3 with the two switches.
