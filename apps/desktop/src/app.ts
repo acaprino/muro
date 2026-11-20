@@ -115,11 +115,12 @@ export function mountApp(root:HTMLElement,transport:Transport):()=>void {
  let refreshing=false;
  async function refreshIfIdle(){
   if(disposed||refreshing||state.busy||state.checking||state.applying||polling||dialog.open||typing())return;
-  refreshing=true;
-  try{const s=await request<Snapshot>('snapshot');if(disposed)return;adopt(s,{replan:false});}
+  refreshing=true;let changed=false;
+  try{const s=await request<Snapshot>('snapshot');if(disposed)return;changed=JSON.stringify(s)!==JSON.stringify(state.snapshot);adopt(s,{replan:false});}
   catch{/* the next focus or tick tries again: a refresh nobody asked for shows no error */}
   finally{refreshing=false;}
-  if(!disposed&&!dialog.open&&!typing())render();
+  // A registry that did not move is not painted again: no needless churn every 30 s.
+  if(changed&&!disposed&&!dialog.open&&!typing())render();
  }
  const refreshTimer=setInterval(()=>{if(document.hasFocus())void refreshIfIdle();},REFRESH_MS);
  const focused=()=>void refreshIfIdle();
