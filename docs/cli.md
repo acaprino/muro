@@ -194,9 +194,15 @@ muro install /tmp/stage/marionette/adapters/claude-code \
   --harness claude-code --home ~/.claude-test
 ```
 
-### `muro mcp [--manifest PATH]`
+### `muro mcp [--manifest PATH] [--tools NAME[,NAME...]]`
 
 Serves the factory as an MCP stdio server (newline-delimited JSON-RPC 2.0).
+`--tools` serves only the named tools: they alone are listed and run, a call to
+any other is refused by name before it does anything, and a name the server
+does not have is refused at start (exit 1, nothing served). Without it every
+tool is served. Give a host agent only what its job needs: the desktop starts
+the server for a simulation with `--tools simulate_prepare,simulate_check`,
+because the text the agent works from may come from a project file of anyone.
 Tools: `validate`, `check_sources`, `build`, `baseline`, `prepare_intake`,
 `prepare_harmonize`, `prepare_review`, `eval_prepare`, `eval_score`,
 `init_package`, `install_adapter`, `simulate_prepare`, `simulate_check`. Every
@@ -245,8 +251,9 @@ layout, removal, runtime retention and a complete Marionette example.
   is refused except on localhost.
 - `--api-key-env`: the environment variable holding the key. Default:
   `MURO_API_KEY`, then `OPENAI_API_KEY`. The key is **never** a command-line
-  argument and is never written anywhere. The value must be a variable name
-  (`[A-Za-z_][A-Za-z0-9_]*`, 128 characters at most); anything else is refused with "The key
+  argument and is never written anywhere. The value must be a variable name in
+  capitals (`^[A-Z_][A-Z0-9_]{0,63}$`: the keys of several providers carry no hyphen and would
+  read as names under a looser rule); anything else is refused with "The key
   setting must name an environment variable, not hold a key", without repeating it, so a key
   pasted there by mistake is not echoed (`muro absorb` and `muro project simulate` read the
   same option through `read_api_key`).
@@ -293,7 +300,7 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
-### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]`
+### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
 The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
 everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
@@ -313,15 +320,27 @@ carries, and a file that `unpack` would refuse. Each source is fetched and check
 functions `check-sources` and `build` use (license gate, coverage gate, the pin's release or HEAD); like
 `check-sources`, it needs the network unless the source is local or already in `--sources-cache`. That folder
 keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
-holds them): `pack` reads a snapshot it finds there without fetching, and stores the one it fetched. The
-cache is trusted as written; keep it yours (a snapshot stored before the NOTICE travelled lacks it: delete it to
-fetch the source again). `--release` is the `--out` folder of a build (`<DIR>/<slug>/…`);
-without it the file carries no release. The file is written whole or not at all, and the same project packs
+holds them) and, beside it, `<DIR>/<id>/<commit>.stamp`: the digest of what the snapshot was fetched for
+(the commit and the source's `selected_paths`, `media_paths`, `notice_paths`, `license_path`, `excluded_paths`
+and `license`). `pack` reads a snapshot whose stamp matches without fetching, and fetches again, replacing it,
+when the stamp differs or is missing (a snapshot made before stamps existed, or by hand); it stores the one it
+fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
+build (`<DIR>/<slug>/…`); `pack` refuses one that is not the build of this package (the `sources.json` plugin
+slug and version, and the capability ids, must be the package's: `muro project verify`'s check); without it the
+file carries no release. The file is written whole or not at all, and the same project packs
 to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
 
+`verify` checks that the plugin a `.mp` carries (`release/<slug>/`) was built from the package it carries: the
+release's `sources.json` plugin slug and version and its capability ids must equal the package's. It prints
+`{"verified": true}`, or exits 1 with "The plugin inside this project does not match the project: it was not
+built from it" and what differs; a project with no release has nothing to disagree with. The desktop runs it
+before it installs a project's plugin.
+
 `unpack` writes into a new (or empty) folder only, all or nothing. A `.mp` from elsewhere is untrusted input:
-a member with an absolute path, a drive letter, `..`, a backslash, a colon, a name ending in a dot or space, or
-that is a link, a device or encrypted is refused before anything is written, a file that is not a zip, or whose
+a member with an absolute path, a drive letter, `..`, a backslash, a colon, a control character, one of
+`< > " | ? *`, a name ending in a dot or space, a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`,
+`LPT1`-`LPT9`, with or without an extension), or that is a link, a device or encrypted is refused before
+anything is written, a file that is not a zip, or whose
 first member is not the stored `mimetype`, is refused as `Not a Muro project file`, and unpacking stops at 2 GiB
 uncompressed or 50,000 members (`MAX_BYTES`, `MAX_MEMBERS` in `muro/project.py`; `pack` stops at the same).
 

@@ -170,3 +170,38 @@ changed after it for R3 (the Adapt dialog now starts from the budget of Settings
 - A missing project file stays listed with its error and has no remove action in this plan (Task 6).
 - Each `projects` call costs one factory run per listed project (0.3 to 0.5 s each) until a cache of summaries by digest is added (Task 5).
 - `install_project` is per harness kind and the page's switch per target (see above).
+
+## Fix wave after the final review (2026-11-20, from 34eaeb4)
+
+One fixer, the findings of the final review; the lines above that this wave made false (the per-kind `install_project`, no remove action, the key rule, the Codex
+dialog, the relayed result, an unstamped sources cache) describe the state at 34eaeb4. Commits: `5d6c54d` (factory), `38d31fb` (registry), `09a9c6d` and `716da46` (runtime),
+`51d7a88` (frontend), `153a8e3` (CI), then the documents.
+
+What changed, finding by finding (each has a test that failed on 34eaeb4: the Python and the frontend ones ran against the unfixed sources and failed, the Rust ones
+do not compile there because the functions they call did not exist):
+- **C1.** `muro mcp --tools a,b` serves, lists and runs only the named tools and refuses an unknown name at start (`tests/test_simulate.py`). The runtime starts the
+  server with `--tools simulate_prepare,simulate_check` for both harnesses, and Codex also gets `-c mcp_servers.muro.enabled_tools=[...]`: the key is not in `codex exec
+  --help` or `codex mcp --help`, it is the field `codex mcp get muro --json -c mcp_servers.muro.enabled_tools=[...]` printed on 0.169.0 (`crates/muro-desktop-runtime/tests/simulate.rs`).
+  The two simulate tools still take a `manifest` or `project` argument from the agent: they read a package folder and print its catalog, nothing else.
+- **I1.** The key variable is `^[A-Z_][A-Z0-9_]{0,63}$` in `muro/agent.py`, `ai.rs` and `settings.ts`, tested with `gsk_abc123`, `hf_xyz` and a 40-character alphanumeric.
+- **I2.** The runtime prepares the context (`simulate-prepare`), takes the answer the harness ends with and shows `simulate-check` of the two; `relayed` is gone and no
+  answer is "The agent gave no answer". The Rust tests also run the real factory through `prepared_context` and `judge` (`real_factory`).
+- **I3.** A sources-cache entry carries a stamp (`<id>/<commit>.stamp`) and is fetched again when it differs or is missing; the stamp also covers `license`.
+- **I4.** `info` refuses a member over 16 MiB and 256 MiB in all; a refused file leaves no unpack; the cache keeps only listed files' and installed builds' unpacks; staging
+  and simulation folders older than a day go at start.
+- **I5.** `muro project verify` and `pack` refuse a release whose plugin slug, version or capability ids are not the package's; `install_project` runs it.
+- **I6.** The `tests` job packs the real Marionette with the release it built and prints the size and the time of `info --summary`. **Not yet measured:** CI has not run it.
+- **I7.** `remove_project`, the update of the shipped project while the copy is still the one Muro made (the mark holds its digest), and `included` from the runtime.
+- **Ruling 1.** `install_project {id, targets}`; **Ruling 2.** Adapt with AI with Codex says what it needs and cannot start, and the AI section line says so.
+- **Minors.** Windows device names and forbidden or control characters in `.mp` member names; a stack token that is not text is an invalid context; the harness runs without the
+  key's variable; the API scheme is compared in any case (the Rust side already did, through the `url` crate: its test passes on 34eaeb4 too); a stale build is shown on
+  the Install step; `tests/test_marionette_project.py` no longer fails on a removed id or an edited note.
+
+Ran locally: the Python tests of `test_project_file`, `test_simulate`, `test_agent_key`, `test_agentic`, `test_cli` and `test_marionette_project`; `cargo test` of
+`muro-registry` and of `muro-desktop-runtime` (`projects`, `simulate`, `real_factory`, the library tests); `npx tsc --noEmit` and `npm test` (349 passing) before the owner
+asked for no more local test runs.
+
+Not run: any harness (no `claude` or `codex` was started), the browser files (`browser-projects.mjs`, `browser-harness.mjs`, `browser-settings.mjs` were edited, three new browser
+tests written, none run), `screenshots.mjs`, the shell build, the full Python suite, a live Muro with the project cache sweeping at start, and the CI pack step. Concerns: a stored
+`api_key_env` in lowercase (saved before this wave) is refused by every later save of the settings until it is renamed; the default project of a data directory that already holds
+the empty mark of 34eaeb4 is never updated (an empty mark records nothing).

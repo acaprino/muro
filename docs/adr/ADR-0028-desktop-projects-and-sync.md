@@ -268,3 +268,7 @@ two sentences above: the page's queue and the "`.mp` container" line.
 
 Nothing open on 2026-11-20: decisions 10 to 12 settled the three questions that
 were.
+
+## Amendment of 2026-11-20 (fix wave after the final review of plan 2)
+
+This is a labelled note, not a decision: `install_project` takes `{id, targets}`, the ids of the managed harnesses the project is installed on (the plugin's targets become exactly those; a build is made for each distinct kind), the plugin inside a `.mp` is checked against its package (`muro project verify`) at pack and at install, `remove_project` takes a project off the list (never the default one), and a coding agent is given only `muro mcp --tools simulate_prepare,simulate_check` and judged by the factory on the answer it ends with (decisions 10 and 11 unchanged otherwise).
