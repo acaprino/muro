@@ -5,7 +5,7 @@ use std::{
     fs::{self, OpenOptions},
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 pub fn prompt(source: &str, harness: &str, plugin: &str, factory: &str, package: &str) -> String {
@@ -21,10 +21,7 @@ Read every supplied Markdown file under custom-instructions/ as owner requiremen
 }
 
 pub fn agent_args(agent: &str, task: &str, budget: f64) -> Result<Vec<String>> {
-    ensure!(
-        budget.is_finite() && budget > 0.0 && budget <= 100.0,
-        "Budget must be between 0 and 100 USD"
-    );
+    muro_registry::ai::validate_budget(budget)?;
     let args: Vec<String> = match agent {
         "claude-code" => vec![
             "-p".into(),
@@ -169,42 +166,39 @@ fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &str) -> Resul
     let mut cmd = Command::new(exe);
     cmd.args(args)
         .current_dir(cwd)
-        .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log));
-    #[cfg(windows)]
+    let cancelled = || dir.join("cancel").exists();
+    match crate::exec::supervise(cmd, &cancelled, Duration::from_secs(1800))
+        .with_context(|| format!("Cannot start {label}: {exe}"))?
     {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    let mut child = cmd
-        .spawn()
-        .with_context(|| format!("Cannot start {label}: {exe}"))?;
-    #[cfg(windows)]
-    let _process_tree = match crate::process_tree::ProcessTree::attach(&child) {
-        Ok(tree) => tree,
-        Err(error) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(error);
-        }
-    };
-    let start = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait()? {
+        crate::exec::Ended::Finished(status) => {
             ensure!(
                 status.success(),
                 "{label} failed ({status}); see output.log"
             );
-            return Ok(());
+            Ok(())
         }
-        if dir.join("cancel").exists() || start.elapsed() > Duration::from_secs(1800) {
-            let _ = child.kill();
-            let _ = child.wait();
+        crate::exec::Ended::Stopped(_) => {
             bail!("{label} cancelled or exceeded 30-minute deadline; inspect output.log")
         }
-        std::thread::sleep(Duration::from_millis(200));
     }
+}
+
+/// The bundled Python and the factory folder, as the registry's settings name them: the one place
+/// the runtime finds them, for adaptation and for projects alike.
+pub fn factory_tools(settings: &Value) -> Result<(String, PathBuf)> {
+    let factory = PathBuf::from(settings["factory_path"].as_str().unwrap_or(""));
+    ensure!(
+        factory.join("muro_build.py").is_file(),
+        "Configure the factory path in Settings"
+    );
+    let python = settings["python"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("python")
+        .to_owned();
+    Ok((python, factory))
 }
 
 pub fn start(data: &Path, payload: &Value) -> Result<Value> {
@@ -238,19 +232,11 @@ pub fn start(data: &Path, payload: &Value) -> Result<Value> {
     );
     let agent = payload["agent"]
         .as_str()
+        .or(registry["settings"]["ai"]["harness"].as_str())
         .or(registry["settings"]["agent"].as_str())
         .unwrap_or("claude-code");
     let budget = payload["budget_usd"].as_f64().unwrap_or(2.0);
-    let factory = PathBuf::from(registry["settings"]["factory_path"].as_str().unwrap_or(""));
-    ensure!(
-        factory.join("muro_build.py").is_file(),
-        "Configure the factory path in Settings"
-    );
-    let python = registry["settings"]["python"]
-        .as_str()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("python")
-        .to_owned();
+    let (python, factory) = factory_tools(&registry["settings"])?;
     let id = uuid::Uuid::new_v4().to_string();
     let dir = job_dir(data, &id)?;
     let package = dir.join("package");

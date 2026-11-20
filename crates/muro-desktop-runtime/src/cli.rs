@@ -408,6 +408,11 @@ fn initialize(data: &Path) -> Result<()> {
             )?;
         }
     }
+    // The project Muro ships is put in the person's list once. A failure here is no reason to keep
+    // Muro from starting: it is reported, and the next start tries again.
+    if let Err(error) = crate::projects::install_default(data, &resource) {
+        eprintln!("Default project: {error:#}");
+    }
     Ok(())
 }
 fn atomic_json(path: &Path, value: &Value) -> Result<()> {
@@ -445,7 +450,13 @@ fn relocate_owned_paths(data: &Path) -> Result<()> {
             let registry_file = data.join("registry.json");
             if registry_file.exists() {
                 let mut registry = read_json(&registry_file)?;
-                let before = registry["plugins"].clone();
+                let before = (registry["plugins"].clone(), registry["projects"].clone());
+                // A project file kept in the data directory (the one Muro ships) moves with it.
+                if let Some(projects) = registry["projects"].as_array_mut() {
+                    for project in projects {
+                        rebase(&mut project["path"], &old, &current);
+                    }
+                }
                 if let Some(plugins) = registry["plugins"].as_array_mut() {
                     for plugin in plugins {
                         for key in ["source", "resolved_source"] {
@@ -461,7 +472,7 @@ fn relocate_owned_paths(data: &Path) -> Result<()> {
                         }
                     }
                 }
-                if registry["plugins"] != before {
+                if (registry["plugins"].clone(), registry["projects"].clone()) != before {
                     registry["revision"] =
                         json!(registry["revision"].as_u64().context("Registry revision")? + 1);
                     atomic_json(&registry_file, &registry)?;
@@ -619,6 +630,31 @@ mod tests {
             read_json(&new.join("registry.json")).unwrap()["revision"],
             3
         );
+    }
+    #[test]
+    fn relocation_moves_the_project_files_kept_in_the_data_directory_and_no_other() {
+        let t = tempfile::tempdir().unwrap();
+        let (old, new) = (t.path().join("old"), t.path().join("new"));
+        std::fs::create_dir_all(&new).unwrap();
+        let elsewhere = t.path().join("documents").join("mine.mp");
+        atomic_json(&new.join("data-location.json"), &json!({"path":old})).unwrap();
+        atomic_json(
+            &new.join("registry.json"),
+            &json!({"revision":5,"plugins":[],"targets":[],"projects":[
+                {"id":"marionette","path":old.join("projects").join("marionette.mp")},
+                {"id":"mine","path":elsewhere}]}),
+        )
+        .unwrap();
+        relocate_owned_paths(&new).unwrap();
+        let reg = read_json(&new.join("registry.json")).unwrap();
+        assert_eq!(reg["revision"], 6);
+        assert_eq!(
+            Path::new(reg["projects"][0]["path"].as_str().unwrap()),
+            ordinary_windows_path(&new.canonicalize().unwrap()).join("projects").join("marionette.mp")
+        );
+        assert_eq!(reg["projects"][1]["path"], json!(elsewhere), "a file the person keeps elsewhere stays");
+        relocate_owned_paths(&new).unwrap();
+        assert_eq!(read_json(&new.join("registry.json")).unwrap()["revision"], 6, "a second pass changes nothing");
     }
     #[cfg(windows)]
     #[test]

@@ -1,8 +1,12 @@
 pub mod autostart;
 pub mod cli;
 pub mod discovery;
+pub mod exec;
+pub mod factory;
 pub mod jobs;
 mod process_tree;
+pub mod projects;
+pub mod simulate;
 pub mod single_instance;
 pub mod sync_gate;
 pub mod tray;
@@ -11,8 +15,32 @@ use anyhow::{Context, Result};
 use serde_json::{Value, json};
 use std::path::Path;
 
+/// Opens a folder in the system's file manager. The one launch, for the custom-instructions folder and
+/// for the folder of a project file.
+pub fn open_in_file_manager(path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    let mut command = std::process::Command::new("explorer.exe");
+    #[cfg(target_os = "macos")]
+    let mut command = std::process::Command::new("open");
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut command = std::process::Command::new("xdg-open");
+    command
+        .arg(path)
+        .spawn()
+        .with_context(|| format!("Cannot open the folder {}", path.display()))?;
+    Ok(())
+}
+
 pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
     match action {
+        "projects" => projects::projects(data),
+        "project" => projects::project(data, &payload),
+        "open_project" => projects::open(data, &payload),
+        "install_project" => projects::install(data, &payload),
+        "open_folder" => projects::open_folder(data, &payload),
+        "env_present" => projects::env_present(&payload),
+        "simulate" => simulate::simulate(data, &payload),
+        "cancel_simulation" => simulate::cancel(data, &payload),
         "discover" => cli::discover_via_cli(&data.join("discovery-cache")),
         "recover_jobs" => {
             jobs::recover(data)?;
@@ -30,13 +58,7 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
             let info = muro_registry::service::request(data, "custom_instructions",
                 json!({"id":payload["id"],"create":true}))?;
             let path = info["path"].as_str().context("Instruction directory missing")?;
-            #[cfg(windows)]
-            let mut command = std::process::Command::new("explorer.exe");
-            #[cfg(target_os = "macos")]
-            let mut command = std::process::Command::new("open");
-            #[cfg(all(unix, not(target_os = "macos")))]
-            let mut command = std::process::Command::new("xdg-open");
-            command.arg(path).spawn().context("Cannot open custom-instructions folder")?;
+            open_in_file_manager(Path::new(path))?;
             Ok(info)
         }
         "snapshot" => {
