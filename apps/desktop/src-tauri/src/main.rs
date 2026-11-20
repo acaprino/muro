@@ -5,6 +5,7 @@ use muro_desktop_runtime::single_instance;
 use muro_desktop_runtime::{
     autostart,
     cli::{self, Client},
+    projects,
     sync_gate::SyncGate,
     tray,
 };
@@ -22,6 +23,7 @@ use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
+use tauri_plugin_dialog::DialogExt;
 
 /// How often the worker looks at the registry's settings, and how long the tray's state line
 /// may go unread when nothing it depends on has changed.
@@ -39,8 +41,9 @@ const SYNC_WAIT: Duration = Duration::from_secs(10 * 60);
 const BUSY_WAIT: Duration = Duration::from_secs(15);
 const BUSY_STEP: Duration = Duration::from_millis(250);
 /// What the registry answers without taking its lock, and what runs no registry request: never
-/// held back behind a sync.
-const WITHOUT_THE_LOCK: [&str; 2] = ["discover", "status"];
+/// held back behind a sync. Cancelling a simulation and asking whether a variable is set touch no
+/// registry.
+const WITHOUT_THE_LOCK: [&str; 4] = ["discover", "status", "cancel_simulation", "env_present"];
 
 /// The backend the window talks to, and what the shell itself answers.
 #[derive(Clone)]
@@ -119,17 +122,43 @@ impl Backend {
     }
 }
 
+/// The native open-file dialog, over the main window. `{filter}` is the line the page shows a person
+/// ("Muro project (*.mp)"). It answers `{path}`: the chosen file, or null when the dialog was closed
+/// without one. Only the shell can show it, so the runtime does not know the action.
+fn pick_file(app: &tauri::AppHandle, payload: &Value) -> anyhow::Result<Value> {
+    let filter = projects::dialog_filter(payload["filter"].as_str().unwrap_or(""))?;
+    let mut dialog = app.dialog().file();
+    if let Some((name, extensions)) = &filter {
+        let extensions: Vec<&str> = extensions.iter().map(String::as_str).collect();
+        dialog = dialog.add_filter(name.as_str(), &extensions);
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    // Blocks until the dialog closes: this runs on a blocking thread, never on the window's.
+    let Some(picked) = dialog.blocking_pick_file() else {
+        return Ok(json!({"path":Value::Null}));
+    };
+    let path = picked
+        .into_path()
+        .map_err(|error| anyhow::anyhow!("The chosen file is not a path on this computer: {error}"))?;
+    Ok(json!({"path":path.to_string_lossy()}))
+}
+
 #[tauri::command]
 async fn request(
+    app: tauri::AppHandle,
     state: tauri::State<'_, Backend>,
     action: String,
     payload: Value,
 ) -> Result<Value, String> {
     let backend = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        backend
-            .request(&action, payload)
-            .map_err(|e| format!("{e:#}"))
+        let answer = match action.as_str() {
+            "pick_file" => pick_file(&app, &payload),
+            _ => backend.request(&action, payload),
+        };
+        answer.map_err(|e| format!("{e:#}"))
     })
     .await
     .map_err(|e| e.to_string())?
@@ -349,6 +378,7 @@ fn main() {
         }
     }
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             std::fs::create_dir_all(&data)?;
             let client = Client::spawn(&cli::bundled_tool("muroctl")?, &data)?;
