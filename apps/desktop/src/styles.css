@@ -330,3 +330,7 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .runs td{vertical-align:top}
 .runs .note{min-width:260px;white-space:pre-line;overflow-wrap:anywhere}
 .prompt{margin:0;padding:12px;flex:1 1 auto;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--bg);font:12px/1.5 "Cascadia Code",Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+/* Settings AI: the engine choice may be wider than a narrow window, a hint can hold a line of status, a box that does not apply reads as off. */
+.set .row .seg{max-width:100%;flex-wrap:wrap}
+.row small .line{display:block}
+.row input:disabled{opacity:.55;cursor:default}

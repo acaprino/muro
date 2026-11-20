@@ -1,4 +1,4 @@
-import type { ViewState, Snapshot, Settings, Autostart, Maintenance } from '../types.ts';
+import type { ViewState, Snapshot, Settings, AiSettings, AiEngine, AiHarness, Autostart, Maintenance } from '../types.ts';
 import type { App, Actions } from '../context.ts';
 import type { Theme } from '../look.ts';
 import { intervalOptions } from '../model.ts';
@@ -12,20 +12,97 @@ import { currentTheme, saveTheme } from '../look.ts';
 const AUTO = 'Automatic sync', TRAY = 'Keep running when the window is closed', START = 'Start Muro when Windows starts';
 const VERIFYING = 'Verifying…';
 const THEMES: [Theme, string][] = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']];
-const AGENTS: [string, string][] = [['claude-code', 'Claude Code · USD budget']];
+const ENGINES: [AiEngine, string][] = [['harness', 'Coding agent on this computer'], ['api', 'OpenAI-compatible API']];
+const HARNESSES: [AiHarness, string][] = [['claude-code', 'Claude Code · dollar budget'], ['codex', 'Codex · no budget limit']];
+const KEY_TITLE = 'Key from the environment variable';
+const BUDGET_REFUSED = 'The budget is a number of US dollars above 0 and at most 100, such as 0.5.';
 const message = (e: unknown) => String(e instanceof Error ? e.message : e);
 
+/** What a setting save asks to change: any field of the settings, and of `ai` only the keys it names (the rest of `ai` is read when the request is sent). */
+type Patch = Partial<Omit<Settings, 'ai'>> & { ai?: Partial<AiSettings> };
+
+// ---------- what the page holds besides the registry ----------
+/** What the page learned and the registry does not keep, for as long as the window shows the page: whether the variable that holds the key is set for the Muro
+ * process (`set` is null when the runtime could not say), and the one field a value was last refused in, with the words. A refusal carries its message only, never
+ * what was typed: it could be a key. */
+const learned: { key: { name: string; set: boolean | null } | null; refused: { field: string; text: string } | null } = { key: null, refused: null };
+export const forgetLearned = (): void => { learned.key = null; learned.refused = null; };
+const refusal = (field: string) => learned.refused?.field === field ? learned.refused.text : '';
+
+// ---------- the rules of the AI settings, as the registry has them (crates/muro-registry/src/ai.rs): the page refuses where the value is typed, the service refuses again ----------
+const bytes = (text: string) => new TextEncoder().encode(text).length;
+/** What the registry says of a key setting that is not a variable's name. It never repeats the value: it may be a key pasted by mistake. */
+export const KEY_REFUSED = 'The key setting must name an environment variable, not hold a key';
+/** '' when `name` is the name of an environment variable (`[A-Za-z_][A-Za-z0-9_]*`, at most 128 bytes), else the words that refuse it. */
+export function keyNameError(name: string): string {
+  if (!name) return 'Enter the name of the environment variable.';
+  return bytes(name) <= 128 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? '' : KEY_REFUSED;
+}
+/** '' when `base` is https, or http on this computer (localhost, 127.0.0.1, ::1), with no user name or password in it; else the words that refuse it, none of which repeats what was typed (it could hold a key). */
+export function endpointError(base: string): string {
+  if (!base) return 'Enter the address of the API.';
+  if (bytes(base) > 2048) return 'The API address is too long.';
+  const refused = 'The API address must be an https URL (http only on localhost).';
+  let url: URL;
+  try { url = new URL(base); } catch { return refused; }
+  if (url.username || url.password) return 'The API address must not hold a user name or a password.';
+  if (url.protocol === 'https:') return url.hostname ? '' : 'The API address has no host.';
+  if (url.protocol === 'http:') return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ? '' : 'Plain http is allowed only on localhost; use https.';
+  return refused;
+}
+/** The budget of a request in dollars: digits with an optional point, above 0 and at most 100; null for anything else. */
+export function parseBudget(text: string): number | null {
+  if (!/^\d+(\.\d+)?$/.test(text)) return null;
+  const budget = Number(text);
+  return budget > 0 && budget <= 100 ? budget : null;
+}
+/** '' when `model` is a name the registry keeps (at most 200 bytes, no control character; none at all is kept: it is asked for when a request is made). */
+export const modelError = (model: string): string => bytes(model) <= 200 && !/\p{Cc}/u.test(model) ? '' : 'The model name is not valid.';
+
+// ---------- the page ----------
 /** Plain text of a hint, or the same as a warning; always escaped, the row takes markup. */
 const note = (text: string, warn = false) => warn ? `<span class="warn">${esc(text)}</span>` : esc(text);
-const row = (title: string, hint: string, control: string) => `<div class="row"><div><strong>${esc(title)}</strong>${hint ? `<small>${hint}</small>` : ''}</div>${control}</div>`;
+/** A row: its title, a hint (markup the caller escaped) and the control. A row with a `field` is a field of the AI section: its hint and its error slot carry the ids its control is described by, and the slot holds the field's refusal. */
+const row = (title: string, hint: string, control: string, field = '') => `<div class="row"><div><strong>${esc(title)}</strong>${hint ? `<small${field ? ` id="hint-${field}"` : ''}>${hint}</small>` : ''}${field ? `<small class="err" id="err-${field}" role="alert">${esc(refusal(field))}</small>` : ''}</div>${control}</div>`;
 const option = (value: string | number, label: string, current: string | number) => `<option value="${esc(value)}" ${String(value) === String(current) ? 'selected' : ''}>${esc(label)}</option>`;
-/** The agents the select offers: a stored agent that is none of them stays an option, so saving another setting never changes it. */
-const agentOptions = (current: string): [string, string][] => AGENTS.some(([id]) => id === current) ? AGENTS : [...AGENTS, [current, current === 'codex' ? 'Codex · USD budget not supported' : current]];
+/** A segmented choice of a setting: its radios say which setting they change, as every other control of the page does. */
+const segSetting = (name: string, value: string, options: [string, string][], label: string) => seg(name, value, options, label).replace(new RegExp(`name="${name}"`, 'g'), `name="${name}" data-setting="${name}"`);
+/** The coding agents the select offers: a stored one that is none of them stays an option, so the select never shows another. */
+const harnessOptions = (current: string): [string, string][] => HARNESSES.some(([id]) => id === current) ? HARNESSES : [...HARNESSES, [current, current]];
+/** A text box of a field of the AI section: described by its hint and its error slot, and marked invalid while the field holds a refusal. `attrs` are the code's own attributes. */
+const textBox = (field: string, label: string, value: string, attrs = '') => `<input ${attrs ? attrs + ' ' : ''}name="${field}" data-setting="${field}" aria-label="${esc(label)}" aria-describedby="hint-${field} err-${field}"${refusal(field) ? ' aria-invalid="true"' : ''} value="${esc(value)}" autocomplete="off" spellcheck="false">`;
 
 function startHint(autostart: Autostart | null, settings: Settings): string {
   if (autostart && !autostart.supported) return note('Available on Windows');
   if (autostart?.enabled && !settings.auto_sync) return note('Automatic sync is off: Muro starts and watches, but applies changes only when you ask.', true);
   return note('Starts in the notification area and keeps your harnesses in line with your list.');
+}
+
+/** Whether the variable that holds the key is set for Muro, as the runtime said; the name is the one stored, and nothing else about the key is ever shown. */
+function keyState(name: string): string {
+  const known = learned.key?.name === name ? learned.key : null;
+  if (!known) return note('Checking…');
+  if (known.set === null) return note(`Could not check whether ${name} is set.`);
+  return known.set ? `<span class="good">${esc(`${name} is set for Muro.`)}</span>` : note(`${name} is not set for Muro.`, true);
+}
+
+/** The AI engine: a coding agent on this computer (its harness and its budget) or an OpenAI-compatible API (its endpoint, its model and the name of the variable that holds the key). Python and the factory folder serve both. */
+function aiSection(s: Settings): string {
+  const ai = s.ai, api = ai.engine === 'api', codex = ai.harness === 'codex';
+  const engine = api ? [
+    row('Endpoint', note('Use https. Plain http is accepted only on localhost.'), textBox('ai_api_base', 'Endpoint', ai.api_base, 'class="mono" placeholder="https://api.openai.com/v1"'), 'ai_api_base'),
+    row('Model', ai.model ? note('The model name as the API knows it.') : note('Required: a request cannot run without a model.', true), textBox('ai_model', 'Model', ai.model, 'class="mono"'), 'ai_model'),
+    row(KEY_TITLE, `<span class="line" role="status">${keyState(ai.api_key_env)}</span><span class="line">${note("Muro never stores the key. Set it in Windows' environment variables, then restart Muro.")}</span>`, textBox('ai_api_key_env', KEY_TITLE, ai.api_key_env, 'class="mono" placeholder="MURO_API_KEY"'), 'ai_api_key_env'),
+  ] : [
+    row('Coding agent', note('It signs in as it does when you use it yourself.'), `<select name="ai_harness" data-setting="ai_harness" aria-label="Coding agent">${harnessOptions(ai.harness).map(([id, label]) => option(id, label, ai.harness)).join('')}</select>`),
+    row('Budget per request', note(codex ? 'Codex has no budget limit.' : 'In US dollars, checked between turns: a request can end slightly above it.'), textBox('ai_budget_usd', 'Budget per request in USD', String(ai.budget_usd), `inputmode="decimal"${codex ? ' disabled' : ''}`), 'ai_budget_usd'),
+  ];
+  return `<section class="card set"><h2>AI</h2><p>How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.</p>`
+    + row('Use', note(api ? 'Muro calls the service itself, with a key it reads from the environment.' : "Claude Code or Codex, as installed on this computer. It reaches Muro's factory over MCP."), segSetting('ai_engine', ai.engine, ENGINES, 'Use'))
+    + engine.join('')
+    + row('Python', note('The command or full path of the interpreter.'), `<input class="mono" name="python" data-setting="python" aria-label="Python" value="${esc(s.python)}" autocomplete="off" spellcheck="false">`)
+    + row('Muro factory folder', note('Leave empty to use the one that ships with Muro.'), `<input class="mono" name="factory_path" data-setting="factory_path" aria-label="Muro factory folder" placeholder="Built in" value="${esc(s.factory_path)}" autocomplete="off" spellcheck="false">`)
+    + '</section>';
 }
 
 export function view(state: ViewState): string {
@@ -37,12 +114,9 @@ export function view(state: ViewState): string {
     + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), `<select name="interval_minutes" data-setting="interval_minutes" aria-label="Check interval" ${s.auto_sync ? '' : 'disabled'}>${intervalOptions(s.interval_minutes).map(([minutes, label]) => option(minutes, label, s.interval_minutes)).join('')}</select>`)
     + row(START, startHint(a, s), sw(!!a?.enabled, START, 'toggle-setting', 'autostart', !a?.supported))
     + row(TRAY, s.close_to_tray ? note('Closing the window leaves Muro in the notification area. Quit from its icon there.') : note('Closing the window quits Muro: nothing syncs until you open it again.', true), sw(s.close_to_tray, TRAY, 'toggle-setting', 'close_to_tray'))
-    + `</section><section class="card set"><h2>Appearance</h2>${row('Theme', note('System follows Windows.'), seg('theme', currentTheme(), THEMES, 'Theme').replace(/name="theme"/g, 'name="theme" data-setting="theme"'))}</section>`
-    + `<section class="card set"><h2>AI adaptation</h2><p>An agent rebuilds a plugin for a harness that has no native version of it.</p>`
-    + row('Agent', note('Runs with a dollar budget need Claude Code.'), `<select name="agent" data-setting="agent" aria-label="Agent">${agentOptions(s.agent).map(([id, label]) => option(id, label, s.agent)).join('')}</select>`)
-    + row('Python', note('The command or full path of the interpreter.'), `<input class="mono" name="python" data-setting="python" aria-label="Python" value="${esc(s.python)}" autocomplete="off" spellcheck="false">`)
-    + row('Muro factory folder', note('Leave empty to use the one that ships with Muro.'), `<input class="mono" name="factory_path" data-setting="factory_path" aria-label="Muro factory folder" placeholder="Built in" value="${esc(s.factory_path)}" autocomplete="off" spellcheck="false">`)
-    + `</section><section class="card set"><h2>Maintenance</h2>`
+    + `</section><section class="card set"><h2>Appearance</h2>${row('Theme', note('System follows Windows.'), segSetting('theme', currentTheme(), THEMES, 'Theme'))}</section>`
+    + aiSection(s)
+    + `<section class="card set"><h2>Maintenance</h2>`
     + row('Verify', note('Check stored builds and installations against what Muro recorded.'), button(verifying ? VERIFYING : 'Verify', 'maintenance-verify', { busy: verifying, disabled: verifying }))
     + row('Clean up', note('Delete stored builds that nothing uses any more.'), button('Clean up…', 'maintenance-cleanup'))
     + (m ? `<div class="row" role="status"><div><span><span class="good">${icon('check')}</span> ${esc(m.message)}</span>${m.details.map(d => `<small class="break">${esc(d)}</small>`).join('')}</div></div>` : '')
@@ -50,9 +124,11 @@ export function view(state: ViewState): string {
 }
 
 // ---------- saving ----------
+/** The settings a request sends: those as stored, the patch laid over them, and `ai` whole with only the keys the patch names changed. */
+const merged = (settings: Settings, patch: Patch): Settings => ({ ...settings, ...patch, ai: { ...settings.ai, ...patch.ai } });
 /** The request of a save: every setting as stored, the changed ones replaced. A save the service refuses because the registry moved behind the page's back (the background worker, the tray) reads the registry again and sends the same change once more, over what is stored now; only a second refusal reaches the person. */
-async function saveRequest(app: App, patch: Partial<Settings>): Promise<Snapshot> {
-  const send = () => { const { revision, settings } = app.state.snapshot!.registry; return app.request<Snapshot>('settings', { revision, settings: { ...settings, ...patch } }); };
+async function saveRequest(app: App, patch: Patch): Promise<Snapshot> {
+  const send = () => { const { revision, settings } = app.state.snapshot!.registry; return app.request<Snapshot>('settings', { revision, settings: merged(settings, patch) }); };
   try { return await send(); }
   catch (e) {
     if (!/Registry revision changed/.test(message(e))) throw e;
@@ -69,11 +145,15 @@ function accept(app: App, saved: Snapshot): void {
   if (held && held.revision === state.snapshot!.registry.revision) state.plan = { ...held, revision: saved.registry.revision };
   app.adopt(saved, { replan: false });
 }
-/** Saves `patch` unless it changes nothing. Afterwards the page is painted from what is stored, so a refused or skipped save puts the control back. */
-async function save(app: App, patch: Partial<Settings>): Promise<void> {
+/** Whether the patch changes anything stored: of `ai` the keys it names are compared one by one. */
+const differs = (stored: Settings, patch: Patch) => (Object.keys(patch) as (keyof Patch)[]).some(key => key === 'ai'
+  ? (Object.keys(patch.ai ?? {}) as (keyof AiSettings)[]).some(k => stored.ai[k] !== patch.ai![k])
+  : stored[key] !== patch[key]);
+/** Saves `patch` unless it changes nothing. Afterwards the page is painted from what is stored, so a refused or skipped save puts the control back. A new engine or a new key variable is asked about, because the key row shows it. */
+async function save(app: App, patch: Patch): Promise<void> {
   const stored = app.state.snapshot!.registry.settings;
-  if ((Object.keys(patch) as (keyof Settings)[]).some(key => stored[key] !== patch[key]))
-    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.', 'good'); });
+  if (differs(stored, patch))
+    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.', 'good'); if (patch.ai && ('engine' in patch.ai || 'api_key_env' in patch.ai)) void readKey(app); });
   app.render();
 }
 /** Refused where it enters: the message, and the control goes back to what is stored. */
@@ -81,6 +161,24 @@ function refuse(app: App, text: string): true {
   app.state.error = text;
   app.render();
   return true;
+}
+/** Refused in a field of the AI section: the words go into the field's own slot (the field is marked invalid and described by it), and the control goes back to what is stored. What was typed is not kept anywhere. */
+function refuseField(app: App, field: string, text: string): true {
+  learned.refused = { field, text };
+  app.render();
+  return true;
+}
+
+/** Asks the runtime whether the variable that holds the key is set for the Muro process: a name goes out, `set` comes back, never a value. Only the API engine shows the answer. An answer for a name that is no longer the stored one is dropped. */
+async function readKey(app: App): Promise<void> {
+  const ai = app.state.snapshot?.registry.settings.ai;
+  if (ai?.engine !== 'api') return;
+  const name = ai.api_key_env;
+  let set: boolean | null;
+  try { set = (await app.request<{ set: boolean }>('env_present', { name })).set === true; } catch { set = null; }
+  if (app.state.snapshot?.registry.settings.ai.api_key_env !== name) return;
+  learned.key = { name, set };
+  if (app.state.page === 'settings') app.render();
 }
 
 /** Start with Windows is the shell's, not a registry setting. Switched on it also turns automatic sync on when it was off (a
@@ -113,7 +211,8 @@ export const actions: Actions = {
 export function change(app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
   const setting = el.dataset.setting;
   if (!setting) return false;
-  const stored = app.state.snapshot!.registry.settings, value = el.value;
+  const value = el.value;
+  if (setting.startsWith('ai_')) learned.refused = null;
   switch (setting) {
     case 'theme':
       if (THEMES.some(([id]) => id === value)) saveTheme(value as Theme);
@@ -125,10 +224,38 @@ export function change(app: App, el: HTMLInputElement | HTMLSelectElement): bool
       void save(app, { interval_minutes: minutes });
       return true;
     }
-    case 'agent':
-      if (!agentOptions(stored.agent).some(([id]) => id === value)) return refuse(app, 'That agent is not available.');
-      void save(app, { agent: value });
+    case 'ai_engine':
+      if (!ENGINES.some(([id]) => id === value)) return refuse(app, 'That engine is not available.');
+      void save(app, { ai: { engine: value as AiEngine } });
       return true;
+    case 'ai_harness':
+      if (!HARNESSES.some(([id]) => id === value)) return refuse(app, 'That agent is not available.');
+      void save(app, { ai: { harness: value as AiHarness } });
+      return true;
+    case 'ai_budget_usd': {
+      const budget = parseBudget(value.trim());
+      if (budget === null) return refuseField(app, setting, BUDGET_REFUSED);
+      void save(app, { ai: { budget_usd: budget } });
+      return true;
+    }
+    case 'ai_api_base': {
+      const base = value.trim(), bad = endpointError(base);
+      if (bad) return refuseField(app, setting, bad);
+      void save(app, { ai: { api_base: base } });
+      return true;
+    }
+    case 'ai_model': {
+      const model = value.trim(), bad = modelError(model);
+      if (bad) return refuseField(app, setting, bad);
+      void save(app, { ai: { model } });
+      return true;
+    }
+    case 'ai_api_key_env': {
+      const name = value.trim(), bad = keyNameError(name);
+      if (bad) return refuseField(app, setting, bad);
+      void save(app, { ai: { api_key_env: name } });
+      return true;
+    }
     case 'python':
       if (!value.trim()) return refuse(app, 'Enter the Python command or its full path.');
       void save(app, { python: value.trim() });
@@ -140,8 +267,21 @@ export function change(app: App, el: HTMLInputElement | HTMLSelectElement): bool
   return false;
 }
 
-/** The page was opened: whether Muro starts with Windows is read now, because the shell owns it and it can change outside Muro. */
+/** Typing in a field of the AI section that holds a refusal takes the refusal away. The page is not painted: a paint would put the stored text back in the box that holds the caret. */
+export function input(_app: App, el: HTMLInputElement | HTMLSelectElement): boolean {
+  const field = el.dataset.setting;
+  if (!field || learned.refused?.field !== field) return false;
+  learned.refused = null;
+  el.removeAttribute('aria-invalid');
+  const slot = el.closest('.row')?.querySelector('.err');
+  if (slot) slot.textContent = '';
+  return true;
+}
+
+/** The page was opened: whether Muro starts with Windows is read now, because the shell owns it and it can change outside Muro; so is whether the key's variable is set, when the API is the engine. Nothing held from an earlier visit is kept. */
 export async function opened(app: App): Promise<void> {
+  forgetLearned();
   try { app.state.autostart = await app.request<Autostart>('autostart'); } catch (e) { app.state.error = message(e); }
   app.render();
+  await readKey(app);
 }

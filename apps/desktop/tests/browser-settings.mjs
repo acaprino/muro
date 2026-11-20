@@ -11,7 +11,8 @@ async function test(name, scenario, options, body) {
   const app = await open(scenario, options);
   try { await app.page.locator('nav').waitFor(); await body(app); done.push(name); } finally { await app.close(); }
 }
-const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' };
+const AI = { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' };
+const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: AI };
 const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const calls = async (app, ...actions) => (await app.calls()).filter(c => actions.includes(c.action));
 const saves = async app => (await calls(app, 'settings')).map(c => c.payload);
@@ -40,13 +41,14 @@ const titles = page => page.locator('ul.act li strong').allTextContents();
 await test('Settings: five sections, saved on change, no Save button', 'default', {}, async app => {
   const { page } = app;
   await openSettings(page);
-  assert.deepEqual(await page.locator('section.set > h2').allTextContents(), ['Sync', 'Background', 'Appearance', 'AI adaptation', 'Maintenance']);
+  assert.deepEqual(await page.locator('section.set > h2').allTextContents(), ['Sync', 'Background', 'Appearance', 'AI', 'Maintenance']);
   assert.equal(await page.getByRole('button', { name: /save/i }).count(), 0, 'there is no Save button');
   assert.equal(await page.getByText('Saved as you change them.').count(), 1);
   assert.equal((await calls(app, 'autostart')).length, 1, 'autostart is read once when the page opens');
   assert.deepEqual((await saves(app)), [], 'opening the page saves nothing');
   assert.equal(await page.getByRole('radio', { name: 'System' }).isChecked(), true, 'the theme starts on System');
-  assert.equal(await page.getByRole('combobox', { name: 'Agent' }).inputValue(), 'claude-code');
+  assert.equal(await page.getByRole('radio', { name: 'Coding agent on this computer' }).isChecked(), true, 'the engine starts on a coding agent');
+  assert.equal(await page.getByRole('combobox', { name: 'Coding agent' }).inputValue(), 'claude-code');
   assert.equal(await page.getByRole('textbox', { name: 'Python' }).inputValue(), 'python');
   assert.equal(await page.getByRole('textbox', { name: 'Muro factory folder' }).getAttribute('placeholder'), 'Built in');
 });
@@ -461,6 +463,187 @@ for (const width of [1100, 760]) {
     await openActivity(page);
     assert.ok(await sideways(page) <= 0, `Activity scrolls sideways at ${width}px`);
     await page.screenshot({ path: `${shots}/activity-${width}.png` });
+  });
+}
+
+// ---- Settings, section AI (plan 2, Task 9): the engine, its fields, the variable that holds the key ----
+// The radios of the engine are saved by the service before the page shows the new engine, so they are clicked (a click states no expectation of its state), never `check`ed.
+const KEY = 'Key from the environment variable';
+const useEngine = (page, label) => page.getByRole('radiogroup', { name: 'Use', exact: true }).getByText(label, { exact: true }).click();
+/** The request of the n-th save was sent. The page shows the stored value until the answer comes back: wait for `boxIs` before reading a box after a save. */
+const saved = (page, n) => page.waitForFunction(count => window.calls.filter(c => c.action === 'settings').length === count, n);
+const boxIs = (page, name, value) => page.waitForFunction(([n, v]) => document.querySelector(`input[name=${n}]`)?.value === v, [name, value]);
+/** The error slot of a field, once it holds `text`. */
+const slotWith = (page, field, text) => page.locator(`#err-${field}`).filter({ hasText: text });
+const hintOf = (page, title) => row(page, title).locator('small[id^="hint-"]');
+async function openApi(page) {
+  await openSettings(page);
+  await useEngine(page, 'OpenAI-compatible API');
+  await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
+}
+
+await test('AI: the engine is a radio group and a keyboard moves it; the API shows its fields and asks whether the key variable is set', 'default', {}, async app => {
+  const { page } = app;
+  await openSettings(page);
+  const use = page.getByRole('radiogroup', { name: 'Use', exact: true });
+  assert.deepEqual(await use.locator('label').allTextContents(), ['Coding agent on this computer', 'OpenAI-compatible API']);
+  assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).count(), 0, 'the API fields wait for the API');
+  assert.equal((await calls(app, 'env_present')).length, 0, 'and the variable is not asked about');
+  await use.getByRole('radio', { name: 'Coding agent on this computer' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
+  assert.deepEqual(await saves(app), [{ revision: 1, settings: { ...STORED, ai: { ...AI, engine: 'api' } } }], 'one save, the engine only');
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'api', 'the radio keeps the focus');
+  assert.deepEqual((await calls(app, 'env_present')).map(c => c.payload), [{ name: 'MURO_API_KEY' }], 'a name goes out, nothing else');
+  assert.equal(await page.getByRole('radio', { name: 'OpenAI-compatible API' }).isChecked(), true);
+  assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).inputValue(), 'https://api.openai.com/v1');
+  assert.equal(await page.getByRole('textbox', { name: 'Model' }).inputValue(), '');
+  assert.equal(await page.getByRole('textbox', { name: KEY }).inputValue(), 'MURO_API_KEY');
+  assert.equal(await page.getByRole('combobox', { name: 'Coding agent' }).count(), 0, 'the coding agent waits for the coding agent');
+  assert.equal(await page.getByRole('textbox', { name: 'Budget per request in USD' }).count(), 0);
+  assert.match(await hintOf(page, 'Model').textContent(), /^Required: a request cannot run without a model\.$/);
+  assert.equal(await row(page, 'Model').locator('small .warn').count(), 1, 'a warning');
+  // The page holds the name and the runtime's answer, never a key: there is no box for one.
+  assert.equal(await page.locator('input[type=password]').count(), 0);
+  await page.getByText('MURO_API_KEY is not set for Muro.', { exact: true }).waitFor();
+  assert.equal((await hintOf(page, KEY).textContent()).endsWith("Muro never stores the key. Set it in Windows' environment variables, then restart Muro."), true);
+  assert.equal(await row(page, KEY).locator('[role=status]').count(), 1, 'the answer is a status');
+  // Set for the Muro process: the next visit says so.
+  await app.flags({ envSet: ['MURO_API_KEY'] });
+  await tab(page, 'Sync').click();
+  await openSettings(page);
+  await page.getByText('MURO_API_KEY is set for Muro.', { exact: true }).waitFor();
+  assert.equal(await row(page, KEY).locator('.good').count(), 1);
+  // A runtime that cannot answer is a line in the row, no banner.
+  await app.flags({ noEnvCheck: true });
+  await tab(page, 'Sync').click();
+  await openSettings(page);
+  await page.getByText('Could not check whether MURO_API_KEY is set.', { exact: true }).waitFor();
+  assert.deepEqual(await bannerText(page), []);
+  await app.flags({ noEnvCheck: false });
+  await page.screenshot({ path: shots + '/settings-ai-api.png' });
+});
+
+await test('AI: the endpoint is validated in the page, in its own field, and the stored address comes back', 'default', {}, async app => {
+  const { page } = app;
+  await openApi(page);
+  const endpoint = page.getByRole('textbox', { name: 'Endpoint' });
+  for (const [bad, text] of [['http://example.com/v1', 'Plain http is allowed only on localhost; use https.'], ['api.openai.com/v1', 'The API address must be an https URL (http only on localhost).'], ['https://user:hunter2@example.com/v1', 'The API address must not hold a user name or a password.'], ['', 'Enter the address of the API.']]) {
+    await endpoint.fill(bad);
+    await endpoint.blur();
+    await slotWith(page, 'ai_api_base', text).waitFor();
+    assert.equal(await endpoint.getAttribute('aria-invalid'), 'true');
+    assert.match(await endpoint.getAttribute('aria-describedby'), /\berr-ai_api_base\b/, 'the error is tied to its field');
+    assert.equal(await page.locator('#err-ai_api_base').getAttribute('role'), 'alert');
+    assert.equal(await endpoint.inputValue(), 'https://api.openai.com/v1', 'the stored address is back');
+    assert.deepEqual(await bannerText(page), [], 'the banner is for what the service refuses');
+  }
+  assert.equal((await saves(app)).length, 1, 'only the engine was ever sent');
+  assert.equal(await page.locator('body').evaluate(b => b.textContent.includes('hunter2')), false);
+  // Typing takes the error away without painting the page; leaving the box saves what passes.
+  await endpoint.fill('http://localhost:11434/v1');
+  await page.waitForFunction(() => document.getElementById('err-ai_api_base').textContent === '' && !document.querySelector('input[name=ai_api_base]').hasAttribute('aria-invalid'));
+  await endpoint.blur();
+  await saved(page, 2);
+  assert.equal((await saves(app))[1].settings.ai.api_base, 'http://localhost:11434/v1', 'http is accepted on localhost');
+  await boxIs(page, 'ai_api_base', 'http://localhost:11434/v1');
+  await endpoint.fill('  https://api.example.com/v1  ');
+  await endpoint.blur();
+  await saved(page, 3);
+  assert.equal((await saves(app))[2].settings.ai.api_base, 'https://api.example.com/v1', 'trimmed');
+});
+
+await test('AI: a key typed where the name of the variable goes is refused without being repeated, and nothing holds it', 'default', {}, async app => {
+  const { page } = app;
+  await openApi(page);
+  const key = page.getByRole('textbox', { name: KEY });
+  await key.fill('sk-proj-ABCDEF1234567890SECRET');
+  await key.blur();
+  await slotWith(page, 'ai_api_key_env', 'The key setting must name an environment variable, not hold a key').waitFor();
+  assert.equal(await key.getAttribute('aria-invalid'), 'true');
+  assert.match(await key.getAttribute('aria-describedby'), /\berr-ai_api_key_env\b/);
+  assert.equal(await key.inputValue(), 'MURO_API_KEY', 'the box is back to the name');
+  assert.equal((await page.content()).includes('SECRET'), false, 'not on the page');
+  assert.equal(JSON.stringify(await app.calls()).includes('SECRET'), false, 'not in any request');
+  assert.equal((await saves(app)).length, 1, 'only the engine was ever sent');
+  assert.equal((await calls(app, 'env_present')).length, 1, 'the runtime was asked once, about the stored name');
+  // A name is saved, trimmed, and its state is read.
+  await app.flags({ envSet: ['OPENAI_API_KEY'] });
+  await key.fill(' OPENAI_API_KEY ');
+  await key.blur();
+  await saved(page, 2);
+  assert.equal((await saves(app))[1].settings.ai.api_key_env, 'OPENAI_API_KEY');
+  await page.getByText('OPENAI_API_KEY is set for Muro.', { exact: true }).waitFor();
+  assert.deepEqual((await calls(app, 'env_present')).map(c => c.payload), [{ name: 'MURO_API_KEY' }, { name: 'OPENAI_API_KEY' }]);
+});
+
+await test('AI: the model is saved trimmed, and its warning goes with it', 'default', {}, async app => {
+  const { page } = app;
+  await openApi(page);
+  const model = page.getByRole('textbox', { name: 'Model' });
+  await model.fill('bad\u0007name');
+  await model.blur();
+  await slotWith(page, 'ai_model', 'The model name is not valid.').waitFor();
+  assert.equal((await saves(app)).length, 1);
+  await model.fill('  org/model:7b  ');
+  await model.blur();
+  await saved(page, 2);
+  assert.equal((await saves(app))[1].settings.ai.model, 'org/model:7b');
+  await page.locator('#hint-ai_model', { hasText: 'The model name as the API knows it.' }).waitFor();
+  assert.equal(await row(page, 'Model').locator('small .warn').count(), 0, 'the warning went with the empty model');
+  await boxIs(page, 'ai_model', 'org/model:7b');
+});
+
+await test('AI: a coding agent has a budget per request in dollars, Codex has none', 'default', {}, async app => {
+  const { page } = app;
+  await openSettings(page);
+  const budget = page.getByRole('textbox', { name: 'Budget per request in USD' });
+  assert.equal(await budget.inputValue(), '0.5');
+  assert.match(await hintOf(page, 'Budget per request').textContent(), /^In US dollars/);
+  for (const bad of ['0', '101', 'abc', '0,5', '']) {
+    await budget.fill(bad);
+    await budget.blur();
+    await slotWith(page, 'ai_budget_usd', 'The budget is a number of US dollars above 0 and at most 100, such as 0.5.').waitFor();
+    assert.equal(await budget.inputValue(), '0.5', `${JSON.stringify(bad)} is not kept`);
+    assert.equal(await budget.getAttribute('aria-invalid'), 'true');
+  }
+  assert.deepEqual(await saves(app), [], 'none was sent');
+  await budget.fill(' 3 ');
+  await budget.blur();
+  await saved(page, 1);
+  assert.deepEqual(await saves(app), [{ revision: 1, settings: { ...STORED, ai: { ...AI, budget_usd: 3 } } }], 'a number, with the rest of ai as it was');
+  await boxIs(page, 'ai_budget_usd', '3');
+  const agent = page.getByRole('combobox', { name: 'Coding agent' });
+  assert.deepEqual(await agent.locator('option').allTextContents(), ['Claude Code · dollar budget', 'Codex · no budget limit']);
+  await agent.selectOption('codex');
+  await saved(page, 2);
+  assert.equal((await saves(app))[1].settings.ai.harness, 'codex');
+  assert.equal((await saves(app))[1].settings.ai.budget_usd, 3, 'the budget stays stored');
+  await page.waitForFunction(() => document.querySelector('input[name=ai_budget_usd]').disabled);
+  assert.equal(await hintOf(page, 'Budget per request').textContent(), 'Codex has no budget limit.');
+  assert.equal(await page.getByRole('textbox', { name: 'Budget per request in USD' }).inputValue(), '3', 'what is stored stays');
+  assert.equal((await calls(app, 'env_present')).length, 0, 'a coding agent never asks about the key');
+});
+
+await test('AI: a save the service refuses puts the engine back and shows the service\'s words in the banner', 'default', {}, async app => {
+  const { page } = app;
+  await openSettings(page);
+  await app.flags({ rejectSettings: true });
+  await useEngine(page, 'OpenAI-compatible API');
+  await page.locator('.banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  assert.equal(await page.getByRole('radio', { name: 'Coding agent on this computer' }).isChecked(), true, 'the stored engine is shown');
+  assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).count(), 0);
+  await app.flags({ rejectSettings: false });
+  await useEngine(page, 'OpenAI-compatible API');
+  await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
+  assert.deepEqual(await bannerText(page), [], 'the error is gone');
+});
+
+for (const width of [1100, 760]) {
+  await test(`AI with the API: no sideways scroll at ${width}px`, 'default', { viewport: { width, height: 900 } }, async ({ page }) => {
+    await openApi(page);
+    assert.ok(await sideways(page) <= 0, `Settings scrolls sideways at ${width}px`);
+    await page.screenshot({ path: `${shots}/settings-ai-api-${width}.png` });
   });
 }
 

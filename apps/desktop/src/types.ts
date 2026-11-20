@@ -5,7 +5,12 @@ export interface Distribution { harness: string; path: string; version: string; 
 export interface Plugin { id:string; name:string; source:string; policy:'pinned'|'stable'|'head'; pinned_version:string; targets:string[]; distributions:Distribution[]; resolved_source?:string; upstream_revision?:string; upstream_version?:string; last_checked?:string; custom_instructions_dir?:string; project?:string }
 export interface InstructionState { plugin_id:string; path:string; files:string[]; digest:string; error?:string; stale_harnesses:string[] }
 export interface Target { id:string; harness:string; name:string; root:string; executable:string; exclusive:boolean; enabled:boolean }
-export interface Settings { auto_sync:boolean; interval_minutes:number; close_to_tray:boolean; agent:string; python:string; factory_path:string }
+/** The engine that answers an AI job: a coding agent on this computer (`harness`, reached over MCP) or an OpenAI-compatible API. The key is never a setting: `api_key_env` is the NAME of the environment variable it is read from. */
+export type AiEngine = 'harness'|'api';
+export type AiHarness = 'claude-code'|'codex';
+export interface AiSettings { engine:AiEngine; harness:AiHarness; budget_usd:number; api_base:string; model:string; api_key_env:string }
+/** `agent` is the old setting of the harness: the service keeps it equal to `ai.harness`. */
+export interface Settings { auto_sync:boolean; interval_minutes:number; close_to_tray:boolean; agent:string; python:string; factory_path:string; ai:AiSettings }
 export interface Registry { schema:number; revision:number; plugins:Plugin[]; targets:Target[]; settings:Settings }
 export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean }
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }

@@ -12,6 +12,8 @@
 //   Projects: pickPath           what the shell's file dialog answers (a path, or null for a cancelled dialog)
 //             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
 //             rejectInstall      install_project fails ("no build for <harness>"); installAssigns: it also sets the harness as a target of the plugin
+//   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
+//                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
 //   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision.
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
@@ -110,8 +112,9 @@ function scenarioData(scenario) {
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
   const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installAssigns: false };
-  const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } };
+  const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
+  Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
@@ -255,6 +258,7 @@ export function createTransport(scenario = 'default') {
         if (payload.revision !== reg.revision || flags.staleSettings > 0) { flags.staleSettings = Math.max(0, flags.staleSettings - 1); throw new Error(STALE); }
         if (flags.rejectSettings) throw new Error('Version conflict: settings not saved');
         reg.settings = structuredClone(payload.settings);
+        if (reg.settings.ai) reg.settings.agent = reg.settings.ai.harness;   // as the registry does: the old `agent` is always ai.harness
         return bump();
       }
       case 'resolve': { const p = reg.plugins.find(p => p.id === payload.id); if (p) p.last_checked = ago(0); return bump(); }
@@ -262,6 +266,12 @@ export function createTransport(scenario = 'default') {
       case 'cancel_job': { const job = jobs.find(j => j.id === payload.id); if (job) Object.assign(job, { status: 'cancelled', message: 'Cancelled' }); return snapshot(); }
       case 'open_custom_instructions': case 'custom_instructions': return structuredClone(instructions().find(i => i.plugin_id === payload.id));
       case 'maintenance': return { message: payload.kind === 'verify' ? 'Every stored build is intact' : 'Nothing to clean up', details: [] };
+      // The runtime's env_present (plan 2, Task 5): whether the variable is set for the Muro process. The name is checked as the registry checks it; no value is ever returned.
+      case 'env_present': {
+        if (flags.noEnvCheck) throw new Error('Unknown registry action: env_present');
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(payload.name))) throw new Error('The key setting must name an environment variable, not hold a key');
+        return { set: flags.envSet.includes(payload.name) };
+      }
       case 'autostart': return { supported: !flags.autostartUnsupported, enabled: autostart, current: autostart };
       case 'set_autostart': {
         if (flags.autostartUnsupported) throw new Error('Start with Windows is not available here');
