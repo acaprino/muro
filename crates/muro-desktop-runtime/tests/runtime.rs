@@ -311,6 +311,50 @@ fn autostart_writes_only_an_absolute_executable_path_without_quotes() {
     }
 }
 
+/// Other programs, and the tests beside this one, add and delete values of the Run key while
+/// Muro reads its own. A search through the whole key passes over a value that is there while
+/// the others move (5% of the searches in a probe of 2026-11-20), so Muro's value would read as
+/// not current; read by its name, it reads as it is every time.
+#[cfg(windows)]
+#[test]
+fn autostart_reads_its_value_while_other_values_of_the_key_change() {
+    let other = r#""C:\Muro Other\a.exe" --background"#;
+    let before: Vec<RunValue> = (0..8).map(|_| RunValue::new()).collect();
+    for value in &before {
+        write_run_value(&value.0, "REG_SZ", other);
+    }
+    let value = RunValue::new();
+    let here = existing_executable();
+    autostart::set(&value.0, &here, true).unwrap();
+    let stop = Arc::new(AtomicBool::new(false));
+    let churn = {
+        let stop = Arc::clone(&stop);
+        let names: Vec<String> = before.iter().map(|value| value.0.clone()).collect();
+        thread::spawn(move || {
+            let key = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+            for name in names.iter().cycle() {
+                if stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                // A value that comes and goes, then one that was there before Muro's and moves after it.
+                let passing = RunValue::new();
+                write_run_value(&passing.0, "REG_SZ", other);
+                drop(passing);
+                let _ = std::process::Command::new("reg.exe")
+                    .args(["delete", key, "/v", name, "/f"])
+                    .output();
+                write_run_value(name, "REG_SZ", other);
+            }
+        })
+    };
+    let misses = (0..100)
+        .filter(|_| autostart::state(&value.0, &here).unwrap()["current"] != true)
+        .count();
+    stop.store(true, Ordering::Relaxed);
+    churn.join().unwrap();
+    assert_eq!(misses, 0, "Muro's value read as not current in {misses} of 100 reads");
+}
+
 /// The smallest registry `sync_now` needs: OpenCode harnesses over profile folders that hold
 /// an `opencode.json`, and the plugin `example`, built in a folder with a `package.json` and
 /// an `index.js`.
