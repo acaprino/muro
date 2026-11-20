@@ -32,9 +32,10 @@ export function view(state: ViewState, info: ProjectInfo): string {
     + (targets.length ? `<ul class="card list">${targets.map(row).join('')}</ul>` : empty('No harness managed yet', 'Add one in Sync.', button('Open Sync', 'page', { id: 'sync', primary: true })));
 }
 
-/** A harness switched on: the project's build for it is put in the list (`install_project`, which gets every harness the plugin is on, so a build that is there stays), and
- * the harness is set as a target of the plugin when the runtime did not already. Off: the harness leaves the plugin's targets and nothing is installed. The runtime's answer to
- * `install_project` is not relied on: the snapshot is read again. Nothing reaches a harness until the review sheet applies it. */
+/** A harness switched on: the project's build for it is put in the list (`install_project`, which gets every harness the plugin is on, so a build that is there stays) and
+ * the runtime sets both the plugin's distributions and its targets: the page saves nothing itself, and says so when the snapshot shows the harness is not among the targets.
+ * Off: the harness leaves the plugin's targets and nothing is installed. The runtime's answer to `install_project` is not relied on: the snapshot is read again. Nothing
+ * reaches a harness until the review sheet applies it. */
 async function toggle(app: App, d: DOMStringMap): Promise<void> {
   const { state } = app, pv = state.project, s = state.snapshot, t = s?.registry.targets.find(x => x.id === d.id);
   if (!pv || !s || !t || !t.enabled) return;
@@ -45,7 +46,8 @@ async function toggle(app: App, d: DOMStringMap): Promise<void> {
     await app.request('install_project', { id: pv.id, harnesses: kinds });
     const read = await app.request<Snapshot>('snapshot'), made = read.registry.plugins.find(p => p.project === pv.id);
     if (!made) throw new Error(`${pv.id} was not added to your list`);
-    return made.targets.includes(t.id) ? read : app.request<Snapshot>('save_plugin', { plugin: { ...made, targets: [...made.targets, t.id] }, revision: read.registry.revision });
+    if (!made.targets.includes(t.id)) throw new Error(`${pv.id} was not set up for ${t.name}`);
+    return read;
   }, v => app.adopt(v));
 }
 export const actions: Actions = { 'toggle-harness': toggle };

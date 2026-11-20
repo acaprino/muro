@@ -2,7 +2,7 @@ import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep } from '../typ
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState } from '../model.ts';
 import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
-import { STEPS, fresh } from './project/state.ts';
+import { STEPS, STATE, fresh } from './project/state.ts';
 import * as inputs from './project/inputs.ts';
 import * as install from './project/install.ts';
 import * as harmonize from './project/harmonize.ts';
@@ -22,7 +22,6 @@ const message = (e: unknown) => String(e instanceof Error ? e.message : e);
 const flat = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 const day = (iso: string) => /^\d{4}-\d{2}-\d{2}/.exec(iso)?.[0] ?? iso;
 const count = (n: number | undefined, one: string, many?: string) => typeof n === 'number' ? plural(n, one, many) : '';
-const STATE = { label: 'Harmonized', tone: 'good' };
 
 // ---------- the list ----------
 const nameOf = (p: ProjectSummary) => p.project?.name || p.plugin?.name || p.id;

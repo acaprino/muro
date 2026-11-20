@@ -7,6 +7,9 @@ export const STEPS = [['inputs', 'Inputs'], ['harmonize', 'Harmonize'], ['graph'
 export const VIEWS = ['records', 'choices', 'history', 'prompts'] as const;
 const KEY = 'muro.project';
 
+/** The state of a project's harmonization, in the words of the list, the page's head, the tab and the strip of step 2: said once, here. Every project is "Harmonized" until plan 3 (the write side) computes the others. */
+export const STATE = { label: 'Harmonized', tone: 'good' };
+
 /** What the Projects page holds while nothing was read: no list, nothing open. */
 export const blankProjects = (): ProjectsState => ({ list: null, loading: false, error: null, info: null, infoId: null, infoLoading: false, infoError: null, noPicker: false, noFolder: false });
 /** A project opened for the first time: its first step, its first view, no filter, no simulation. */

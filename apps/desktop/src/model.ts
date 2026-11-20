@@ -103,6 +103,17 @@ const needsAction=(p:Plugin,s:Snapshot,plan:Plan|null)=>s.registry.targets.some(
 export function filterPlugins(plugins:Plugin[],query:string,filter:string,snapshot:Snapshot,plan:Plan|null=null):Plugin[] {return plugins.filter(p=>(p.name+' '+p.source).toLocaleLowerCase().includes(query.toLocaleLowerCase())&&(filter==='all'||(filter==='action'?needsAction(p,snapshot,plan):filter===pluginState(p,snapshot).kind)));}
 export const harnessNames:Record<string,string>={'claude-code':'Claude Code',codex:'Codex',opencode:'OpenCode',pi:'Pi',hermes:'Hermes',deepseek:'DeepSeek'};
 export const harnessInitials:Record<string,string>={'claude-code':'CC',codex:'CX',opencode:'OC',pi:'PI',hermes:'HM',deepseek:'DS'};
+// Readers of data the page did not write (a project file from elsewhere, a service older than the window): a field of the wrong type is left out, never guessed.
+export const obj=(v:unknown):Record<string,unknown>|null=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:null;
+export const text=(v:unknown,fallback=''):string=>typeof v==='string'?v:fallback;
+export const amount=(v:unknown):number|null=>typeof v==='number'&&Number.isFinite(v)&&v>=0?v:null;
+/** The AI engine as the pages say it: what answers a free-text simulation (a coding agent or an API) and an AI adaptation (a coding agent today). */
+export interface Engine {api:boolean;harness:string;budget:number|null;model:string;base:string}
+/** `registry.settings.ai` of the snapshot. A service that has none yet has its agent: the old `agent` setting is the harness. The one reading of the engine, for the simulator and for the Adapt with AI dialog. */
+export function engineOf(settings:unknown):Engine {
+ const s=obj(settings)??{},ai=obj(s.ai)??{};
+ return {api:ai.engine==='api',harness:text(ai.harness)||text(s.agent)||'claude-code',budget:amount(ai.budget_usd),model:text(ai.model).trim(),base:text(ai.api_base).trim()};
+}
 /** What an installed plugin becomes in the list: its own folder is the source and its one build, kept at the version it has. A plugin that reports no version cannot be pinned, so it follows the stable policy; the id is new. */
 export const listedPlugin=(installed:InstalledPlugin,target:Target):Plugin=>({id:crypto.randomUUID(),name:installed.name,source:installed.path,policy:installed.version?'pinned':'stable',pinned_version:installed.version,targets:[target.id],distributions:[{harness:target.harness,path:installed.path,version:installed.version}]});
 /** What "Add to my list" and the first run save for an installed plugin: the plugin, and the installation it takes over (`adopt`), which the service binds to the plugin, so the next sync finds it installed instead of installing a second copy beside it. */

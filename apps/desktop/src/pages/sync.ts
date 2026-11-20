@@ -1,6 +1,6 @@
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan } from '../model.ts';
+import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
@@ -197,7 +197,7 @@ function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
   e.preventDefault();const data=new FormData(form),budget=Number(data.get('budget')),harness=String(data.get('harness'));
   if(!showErrors(form,Number.isFinite(budget)&&budget>0?{}:{budget:'Enter a budget above zero.'}))return;
   app.closeDialog();
-  void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:app.state.snapshot!.registry.settings.agent,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
+  void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:engineOf(app.state.snapshot!.registry.settings).harness,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
  };
 }
 /** Paints the instructions section of the open plugin dialog again, keeping it open and, when the control that was used lives in it, the keyboard where it was. */

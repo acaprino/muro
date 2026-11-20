@@ -488,24 +488,23 @@ test('Open folder asks the shell to open the folder of the file; a shell that ca
 });
 
 const open = async (scenario = 'projects') => { const s = await session(scenario); await s.act('retry-projects'); await s.act('open-project', { id: 'marionette' }); return s; };
-test('switching a harness on installs the project there: install_project with that harness, then the target is set', async () => {
+test('switching a harness on installs the project there with one install_project, which sets the distributions and the targets: no second save', async () => {
   const { act, fake, state, actions } = await open();
-  fake.calls.length = 0;
-  await act('toggle-harness', { id: 't2' });
-  assert.deepEqual(actions(), ['install_project', 'snapshot', 'save_plugin']);
-  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', harnesses: ['codex'] });
-  const saved = fake.calls[2].payload as { plugin: Plugin; revision: number };
-  assert.deepEqual(saved.plugin.targets, ['t2']);
-  assert.equal(saved.plugin.project, 'marionette');
-  assert.deepEqual(state.snapshot?.registry.plugins.find(p => p.project === 'marionette')?.targets, ['t2']);
-});
-test('a runtime whose install_project already sets the target needs no second save', async () => {
-  const { act, fake, state, actions } = await open();
-  fake.flags.installAssigns = true;
   fake.calls.length = 0;
   await act('toggle-harness', { id: 't2' });
   assert.deepEqual(actions(), ['install_project', 'snapshot']);
-  assert.deepEqual(state.snapshot?.registry.plugins.find(p => p.project === 'marionette')?.targets, ['t2']);
+  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', harnesses: ['codex'] });
+  const made = state.snapshot?.registry.plugins.find(p => p.project === 'marionette');
+  assert.deepEqual(made?.targets, ['t2']);
+  assert.deepEqual(made?.distributions.map(d => d.harness), ['codex']);
+});
+test('a runtime that built the plugin but left the harness out of its targets is an error shown in the banner; the page does not save the targets itself', async () => {
+  const { act, fake, state, actions } = await open();
+  fake.flags.installLeavesTargets = true;
+  fake.calls.length = 0;
+  await act('toggle-harness', { id: 't2' });
+  assert.deepEqual(actions(), ['install_project', 'snapshot'], 'no save_plugin');
+  assert.match(state.error ?? '', /marionette was not set up for Codex/);
 });
 test('a second harness asks for both, so the first one keeps its build', async () => {
   const { act, fake } = await open();

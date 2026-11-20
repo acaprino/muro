@@ -1,6 +1,6 @@
 import type { ViewState, Plan, Plugin, Target, Discovered } from './types.ts';
 import { esc, icon, plural, mark, button, spin, field } from './ui.ts';
-import { harnessNames, inList, stamp } from './model.ts';
+import { harnessNames, inList, stamp, engineOf } from './model.ts';
 import { choice, pluginForm, targetForm } from './forms.ts';
 
 /** The head of a sheet or dialog: the heading is the dialog's name (`openDialog` names it), the cross closes it. */
@@ -49,9 +49,10 @@ export function harnessSheet(state:ViewState,target?:Target,found?:Discovered):s
  return `<form class="dl" id="target-form" novalidate>${dlHead(target?target.name:'Add a harness',sub)}${targetForm(target,found)}${target?installedHere(state,target):''}${errorSlot}${foot(target?'Save':'Add harness',target?button('Stop managing','remove-target',{id:target.id,danger:true,cls:'left'}):'')}</form>`;
 }
 
-/** Adapting a plugin with AI: for which harness, with how much budget. The harness first offered is one whose instructions changed, or one the plugin targets and has no build for. */
+/** Adapting a plugin with AI: for which harness, with how much budget. The coding agent and the budget it starts from are Settings' (section AI: `registry.settings.ai`). Adaptation runs a coding agent on this computer whatever engine answers free-text simulations: with the API chosen, the dialog says so. The harness first offered is one whose instructions changed, or one the plugin targets and has no build for. */
 export function adaptDialog(state:ViewState,plugin:Plugin):string {
- const s=state.snapshot!,agent=s.registry.settings.agent,agentName=harnessNames[agent]||agent;
+ const s=state.snapshot!,engine=engineOf(s.registry.settings),agentName=harnessNames[engine.harness]||engine.harness,budget=engine.budget&&engine.budget>0?engine.budget:2;
  const needs=s.custom_instructions?.find(i=>i.plugin_id===plugin.id)?.stale_harnesses[0]??plugin.targets.map(id=>s.registry.targets.find(t=>t.id===id)?.harness).find(h=>h&&!plugin.distributions.some(d=>d.harness===h));
- return `<form class="dl" id="adapt-form" novalidate>${dlHead(`Adapt ${plugin.name} with AI`,`${agentName} rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses ${agentName}'s own credentials and spends at most the budget below.`)}<p class="muted">Your custom instructions are read with the source: the AI decides how to fit them in and records why.</p>${choice('For harness','harness',Object.entries(harnessNames).filter(([h])=>h!=='deepseek'),needs||'')}${field('Maximum budget (USD)','budget','2',{type:'number',autofocus:true,hint:'Checked between turns: the run can end slightly above it.',attrs:{min:'0',step:'0.5',inputmode:'decimal'}})}${errorSlot}${foot('Start')}</form>`;
+ const lead=engine.api?`Adapting a plugin needs a coding agent on this computer: ${agentName}. It`:agentName;
+ return `<form class="dl" id="adapt-form" novalidate>${dlHead(`Adapt ${plugin.name} with AI`,`${lead} rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses ${agentName}'s own credentials and spends at most the budget below.`)}<p class="muted">Your custom instructions are read with the source: the AI decides how to fit them in and records why.</p>${choice('For harness','harness',Object.entries(harnessNames).filter(([h])=>h!=='deepseek'),needs||'')}${field('Maximum budget (USD)','budget',String(budget),{type:'number',autofocus:true,hint:'Checked between turns: the run can end slightly above it.',attrs:{min:'0',step:'0.5',inputmode:'decimal'}})}${errorSlot}${foot('Start')}</form>`;
 }

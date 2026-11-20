@@ -2,8 +2,9 @@ import type { ViewState, ProjectInfo } from '../../types.ts';
 import type { App, Actions, TextBox } from '../../context.ts';
 import { esc, plural, tag, button, empty } from '../../ui.ts';
 import { dlHead } from '../../sheets.ts';
-import { harnessNames } from '../../model.ts';
-import { obj, text, amount, capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from './graph-model.ts';
+import { harnessNames, obj, text, engineOf } from '../../model.ts';
+import type { Engine } from '../../model.ts';
+import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from './graph-model.ts';
 import type { Cap, Example, Outcome, Who } from './graph-model.ts';
 import { drawGraph } from './graph-draw.ts';
 
@@ -38,12 +39,6 @@ export function restoreSim(raw: unknown): SimState {
 }
 
 // ---------- the engine, in the words of the interface ----------
-interface Engine { api: boolean; harness: string; budget: number | null; model: string; base: string }
-/** The AI engine of the settings (`registry.settings.ai`); a service that has none yet has its agent (the old `agent` setting is the harness). */
-function engineOf(state: ViewState): Engine {
-  const settings = obj(state.snapshot?.registry.settings) ?? {}, ai = obj(settings.ai) ?? {};
-  return { api: ai.engine === 'api', harness: text(ai.harness) || text(settings.agent) || 'claude-code', budget: amount(ai.budget_usd), model: text(ai.model).trim(), base: text(ai.api_base).trim() };
-}
 const asking = (e: Engine) => e.api ? e.model || 'the API' : harnessNames[e.harness] || e.harness;
 const money = (n: number) => '$' + (n > 0 && n < 0.01 ? n.toFixed(4) : n.toFixed(2));
 const took = (ms: number) => { const s = ms / 1000; if (s < 60) return `${s.toFixed(1)} s`; const t = Math.round(s); return `${Math.floor(t / 60)} min ${t % 60} s`; };
@@ -88,7 +83,7 @@ const shownOf = (sim: SimState, examples: Example[]): Outcome | null => sim.exam
 export function view(state: ViewState, info: ProjectInfo): string {
   const caps = capsOf(info), entries = entriesOf(info), examples = examplesOf(info);
   if (!caps.length) return empty('No decision graph', 'This project\'s plugin has no capabilities to choose between, so there is nothing to simulate.');
-  const sim = state.project!.sim, engine = engineOf(state), shown = shownOf(sim, examples), lit = litOf(shown), running = sim.run !== null, explain = !told();
+  const sim = state.project!.sim, engine = engineOf(state.snapshot?.registry.settings), shown = shownOf(sim, examples), lit = litOf(shown), running = sim.run !== null, explain = !told();
   const box = `<textarea name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"${sim.error ? ' aria-invalid="true"' : ''} aria-describedby="err-simtask${explain ? ' sim-note' : ''}">${esc(sim.task)}</textarea>`;
   const go = running ? button(`Asking ${asking(engine)}…`, 'graph-simulate', { busy: true, attrs: { 'aria-busy': 'true', 'aria-disabled': 'true' } }) : button('Simulate', 'graph-simulate', { icon: 'play' });
   const list = examples.length ? `<h3>Documented examples <span class="count">${examples.length}</span></h3><ul class="card exlist">${examples.map((e, i) => `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${sim.example === i}"><strong>${esc(e.title)}</strong><small>${esc(e.task)}</small></button></li>`).join('')}</ul>` : '';

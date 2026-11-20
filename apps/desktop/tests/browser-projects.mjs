@@ -135,7 +135,7 @@ await test('Install: a switch per harness calls install_project with that harnes
   await switchOf(page, 'Codex').click();
   await page.locator('#step-panel li', { hasText: 'Codex' }).getByText('Install 0.5.0').waitFor();
   const made = (await app.calls()).slice(before);
-  assert.deepEqual(made.map(c => c.action).filter(a => a !== 'plan'), ['install_project', 'snapshot', 'save_plugin']);
+  assert.deepEqual(made.map(c => c.action).filter(a => a !== 'plan'), ['install_project', 'snapshot'], 'one install_project sets the build and the target: the page saves nothing');
   assert.deepEqual(made[0], { action: 'install_project', payload: { id: 'marionette', harnesses: ['codex'] } });
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'true');
   assert.equal(await switchOf(page, 'Claude Code').getAttribute('aria-checked'), 'false', 'only the one switched');
@@ -174,15 +174,16 @@ await test('the list says where a project is installed once it is, and keeps the
   assert.equal(await page.locator('li:not(.go)', { hasText: 'Marionette' }).count(), 0, 'the project plugin is not listed among the plugins installed as published');
 });
 
-await test('a flag makes install_project set the target by itself: no second save', 'projects', {}, async app => {
+await test('a runtime that leaves the harness out of the plugin\'s targets is an error in the banner, and the switch stays off', 'projects', {}, async app => {
   const { page } = app;
-  await app.flags({ installAssigns: true });
+  await app.flags({ installLeavesTargets: true });
   await openMarionette(page);
   await tab(page, 'Install').click();
   const before = (await app.calls()).length;
   await switchOf(page, 'Codex').click();
-  await switchOf(page, 'Codex').and(page.locator('[aria-checked=true]')).waitFor();
-  assert.deepEqual((await app.calls()).slice(before).map(c => c.action).filter(a => a !== 'plan'), ['install_project', 'snapshot']);
+  await page.locator('.banner.bad', { hasText: 'marionette was not set up for Codex' }).waitFor();
+  assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false');
+  assert.equal((await app.calls()).slice(before).some(c => c.action === 'save_plugin'), false, 'the page does not save the targets itself');
 });
 
 await test('an install that fails says why and changes nothing', 'projects', {}, async app => {

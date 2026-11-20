@@ -7,7 +7,7 @@ import type { App } from '../src/context.ts';
 import { modules } from '../src/views.ts';
 import * as projects from '../src/pages/projects.ts';
 import * as harmonize from '../src/pages/project/harmonize.ts';
-import { blankProjects, fresh } from '../src/pages/project/state.ts';
+import { blankProjects, fresh, STATE } from '../src/pages/project/state.ts';
 
 process.env.TZ = 'UTC';
 
@@ -334,6 +334,17 @@ test('the page puts the step in its tab panel, and the tab still says Harmonized
   assert.match(html, /<div role="tabpanel" id="step-panel" aria-labelledby="step-tab-harmonize"><section class="strip good"/);
   assert.match(html, /id="step-tab-harmonize" aria-selected="true"[^>]*>[\s\S]*?<small>Harmonized<\/small>/);
   assert.doesNotMatch(html, /Coming in this version/);
+});
+test('the state of the harmonization is one value: the page\'s head, its tab and the strip of the step all read it', () => {
+  const before = { ...STATE };
+  Object.assign(STATE, { label: 'Waiting', tone: 'warn' });
+  try {
+    const html = projects.view(opened('records'));
+    assert.match(html, /<span class="tag warn">Waiting<\/span>/, 'the head');
+    assert.match(html, /id="step-tab-harmonize"[^>]*>[\s\S]*?<small>Waiting<\/small>/, 'the tab');
+    assert.match(html, /<section class="strip warn" aria-label="Harmonization state"><span class="sico">[\s\S]*?<strong>Waiting<\/strong>/, 'the strip');
+    assert.doesNotMatch(html, /Harmonized/, 'no second copy of the word');
+  } finally { Object.assign(STATE, before); }
 });
 test('every action of the step is named harmonize-, and has one owner in the app', () => {
   assert.deepEqual(Object.keys(harmonize.actions), ['harmonize-prompt']);

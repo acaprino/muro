@@ -111,6 +111,34 @@ test('the adapt dialog asks for a harness and a budget above zero, tied to its e
  assert.doesNotMatch(adaptDialog(viewState(snapshot()),{...plugin,name:'<b>x</b>'}),/<b>x/);
 });
 
+// Settings, section AI, owns the engine: the dialog reads `registry.settings.ai` (the harness, the budget it starts from) and never the old `agent` alone.
+const settingsWith=(ai:Record<string,unknown>|undefined,agent='claude-code'):Snapshot=>{
+ const s=snapshot();s.registry.settings={...s.registry.settings,agent,...(ai?{ai:{engine:'harness',harness:'claude-code',budget_usd:2,api_base:'https://api.openai.com/v1',model:'',api_key_env:'MURO_API_KEY',...ai}}:{})} as Snapshot['registry']['settings'];return s;
+};
+const plain=(html:string)=>html.replace(/<[^>]*>/g,' ').replace(/&#39;/g,"'").replace(/\s+/g,' ').trim();
+/** What the dialog says under its title: the choice of harnesses below it lists them all by name. */
+const said=(html:string)=>plain(html.match(/<div class="dlhead">[\s\S]*?<\/p>/)![0]);
+test('the adapt dialog names the harness of the AI settings and starts from their budget',()=>{
+ const codex=adaptDialog(viewState(settingsWith({harness:'codex',budget_usd:0.5},'claude-code')),plugin);
+ assert.match(said(codex),/Codex rebuilds this plugin/);assert.match(said(codex),/It uses Codex's own credentials/);assert.doesNotMatch(said(codex),/Claude Code/,'the old agent setting does not name it');
+ assert.match(codex,/name="budget" value="0.5" type="number"/);
+ const claude=adaptDialog(viewState(settingsWith({harness:'claude-code',budget_usd:3.25})),plugin);
+ assert.match(said(claude),/Claude Code rebuilds this plugin/);assert.match(claude,/name="budget" value="3.25"/);
+ assert.doesNotMatch(said(claude),/needs a coding agent/,'a harness engine needs no explanation');
+});
+test('with the API as the engine the dialog says adapting runs a coding agent on this computer, and names the harness of the settings',()=>{
+ const api=adaptDialog(viewState(settingsWith({engine:'api',harness:'codex',budget_usd:1.5,model:'gpt-test'})),plugin);
+ assert.match(said(api),/Adapting a plugin needs a coding agent on this computer: Codex\./);
+ assert.match(said(api),/It uses Codex's own credentials/);assert.doesNotMatch(api,/gpt-test/);assert.doesNotMatch(said(api),/Claude Code/);
+ assert.match(api,/name="budget" value="1.5"/);
+ assert.match(said(adaptDialog(viewState(settingsWith({engine:'api'})),plugin)),/Adapting a plugin needs a coding agent on this computer: Claude Code\./);
+});
+test('a service with no AI settings yet falls back to its agent and to a budget of 2; a budget of nothing is not offered',()=>{
+ const old=adaptDialog(viewState(settingsWith(undefined,'codex')),plugin);
+ assert.match(said(old),/Codex rebuilds this plugin/);assert.match(old,/name="budget" value="2"/);
+ assert.match(adaptDialog(viewState(settingsWith({budget_usd:0})),plugin),/name="budget" value="2"/);
+});
+
 // ---------- the harness sheet ----------
 test('the harness sheet has the mockup\'s fields and words, and Stop managing only for a harness that exists',()=>{
  const s=snapshot(),state=viewState(s),target=s.registry.targets[0],html=harnessSheet(state,target);

@@ -3,7 +3,7 @@ import type { App, Actions, TextBox } from '../../context.ts';
 import { harnessNames } from '../../model.ts';
 import { dlHead } from '../../sheets.ts';
 import { esc, tag, seg, button, empty, icon, when } from '../../ui.ts';
-import { VIEWS } from './state.ts';
+import { VIEWS, STATE } from './state.ts';
 
 /** Step 2, why the project is the way it is, read only: the state of the last harmonization, and four views of it (the decision records, the choices by part, the history, the
  * prompts). Writing any of it (harmonize, edit or add a record) is plan 3, so nothing here changes a project.
@@ -12,8 +12,6 @@ import { VIEWS } from './state.ts';
  * input the project does not have, or a form that is none, means all. The views and the form filter are radios (`hview`, `dform`), the input filter a select (`dsrc`):
  * `change` keeps what they say in the state and paints again. A link to a capability is the action `open-capability`, which pages/project/graph.ts owns. */
 
-/** What the page says of the project's state until plan 3 computes the others: the same word as the tab (pages/projects.ts). */
-const STATE = 'Harmonized';
 /** The forms a decision can take, in the words of the interface, and the tone of each. */
 const FORMS: [DecisionForm, string, string][] = [['capability', 'Capability', 'accent'], ['always-on', 'Always on', 'warn'], ['hook', 'Hook', 'good'], ['dropped', 'Dropped', '']];
 /** What the factory's own prompts are for: a prompt that is not one of them is listed with no description. */
@@ -39,7 +37,7 @@ const agent = (engine: string | null) => engine ? (harnessNames[engine] ?? engin
 /** The state of the last harmonization: its time, the version of the plugin and the agent that ran it, when the run says. No button here: harmonizing again is plan 3. */
 function strip(info: ProjectInfo): string {
   const last = newestFirst(info.history)[0], who = agent(last?.engine ?? null);
-  return `<section class="strip good" aria-label="Harmonization state"><span class="sico">${icon('check')}</span><div class="grow"><strong>${STATE}</strong><small class="meta"><span>Last run <b>${last ? esc(at(last.time)) : 'never'}</b></span><span>Version <b>${esc(info.plugin.version)}</b></span>${who ? `<span>Agent <b>${esc(who)}</b></span>` : ''}</small></div></section>`;
+  return `<section class="strip ${STATE.tone}" aria-label="Harmonization state"><span class="sico">${icon('check')}</span><div class="grow"><strong>${esc(STATE.label)}</strong><small class="meta"><span>Last run <b>${last ? esc(at(last.time)) : 'never'}</b></span><span>Version <b>${esc(info.plugin.version)}</b></span>${who ? `<span>Agent <b>${esc(who)}</b></span>` : ''}</small></div></section>`;
 }
 
 // ---------- decision records ----------

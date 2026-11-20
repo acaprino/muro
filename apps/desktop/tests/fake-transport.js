@@ -11,7 +11,7 @@
 //   staleSettings (n)            the next n settings requests are refused as the service refuses a stale revision
 //   Projects: pickPath           what the shell's file dialog answers (a path, or null for a cancelled dialog)
 //             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
-//             rejectInstall      install_project fails ("no build for <harness>"); installAssigns: it also sets the harness as a target of the plugin
+//             rejectInstall      install_project fails ("no build for <harness>"); installLeavesTargets: it builds the plugin but leaves its targets alone (a runtime older than the window)
 //             simulate           what `simulate` answers: 'selected' (a prerequisite and a chosen step), 'no_match', 'clarify' (needs_clarification, with its questions) or
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
@@ -131,7 +131,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installAssigns: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -186,7 +186,7 @@ export function createTransport(scenario = 'default') {
     return structuredClone(plan);
   }
   const projectOf = id => { const p = projects.find(x => x.id === id); if (!p) throw new Error('Project not found: ' + id); return p; };
-  // The runtime's install_project (plan 2, Task 5): the project's build for each harness is put in the list as the plugin named by its slug. It sets no target unless flags.installAssigns.
+  // The runtime's install_project (plan 2, Task 5): the project's build for each harness is put in the list as the plugin named by its slug, and every target of those harnesses becomes a target of the plugin (as the runtime does, plan 2 Task 5). flags.installLeavesTargets models a runtime that does not.
   function installProject({ id, harnesses }) {
     if (flags.rejectInstall) throw new Error(`The project has no build for ${harnesses[0]}`);
     const project = projectOf(id);
@@ -195,7 +195,7 @@ export function createTransport(scenario = 'default') {
     let made = reg.plugins.find(p => p.project === id);
     if (made) made.distributions = distributions;
     else reg.plugins.push(made = plugin(slug, name, [], distributions, { project: id, source: 'project:' + id, upstream_version: 'v' + version }));
-    if (flags.installAssigns) for (const t of reg.targets) if (harnesses.includes(t.harness) && !made.targets.includes(t.id)) made.targets.push(t.id);
+    if (!flags.installLeavesTargets) for (const t of reg.targets) if (harnesses.includes(t.harness) && !made.targets.includes(t.id)) made.targets.push(t.id);
     reg.revision++;
     return { plugin_id: made.id };
   }

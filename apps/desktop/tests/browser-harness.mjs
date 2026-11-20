@@ -441,7 +441,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Adapt with AI' }).click();
   await dlg.locator('h2').getByText('Adapt Package with AI', { exact: true }).waitFor();
-  assert.equal(await dlg.locator('[name=budget]').inputValue(), '2');
+  assert.equal(await dlg.locator('[name=budget]').inputValue(), '0.5', 'the budget Settings, section AI, starts from');
   await page.screenshot({ path: shots + '/harness-adapt.png' });
   await dlg.locator('[name=budget]').fill('0');
   await dlg.getByRole('button', { name: 'Start' }).click();

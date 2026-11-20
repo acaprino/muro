@@ -1,4 +1,5 @@
 import type { ProjectInfo } from '../../types.ts';
+import { obj, text, amount } from '../../model.ts';
 
 /** What step 3 reads of a project and of a simulation, as plain data. `info.graph` comes from the guide's data model (`muro project info`) and the project may be a
  * file from elsewhere, so everything is read for what is there: a field of the wrong type is left out, never guessed. Nothing here decides which capability a request
@@ -20,11 +21,8 @@ export type Outcome =
   | { kind: 'invalid'; asked: string; errors: string[]; who: Who | null }
   | { kind: 'failed'; asked: string; message: string };
 
-export const obj = (v: unknown): Record<string, unknown> | null => v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null;
-export const text = (v: unknown, fallback = ''): string => typeof v === 'string' ? v : fallback;
 const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 const items = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.map(obj).filter((x): x is Record<string, unknown> => !!x) : [];
-export const amount = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
 const isStatus = (v: unknown): v is Status => typeof v === 'string' && STATUSES.includes(v);
 
 // ---------- the graph ----------
