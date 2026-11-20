@@ -39,7 +39,7 @@ export interface SetupState { step:1|2|3; pick:Record<string,boolean>; keep:Reco
 /** `project.json` of a project file. */
 export interface ProjectMeta { schema:number; name:string; slug:string; version:string; author:string; created:string; changed:string; repository:{url:string;branch:string;tag_prefix:string}|null; builtin:boolean }
 /** What the action `projects` returns for each listed project: its id and file, then what `muro project info` knows in short (a count the runtime does not send is absent), or `error` when the file is missing or invalid. */
-export interface ProjectSummary { id:string; path:string; project?:ProjectMeta; plugin?:{name:string;slug:string;version:string}; inputs?:number; capabilities?:number; entries?:number; examples?:number; records?:number; runs?:number; digest?:string; error?:string }
+export interface ProjectSummary { id:string; path:string; included?:boolean; project?:ProjectMeta; plugin?:{name:string;slug:string;version:string}; inputs?:number; capabilities?:number; entries?:number; examples?:number; records?:number; runs?:number; digest?:string; error?:string }
 export type DecisionForm = 'capability'|'always-on'|'hook'|'dropped';
 export interface ProjectInput { id:string; url:string|null; pin:string; release:string|null; commit:string|null; license:string|null; paths:string[]; became:Record<DecisionForm,number> }
 export interface ProjectDecision { source:string; content:string; form:DecisionForm; targets:string[]; reason:string }
@@ -48,8 +48,8 @@ export interface ProjectRun { id:string; time:string; version:string; status:'co
 /** One capability and one documented example as the guide's data model carries them (`guide_data`): the keys the graph reads are its own to name. */
 export interface GraphCapability { id:string; title:string; [key:string]:unknown }
 export interface GraphExample { [key:string]:unknown }
-/** What the action `project {id}` returns: `muro project info` of the file as it is. */
-export interface ProjectInfo { project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+/** What the action `project {id}` returns: `muro project info` of the file as it is, and `included`: whether it is the copy of the project Muro ships (the runtime says so; `project.builtin` is what the file claims of itself, and is not what decides). */
+export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
 export type ProjectStep = 'inputs'|'harmonize'|'graph'|'install';
 export type ProjectViewKind = 'records'|'choices'|'history'|'prompts';
 /** The open project page: which project, which step, step 2's view and filters (`dsrc` an input id or '', `dform` a form or 'all'), and step 3's simulation. Kept across renders and in the session. */

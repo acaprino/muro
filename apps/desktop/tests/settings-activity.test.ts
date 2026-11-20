@@ -142,6 +142,14 @@ test('AI: with Codex the budget is disabled and says why, and the stored one sta
   assert.match(plain(aiRows(html)['Budget per request']), /Codex has no budget limit\./);
 });
 
+test('AI: the section says what the agent is for, and with Codex that it simulates requests while adapting needs Claude Code', () => {
+  const lead = (aiOver: Partial<AiSettings>) => plain(settings(viewState(snapshot({}, {}, aiOver))).match(/<h2>AI<\/h2><p>([^<]*)<\/p>/)![1]);
+  assert.equal(lead({}), 'How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.', 'Claude Code: as before');
+  assert.equal(lead({ engine: 'api' }), 'How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.', 'with the API and Claude Code as the agent for adapting');
+  assert.equal(lead({ harness: 'codex' }), 'How Muro reaches an AI when it needs one. Codex simulates requests; adapting needs Claude Code.');
+  assert.equal(lead({ harness: 'codex', engine: 'api' }), 'How Muro reaches an AI when it needs one. The API simulates requests; adapting needs Claude Code.', 'keyed on the harness, whatever the engine: the API simulates, Codex cannot adapt');
+});
+
 test('AI: with the API the page asks for an endpoint, a model and the name of the variable that holds the key, never for a key', () => {
   forgetLearned();
   const html = settings(viewState(snapshot({}, {}, { engine: 'api', api_base: 'https://api.example.com/v1', model: 'big-model', api_key_env: 'MY_API_KEY' })));
@@ -210,9 +218,13 @@ test('the endpoint rule of the registry, in the page: https, or http on this com
 
 test('the key variable rule of the registry, in the page: a name, never a key, and the refusal repeats nothing', () => {
   assert.equal(KEY_REFUSED, 'The key setting must name an environment variable, not hold a key');
-  for (const good of ['MURO_API_KEY', '_x', 'a1', 'OPENAI_API_KEY', 'x'.repeat(128)]) assert.equal(keyNameError(good), '', good);
-  for (const bad of ['sk-proj-abc123', '1ABC', 'MY KEY', 'KEY=value', '$HOME', 'a.b', 'ünï', 'x'.repeat(129)]) assert.equal(keyNameError(bad), KEY_REFUSED, bad);
+  // the rule is `^[A-Z_][A-Z0-9_]{0,63}$`, the same in the registry and in the factory
+  for (const good of ['MURO_API_KEY', '_X1', 'A1', 'OPENAI_API_KEY', 'A', '_', 'X'.repeat(64)]) assert.equal(keyNameError(good), '', good);
+  for (const bad of ['sk-proj-abc123', '1ABC', 'MY KEY', 'KEY=value', '$HOME', 'a.b', 'ünï', 'X'.repeat(65), 'KEY\n',
+    // real keys of providers that carry no hyphen: a looser rule read them as names, and a name is shown and repeated
+    'gsk_abc123', 'hf_xyz', 'Zk3dQp9RtLm2NvXw8YbHc5JfGs7AaE1uOi4TyP6e', 'abcdef0123456789', 'key2', 'a', 'MixedCase_Key']) assert.equal(keyNameError(bad), KEY_REFUSED, bad);
   assert.equal(keyNameError(''), 'Enter the name of the environment variable.');
+  for (const key of ['gsk_abc123', 'hf_xyz']) assert.ok(!keyNameError(key).includes(key), `the refusal of ${key} does not repeat it`);
 });
 
 test('the budget rule: dollars above 0 and at most 100, written as digits with a point', () => {

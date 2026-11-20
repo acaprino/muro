@@ -569,6 +569,16 @@ await test('AI: a key typed where the name of the variable goes is refused witho
   assert.equal(JSON.stringify(await app.calls()).includes('SECRET'), false, 'not in any request');
   assert.equal((await saves(app)).length, 1, 'only the engine was ever sent');
   assert.equal((await calls(app, 'env_present')).length, 1, 'the runtime was asked once, about the stored name');
+  // A key of a provider that carries no hyphen (gsk_..., hf_..., letters and digits) is no name either, and is not repeated
+  for (const pasted of ['gsk_abc123SECRET', 'hf_xyz789SECRET', 'Zk3dQp9RtLm2NvXw8YbHc5JfGs7AaE1uOi4TyP6eSECRET']) {
+    await key.fill(pasted);
+    await key.blur();
+    await slotWith(page, 'ai_api_key_env', 'The key setting must name an environment variable, not hold a key').waitFor();
+    assert.equal(await key.inputValue(), 'MURO_API_KEY', 'the box is back to the name');
+    assert.equal((await page.content()).includes('SECRET'), false, 'not on the page');
+  }
+  assert.equal(JSON.stringify(await app.calls()).includes('SECRET'), false, 'in no request');
+  assert.equal((await saves(app)).length, 1, 'none of them was sent');
   // A name is saved, trimmed, and its state is read.
   await app.flags({ envSet: ['OPENAI_API_KEY'] });
   await key.fill(' OPENAI_API_KEY ');

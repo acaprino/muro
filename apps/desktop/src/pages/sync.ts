@@ -195,6 +195,7 @@ function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
  const dialog=app.openDialog(adaptDialog(app.state,p)),form=dialog.querySelector<HTMLFormElement>('#adapt-form')!;
  form.onsubmit=e=>{
   e.preventDefault();const data=new FormData(form),budget=Number(data.get('budget')),harness=String(data.get('harness'));
+  if(engineOf(app.state.snapshot!.registry.settings).harness==='codex')return;   // the dialog says why and its Start is disabled: an Enter in a field starts nothing either
   if(!showErrors(form,Number.isFinite(budget)&&budget>0?{}:{budget:'Enter a budget above zero.'}))return;
   app.closeDialog();
   void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:engineOf(app.state.snapshot!.registry.settings).harness,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});

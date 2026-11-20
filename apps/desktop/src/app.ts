@@ -93,7 +93,8 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
 
  const go=(page:Page)=>{state.page=page;render();void modules[page].opened?.(app);};
  // The Projects tab, clicked while a project is open, goes back to the list.
- const actions:Actions={page:(_app,d)=>{if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload()};
+ // A page button inside a dialog (the Adapt with AI dialog links to Settings) takes the person there: the dialog closes first, unless an apply is running in it.
+ const actions:Actions={page:(_app,d)=>{if(!state.applying)closeDialog();if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload()};
  for(const [name,m] of Object.entries(modules))for(const [action,fn] of Object.entries(m.actions)){if(action in actions)throw new Error(`The action "${action}" of the ${name} page is already declared`);actions[action]=fn;}
 
  const click=(e:Event)=>{

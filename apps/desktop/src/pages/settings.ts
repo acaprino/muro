@@ -33,10 +33,10 @@ const refusal = (field: string) => learned.refused?.field === field ? learned.re
 const bytes = (text: string) => new TextEncoder().encode(text).length;
 /** What the registry says of a key setting that is not a variable's name. It never repeats the value: it may be a key pasted by mistake. */
 export const KEY_REFUSED = 'The key setting must name an environment variable, not hold a key';
-/** '' when `name` is the name of an environment variable (`[A-Za-z_][A-Za-z0-9_]*`, at most 128 bytes), else the words that refuse it. */
+/** '' when `name` is the name of an environment variable in capitals (`^[A-Z_][A-Z0-9_]{0,63}$`: the rule of the registry and of the factory, one in all three places), else the words that refuse it. A looser rule read as a name the keys of providers that carry no hyphen (`gsk_...`, `hf_...`, plain letters and digits). */
 export function keyNameError(name: string): string {
   if (!name) return 'Enter the name of the environment variable.';
-  return bytes(name) <= 128 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? '' : KEY_REFUSED;
+  return /^[A-Z_][A-Z0-9_]{0,63}$/.test(name) ? '' : KEY_REFUSED;
 }
 /** '' when `base` is https, or http on this computer (localhost, 127.0.0.1, ::1), with no user name or password in it; else the words that refuse it, none of which repeats what was typed (it could hold a key). */
 export function endpointError(base: string): string {
@@ -86,6 +86,14 @@ function keyState(name: string): string {
   return known.set ? `<span class="good">${esc(`${name} is set for Muro.`)}</span>` : note(`${name} is not set for Muro.`, true);
 }
 
+/** What the AI section says it is for. Adapting a plugin runs Claude Code (the only agent Muro can hold to a budget) whatever engine answers simulations, so with Codex chosen as the coding agent the line says so, as the Adapt with AI dialog does. */
+export function aiLead(ai: AiSettings): string {
+  if (ai.harness !== 'codex') return 'How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.';
+  return ai.engine === 'api'
+    ? 'How Muro reaches an AI when it needs one. The API simulates requests; adapting needs Claude Code.'
+    : 'How Muro reaches an AI when it needs one. Codex simulates requests; adapting needs Claude Code.';
+}
+
 /** The AI engine: a coding agent on this computer (its harness and its budget) or an OpenAI-compatible API (its endpoint, its model and the name of the variable that holds the key). Python and the factory folder serve both. */
 function aiSection(s: Settings): string {
   const ai = s.ai, api = ai.engine === 'api', codex = ai.harness === 'codex';
@@ -97,7 +105,7 @@ function aiSection(s: Settings): string {
     row('Coding agent', note('It signs in as it does when you use it yourself.'), `<select name="ai_harness" data-setting="ai_harness" aria-label="Coding agent">${harnessOptions(ai.harness).map(([id, label]) => option(id, label, ai.harness)).join('')}</select>`),
     row('Budget per request', note(codex ? 'Codex has no budget limit.' : 'In US dollars, checked between turns: a request can end slightly above it.'), textBox('ai_budget_usd', 'Budget per request in USD', String(ai.budget_usd), `inputmode="decimal"${codex ? ' disabled' : ''}`), 'ai_budget_usd'),
   ];
-  return `<section class="card set"><h2>AI</h2><p>How Muro reaches an AI when it needs one, to adapt a plugin or to simulate a request.</p>`
+  return `<section class="card set"><h2>AI</h2><p>${esc(aiLead(ai))}</p>`
     + row('Use', note(api ? 'Muro calls the service itself, with a key it reads from the environment.' : "Claude Code or Codex, as installed on this computer. It reaches Muro's factory over MCP."), segSetting('ai_engine', ai.engine, ENGINES, 'Use'))
     + engine.join('')
     + row('Python', note('The command or full path of the interpreter.'), `<input class="mono" name="python" data-setting="python" aria-label="Python" value="${esc(s.python)}" autocomplete="off" spellcheck="false">`)

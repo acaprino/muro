@@ -1,4 +1,4 @@
-import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep } from '../types.ts';
+import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState } from '../model.ts';
 import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
@@ -25,10 +25,12 @@ const count = (n: number | undefined, one: string, many?: string) => typeof n ==
 
 // ---------- the list ----------
 const nameOf = (p: ProjectSummary) => p.project?.name || p.plugin?.name || p.id;
+/** "Remove from list" on every project but the one Muro ships (`included`, which the runtime says: never a field of the project file, which anyone can write). The file is not touched. */
+const removal = (p: ProjectSummary) => p.included ? '' : button('Remove from list', 'remove-project', { sm: true, id: p.id, attrs: { 'aria-label': `Remove ${nameOf(p)} from the list` } });
 function item(state: ViewState, p: ProjectSummary): string {
-  if (p.error) return `<li>${sym(nameOf(p))}<div class="grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="break">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}</li>`;
+  if (p.error) return `<li>${sym(nameOf(p))}<div class="grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="break">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}${removal(p)}</li>`;
   const counts = [count(p.inputs, 'input'), count(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
-  return `<li class="go"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="muted">${esc(p.plugin.version)}</span>` : ''}${p.project?.builtin ? ' <span class="tag">Included with Muro</span>' : ''}</strong><small class="pfile" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button></li>`;
+  return `<li class="go"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="tag">Included with Muro</span>' : ''}</strong><small class="pfile" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
 }
 /** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no version of them. */
 function published(state: ViewState): string {
@@ -60,7 +62,7 @@ function holds(info: ProjectInfo): string {
 }
 function projectHead(state: ViewState, info: ProjectInfo): string {
   const p = info.project, file = state.projects.list?.find(x => x.id === state.project!.id)?.path, repo = p.repository;
-  return `<div class="projhead">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(STATE.label, STATE.tone)}${p.builtin ? tag('Included with Muro') : ''}</div>`
+  return `<div class="projhead">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(STATE.label, STATE.tone)}${info.included ? tag('Included with Muro') : ''}</div>`
     + `<div class="projfile">${file ? `<code>${esc(file)}</code>${state.projects.noFolder ? '' : button('Open folder', 'open-folder', { sm: true, icon: 'folder', id: file })}` : ''}<span>${repo ? `Repository <code>${esc(repo.url.replace(/^https?:\/\//, ''))}</code> · ${esc(repo.branch)}` : 'No Git repository set'} · by ${esc(p.author)} · created ${esc(day(p.created))}</span>${holds(info)}</div>`;
 }
 function tabs(state: ViewState, info: ProjectInfo): string {
@@ -126,6 +128,26 @@ async function openFile(app: App): Promise<void> {
   });
 }
 
+// ---------- removing a project from the list ----------
+/** The list without the project: the entry only, never the file. A save the service refuses because the registry moved behind the page's back reads it again and sends the request once more; the default project is refused by the service, whatever the page shows. */
+async function removeRequest(app: App, id: string): Promise<Snapshot> {
+  const send = () => app.request<Snapshot>('remove_project', { id, revision: app.state.snapshot!.registry.revision });
+  try { return await send(); }
+  catch (e) {
+    if (!/Registry revision changed/.test(message(e))) throw e;
+    app.adopt(await app.request<Snapshot>('snapshot'), { replan: false });
+    return send();
+  }
+}
+/** "Remove from list" asks first: what goes (the entry), what stays (the file, and its installed plugin as it is). */
+function askRemoval(app: App, d: DOMStringMap): void {
+  const p = app.state.projects.list?.find(x => x.id === d.id), s = app.state.snapshot;
+  if (!p || !s) return;
+  const installed = s.registry.plugins.some(x => x.project === p.id);
+  app.confirm(`Remove ${nameOf(p)} from your list?`, `Only the entry goes: the file stays where it is (${p.path}) and you can open it again.${installed ? ' Its installed plugin stays as it is; Sync shows it as changed until the project is in your list again.' : ''}`, 'Remove from list',
+    () => void app.run('Removing the project from your list…', () => removeRequest(app, p.id), async saved => { app.adopt(saved); await loadList(app); app.notify(`${nameOf(p)} removed from your list.`, 'good'); }), true);
+}
+
 // ---------- the page's actions and events ----------
 function merge(...sets: Actions[]): Actions {
   const all: Actions = {};
@@ -138,6 +160,7 @@ const own: Actions = {
   step: (app, d) => { const pv = app.state.project, id = STEPS.find(([s]) => s === d.id)?.[0]; if (pv && id) { pv.step = id; app.render(); } },
   'retry-projects': app => opened(app),
   'open-project-file': openFile,
+  'remove-project': askRemoval,
   'open-folder': async (app, d) => { if (d.id) await viaShell(app, 'open_folder', { path: d.id }, 'noFolder', 'open folders'); },
 };
 export const actions: Actions = merge(own, ...Object.values(steps).map(s => s.actions));

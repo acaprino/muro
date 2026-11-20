@@ -12,6 +12,8 @@
 //   Projects: pickPath           what the shell's file dialog answers (a path, or null for a cancelled dialog)
 //             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
 //             rejectInstall      install_project fails ("no build for <harness>"); installLeavesTargets: it builds the plugin but leaves its targets alone (a runtime older than the window)
+//             projectChanged     every plan blocks the plugin of a project on each harness it is on with "Project file changed: open the project again" (the registry's words for a build older than its file); an install_project clears it
+//             remove_project     {id, revision} takes the project off the list, never the default one (a project with `included: true`, as the runtime flags the copy Muro ships)
 //             simulate           what `simulate` answers: 'selected' (a prerequisite and a chosen step), 'no_match', 'clarify' (needs_clarification, with its questions) or
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
@@ -88,7 +90,7 @@ function withBigGraph(info) {
   const example = (title, chosen) => ({ id: title, title, task: title, stack_tokens: [], status: 'selected', selections: chosen.map(pick), reason: 'Both.', questions: [], path: chosen, steps: chosen.map(id => ({ step: id, capability: id, intent: id + '-intent' })) });
   return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]])] } };
 }
-const summaryOf = (id, path, info) => ({ id, path, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
+const summaryOf = (id, path, info, included = false) => ({ id, path, included, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
 function scenarioData(scenario) {
   const idle = { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, errors: null, targets: {} };
@@ -102,7 +104,7 @@ function scenarioData(scenario) {
     case 'recorded-ok': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0) };
     case 'recorded-errors': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0, { errors: 1 }) };
     case 'recorded-unseen': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] }, sync: recorded(1) };
-    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Marionette', 'marionette', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
+    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], included: true, info: projectInfo('Marionette', 'marionette', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
@@ -131,7 +133,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -170,6 +172,7 @@ export function createTransport(scenario = 'default') {
       for (const p of reg.plugins.filter(p => p.targets.includes(t.id))) {
         const want = p.distributions.find(d => d.harness === t.harness && d.path), have = inv.plugins.find(i => i.registry_id === p.id);
         if (have) wanted.add(have.id);
+        if (flags.projectChanged && p.project) { blockers.push(`${t.name} / ${p.name}: Project file changed: open the project again`); continue; }   // the registry's words for a build older than its project file
         if (!want) { blockers.push(`${t.name} / ${p.name}: No version for this harness`); continue; }
         const kind = !have ? 'install' : reinstall === p.id ? 'reinstall' : have.version !== want.version ? 'update' : null;
         if (kind) operations.push({ target_id: t.id, plugin_id: p.id, name: p.name, kind, from_version: have?.version || '', to_version: want.version, reason: kind === 'install' ? 'Missing desired distribution' : 'Reconcile desired artifact' });
@@ -186,18 +189,37 @@ export function createTransport(scenario = 'default') {
     return structuredClone(plan);
   }
   const projectOf = id => { const p = projects.find(x => x.id === id); if (!p) throw new Error('Project not found: ' + id); return p; };
-  // The runtime's install_project (plan 2, Task 5): the project's build for each harness is put in the list as the plugin named by its slug, and every target of those harnesses becomes a target of the plugin (as the runtime does, plan 2 Task 5). flags.installLeavesTargets models a runtime that does not.
-  function installProject({ id, harnesses }) {
-    if (flags.rejectInstall) throw new Error(`The project has no build for ${harnesses[0]}`);
+  // The runtime's install_project {id, targets}: the ids are managed harnesses (enabled targets of the registry); the project's build for each distinct kind of them is put in the list as the plugin
+  // named by its slug, and its targets become exactly those ids (a paused target the plugin already holds stays). A target not named is not touched. flags.installLeavesTargets models a runtime that
+  // builds the plugin and leaves its targets alone. Installing takes the project file as it is now: a changed file (flags.projectChanged) is no longer.
+  function installProject({ id, targets }) {
+    if (!Array.isArray(targets) || !targets.length) throw new Error('Name at least one target to install on');
+    const named = [...new Set(targets)].map(tid => {
+      const t = reg.targets.find(x => x.id === tid);
+      if (!t) throw new Error(`No harness is managed under the id ${tid}`);
+      if (!t.enabled) throw new Error(`${t.name} is paused: switch it on in Sync first`);
+      return t;
+    });
+    const kinds = [...new Set(named.map(t => t.harness))];
+    if (flags.rejectInstall) throw new Error(`The project has no build for ${kinds[0]}`);
     const project = projectOf(id);
-    for (const h of harnesses) if (!project.adapters.includes(h)) throw new Error(`The project has no build for ${h}`);
-    const { slug, name, version } = project.info.plugin, distributions = harnesses.map(h => build(h, version));
+    for (const h of kinds) if (!project.adapters.includes(h)) throw new Error(`The project has no build for ${h}`);
+    const { slug, name, version } = project.info.plugin, distributions = kinds.map(h => build(h, version));
     let made = reg.plugins.find(p => p.project === id);
     if (made) made.distributions = distributions;
     else reg.plugins.push(made = plugin(slug, name, [], distributions, { project: id, source: 'project:' + id, upstream_version: 'v' + version }));
-    if (!flags.installLeavesTargets) for (const t of reg.targets) if (harnesses.includes(t.harness) && !made.targets.includes(t.id)) made.targets.push(t.id);
+    if (!flags.installLeavesTargets) made.targets = [...named.map(t => t.id), ...made.targets.filter(tid => !named.some(t => t.id === tid) && reg.targets.some(t => t.id === tid && !t.enabled))];
+    flags.projectChanged = false;
     reg.revision++;
     return { plugin_id: made.id };
+  }
+  // The runtime's remove_project {id, revision}: the entry leaves the list and nothing else; the default project stays ("The default project stays in the list").
+  function removeProject(payload) {
+    mutate(payload);
+    projectOf(payload.id);
+    if (payload.id === 'marionette') throw new Error('The default project stays in the list');
+    projects.splice(projects.findIndex(p => p.id === payload.id), 1);
+    return bump();
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
@@ -255,18 +277,19 @@ export function createTransport(scenario = 'default') {
         return { snapshot: snapshot(), plan, errors };
       }
       case 'apply': return apply(payload);
-      case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info));
-      case 'project': return structuredClone(flags.bigGraph ? withBigGraph(projectOf(payload.id).info) : projectOf(payload.id).info);
+      case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info, !!p.included));
+      case 'project': return structuredClone({ ...(flags.bigGraph ? withBigGraph(projectOf(payload.id).info) : projectOf(payload.id).info), included: !!projectOf(payload.id).included });
       case 'open_project': {
         if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
         const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();
         const known = projects.find(p => p.id === id);
-        if (known) return summaryOf(known.id, known.path, known.info);
+        if (known) return summaryOf(known.id, known.path, known.info, !!known.included);
         const info = projectInfo(file, id), added = { id, path: payload.path, adapters: ['claude-code', 'codex'], info };
         projects.push(added);
         return summaryOf(id, added.path, info);
       }
       case 'install_project': return installProject(payload);
+      case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);
       case 'cancel_simulation': {
         const stop = running.get(payload.run);
@@ -314,7 +337,7 @@ export function createTransport(scenario = 'default') {
       // The runtime's env_present (plan 2, Task 5): whether the variable is set for the Muro process. The name is checked as the registry checks it; no value is ever returned.
       case 'env_present': {
         if (flags.noEnvCheck) throw new Error('Unknown registry action: env_present');
-        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(payload.name))) throw new Error('The key setting must name an environment variable, not hold a key');
+        if (!/^[A-Z_][A-Z0-9_]{0,63}$/.test(String(payload.name))) throw new Error('The key setting must name an environment variable, not hold a key');
         return { set: flags.envSet.includes(payload.name) };
       }
       case 'autostart': return { supported: !flags.autostartUnsupported, enabled: autostart, current: autostart };

@@ -129,7 +129,7 @@ await test('Graph & simulator opens in its tab panel with the simulator and the 
   assert.equal(await page.getByText('Coming in this version').count(), 0, 'no placeholder is left');
 });
 
-await test('Install: a switch per harness calls install_project with that harness; what waits is reviewed in the sheet of Sync and applied there', 'projects', {}, async app => {
+await test('Install: a switch per harness calls install_project with the id of that harness; what waits is reviewed in the sheet of Sync and applied there', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   await tab(page, 'Install').click();
@@ -140,7 +140,7 @@ await test('Install: a switch per harness calls install_project with that harnes
   await page.locator('#step-panel li', { hasText: 'Codex' }).getByText('Install 0.5.0').waitFor();
   const made = (await app.calls()).slice(before);
   assert.deepEqual(made.map(c => c.action).filter(a => a !== 'plan'), ['install_project', 'snapshot'], 'one install_project sets the build and the target: the page saves nothing');
-  assert.deepEqual(made[0], { action: 'install_project', payload: { id: 'marionette', harnesses: ['codex'] } });
+  assert.deepEqual(made[0], { action: 'install_project', payload: { id: 'marionette', targets: ['t2'] } }, 'the id of the Codex switch, never the kind of harness');
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'true');
   assert.equal(await switchOf(page, 'Claude Code').getAttribute('aria-checked'), 'false', 'only the one switched');
   assert.match(await tab(page, 'Install').textContent(), /On 1 harness · 1 change waiting/);
@@ -176,6 +176,64 @@ await test('the list says where a project is installed once it is, and keeps the
   assert.equal(await page.locator('h2', { hasText: 'Installed as published' }).count(), 1);
   assert.equal(await page.locator('li', { hasText: 'commit-helper' }).count(), 1);
   assert.equal(await page.locator('li:not(.go)', { hasText: 'Marionette' }).count(), 0, 'the project plugin is not listed among the plugins installed as published');
+});
+
+await test('Install: a harness whose build is older than the project file says so, offers to install again, and the install takes the file as it is now', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  await tab(page, 'Install').click();
+  await switchOf(page, 'Claude Code').click();
+  await switchOf(page, 'Claude Code').and(page.locator('[aria-checked=true]')).waitFor();
+  assert.match(await tab(page, 'Install').textContent(), /On 1 harness · 1 change waiting/);
+  // the project file changes behind the page: the registry's plan blocks the plugin of the project on the harness it is on
+  await app.flags({ projectChanged: true });
+  await page.locator('nav button', { hasText: 'Sync' }).click();
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await page.getByText(/Project file changed: open the project again/).first().waitFor();
+  await page.locator('nav button', { hasText: 'Projects' }).click();
+  const row = page.locator('#step-panel li', { hasText: 'Claude Code' });
+  await row.getByText('Changed since it was installed: install again', { exact: true }).waitFor();
+  assert.equal(await row.locator('.cell').count(), 0, 'not shown as a version that is up to date');
+  assert.match(await tab(page, 'Install').textContent(), /1 harness to install again/);
+  const before = (await app.calls()).length;
+  await row.getByRole('button', { name: 'Install Marionette again on Claude Code' }).click();
+  await row.getByText('Changed since it was installed: install again').waitFor({ state: 'detached' });
+  const made = (await app.calls()).slice(before);
+  assert.deepEqual(made.filter(c => c.action === 'install_project'), [{ action: 'install_project', payload: { id: 'marionette', targets: ['t1'] } }], 'the harnesses that are on, nothing else');
+  assert.equal(made.some(c => c.action === 'save_plugin'), false, 'the page saves nothing itself');
+  assert.equal(await switchOf(page, 'Claude Code').getAttribute('aria-checked'), 'true');
+  assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false', 'a harness that was off stays off');
+  await page.screenshot({ path: shots + '/project-install-again.png' });
+});
+
+await test('Remove from list asks first, removes only the entry, and the project Muro ships has none', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ pickPath: 'D:/Notes/Notes.mp' });
+  await goProjects(page);
+  await page.locator('li.go', { hasText: 'Marionette' }).waitFor();
+  assert.equal(await page.getByRole('button', { name: /^Remove .* from the list$/ }).count(), 0, 'the project Muro ships stays in the list');
+  await page.getByRole('button', { name: 'Open project file…' }).click();
+  await page.locator('li.go', { hasText: 'Notes' }).waitFor();
+  const remove = page.getByRole('button', { name: 'Remove Notes from the list' });
+  assert.equal(await remove.count(), 1);
+  const dlg = page.locator('dialog[open]');
+  await remove.click();
+  await dlg.locator('h2', { hasText: 'Remove Notes from your list?' }).waitFor();
+  await dlg.getByText('Only the entry goes: the file stays where it is (D:/Notes/Notes.mp) and you can open it again.', { exact: true }).waitFor();
+  assert.equal((await actions(app)).includes('remove_project'), false, 'nothing is removed before the person agrees');
+  await dlg.getByRole('button', { name: 'Cancel' }).click();
+  await dlg.waitFor({ state: 'detached' });
+  assert.equal(await page.locator('li.go', { hasText: 'Notes' }).count(), 1, 'cancelled: still listed');
+  await remove.click();
+  await dlg.getByRole('button', { name: 'Remove from list', exact: true }).click();
+  await page.locator('.toast', { hasText: 'Notes removed from your list.' }).waitFor();
+  await page.locator('li.go', { hasText: 'Notes' }).waitFor({ state: 'detached' });
+  const asked = (await app.calls()).filter(c => c.action === 'remove_project');
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].payload.id, 'notes');
+  assert.equal(typeof asked[0].payload.revision, 'number');
+  assert.equal(await page.locator('li.go').count(), 1, 'the project Muro ships is all that is left');
+  assert.equal(await sideways(page), 0);
 });
 
 await test('a runtime that leaves the harness out of the plugin\'s targets is an error in the banner, and the switch stays off', 'projects', {}, async app => {
@@ -240,7 +298,7 @@ await test('Open project file: the shell picks a file, Muro adds it, the list is
   await page.locator('.toast', { hasText: 'Notes added to your list.' }).waitFor();
   assert.equal(await page.locator('li.go').count(), 2);
   assert.doesNotMatch(await page.locator('li.go', { hasText: 'Notes' }).textContent(), /Included with Muro/);
-  await page.locator('li.go', { hasText: 'Notes' }).getByRole('button').click();
+  await page.locator('li.go', { hasText: 'Notes' }).locator('button[data-action=open-project]').click();
   await page.getByRole('heading', { name: 'Notes', level: 1 }).waitFor();
   assert.match(await page.locator('.projfile').textContent(), /No Git repository set · by you/);
 });
@@ -394,7 +452,7 @@ await test('Harmonize, History: a project with no repository has no tag', 'proje
   await app.flags({ pickPath: 'D:/Notes/Notes.mp' });
   await goProjects(page);
   await page.getByRole('button', { name: 'Open project file…' }).click();
-  await page.locator('li.go', { hasText: 'Notes' }).getByRole('button').click();
+  await page.locator('li.go', { hasText: 'Notes' }).locator('button[data-action=open-project]').click();
   await page.getByRole('heading', { name: 'Notes', level: 1 }).waitFor();
   await tab(page, 'Harmonize').click();
   await choose(page, 'History');

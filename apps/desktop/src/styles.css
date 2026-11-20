@@ -316,6 +316,11 @@ button[aria-busy="true"]{opacity:.6;cursor:progress}
 .steps4 small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .list>li.go small.pfile{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .list>li.go>button>span.grow>strong{overflow-wrap:anywhere}
+/* A project's row holds its opening button, which is the row, and beside it the button that removes it from the list. */
+.list>li.go>button.btn{width:auto;flex:none;margin-right:12px;padding:0 9px;gap:7px;border-radius:var(--r-sm);display:inline-flex}
+.list>li.go>button.btn:hover{background:var(--wash-hover)}
+.list>li.go>button[data-action=open-project]{flex:1 1 auto;min-width:0}
+.list>li>.btn.sm{flex:none}
 .sub{margin:-4px 0 10px}
 .pinputs .ver small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:340px}
 @media (max-width:980px){.steps4{grid-template-columns:repeat(2,1fr)}.pfiles li{grid-template-columns:1fr;gap:2px}}

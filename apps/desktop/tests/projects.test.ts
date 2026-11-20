@@ -26,10 +26,10 @@ const snapshot = (over: { plugins?: Plugin[]; targets?: Target[]; installed?: Re
   };
 };
 const meta = (over: Partial<ProjectInfo['project']> = {}): ProjectInfo['project'] => ({ schema: 1, name: 'Marionette', slug: 'marionette', version: '0.5.0', author: 'acaprino', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' }, builtin: true, ...over });
-const summary = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', project: meta(), plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0' }, inputs: 3, capabilities: 37, entries: 15, examples: 26, records: 12, runs: 4, digest: 'sha256:aaa', ...over });
+const summary = (over: Partial<ProjectSummary> = {}): ProjectSummary => ({ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', included: true, project: meta(), plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0' }, inputs: 3, capabilities: 37, entries: 15, examples: 26, records: 12, runs: 4, digest: 'sha256:aaa', ...over });
 const became = (capability = 0, always = 0, hook = 0, dropped = 0) => ({ capability, 'always-on': always, hook, dropped });
 const info = (over: Partial<ProjectInfo> = {}): ProjectInfo => ({
-  project: meta(), plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0', description: 'One plugin' },
+  included: true, project: meta(), plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0', description: 'One plugin' },
   inputs: [
     { id: 'taste-skill', url: 'https://github.com/example/taste-skill', pin: 'release', release: 'v1.2.0', commit: 'abcdef1234567890', license: 'MIT', paths: ['skills'], became: became(11, 1, 0, 2) },
     { id: 'genoffice', url: 'https://github.com/example/genoffice', pin: 'head', release: null, commit: '0123456789abcdef', license: 'Apache-2.0', paths: ['skills'], became: became(4, 0, 1, 0) },
@@ -72,7 +72,7 @@ test('the Projects tab is current on its page, which is wide like Sync', () => {
 test('every action has one owner, with the project steps merged in', () => {
   const names = Object.values(modules).flatMap(m => Object.keys(m.actions));
   assert.equal(new Set(names).size, names.length, `duplicate: ${names.filter((n, i) => names.indexOf(n) !== i)}`);
-  for (const name of ['open-project', 'close-project', 'step', 'open-project-file', 'open-folder', 'retry-projects', 'decisions-of', 'toggle-harness']) assert.ok(name in modules.projects.actions, name);
+  for (const name of ['open-project', 'close-project', 'step', 'open-project-file', 'open-folder', 'retry-projects', 'decisions-of', 'toggle-harness', 'install-again', 'remove-project']) assert.ok(name in modules.projects.actions, name);
 });
 
 // ---------- the list ----------
@@ -85,8 +85,22 @@ test('the list says for each project its name, version, file, counts, state and 
   assert.match(row, /<span class="tag good">Harmonized<\/span>/);
 });
 test('a project that is not Muro\'s own has no Included with Muro tag', () => {
-  const html = projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary({ id: 'notes', project: meta({ name: 'Notes', builtin: false }) })] } }));
+  const html = projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary({ id: 'notes', included: false, project: meta({ name: 'Notes', builtin: false }) })] } }));
   assert.doesNotMatch(html, /Included with Muro/);
+});
+test('Included with Muro is what the runtime says, never what a project file says of itself', () => {
+  // a foreign file that claims to be built in (`project.builtin`) and the runtime says is not Muro's own
+  const claims = summary({ id: 'foreign', included: false, project: meta({ name: 'Foreign', builtin: true }) });
+  const list = projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [claims] } }));
+  assert.doesNotMatch(list, /Included with Muro/, 'the list');
+  assert.doesNotMatch(projects.view(opened({}, 'inputs', info({ included: false, project: meta({ name: 'Foreign', builtin: true }) }))), /Included with Muro/, 'the project page');
+  // and the one the runtime flags wears it, whatever its own file says
+  const shipped = summary({ project: meta({ builtin: false }) });
+  assert.match(projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [shipped] } })), /Included with Muro/);
+  assert.match(projects.view(opened({}, 'inputs', info({ included: true, project: meta({ builtin: false }) }))), /Included with Muro/);
+  // a runtime that says nothing (older than the window) does not make any project the shipped one
+  const silent = { ...summary(), included: undefined };
+  assert.doesNotMatch(projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [silent] } })), /Included with Muro/);
 });
 test('one input and one capability read in the singular', () => {
   assert.match(words(rowOf(projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary({ inputs: 1, capabilities: 1 })] } })), 'marionette')), /1 input · 1 capability/);
@@ -169,7 +183,7 @@ test('the project page: header, the file with its folder, repository, author, cr
   assert.match(file, /<code class="muted">release\/<\/code>/);
 });
 test('a project with no repository says so, and one from the user is not marked as Muro\'s', () => {
-  const held = info({ project: meta({ repository: null, builtin: false, author: 'you' }) });
+  const held = info({ included: false, project: meta({ repository: null, builtin: false, author: 'you' }) });
   const html = projects.view(opened({}, 'inputs', held));
   assert.match(words(html), /No Git repository set · by you · created 2026-11-10/);
   assert.doesNotMatch(html, /Included with Muro/);
@@ -493,7 +507,7 @@ test('switching a harness on installs the project there with one install_project
   fake.calls.length = 0;
   await act('toggle-harness', { id: 't2' });
   assert.deepEqual(actions(), ['install_project', 'snapshot']);
-  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', harnesses: ['codex'] });
+  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', targets: ['t2'] }, 'the id of the switch, not the kind of harness');
   const made = state.snapshot?.registry.plugins.find(p => p.project === 'marionette');
   assert.deepEqual(made?.targets, ['t2']);
   assert.deepEqual(made?.distributions.map(d => d.harness), ['codex']);
@@ -506,12 +520,33 @@ test('a runtime that built the plugin but left the harness out of its targets is
   assert.deepEqual(actions(), ['install_project', 'snapshot'], 'no save_plugin');
   assert.match(state.error ?? '', /marionette was not set up for Codex/);
 });
-test('a second harness asks for both, so the first one keeps its build', async () => {
+test('a second harness names both switches that are on, so the first one keeps its build', async () => {
   const { act, fake } = await open();
   await act('toggle-harness', { id: 't1' });
   fake.calls.length = 0;
   await act('toggle-harness', { id: 't2' });
-  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', harnesses: ['claude-code', 'codex'] });
+  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', targets: ['t1', 't2'] });
+});
+test('two harnesses of one kind: switching one on names that one, and one that was switched off stays off when another kind is switched on', async () => {
+  const { act, fake, state } = await open();
+  await fake.request('save_target', { revision: state.snapshot!.registry.revision, target: { id: 't3', harness: 'claude-code', name: 'Claude Code (work)', root: 'D:/work/.claude', executable: 'claude', exclusive: false, enabled: true } });
+  state.snapshot = await fake.request('snapshot');
+  fake.calls.length = 0;
+  await act('toggle-harness', { id: 't1' });
+  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', targets: ['t1'] }, 'the other Claude Code is not named: it was not switched on');
+  assert.deepEqual(state.snapshot?.registry.plugins.find(p => p.project === 'marionette')?.targets, ['t1'], 'and it is not a target');
+  await act('toggle-harness', { id: 't2' });
+  assert.deepEqual(fake.calls.filter(c => c.action === 'install_project').map(c => c.payload.targets), [['t1'], ['t1', 't2']]);
+  assert.deepEqual(state.snapshot?.registry.plugins.find(p => p.project === 'marionette')?.targets, ['t1', 't2'], 'switching Codex on left the Claude Code that is off still off');
+});
+test('a switch that is off for a paused harness is not named: a paused harness has no switch', async () => {
+  const { act, fake, state } = await open();
+  const t2 = state.snapshot!.registry.targets.find(t => t.id === 't2')!;
+  await fake.request('save_target', { revision: state.snapshot!.registry.revision, target: { ...t2, enabled: false } });
+  state.snapshot = await fake.request('snapshot');
+  fake.calls.length = 0;
+  await act('toggle-harness', { id: 't2' });
+  assert.deepEqual(fake.calls, [], 'a paused harness cannot be switched on from here');
 });
 test('switching a harness off takes it out of the plugin\'s targets and installs nothing', async () => {
   const { act, fake, state, actions } = await open();
@@ -538,4 +573,113 @@ test('a harness the page does not know, or a project that is not open, is ignore
   await act('toggle-harness', { id: 'nope' });
   assert.deepEqual(fake.calls, []);
   assert.equal(state.error, null);
+});
+
+// ---------- a build older than its project file ----------
+const CHANGED_BY_THE_PLAN = (name: string) => `${name} / Marionette: Project file changed: open the project again`;
+test('Install: a harness whose build is older than the project file says so and offers to install again; the others read as they did', () => {
+  const held = { ...plan([]), blockers: [CHANGED_BY_THE_PLAN('Claude Code')] };
+  const both = live({ targetsOn: ['t1', 't2'], plan: held, installed: { t1: [{ id: 'n1', registry_id: 'marionette', name: 'Marionette', version: '0.5.0' }], t2: [{ id: 'n2', registry_id: 'marionette', name: 'Marionette', version: '0.5.0' }] } });
+  const html = install.view(both, info());
+  const rows = html.split('<li>').slice(1);
+  assert.match(words(rows[0]), /^CC Claude Code Checked never · last sync never Changed since it was installed: install again Install again$/);
+  assert.match(rows[0], /<button[^>]*class="btn sm"[^>]*data-action="install-again"[^>]*data-id="t1"[^>]*aria-label="Install Marionette again on Claude Code"/);
+  assert.doesNotMatch(rows[0], /class="cell ok"/, 'not shown as up to date');
+  assert.match(words(rows[1]), /^CX Codex Checked never · last sync never 0\.5\.0$/, 'Codex is blocked by nothing');
+  assert.doesNotMatch(rows[1], /install-again/);
+  assert.equal(install.installLine(both, 'marionette'), 'On 2 harnesses · 1 harness to install again', 'the line of the tab and of the list says it too: not "in sync"');
+});
+test('Install: only the registry\'s own words for a changed project file mark a build, and only for a plan of the registry the page holds', () => {
+  const other = { ...plan([]), blockers: ['Claude Code / Marionette: No version for this harness', 'Claude Code / Other: Project file changed: open the project again', 'Codex / Marionette: Project file changed: open the project again'] };
+  assert.doesNotMatch(install.view(live({ plan: other }), info()), /install-again/, 'another reason, another plugin, a harness the project is not on');
+  const old = { ...plan([], 7), blockers: [CHANGED_BY_THE_PLAN('Claude Code')] };
+  assert.doesNotMatch(install.view(live({ plan: old }), info()), /install-again/, 'a plan of another revision is no plan of this snapshot');
+  assert.equal(install.installLine(live({ plan: old }), 'marionette'), 'On 1 harness · in sync');
+});
+test('Install again installs the project on the harnesses that are on, from the file as it is now, and the harness is no longer marked', async () => {
+  const { act, fake, state, actions } = await open();
+  await act('toggle-harness', { id: 't1' });
+  await act('toggle-harness', { id: 't2' });
+  fake.flags.projectChanged = true;
+  fake.calls.length = 0;
+  await act('install-again', { id: 't1' });
+  assert.deepEqual(actions(), ['install_project', 'snapshot']);
+  assert.deepEqual(fake.calls[0].payload, { id: 'marionette', targets: ['t1', 't2'] }, 'every harness that is on: the ones not named would lose their build');
+  assert.equal(fake.flags.projectChanged, false);
+  assert.deepEqual(state.snapshot?.registry.plugins.find(p => p.project === 'marionette')?.targets, ['t1', 't2']);
+  // a harness that is off, or a paused one, or no project open: nothing happens
+  await act('toggle-harness', { id: 't2' });
+  fake.calls.length = 0;
+  await act('install-again', { id: 't2' });
+  await act('install-again', { id: 'nope' });
+  assert.deepEqual(fake.calls, []);
+});
+
+// ---------- removing a project from the list ----------
+const NOTES = 'D:/Notes/Notes.mp';
+const withNotes = async (wrap?: Parameters<typeof session>[1]) => {
+  const s = await session('projects', wrap);
+  const asked: { title: string; text: string; ok: string; danger: boolean }[] = [];
+  let confirmed: (() => void) | null = null;
+  (s.app as unknown as { confirm: (...a: any[]) => void }).confirm = (title: string, text: string, ok: string, then: () => void, danger = false) => { asked.push({ title, text, ok, danger }); confirmed = then; };
+  s.fake.flags.pickPath = NOTES;
+  await s.act('open-project-file');
+  s.fake.calls.length = 0;
+  return { ...s, asked, confirm: async () => { confirmed?.(); await new Promise(done => setTimeout(done, 0)); await new Promise(done => setTimeout(done, 0)); } };
+};
+test('the list has Remove from list on every project but the one Muro ships, and a project that cannot be read has it too', () => {
+  const list = [summary(), summary({ id: 'notes', path: NOTES, included: false, project: meta({ name: 'Notes', builtin: false }) }), { id: 'gone', path: 'D:/old/gone.mp', error: 'The project file is missing: D:/old/gone.mp', included: false }, { id: 'broken-default', path: 'D:/Muro/data/projects/marionette.mp', error: 'Not a Muro project file', included: true }];
+  const html = projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list } }));
+  const buttons = [...html.matchAll(/<button[^>]*data-action="remove-project"[^>]*>/g)].map(m => m[0]);
+  assert.equal(buttons.length, 2, 'the shipped project has none, readable or not');
+  assert.match(buttons[0], /data-id="notes"[^>]*aria-label="Remove Notes from the list"|aria-label="Remove Notes from the list"[^>]*data-id="notes"/);
+  assert.match(buttons[1], /data-id="gone"/);
+  assert.match(rowOf(html, 'notes'), /<\/button><button[^>]*data-action="remove-project"[^>]*>.*<span>Remove from list<\/span><\/button><\/li>$/, 'beside the button that opens the row, never inside it');
+  assert.doesNotMatch(rowOf(html, 'marionette'), /remove-project/);
+});
+test('Remove from list asks first, says the file stays, and removes only the entry; the list is read again', async () => {
+  const { act, fake, state, asked, confirm, toasts } = await withNotes();
+  assert.deepEqual(state.projects.list?.map(p => p.id), ['marionette', 'notes']);
+  await act('remove-project', { id: 'notes' });
+  assert.deepEqual(fake.calls, [], 'nothing is sent before the person confirms');
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].title, 'Remove Notes from your list?');
+  assert.match(asked[0].text, /Only the entry goes: the file stays where it is \(D:\/Notes\/Notes\.mp\) and you can open it again\./);
+  assert.deepEqual([asked[0].ok, asked[0].danger], ['Remove from list', true]);
+  const revision = state.snapshot!.registry.revision;
+  await confirm();
+  assert.deepEqual(fake.calls.map(c => c.action), ['remove_project', 'projects']);
+  assert.deepEqual(fake.calls[0].payload, { id: 'notes', revision }, 'at the revision the page held');
+  assert.equal(state.snapshot!.registry.revision, revision + 1, 'and the snapshot the service answered is kept');
+  assert.deepEqual(state.projects.list?.map(p => p.id), ['marionette']);
+  assert.deepEqual(toasts.slice(1), ['Notes removed from your list.'], 'after the one that said it was added');
+  assert.equal(state.error, null);
+});
+test('Remove from list says when its installed plugin stays, and a revision that moved behind the page is read again and sent once more', async () => {
+  let refused = 1;
+  const { act, fake, state, asked, confirm } = await withNotes(request => (a, p) => { if (a === 'remove_project' && refused-- > 0) return Promise.reject(new Error('Registry revision changed; refresh before saving')); return request(a, p); });
+  await fake.request('save_plugin', { revision: state.snapshot!.registry.revision, plugin: { id: 'notes', name: 'Notes', source: 'project:notes', policy: 'head', pinned_version: '', targets: ['t1'], distributions: [], project: 'notes' } });
+  state.snapshot = await fake.request('snapshot');
+  fake.calls.length = 0;
+  await act('remove-project', { id: 'notes' });
+  assert.match(asked[0].text, /Its installed plugin stays as it is; Sync shows it as changed until the project is in your list again\./);
+  await confirm();
+  assert.deepEqual(fake.calls.map(c => c.action), ['snapshot', 'remove_project', 'projects'], 'the refused request never reached the service: the registry was read, the request sent again');
+  assert.deepEqual(state.projects.list?.map(p => p.id), ['marionette']);
+  assert.equal(state.error, null);
+});
+test('the service\'s refusal to remove the default project reaches the banner, and the list is not read again', async () => {
+  const { act, fake, state, confirm } = await withNotes();
+  state.projects.list = [summary({ included: false })];       // a page that did not know the project is the shipped one
+  await act('remove-project', { id: 'marionette' });
+  await confirm();
+  assert.equal(state.error, 'The default project stays in the list');
+  assert.deepEqual(fake.calls.map(c => c.action), ['remove_project']);
+  assert.ok(fake.calls.length === 1 && (await fake.request('projects')).some((p: ProjectSummary) => p.id === 'marionette'));
+});
+test('Remove from list for a project the page does not list, or before the registry was read, does nothing', async () => {
+  const { act, fake, asked } = await withNotes();
+  await act('remove-project', { id: 'nobody' });
+  await act('remove-project', {});
+  assert.deepEqual([asked.length, fake.calls.length], [0, 0]);
 });
