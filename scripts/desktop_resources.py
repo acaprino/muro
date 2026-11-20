@@ -1,4 +1,11 @@
-"""Stage a private Windows Python and the factory into a fresh desktop resource folder."""
+"""Stage a private Windows Python, the factory and the default project into a fresh desktop resource folder.
+
+The default project is Marionette (examples/marionette), packed as projects/marionette.mp: a fresh release
+is built, then `muro project pack` carries the package, every input at its pinned commit and that release.
+This step needs the network, as `muro check-sources` does: the pinned sources are fetched for the build and
+for the inputs. The inputs are kept in --sources-cache (default .scratch/sources-cache), so the next run
+fetches only what changed. --archive covers the Python download only.
+"""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -6,11 +13,16 @@ import io
 import json
 from pathlib import Path
 import shutil
+import subprocess
+import sys
+import tempfile
 import urllib.request
 import zipfile
 
 PYTHON_URL = "https://www.python.org/ftp/python/3.13.17/python-3.13.17-embed-amd64.zip"
 PYTHON_SHA256 = "9e35319bffedab8b36ad44d8f377cb4f1733bcec257a0b6d04d94f01486ddb38"
+DEFAULT_PROJECT = Path("examples") / "marionette"      # the package that ships as the default project
+SOURCES_CACHE = Path(".scratch") / "sources-cache"     # under the checkout; build-release.bat leaves it alone
 
 def stage(out: Path, archive: bytes, root: Path) -> None:
     if hashlib.sha256(archive).hexdigest() != PYTHON_SHA256:
@@ -35,14 +47,43 @@ def stage(out: Path, archive: bytes, root: Path) -> None:
     shutil.copytree(root / "docs" / "adr", factory / "docs" / "adr")
     (out / "PROVENANCE.json").write_text(json.dumps({"python_url": PYTHON_URL, "sha256": PYTHON_SHA256}, indent=2), encoding="utf-8")
 
+def pack_default_project(out: Path, root: Path, sources_cache: Path, run=subprocess.run) -> Path:
+    """Build the default project's release and pack it into `<out>/projects/<slug>.mp`; needs the network.
+
+    The factory run is the checkout's own `muro` package (`cwd=root`), the same code `out/factory` is a copy of.
+    The release is built beside `out`, never inside it, and removed once packed or when a command fails.
+    """
+    manifest = root / DEFAULT_PROJECT / "sources.json"
+    slug = json.loads(manifest.read_text(encoding="utf-8"))["plugin"]["slug"]
+    target = out / "projects" / f"{slug}.mp"
+    target.parent.mkdir(exist_ok=True)
+    factory = [sys.executable, "-m", "muro"]
+    with tempfile.TemporaryDirectory(prefix=".muro-release-", dir=out.parent) as release:
+        run([*factory, "build", "--manifest", str(manifest), "--out", release], cwd=root, check=True)
+        run([*factory, "project", "pack", "--manifest", str(manifest), "--out", str(target),
+             "--sources-cache", str(sources_cache), "--release", release], cwd=root, check=True)
+    return target
+
+def stage_resources(out: Path, archive: bytes, root: Path, sources_cache: Path, run=subprocess.run) -> Path:
+    """`stage`, then the default project. A failed project step removes the folder `stage` made a moment ago."""
+    stage(out, archive, root)
+    try:
+        return pack_default_project(out, root, sources_cache, run)
+    except BaseException:
+        shutil.rmtree(out, ignore_errors=True)
+        raise
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--out", type=Path, required=True)
-    parser.add_argument("--archive", type=Path)
+    parser.add_argument("--archive", type=Path, help="an already downloaded copy of the embedded Python archive")
+    parser.add_argument("--sources-cache", type=Path, metavar="DIR",
+                        help=f"where the default project's inputs are kept between runs (default: <repository>/{SOURCES_CACHE})")
     args = parser.parse_args()
+    root = Path(__file__).resolve().parent.parent
     archive = args.archive.read_bytes() if args.archive else urllib.request.urlopen(PYTHON_URL, timeout=90).read()
-    stage(args.out.resolve(), archive, Path(__file__).resolve().parent.parent)
-    print(f"Staged private Python + factory: {args.out.resolve()}")
+    project = stage_resources(args.out.resolve(), archive, root, (args.sources_cache or root / SOURCES_CACHE).resolve())
+    print(f"Staged private Python + factory + default project: {args.out.resolve()} ({project.name})")
 
 if __name__ == "__main__":
     main()
