@@ -348,8 +348,8 @@ identity check, a catalog, delivery document or entries file that fails the buil
 the reason. `pack` and `unpack` print the path they wrote. Exit `0` on success, `1` with the reason on stderr
 otherwise.
 
-`info --summary` is what a list of projects shows: `{project, plugin: {name, slug, version}, counts: {inputs,
-capabilities, entries, examples, records, runs}, digest}` and none of the capability bodies that make the full
+`info --summary` is what a list of projects shows: `{project, plugin: {name, slug, version}, inputs,
+capabilities, entries, examples, records, runs, digest}` (the counts) and none of the capability bodies that make the full
 `info` large (610 KB for Marionette). The counts are the full `info`'s own. A file that is missing or invalid is
 `{"error": reason}` on stdout with exit `0`, so one bad file never hides the others from a list (the desktop
 runs it once per listed project and reads the full `info` only for the project it opens).

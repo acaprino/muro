@@ -360,9 +360,12 @@ def summary(mp: Path, cache_root: Path) -> dict[str, Any]:
     return {
         "project": full["project"],
         "plugin": {key: full["plugin"][key] for key in ("name", "slug", "version")},
-        "counts": {"inputs": len(full["inputs"]), "capabilities": len(graph["capabilities"]),
-                   "entries": len(graph["entries"]), "examples": len(graph["examples"]),
-                   "records": len(full["records"]), "runs": len(full["history"])},
+        "inputs": len(full["inputs"]),
+        "capabilities": len(graph["capabilities"]),
+        "entries": len(graph["entries"]),
+        "examples": len(graph["examples"]),
+        "records": len(full["records"]),
+        "runs": len(full["history"]),
         "digest": full["digest"],
     }
 

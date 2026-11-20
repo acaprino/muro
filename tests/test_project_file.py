@@ -847,7 +847,8 @@ def test_project_subcommands_report_failures_on_stderr_with_exit_1(tmp_path, pac
 
 # --- info --summary: what the projects list shows, without the capability bodies ----------------------
 
-SUMMARY_KEYS = {"project", "plugin", "counts", "digest"}
+COUNTS = ("inputs", "capabilities", "entries", "examples", "records", "runs")
+SUMMARY_KEYS = {"project", "plugin", "digest", *COUNTS}
 
 
 def test_summary_is_the_identity_and_the_counts_and_none_of_the_content(tmp_path, described, cache):
@@ -856,18 +857,20 @@ def test_summary_is_the_identity_and_the_counts_and_none_of_the_content(tmp_path
     assert set(shown) == SUMMARY_KEYS
     assert shown["project"] == PROJECT_JSON
     assert shown["plugin"] == {"name": "Tester", "slug": SLUG, "version": "0.1.0"}
-    assert shown["counts"] == {"inputs": 1, "capabilities": 1, "entries": 1, "examples": 1, "records": 1, "runs": 1}
+    assert {key: shown[key] for key in COUNTS} == {"inputs": 1, "capabilities": 1, "entries": 1, "examples": 1,
+                                                    "records": 1, "runs": 1}
     assert shown["digest"] == project.digest(mp) == full["digest"]
     # the counts are the full info's own, not a second computation
-    assert shown["counts"] == {"inputs": len(full["inputs"]), "capabilities": len(full["graph"]["capabilities"]),
-                               "entries": len(full["graph"]["entries"]), "examples": len(full["graph"]["examples"]),
-                               "records": len(full["records"]), "runs": len(full["history"])}
+    assert {key: shown[key] for key in COUNTS} == {
+        "inputs": len(full["inputs"]), "capabilities": len(full["graph"]["capabilities"]),
+        "entries": len(full["graph"]["entries"]), "examples": len(full["graph"]["examples"]),
+        "records": len(full["records"]), "runs": len(full["history"])}
     assert "Source: demo" not in json.dumps(shown)        # a capability body is what makes the full info large
 
 
 def test_summary_of_a_project_without_entries_counts_none(tmp_path, package, cache):
     shown = project.summary(project.pack(package, tmp_path / "t.mp", sources_cache=cache), tmp_path / "kept")
-    assert shown["counts"]["entries"] == 0 and shown["counts"]["capabilities"] == 1
+    assert shown["entries"] == 0 and shown["capabilities"] == 1
 
 
 def test_summary_of_a_file_that_is_missing_or_invalid_is_an_error_not_a_failure(tmp_path, package, cache):
