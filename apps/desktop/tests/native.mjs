@@ -158,15 +158,32 @@ try {
   // 6. Settings, through the real service: saved on change; the interface and the registry agree.
   await page.locator('nav').getByRole('button', { name: /^Settings/ }).click();
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
-  const tray = page.getByRole('switch', { name: 'Keep running when the window is closed' });
+  const TRAY = 'Keep running when the window is closed';
+  const tray = page.getByRole('switch', { name: TRAY });
+  // The page paints a setting only after the service answered, so once it shows it the save is done on disk too.
+  const shows = async on => { await page.locator(`[role=switch][aria-label="${TRAY}"][aria-checked="${on}"]`).waitFor(); await page.locator('.busy').waitFor({ state: 'detached' }); };
   assert.equal(await tray.getAttribute('aria-checked'), 'true');
   await tray.click();
-  await until('the setting saved', async () => (await json(join(data, 'registry.json'))).settings.close_to_tray === false);
-  assert.equal(await tray.getAttribute('aria-checked'), 'false');
-  assert.equal((await status()).revision, (await json(join(data, 'registry.json'))).revision, 'a settings save keeps the recorded plan current');
+  await shows(false);
+  const saved = await json(join(data, 'registry.json'));
+  assert.equal(saved.settings.close_to_tray, false);
+  assert.equal((await status()).revision, saved.revision, 'a settings save keeps the recorded plan current');
   await tray.click();
-  await until('the setting saved again', async () => (await json(join(data, 'registry.json'))).settings.close_to_tray === true);
+  await shows(true);
+  assert.equal((await json(join(data, 'registry.json'))).settings.close_to_tray, true);
   checks.push('Settings saves on change through the real service and keeps the recorded sync state current');
+
+  // 7. Stop managing: the service refuses a harness that a plugin still lists, so the page takes it off the plugin first.
+  await page.locator('nav').getByRole('button', { name: /^Sync/ }).click();
+  await page.locator('th .hbtn').click();
+  const sheet = page.locator('dialog[open]');
+  await sheet.getByRole('button', { name: 'Stop managing' }).click();
+  await sheet.getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await page.locator('#toasts').getByText(/Muro no longer manages/).waitFor();
+  registry = await json(join(data, 'registry.json'));
+  assert.deepEqual([registry.targets.length, registry.plugins.length, registry.plugins[0].targets.length], [0, 1, 0], 'the harness is gone and the plugin kept its place in the list');
+  assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 1, 'the plugin stays installed in the profile');
+  checks.push('Stop managing takes the harness off its plugin and removes it; the profile keeps the installed plugin');
 
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'pass', test: 'native WebView2 + real Tauri IPC: first run, add a plugin, check, apply, check again', checks, screenshot: 'apps/desktop/tests/artifacts/native-sync.png' }));
