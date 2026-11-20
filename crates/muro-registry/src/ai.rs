@@ -19,6 +19,16 @@ pub fn defaults() -> Value {
            "api_base":"https://api.openai.com/v1","model":"","api_key_env":"MURO_API_KEY"})
 }
 
+/// The dollar budget of one request: above 0 and at most 100. The one rule, for the setting and for
+/// every run that reads it.
+pub fn validate_budget(budget: f64) -> Result<()> {
+    ensure!(
+        budget.is_finite() && budget > 0.0 && budget <= 100.0,
+        "The AI budget must be above 0 and at most 100 USD"
+    );
+    Ok(())
+}
+
 /// `[A-Za-z_][A-Za-z0-9_]*`, the shape of an environment variable's name, and nothing more.
 pub fn validate_key_env(name: &str) -> Result<()> {
     let mut chars = name.chars();
@@ -80,12 +90,7 @@ pub fn validate(ai: &Value) -> Result<()> {
         HARNESSES.contains(&text("harness")?),
         "The AI harness must be claude-code or codex"
     );
-    ensure!(
-        ai["budget_usd"]
-            .as_f64()
-            .is_some_and(|b| b.is_finite() && b > 0.0 && b <= 100.0),
-        "The AI budget must be above 0 and at most 100 USD"
-    );
+    validate_budget(ai["budget_usd"].as_f64().unwrap_or(f64::NAN))?;
     let base = text("api_base")?;
     if engine == "api" || !base.is_empty() {
         validate_api_base(base)?;

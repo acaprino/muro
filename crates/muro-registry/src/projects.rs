@@ -18,13 +18,20 @@ pub const CHANGED: &str = "Project file changed: open the project again";
 /// The most projects a registry lists: a list that long is a mistake, and each one costs a read.
 const LIMIT: usize = 500;
 
-/// How two paths are compared for being the same file: Windows paths ignore case and take either slash.
-fn same_file(path: &str) -> String {
+/// A path as it is compared for being the same file: Windows paths ignore case, take either slash and
+/// end with or without one. Two paths name one file when their `same_file` are equal.
+pub fn same_file(path: &str) -> String {
     if cfg!(windows) {
-        path.replace('/', "\\").to_lowercase()
+        path.replace('/', "\\").trim_end_matches('\\').to_lowercase()
     } else {
         path.to_owned()
     }
+}
+
+/// The version a built adapter folder declares for `harness`, read by the registry's own reader: the
+/// value a distribution of that folder must record, or the plan refuses it.
+pub fn build_version(harness: &str, adapter: &Path) -> Result<String> {
+    Ok(crate::native::identity(harness, adapter)?.1)
 }
 
 /// The list a request asks to save, as the registry keeps it: each project is `{id, path}` and nothing
