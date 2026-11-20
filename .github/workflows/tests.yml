@@ -59,3 +59,13 @@ jobs:
         run: |
           npm ci
           npm test
+      - name: Type check
+        if: always()
+        run: npx tsc --noEmit
+      - name: Frontend build
+        if: always()
+        run: npm run build
+      # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
+      - name: Browser tests
+        if: always()
+        run: node apps/desktop/tests/browser.mjs
