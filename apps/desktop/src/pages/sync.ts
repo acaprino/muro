@@ -1,6 +1,6 @@
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin } from '../model.ts';
+import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
@@ -25,9 +25,10 @@ function strip(state:ViewState):string {
  else if(state.checking){ico=spin;title='Checking sources and harnesses…';text='Reading what is installed and looking for new versions.';}
  else if(h.kind==='no-harness'){const found=foundHarnesses(state).find(d=>d.supported);tone='warn';ico=icon('alert');title='No harness is managed';text='Muro needs at least one harness to install plugins into.';extra=found?button(`Manage ${found.name}`,'manage-found',{id:found.harness,primary:true}):button('Add a harness','add-target',{primary:true});}
  else if(h.kind==='not-checked'){lead=true;title='Not checked yet';text='Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.';}
- else if(h.kind==='changes'){const parts=CHANGE_WORDS.filter(([k])=>h.byKind[k]).map(([k,w])=>plural(h.byKind[k],w));tone='accent';title=`${plural(h.operations,'change')} ready to apply`;text=`${parts.join(', ')}${h.blockers?` · ${plural(h.blockers,'item')} not ready yet`:''}${unreadable?` · ${unreadable}`:''}. Nothing changes until you apply.`;extra=button('Review','review')+button(`Apply all ${plural(h.operations,'change')}`,'apply-all',{primary:true});}
+ else if(h.kind==='changes'){const parts=CHANGE_WORDS.filter(([k])=>h.byKind[k]).map(([k,w])=>plural(h.byKind[k],w)),bits=[parts.join(', '),h.blockers?`${plural(h.blockers,'item')} not ready yet`:'',unreadable,h.errors?`${plural(h.errors,'source')} could not be checked`:''].filter(Boolean);tone='accent';title=`${plural(h.operations,'change')} ready to apply`;text=`${bits.length?`${bits.join(' · ')}. `:''}Nothing changes until you apply.`;extra=button('Review','review')+button(`Apply all ${plural(h.operations,'change')}`,'apply-all',{primary:true});}
  else if(h.kind==='unreadable'){lead=true;tone='warn';ico=icon('alert');title=unreadable;text=h.unreadable.some(u=>!u.count)?'Muro could not read what is installed there, so it cannot say whether it is in sync. Check the harness settings, then check again.':'The custom instructions of a plugin on it could not be read, so it cannot say whether it is in sync. Check the plugin, then check again.';}
- else if(h.kind==='blocked'){lead=true;tone='warn';ico=icon('alert');const b=state.plan?.blockers||[];title='Some plugins are not ready';text=`${esc(b[0]||'')}${b.length>1?` and ${b.length-1} more`:''}. Muro leaves them out until they are fixed.`;extra=button('Review','review');}
+ else if(h.kind==='sources'){lead=true;tone='warn';ico=icon('alert');const one=h.errors===1;title=`${plural(h.errors,'source')} could not be checked`;text=`Muro could not resolve ${one?'it':'them'}, so it cannot say ${one?'it is':'they are'} up to date.${h.blockers?` ${plural(h.blockers,'item')} not ready yet.`:''} Check again when ${one?'it answers':'they answer'}.`;extra=h.blockers?button('Review','review'):'';}
+ else if(h.kind==='blocked'){lead=true;tone='warn';ico=icon('alert');const b=currentPlan(s,state.plan)?.blockers||[];title='Some plugins are not ready';text=b.length?`${esc(b[0])}${b.length>1?` and ${b.length-1} more`:''}. Muro leaves them out until they are fixed.`:`${plural(h.blockers,'item')} ${h.blockers===1?'is':'are'} not ready yet. Muro leaves them out until they are fixed.`;extra=button('Review','review');}
  else{tone='good';ico=icon('check');title='Everything is in sync';text='What is installed on your harnesses matches your list.';}
  const next=settings.auto_sync?`Next check <b>${last&&/^\d+$/.test(last)?esc(stamp(String(Number(last)+settings.interval_minutes*60))):'soon'}</b>`:'Automatic sync off';
  return `<section class="strip ${tone}" aria-label="Sync state"><span class="sico">${ico}</span><div class="grow"><strong>${title}</strong><small>${text}</small><small class="meta"><span>Last check <b>${esc(stamp(last))}</b></span><span>Last sync <b>${esc(stamp(s.sync.last_sync))}</b></span><span>${next}</span></small></div>${button('Check now','check',{icon:'sync',primary:lead&&!a,busy:state.checking,disabled:state.checking||!!a})}${a?'':extra}</section>`;
@@ -56,6 +57,7 @@ function hstate(state:ViewState,t:Target):string {
   case 'changes':return button(`Sync ${plural(h.count,'change')}`,'review',{id:t.id,sm:true,accent:true,icon:'sync'});
   case 'needs-build':return tag(`${plural(h.count,'plugin')} without a version`,'warn');
   case 'unknown':return tag(h.count?`${plural(h.count,'plugin')} to check`:'Cannot be read','warn');
+  case 'unseen':return tag('Check to see the changes','accent');
   default:return `<span class="cell ok">${icon('check')}<span>In sync</span></span>`;
  }
 }
@@ -218,7 +220,7 @@ function repaintInstalled(app:App,id:string):void {
 async function addToList(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
  const t=targetOf(app.state,d.id),p=app.state.snapshot?.inventory.find(i=>i.target_id===d.id)?.plugins.find(x=>x.id===d.native);if(!t||!p)return;
  if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]});return;}
- await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',{plugin:listedPlugin(p,t),revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`,'good');repaintInstalled(app,t.id);});
+ await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',listing(p,t,app.state.snapshot!.registry.revision)),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`,'good');repaintInstalled(app,t.id);});
 }
 /** The service refuses to remove a harness that a plugin still lists, so the plugins that list it are saved without it first, one after the other, each with the revision the one before returned; then the harness goes. A failure says how many plugins were already taken off it, and those stay saved. */
 async function stopManaging(app:App,t:Target):Promise<Snapshot> {

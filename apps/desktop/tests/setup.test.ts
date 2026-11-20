@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listedPlugin, inList } from '../src/model.ts';
+import { listedPlugin, listing, inList } from '../src/model.ts';
 import { sw } from '../src/ui.ts';
 import * as setup from '../src/pages/setup.ts';
 import { frame } from '../src/views.ts';
@@ -10,7 +10,7 @@ import type { App } from '../src/context.ts';
 
 const target: Target = { id: 't1', harness: 'claude-code', name: 'Claude Code', root: 'D:/config/claude-code', executable: 'claude', exclusive: false, enabled: true };
 const installed: InstalledPlugin = { id: 'native-commit-helper', name: 'commit-helper', version: '2.1.0', path: 'D:/plugins/commit-helper', managed: false };
-const snapshot = (plugins: Plugin[] = []): Snapshot => ({ registry: { schema: 1, revision: 3, plugins, targets: [target], settings: { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } }, inventory: [], activity: [], sync: { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, targets: {} } });
+const snapshot = (plugins: Plugin[] = []): Snapshot => ({ registry: { schema: 1, revision: 3, plugins, targets: [target], settings: { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } }, inventory: [], activity: [], sync: { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, errors: null, targets: {} } });
 
 test('an installed plugin becomes a list entry kept at the version it has, built from its own folder', () => {
   const plugin = listedPlugin(installed, target);
@@ -279,6 +279,8 @@ it('Finish with the plugin kept saves it, the settings and the start-up choice, 
   assert.equal(settings.payload.settings.interval_minutes, 60, 'the rest of the settings go with it');
   assert.equal(settings.payload.revision, plugin.payload.revision + 1, 'each save uses the revision the last one made');
   assert.deepEqual(autostart.payload, { enabled: true });
+  // The plugin is the installation the person already has: the service binds it, so the first sync installs nothing over it.
+  assert.deepEqual(plugin.payload.adopt, { target_id: state.snapshot!.registry.targets[0].id, native_id: 'native-commit-helper' });
   assert.equal(state.setup, null);
   assert.equal(state.page, 'sync');
   assert.equal(setup.needed(state), false, 'the tabs are back');

@@ -6,6 +6,9 @@ import { watchTheme } from './look.ts';
 import { serial } from './queue.ts';
 import { esc } from './ui.ts';
 
+/** How often the open window reads the registry again while it has the focus: the background worker and the tray change it behind the window's back. */
+export const REFRESH_MS=30_000;
+
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
 export function mountApp(root:HTMLElement,transport:Transport):()=>void {
  const request=serial(transport,['discover']);
@@ -107,6 +110,20 @@ export function mountApp(root:HTMLElement,transport:Transport):()=>void {
   e.preventDefault();if(state.page!=='sync')go('sync');root.querySelector<HTMLInputElement>('#search')?.focus();
  };
  document.addEventListener('keydown',keydown);
+ // The background worker and the tray move the registry and the sync record while the window is open or hidden. The window reads them again when it gets the focus (it is shown again, or clicked back to) and every REFRESH_MS while it has it, and only when nothing of the person's is under way: no request, no dialog, nothing being typed (a render would put the stored text back in the box). It asks for no plan: the recorded check says what changed, and a plan is made by Check now, Review and Apply all. A hidden window has no focus: WebView2 keeps `visibilityState` "visible" for it, so that says nothing.
+ const typing=()=>{const a=document.activeElement;return !!a&&root.contains(a)&&(a instanceof HTMLSelectElement||a instanceof HTMLTextAreaElement||(a instanceof HTMLInputElement&&!/^(checkbox|radio|button|submit)$/.test(a.type)));};
+ let refreshing=false;
+ async function refreshIfIdle(){
+  if(disposed||refreshing||state.busy||state.checking||state.applying||polling||dialog.open||typing())return;
+  refreshing=true;
+  try{const s=await request<Snapshot>('snapshot');if(disposed)return;adopt(s,{replan:false});}
+  catch{/* the next focus or tick tries again: a refresh nobody asked for shows no error */}
+  finally{refreshing=false;}
+  if(!disposed&&!dialog.open&&!typing())render();
+ }
+ const refreshTimer=setInterval(()=>{if(document.hasFocus())void refreshIfIdle();},REFRESH_MS);
+ const focused=()=>void refreshIfIdle();
+ window.addEventListener('focus',focused);
  const jobTimer=setInterval(async()=>{
   if(polling||state.busy||dialog.open||!state.snapshot?.jobs?.some(j=>j.status==='running'))return;
   polling=true;
@@ -114,5 +131,5 @@ export function mountApp(root:HTMLElement,transport:Transport):()=>void {
   catch(e){fail(e);}finally{polling=false;}
  },3000);
  void reload().then(()=>{if(state.snapshot){void discover();void modules[state.page].opened?.(app);}});
- return ()=>{disposed=true;stopTheme();clearInterval(jobTimer);document.removeEventListener('keydown',keydown);dialog.remove();toasts.remove();root.replaceChildren();};
+ return ()=>{disposed=true;stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);document.removeEventListener('keydown',keydown);dialog.remove();toasts.remove();root.replaceChildren();};
 }

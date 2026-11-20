@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listedPlugin, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
+import { listedPlugin, listing, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
 import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.ts';
 import { frame, modules } from '../src/views.ts';
 import { reviewSheet } from '../src/sheets.ts';
@@ -8,7 +8,7 @@ import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
 
 const plugin: Plugin = {id:'pkg',name:'Package',source:'owner/pkg',policy:'stable',pinned_version:'',targets:['target'],distributions:[{harness:'codex',path:'/artifact',version:'2'}]};
-function snapshot(): Snapshot {return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'target',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},inventory:[{target_id:'target',complete:true,supported:true,error:null,plugins:[{id:'pkg',name:'Package',version:'1',path:'/plugin',managed:true}]}],activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,targets:{}}};}
+function snapshot(): Snapshot {return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'target',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},inventory:[{target_id:'target',complete:true,supported:true,error:null,plugins:[{id:'pkg',name:'Package',version:'1',path:'/plugin',managed:true}]}],activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,errors:null,targets:{}}};}
 const viewState=(snapshot:Snapshot|null,over:Partial<ViewState>={}):ViewState=>({page:'sync',snapshot,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,...over});
 test('version drift requires an update',()=>assert.equal(pluginState(plugin,snapshot()).kind,'update'));
 test('incomplete inventory is never marked missing or synchronized',()=>{const s=snapshot();s.inventory[0].complete=false;assert.equal(pluginState(plugin,s).kind,'unknown');});
@@ -126,19 +126,53 @@ test('harnessState: a plugin whose instructions cannot be read keeps the harness
 
 test('syncSummary: no enabled harness',()=>{
  const s=snapshot();s.registry.targets[0].enabled=false;
- assert.deepEqual(syncSummary(s,plan([op('update','1','2')])),{kind:'no-harness',operations:0,blockers:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('update','1','2')])),{kind:'no-harness',operations:0,blockers:0,errors:0,byKind:{}});
  s.registry.targets=[];assert.equal(syncSummary(s,null).kind,'no-harness');
 });
 test('a plan of another revision counts as not checked',()=>{
- const s=snapshot(),empty={kind:'not-checked',operations:0,blockers:0,byKind:{}};
+ const s=snapshot(),empty={kind:'not-checked',operations:0,blockers:0,errors:0,byKind:{}};
  assert.deepEqual(syncSummary(s,plan([op('update','1','2')],3,['Codex: broken'])),empty);
  assert.deepEqual(syncSummary(s,null),empty);
 });
 test('syncSummary counts the operations of a current plan by kind, and its blockers',()=>{
  const s=snapshot();
- assert.deepEqual(syncSummary(s,plan([op('install','','2','a'),op('update','1','2','b'),op('update','1','2','c'),op('remove','1','','')],4,['Codex / D: no build'])),{kind:'changes',operations:4,blockers:1,byKind:{install:1,update:2,remove:1}});
- assert.deepEqual(syncSummary(s,plan([],4,['Codex / D: no build'])),{kind:'blocked',operations:0,blockers:1,byKind:{}});
- assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('install','','2','a'),op('update','1','2','b'),op('update','1','2','c'),op('remove','1','','')],4,['Codex / D: no build'])),{kind:'changes',operations:4,blockers:1,errors:0,byKind:{install:1,update:2,remove:1}});
+ assert.deepEqual(syncSummary(s,plan([],4,['Codex / D: no build'])),{kind:'blocked',operations:0,blockers:1,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
+});
+
+/** What the service recorded for the snapshot's own revision (4): the check a person has not seen in this window. */
+const recordedSync=(over:Partial<Snapshot['sync']>={}):Snapshot['sync']=>({last_check:'1700000000',last_sync:null,revision:4,pending:3,blockers:0,errors:null,targets:{},...over});
+test('with no plan of this revision the summary is the recorded check: its counts, with no breakdown',()=>{
+ const s=snapshot();s.sync=recordedSync();
+ assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:3,blockers:0,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('update','1','2')],3)),{kind:'changes',operations:3,blockers:0,errors:0,byKind:{}},'a plan of another revision is no plan');
+ s.sync=recordedSync({pending:0,blockers:2});assert.deepEqual(syncSummary(s,null),{kind:'blocked',operations:0,blockers:2,errors:0,byKind:{}});
+ s.sync=recordedSync({pending:0});assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
+ s.sync=recordedSync({pending:2,blockers:1});assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:2,blockers:1,errors:0,byKind:{}});
+});
+test('a record of another revision, or of none, is not a check of this one',()=>{
+ const empty={kind:'not-checked',operations:0,blockers:0,errors:0,byKind:{}},s=snapshot();
+ for(const over of [{revision:3},{revision:null},{pending:null,blockers:null},{revision:5}]){s.sync=recordedSync(over);assert.deepEqual(syncSummary(s,null),empty,JSON.stringify(over));}
+ s.sync=recordedSync({errors:2,revision:3});assert.equal(syncSummary(s,null).errors,0,'errors recorded for another revision say nothing about this one');
+});
+test('a plan of this revision wins over the record',()=>{
+ const s=snapshot();s.sync=recordedSync({pending:3});
+ assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('install','','2')])),{kind:'changes',operations:1,blockers:0,errors:0,byKind:{install:1}});
+ s.registry.targets[0].enabled=false;assert.equal(syncSummary(s,null).kind,'no-harness','no harness still comes first');
+});
+test('the sources a check could not resolve are counted, with or without a plan',()=>{
+ const s=snapshot();s.sync=recordedSync({pending:0,errors:2});
+ assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:2,byKind:{}});
+ assert.equal(syncSummary(s,plan([])).errors,2);
+ s.sync=recordedSync({pending:0,errors:null});assert.equal(syncSummary(s,null).errors,0,'no count is none');
+ s.sync=recordedSync({pending:0,errors:2});s.inventory[0].plugins[0].version='2';
+ const h=syncHeadline(s,null);assert.equal(h.kind,'sources');assert.equal(h.errors,2);
+ s.sync=recordedSync({pending:0,blockers:1,errors:2});assert.equal(syncHeadline(s,null).kind,'sources','blockers do not hide a source that was not checked');
+ s.sync=recordedSync({pending:1,errors:2});assert.equal(syncHeadline(s,null).kind,'changes','changes still lead');
+ s.sync=recordedSync({pending:0,errors:0});assert.equal(syncHeadline(s,null).kind,'ok');
+ s.inventory[0].complete=false;s.sync=recordedSync({pending:0,errors:2});assert.equal(syncHeadline(s,null).kind,'unreadable','a harness that cannot be read is told first');
 });
 
 test('unlisted gives the plugins outside the list of enabled harnesses with a complete inventory, with their index',()=>{
@@ -163,6 +197,11 @@ test('exclusiveMode reads whether every, none or some harness uninstalls plugins
  assert.equal(exclusiveMode([t(true),t(false)]),'mixed');assert.equal(exclusiveMode([]),'keep');
 });
 
+test('adding an installed plugin to the list sends the installation it takes over, with the plugin and the revision',()=>{
+ const t=snapshot().registry.targets[0],installed={id:'native-pkg',name:'Package',version:'1.0.0',path:'/plugin',managed:false},body=listing(installed,t,7);
+ assert.equal(body.revision,7);assert.deepEqual(body.adopt,{target_id:'target',native_id:'native-pkg'});
+ assert.deepEqual({...body.plugin,id:''},{...listedPlugin(installed,t),id:''});assert.equal(body.plugin.source,'/plugin');
+});
 test('intervalOptions lists the six intervals with the mockup labels',()=>assert.deepEqual(intervalOptions(60),[[15,'Every 15 minutes'],[30,'Every 30 minutes'],[60,'Every hour'],[180,'Every 3 hours'],[720,'Every 12 hours'],[1440,'Once a day']]));
 test('intervalOptions(45) keeps 45 between 30 and 60',()=>{const o=intervalOptions(45);assert.deepEqual(o[2],[45,'Every 45 minutes']);assert.deepEqual(o.map(([m])=>m),[15,30,45,60,180,720,1440]);});
 test('intervalOptions places any stored interval in order and reads one minute as singular',()=>{
@@ -203,7 +242,7 @@ test('syncHeadline: instructions that cannot be read also keep a harness from re
 });
 test('syncHeadline keeps the counts of syncSummary',()=>{
  const s=snapshot(),p=plan([op('install','','2','a'),op('remove','1','','')],4,['Codex / D: no build']);
- const {unreadable,kind,...counts}=syncHeadline(s,p);assert.equal(kind,'changes');assert.deepEqual(unreadable,[]);assert.deepEqual(counts,{operations:2,blockers:1,byKind:{install:1,remove:1}});
+ const {unreadable,kind,...counts}=syncHeadline(s,p);assert.equal(kind,'changes');assert.deepEqual(unreadable,[]);assert.deepEqual(counts,{operations:2,blockers:1,errors:0,byKind:{install:1,remove:1}});
 });
 test('sameOperations compares the operations of two plans in any order, and never equates a missing plan',()=>{
  const a=plan([op('install','','2','a'),op('update','1','2','b')]),b=plan([op('update','1','2','b'),op('install','','2','a')],5);
@@ -221,8 +260,43 @@ test('the frame is an app bar with three tabs and a state button, no sidebar; Sy
  assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
  assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="appbar">/);assert.match(html,/<main id="main"/);
 });
-test('the strip says Not checked yet and offers only Check now before a check, and for a plan of another revision',()=>{
+test('the strip says Not checked yet and offers only Check now when nothing was recorded for this revision, and for a plan of another revision',()=>{
  for(const held of [null,plan([op('update','1','2')],3)]){const strip=stripOf(frame(viewState(snapshot(),{plan:held})));assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(strip),['check']);}
+});
+test('a recorded check shows on open: its count, Review and Apply all, and no text built from a plan that is not there',()=>{
+ const s=snapshot();s.sync=recordedSync({pending:3});
+ const html=frame(viewState(s)),strip=stripOf(html);
+ assert.match(strip,/<strong>3 changes ready to apply<\/strong>/);
+ assert.match(strip,/<small>Nothing changes until you apply\.<\/small>/,'no leading full stop, no breakdown');
+ assert.deepEqual(actionsOf(strip),['check','review','apply-all']);assert.match(strip,/Apply all 3 changes/);
+ assert.doesNotMatch(strip,/Not checked yet/);assert.doesNotMatch(strip,/Last check <b>never/);
+ assert.match(html,/3 changes waiting · checked /,'the app bar button agrees');
+ assert.match(html,/aria-label="Sync, 3 changes waiting"/,'and so does the tab badge');
+ s.sync=recordedSync({pending:2,blockers:1});
+ assert.match(stripOf(frame(viewState(s))),/<small>1 item not ready yet\. Nothing changes until you apply\.<\/small>/);
+});
+test('a recorded check with blockers or sources not checked or nothing to do reads as such',()=>{
+ const s=snapshot();s.inventory[0].plugins[0].version='2';
+ s.sync=recordedSync({pending:0,blockers:2});
+ const blocked=stripOf(frame(viewState(s)));assert.match(blocked,/Some plugins are not ready/);assert.match(blocked,/2 items are not ready yet/);assert.doesNotMatch(blocked,/<small>\./);assert.deepEqual(actionsOf(blocked),['check','review']);
+ s.sync=recordedSync({pending:0,errors:2});
+ const sources=stripOf(frame(viewState(s)));assert.match(sources,/<strong>2 sources could not be checked<\/strong>/);assert.doesNotMatch(sources,/Everything is in sync/);assert.deepEqual(actionsOf(sources),['check']);assert.match(sources,/class="btn primary" data-action="check"/,'Check now leads');
+ assert.match(frame(viewState(s)),/Sources not checked/,'the app bar button says it too');
+ s.sync=recordedSync({pending:2,errors:1});
+ assert.match(stripOf(frame(viewState(s))),/1 source could not be checked\. Nothing changes until you apply\./,'changes still lead and the count follows');
+ s.sync=recordedSync({pending:0});
+ assert.match(stripOf(frame(viewState(s))),/Everything is in sync/);
+});
+test('a column the record cannot describe says to check, and never In sync',()=>{
+ const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
+ s.sync=recordedSync({pending:2});
+ assert.deepEqual(harnessState(t,s,null),{kind:'unseen',count:2});
+ const html=frame(viewState(s));assert.match(html,/Check to see the changes/);assert.doesNotMatch(html,/>In sync</);
+ assert.equal(harnessState(t,s,plan([],4)).kind,'ok','a plan of this revision describes the column itself');
+ s.sync=recordedSync({pending:0});assert.equal(harnessState(t,s,null).kind,'ok','nothing pending was recorded');
+ s.sync=recordedSync({pending:2});s.inventory[0].plugins[0].version='1';
+ assert.deepEqual(harnessState(t,s,null),{kind:'changes',count:1},'what the snapshot shows of its own is still shown');
+ s.inventory[0].plugins[0].version='2';t.enabled=false;assert.equal(harnessState(t,s,null).kind,'paused');
 });
 test('the strip counts the held plan and offers Review and Apply all',()=>{
  const strip=stripOf(frame(viewState(snapshot(),{plan:plan([op('update','1','2')],4,['Codex / D: no build'])})));

@@ -14,7 +14,7 @@ const tabs=[['sync','sync','Sync'],['activity','clock','Activity'],['settings','
 /** The state button of the app bar: the strip's headline in a few words, and when it was last checked. */
 function stateButton(state:ViewState):string {
  const s=state.snapshot!,h=syncHeadline(s,state.plan),last=s.sync.last_check;
- const text={'no-harness':'No harness','not-checked':'Not checked yet',changes:`${plural(h.operations,'change')} waiting`,blocked:'Needs attention',unreadable:'A harness cannot be read',ok:'In sync'}[h.kind];
+ const text={'no-harness':'No harness','not-checked':'Not checked yet',changes:`${plural(h.operations,'change')} waiting`,blocked:'Needs attention',unreadable:'A harness cannot be read',sources:'Sources not checked',ok:'In sync'}[h.kind];
  return `<button type="button" class="tstatus" data-action="page" data-id="sync" aria-label="Sync state: ${esc(text)}. Open Sync"><i class="dot${h.kind==='ok'?'':' pending'}" aria-hidden="true"></i><span>${esc(text)}${last?` · checked ${esc(stamp(last))}`:''}</span></button>`;
 }
 function banners(state:ViewState):string {

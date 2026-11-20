@@ -10,6 +10,7 @@ const TITLES: Record<string, [string, string]> = {
   sync: ['Synced your harnesses', 'Sync failed'],
   resolve: ['Checked a plugin source', 'Source check failed'],
   'Automatic sync': ['Automatic sync', 'Automatic sync failed'],
+  'Background check': ['Background check', 'Background check failed'],
   save_plugin: ['Plugin saved', 'Plugin not saved'],
   remove_plugin: ['Plugin removed from your list', 'Plugin not removed'],
   save_target: ['Harness saved', 'Harness not saved'],
@@ -17,8 +18,8 @@ const TITLES: Record<string, [string, string]> = {
   settings: ['Settings saved', 'Settings not saved'],
   maintenance: ['Maintenance', 'Maintenance failed'],
 };
-/** The actions that make up a sync run: the filter Sync shows them. Every other action is only under All. */
-const SYNC_ACTIONS = new Set(['check', 'sync', 'resolve', 'Automatic sync']);
+/** The actions that make up a sync run: the filter Sync shows them, the background worker's included (a check that only looked, and one that applied). Every other action is only under All. */
+const SYNC_ACTIONS = new Set(['check', 'sync', 'resolve', 'Automatic sync', 'Background check']);
 const FILTERS: [ActivityFilter, string][] = [['all', 'All'], ['sync', 'Sync'], ['ai', 'AI adaptation'], ['problems', 'Problems']];
 /** A status that is not a problem; anything else (failed, cancelled, interrupted, a status not known) is one. */
 const OK = new Set(['complete', 'completed', 'ok']);

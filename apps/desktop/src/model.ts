@@ -7,7 +7,9 @@ const distributionFor=(p:Plugin,t:Target)=>p.distributions.find(d=>d.harness===t
 const installedOn=(p:Plugin,t:Target,s:Snapshot)=>s.inventory.find(i=>i.target_id===t.id)?.plugins.find(i=>(i.registry_id||i.id)===p.id);
 const instructionsOf=(p:Plugin,s:Snapshot)=>s.custom_instructions?.find(i=>i.plugin_id===p.id);
 /** A plan counts only for the registry revision it was made for: another revision is as good as none. */
-const fresh=(s:Snapshot,plan:Plan|null)=>plan&&plan.revision===s.registry.revision?plan:null;
+export const currentPlan=(s:Snapshot,plan:Plan|null)=>plan&&plan.revision===s.registry.revision?plan:null;
+/** What the service recorded for the last full plan, while it is of the snapshot's revision. A window that was just opened, or whose registry a background check or the tray moved, holds no plan of this revision: the record is then all it knows of the changes. */
+const recorded=(s:Snapshot)=>s.sync.revision===s.registry.revision&&s.sync.pending!==null?s.sync:null;
 export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   const targets=snapshot.registry.targets.filter(t=>t.enabled&&plugin.targets.includes(t.id));
   if(!targets.length) return status('unassigned','No harness chosen','muted');
@@ -29,7 +31,7 @@ const CHANGES=new Set<string>(['install','update','reinstall','activate','remove
 /** One plugin on one target: the operation of a current plan for that pair, otherwise what the snapshot shows. A removal is only ever read from a plan, because a harness with a blocker gets none. */
 export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Plan|null):CellStatus {
   if(!target.enabled) return cell('paused');
-  const op=fresh(snapshot,plan)?.operations.find(o=>o.target_id===target.id&&o.plugin_id===plugin.id);
+  const op=currentPlan(snapshot,plan)?.operations.find(o=>o.target_id===target.id&&o.plugin_id===plugin.id);
   if(op) return CHANGES.has(op.kind)?cell(op.kind as CellKind,op.from_version,op.to_version):cell('unknown');
   if(!plugin.targets.includes(target.id)) return cell('none');
   const instructions=instructionsOf(plugin,snapshot);
@@ -42,36 +44,38 @@ export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Pla
   if(!installed) return cell('install',undefined,wanted.version);
   return cell(installed.version===wanted.version?'ok':'update',installed.version,wanted.version);
 }
-export interface HarnessStatus { kind:'paused'|'unknown'|'changes'|'needs-build'|'ok'; count:number }
-/** The state line of a harness column. A harness that cannot be read is never in sync; the count is of what the kind names. */
+export interface HarnessStatus { kind:'paused'|'unknown'|'changes'|'needs-build'|'unseen'|'ok'; count:number }
+/** The state line of a harness column. A harness that cannot be read is never in sync; the count is of what the kind names. `unseen`: the record says changes are waiting and this column has none of its own to show (the record does not say where they are), so it cannot say it is in sync: `count` is the recorded total. */
 export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):HarnessStatus {
   if(!target.enabled) return {kind:'paused',count:0};
   if(!readable(target,snapshot)) return {kind:'unknown',count:0};
   const kinds=snapshot.registry.plugins.map(p=>cellState(p,target,snapshot,plan).kind);
   const count=(wanted:(k:CellKind)=>boolean)=>kinds.filter(wanted).length;
   // A plugin outside the list has no row: its removal is in the plan alone.
-  const outside=fresh(snapshot,plan)?.operations.filter(o=>o.target_id===target.id&&!snapshot.registry.plugins.some(p=>p.id===o.plugin_id)).length??0;
+  const outside=currentPlan(snapshot,plan)?.operations.filter(o=>o.target_id===target.id&&!snapshot.registry.plugins.some(p=>p.id===o.plugin_id)).length??0;
   const changes=count(k=>CHANGES.has(k))+outside,build=count(k=>k==='needs-build'),unreadable=count(k=>k==='unknown');
-  return changes?{kind:'changes',count:changes}:build?{kind:'needs-build',count:build}:unreadable?{kind:'unknown',count:unreadable}:{kind:'ok',count:0};
+  const unseen=currentPlan(snapshot,plan)?0:recorded(snapshot)?.pending??0;
+  return changes?{kind:'changes',count:changes}:build?{kind:'needs-build',count:build}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:{kind:'ok',count:0};
 }
-export interface SyncSummary { kind:'no-harness'|'not-checked'|'changes'|'blocked'|'ok'; operations:number; blockers:number; byKind:Record<string,number> }
-/** The strip over the table. Counts come from the plan only while it is of the snapshot's revision; otherwise nothing was checked. */
+export interface SyncSummary { kind:'no-harness'|'not-checked'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; byKind:Record<string,number> }
+/** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked. `errors` is the sources the last check could not resolve. */
 export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {
-  const empty=(kind:SyncSummary['kind']):SyncSummary=>({kind,operations:0,blockers:0,byKind:{}});
+  const empty=(kind:SyncSummary['kind']):SyncSummary=>({kind,operations:0,blockers:0,errors:0,byKind:{}});
   if(!snapshot.registry.targets.some(t=>t.enabled)) return empty('no-harness');
-  const checked=fresh(snapshot,plan);
-  if(!checked) return empty('not-checked');
+  const checked=currentPlan(snapshot,plan),record=checked?null:recorded(snapshot);
+  if(!checked&&!record) return empty('not-checked');
   const byKind:Record<string,number>={};
-  for(const o of checked.operations) byKind[o.kind]=(byKind[o.kind]||0)+1;
-  const operations=checked.operations.length,blockers=checked.blockers.length;
-  return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,byKind};
+  for(const o of checked?.operations??[]) byKind[o.kind]=(byKind[o.kind]||0)+1;
+  const operations=checked?checked.operations.length:record!.pending!,blockers=checked?checked.blockers.length:record!.blockers??0,errors=snapshot.sync.errors??0;
+  return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,errors,byKind};
 }
-export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'; operations:number; blockers:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
-/** What the strip leads with. A harness column that cannot be read (its inventory, or the instructions of one of its plugins; `count` tells which) never reads as in sync, so with nothing to apply it replaces "ok" and "blocked". */
+export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'|'sources'; operations:number; blockers:number; errors:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
+/** What the strip leads with. A harness column that cannot be read (its inventory, or the instructions of one of its plugins; `count` tells which) never reads as in sync, and neither does a source that could not be resolved: with nothing to apply they replace "ok" and "blocked", the unreadable harness first. */
 export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
   const summary=syncSummary(snapshot,plan);
   const unreadable=snapshot.registry.targets.filter(t=>t.enabled).map(target=>({target,state:harnessState(target,snapshot,plan)})).filter(x=>x.state.kind==='unknown').map(x=>({target:x.target,count:x.state.count}));
-  return {...summary,kind:unreadable.length&&(summary.kind==='ok'||summary.kind==='blocked')?'unreadable':summary.kind,unreadable};
+  const quiet=summary.kind==='ok'||summary.kind==='blocked';
+  return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':summary.kind,unreadable};
 }
 /** Whether two plans ask for the same operations (harness, plugin, kind, versions), in any order. */
 export function sameOperations(a:Plan|null,b:Plan|null):boolean {
@@ -101,5 +105,7 @@ export const harnessNames:Record<string,string>={'claude-code':'Claude Code',cod
 export const harnessInitials:Record<string,string>={'claude-code':'CC',codex:'CX',opencode:'OC',pi:'PI',hermes:'HM',deepseek:'DS'};
 /** What an installed plugin becomes in the list: its own folder is the source and its one build, kept at the version it has. A plugin that reports no version cannot be pinned, so it follows the stable policy; the id is new. */
 export const listedPlugin=(installed:InstalledPlugin,target:Target):Plugin=>({id:crypto.randomUUID(),name:installed.name,source:installed.path,policy:installed.version?'pinned':'stable',pinned_version:installed.version,targets:[target.id],distributions:[{harness:target.harness,path:installed.path,version:installed.version}]});
+/** What "Add to my list" and the first run save for an installed plugin: the plugin, and the installation it takes over (`adopt`), which the service binds to the plugin, so the next sync finds it installed instead of installing a second copy beside it. */
+export const listing=(installed:InstalledPlugin,target:Target,revision:number)=>({revision,plugin:listedPlugin(installed,target),adopt:{target_id:target.id,native_id:installed.id}});
 /** Whether the list already holds this installed plugin: Muro put it there, or a plugin of the list targets the harness with a build in the folder it is installed in. */
 export const inList=(snapshot:Snapshot,target:Target,installed:InstalledPlugin):boolean=>installed.managed||(!!installed.path&&snapshot.registry.plugins.some(p=>p.targets.includes(target.id)&&p.distributions.some(d=>d.harness===target.harness&&d.path===installed.path)));

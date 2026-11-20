@@ -14,7 +14,7 @@ const outside: InstalledPlugin = {id:'native-old',name:'old-snippets',version:'0
 function snapshot(): Snapshot {
  return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'t1',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true},{id:'t2',harness:'opencode',name:'OpenCode',root:'/oc',executable:'opencode',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},
   inventory:[{target_id:'t1',complete:true,supported:true,error:null,plugins:[{id:'native-pkg',registry_id:'pkg',name:'Package',version:'1',path:'/plugins/pkg',managed:true},outside]},{target_id:'t2',complete:true,supported:true,error:null,plugins:[]}],
-  activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,targets:{}}};
+  activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,errors:null,targets:{}}};
 }
 const viewState=(s:Snapshot|null,over:Partial<ViewState>={}):ViewState=>({page:'sync',snapshot:s,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,...over});
 const found=(harness:string,name:string,over:Partial<Discovered>={}):Discovered=>({harness,name,executable:harness,version:'1',config_root:`/config/${harness}`,available:true,supported:true,...over});

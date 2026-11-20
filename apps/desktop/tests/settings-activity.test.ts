@@ -9,7 +9,7 @@ import { view as activity, entries, matches } from '../src/pages/activity.ts';
 const target = (id: string, exclusive: boolean): Target => ({ id, harness: 'codex', name: id, root: '/profile', executable: 'codex', exclusive, enabled: true });
 const snapshot = (over: Partial<Snapshot> = {}, settingsOver: Partial<Snapshot['registry']['settings']> = {}): Snapshot => ({
   registry: { schema: 1, revision: 4, plugins: [{ id: 'docs', name: 'Docs <b>writer</b>', source: 'owner/docs', policy: 'stable', pinned_version: '', targets: [], distributions: [] }], targets: [target('one', false)], settings: { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ...settingsOver } },
-  inventory: [], activity: [], sync: { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, targets: {} }, ...over,
+  inventory: [], activity: [], sync: { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, errors: null, targets: {} }, ...over,
 });
 const viewState = (s: Snapshot | null, over: Partial<ViewState> = {}): ViewState => ({ page: 'sync', snapshot: s, discovered: [], discovering: false, plan: null, checking: false, applying: null, review: null, query: '', filter: 'all', afilter: 'all', busy: null, error: null, checkErrors: [], discoveryError: null, maintenance: null, autostart: null, setup: null, ...over });
 const event = (id: string, time: string, action: string, status = 'complete', message = ''): Event => ({ id, time, action, status, message });
@@ -95,6 +95,13 @@ test('Verify shows it is running and Clean up asks first', () => {
   const html = settings(viewState(snapshot(), { busy: 'Verifying…' }));
   assert.match(html, /data-action="maintenance-verify" [^>]*disabled>.*Verifying…/);
   assert.match(settings(viewState(snapshot())), /data-action="maintenance-cleanup"[^>]*>.*Clean up…/);
+});
+
+test('the Sync filter holds every run of the background worker, a check that only looked included', () => {
+  const s = snapshot({ activity: [event('1', '10', 'Background check'), event('2', '11', 'Automatic sync', 'failed'), event('3', '12', 'settings')] });
+  const kinds = entries(s).map(e => [e.title, e.kind]);
+  assert.deepEqual(kinds, [['Settings saved', 'other'], ['Automatic sync failed', 'sync'], ['Background check', 'sync']]);
+  assert.deepEqual(entries(s).filter(e => matches(e, 'sync')).map(e => e.title), ['Automatic sync failed', 'Background check']);
 });
 
 test('Activity: events newest first, an adaptation that is over among them, a running one not', () => {

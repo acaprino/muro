@@ -1,6 +1,6 @@
 import type { ViewState, SetupState, Snapshot, Target, Discovered, InstalledPlugin, Autostart } from '../types.ts';
 import type { App, Actions } from '../context.ts';
-import { inList, listedPlugin, intervalOptions } from '../model.ts';
+import { inList, listing, intervalOptions } from '../model.ts';
 import { esc, mark, sw, button, empty, spin } from '../ui.ts';
 
 /** The first run: three steps in place of the tabs while Muro manages no harness, and while the person is still going through them.
@@ -134,7 +134,7 @@ const chooseKept = (app: App, s: Held) => go(app, 'Reading what this computer su
 const finish = (app: App, s: Held) => go(app, 'Setting up Muro…', async () => {
   const revision = () => app.state.snapshot!.registry.revision;
   for (const item of installed(app.state, s).items) if (kept(s, item)) {
-    try { app.adopt(await app.request<Snapshot>('save_plugin', { revision: revision(), plugin: listedPlugin(item.plugin, item.target) })); }
+    try { app.adopt(await app.request<Snapshot>('save_plugin', listing(item.plugin, item.target, revision()))); }
     catch (e) { throw new Error(`${item.plugin.name} on ${item.target.name} was not added: ${message(e)}`); }
   }
   app.adopt(await app.request<Snapshot>('settings', { revision: revision(), settings: { ...app.state.snapshot!.registry.settings, auto_sync: s.auto } }));

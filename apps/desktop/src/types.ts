@@ -9,9 +9,9 @@ export interface InstalledPlugin { id:string; registry_id?:string; name:string; 
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
 export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
-/** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan. */
+/** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan, and `errors` is the sources the last check could not resolve (null before any check). */
 export interface SyncTimes { checked:string|null; synced:string|null }
-export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; targets:Record<string,SyncTimes> }
+export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; targets:Record<string,SyncTimes> }
 /** `left_out` is what an apply with `allow_blocked` reports: the blockers of its plan, left out of the sync. */
 export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[]; left_out?:string[] }
 export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }

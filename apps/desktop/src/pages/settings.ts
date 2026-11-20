@@ -50,11 +50,16 @@ export function view(state: ViewState): string {
 }
 
 // ---------- saving ----------
-/** The request of a save: every setting as stored, the changed ones replaced. */
-const saveRequest = (app: App, patch: Partial<Settings>) => {
-  const { revision, settings } = app.state.snapshot!.registry;
-  return app.request<Snapshot>('settings', { revision, settings: { ...settings, ...patch } });
-};
+/** The request of a save: every setting as stored, the changed ones replaced. A save the service refuses because the registry moved behind the page's back (the background worker, the tray) reads the registry again and sends the same change once more, over what is stored now; only a second refusal reaches the person. */
+async function saveRequest(app: App, patch: Partial<Settings>): Promise<Snapshot> {
+  const send = () => { const { revision, settings } = app.state.snapshot!.registry; return app.request<Snapshot>('settings', { revision, settings: { ...settings, ...patch } }); };
+  try { return await send(); }
+  catch (e) {
+    if (!/Registry revision changed/.test(message(e))) throw e;
+    app.adopt(await app.request<Snapshot>('snapshot'), { replan: false });
+    return send();
+  }
+}
 /** Keeps the snapshot a save returned. Settings do not change what a sync would do, so the plan that was current stays
  * current: its revision follows the registry's (the service does the same with the recorded sync state), and `adopt` is
  * told not to replan, so no save of a setting asks for a plan, not even the first of a session in which nothing was checked.
