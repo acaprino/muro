@@ -23,6 +23,10 @@ export interface App {
   /** Opens `html` in the one dialog (centred; a panel for one object is the inspector); open already, it replaces the content and keeps the focus. The first heading becomes its name. Returns the element: wire a form's `onsubmit` on it. */
   openDialog(html: string): HTMLDialogElement;
   closeDialog(): void;
+  /** Opens `html` (one element: a form whose children are an `im-panel-header`, an `im-panel-body` and an `im-panel-foot`) in the inspector: not modal, the page stays usable. With `dirty`, leaving it with changes asks once ("Discard changes to `name`?"). Returns the element. */
+  openInspector(html: string, options?: { opener?: HTMLElement; dirty?: () => boolean; name?: string }): HTMLElement;
+  /** Closes the inspector. It asks first when its form has unsaved changes, unless `force`: the object is gone, or the form was saved. */
+  closeInspector(force?: boolean): void;
   confirm(title: string, text: string, ok: string, then: () => void, danger?: boolean): void;
 }
 /** An action is named by a control's `data-action`; its `data-*` and the element come with it. A name has one owner: two modules declaring it make `mountApp` throw. */
@@ -30,6 +34,10 @@ export type Actions = Record<string, (app: App, data: DOMStringMap, el: HTMLElem
 /** The controls whose `input` and `change` events a page module hears: a text box, a choice, a text area. */
 export type TextBox = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 /** The control an event came from, when it is one a page module hears; otherwise null. The one place that says which they are. */
+/** The surface a control lives in: the inspector or a dialog. The one place that says where a control is, so a save in the inspector is not taken for a late result. */
+export const surfaceOf = (el: { closest(selector: string): unknown } | null): HTMLElement | null => (el?.closest('.im-inspector, dialog') as HTMLElement | null) ?? null;
+/** The surface is still there and shown: a dialog that is open, an inspector that is not hidden. */
+export const surfaceOpen = (surface: HTMLElement | null): boolean => !!surface && surface.isConnected && (surface.tagName === 'DIALOG' ? (surface as HTMLDialogElement).open : !surface.hidden);
 export const textBoxOf = (target: EventTarget | null): TextBox | null => target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement ? target : null;
 export interface PageModule {
   /** The page, as HTML for the `main` element. */

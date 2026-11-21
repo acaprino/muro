@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import type { Snapshot, Plugin, Target, Discovered, ViewState, InstalledPlugin } from '../src/types.ts';
 import { pluginForm, targetForm, distributionRow, pluginErrors, targetErrors, exclusiveSeg, lastPart } from '../src/forms.ts';
 import { listedPlugin } from '../src/model.ts';
-import { pluginDialog, harnessSheet, adaptDialog, instructionDetails } from '../src/sheets.ts';
+import { pluginPanel, harnessPanel, adaptDialog, instructionDetails } from '../src/sheets.ts';
 import { frame, modules } from '../src/views.ts';
 import { field, button } from '../src/ui.ts';
 
@@ -82,25 +82,25 @@ test('a harness needs a name, an absolute configuration folder and an executable
 
 // ---------- the plugin dialog ----------
 test('a saved plugin\'s dialog has its own heading, Save, and a More disclosure with the five actions; a new one has neither',()=>{
- const state=viewState(snapshot()),html=pluginDialog(state,plugin);
- assert.match(html,/<h2 id="dlg-title">Package<\/h2>/);assert.match(html,/<form class="im-form" id="plugin-form" novalidate data-named="1">/);
- assert.match(html,/<details id="plugin-more"[^>]*><summary>More<\/summary>/);
+ const state=viewState(snapshot()),html=pluginPanel(state,plugin);
+ assert.match(html,/<h2 class="im-panel-title" id="plugin-form-title">Package<\/h2>/);assert.match(html,/<form id="plugin-form" novalidate data-named="1">/);
+ assert.doesNotMatch(html,/im-btn--primary/,'the window's one primary is in the action bar, not in the panel');assert.match(html,/<button type="button" class="im-icon-btn" data-action="close-inspector" aria-label="Close" title="Close">/,'a Close with its tooltip');assert.match(html,/<details id="plugin-more"[^>]*><summary>More<\/summary>/);
  const more=html.slice(html.indexOf('<summary>More</summary>'));
  for(const [action,label] of [['resolve-plugin','Check for updates'],['adapt-plugin','Adapt with AI'],['reinstall-plugin','Plan a reinstall'],['open-custom-instructions','Open instructions folder'],['remove-plugin','Remove from my list']])assert.match(more,new RegExp(`data-action="${action}" data-id="pkg"[^>]*>(?:<svg[\\s\\S]*?</svg>)?<span>${label}</span>`),label);
- assert.match(html,/<button type="submit" class="im-btn im-btn--primary">Save<\/button>/);assert.match(html,/<div class="im-field-error" id="form-error" role="alert"/);
- const fresh=pluginDialog(state);
- assert.match(fresh,/<h2 id="dlg-title">Add a plugin<\/h2>/);assert.doesNotMatch(fresh,/More|remove-plugin|resolve-plugin/);assert.match(fresh,/<button type="submit" class="im-btn im-btn--primary">Add plugin<\/button>/);assert.doesNotMatch(fresh,/data-named/);
- const draft=pluginDialog(state,{...plugin,id:'not-in-the-list'});assert.match(draft,/Add a plugin/);assert.doesNotMatch(draft,/remove-plugin/,'a plugin that is not in the list has nothing to remove or check');
+ assert.match(html,/<button type="submit" class="im-btn">Save<\/button>/);assert.match(html,/<div class="im-field-error" id="form-error" role="alert"/);
+ const fresh=pluginPanel(state);
+ assert.match(fresh,/<h2 class="im-panel-title" id="plugin-form-title">Add a plugin<\/h2>/);assert.doesNotMatch(fresh,/More|remove-plugin|resolve-plugin/);assert.match(fresh,/<button type="submit" class="im-btn">Add plugin<\/button>/);assert.doesNotMatch(fresh,/data-named/);
+ const draft=pluginPanel(state,{...plugin,id:'not-in-the-list'});assert.match(draft,/Add a plugin/);assert.doesNotMatch(draft,/remove-plugin/,'a plugin that is not in the list has nothing to remove or check');
 });
 test('the dialog shows the custom instructions with their errors and stale warning, escaped, and a way to read them again',()=>{
  const s={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'D:/<folder>',files:['custom-instructions/<script>.md'],digest:'',stale_harnesses:['codex'],error:'Cannot read <file>'}]};
  const html=instructionDetails(plugin,viewState(s));
  assert.match(html,/D:\/&lt;folder&gt;/);assert.match(html,/custom-instructions\/&lt;script&gt;\.md/);assert.match(html,/Cannot read &lt;file&gt;/);assert.match(html,/Adapt again for: Codex/);
  assert.match(html,/data-action="reload-instructions" data-id="pkg"/);assert.match(html,/id="notes-status" role="status"/);assert.doesNotMatch(html,/<script>/);
- assert.match(pluginDialog(viewState(s),plugin),/class="im-notes"/,'the dialog carries the section');
+ assert.match(pluginPanel(viewState(s),plugin),/class="im-notes"/,'the dialog carries the section');
 });
 test('the dialog of a plugin with no instructions yet says so',()=>{
- assert.match(pluginDialog(viewState(snapshot()),plugin),/Custom instructions · none yet/);
+ assert.match(pluginPanel(viewState(snapshot()),plugin),/Custom instructions · none yet/);
 });
 
 // ---------- the adapt dialog ----------
@@ -108,7 +108,7 @@ test('the adapt dialog asks for a harness and a budget above zero, tied to its e
  const state=viewState(snapshot()),html=adaptDialog(state,plugin);
  assert.match(html,/<h2 id="dlg-title">Adapt Package with AI<\/h2>/);assert.match(html,/Claude Code/);
  assert.match(html,/name="budget" value="2" type="number"/);assert.match(html,/aria-describedby="[^"]*err-budget"/);assert.match(html,/id="err-budget" role="alert"/);
- assert.doesNotMatch(html,/value="deepseek"/);assert.match(html,/<button type="submit" class="im-btn im-btn--primary">Start<\/button>/);
+ assert.doesNotMatch(html,/value="deepseek"/);assert.match(html,/<button type="submit" class="im-btn">Start<\/button>/);
  assert.match(adaptDialog(state,{...plugin,targets:['t1','t2']}),/<option value="opencode" selected>/,'the harness the plugin has no build for is chosen');
  const stale={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'p',files:[],digest:'',stale_harnesses:['codex']}]};
  assert.match(adaptDialog(viewState(stale),plugin),/<option value="codex" selected>/,'a harness whose instructions changed comes first');
@@ -128,7 +128,7 @@ test('the adapt dialog names Claude Code and starts from the budget of the AI se
  const claude=adaptDialog(viewState(settingsWith({harness:'claude-code',budget_usd:3.25})),plugin);
  assert.match(said(claude),/Claude Code rebuilds this plugin/);assert.match(said(claude),/It uses Claude Code's own credentials/);assert.match(claude,/name="budget" value="3.25"/);
  assert.doesNotMatch(said(claude),/needs a coding agent/,'a harness engine needs no explanation');
- assert.equal(start(claude),'<button type="submit" class="im-btn im-btn--primary">Start</button>');assert.doesNotMatch(claude,/data-action="page"/,'no link to Settings: nothing to change');
+ assert.equal(start(claude),'<button type="submit" class="im-btn">Start</button>');assert.doesNotMatch(claude,/data-action="page"/,'no link to Settings: nothing to change');
 });
 test('with Codex as the agent, whatever the engine, the dialog says adapting needs Claude Code, links to Settings and cannot be started',()=>{
  for(const [why,ai] of [['the harness engine',{harness:'codex',budget_usd:0.5}],['the API engine',{engine:'api',harness:'codex',budget_usd:1.5,model:'gpt-test'}]] as const){
@@ -143,7 +143,7 @@ test('with the API as the engine and Claude Code as the agent the dialog says ad
  const api=adaptDialog(viewState(settingsWith({engine:'api',harness:'claude-code',budget_usd:1.5,model:'gpt-test'})),plugin);
  assert.match(said(api),/Adapting a plugin needs a coding agent on this computer: Claude Code\./);
  assert.match(said(api),/It uses Claude Code's own credentials/);assert.doesNotMatch(api,/gpt-test/);assert.match(api,/name="budget" value="1.5"/);
- assert.equal(start(api),'<button type="submit" class="im-btn im-btn--primary">Start</button>');
+ assert.equal(start(api),'<button type="submit" class="im-btn">Start</button>');
 });
 test('a service with no AI settings yet falls back to its agent and to a budget of 2; a budget of nothing is not offered',()=>{
  const old=adaptDialog(viewState(settingsWith(undefined,'codex')),plugin);
@@ -154,45 +154,45 @@ test('a service with no AI settings yet falls back to its agent and to a budget 
 
 // ---------- the harness sheet ----------
 test('the harness sheet has the mockup\'s fields and words, and Stop managing only for a harness that exists',()=>{
- const s=snapshot(),state=viewState(s),target=s.registry.targets[0],html=harnessSheet(state,target);
- assert.match(html,/<h2 id="dlg-title">Codex<\/h2>/);assert.match(html,/Checked never · last sync never/);
+ const s=snapshot(),state=viewState(s),target=s.registry.targets[0],html=harnessPanel(state,target);
+ assert.match(html,/<h2 class="im-panel-title" id="target-form-title">Codex<\/h2>/);assert.match(html,/Checked never · last sync never/);
  for(const name of ['name','harness','root','executable','enabled','exclusive'])assert.match(html,new RegExp(`name="${name}"`),name);
  assert.match(html,/<strong>Keep this harness in sync<\/strong>/);assert.match(html,/Switch off to pause: Muro leaves it alone\./);
  assert.match(html,/<strong>Uninstall plugins that are not in my list<\/strong>/);assert.match(html,/<small>Muro asks before it uninstalls\. Only on this harness\. The rule for all of them is in Settings\.<\/small>/);assert.doesNotMatch(html,/Always uninstall/);
  assert.match(html,/name="enabled" checked/);assert.doesNotMatch(html,/name="exclusive" checked/);
  assert.match(html,/data-action="remove-target" data-id="t1"[^>]*>(?:(?!<\/button>)[\s\S])*Stop managing/);
- assert.match(html,/<button type="submit" class="im-btn im-btn--primary">Save<\/button>/);
- const fresh=harnessSheet(state);
- assert.match(fresh,/<h2 id="dlg-title">Add a harness<\/h2>/);assert.match(fresh,/Tell Muro where this harness keeps its plugin configuration\./);assert.doesNotMatch(fresh,/Stop managing|Installed here/);assert.match(fresh,/<button type="submit" class="im-btn im-btn--primary">Add harness<\/button>/);
+ assert.match(html,/<button type="submit" class="im-btn">Save<\/button>/);
+ const fresh=harnessPanel(state);
+ assert.match(fresh,/<h2 class="im-panel-title" id="target-form-title">Add a harness<\/h2>/);assert.match(fresh,/Tell Muro where this harness keeps its plugin configuration\./);assert.doesNotMatch(fresh,/Stop managing|Installed here/);assert.match(fresh,/<button type="submit" class="im-btn">Add harness<\/button>/);
  assert.match(fresh,/name="name" value="" type="text"[^>]* autofocus/,'a new harness starts in its name');
 });
 test('a paused or exclusive harness shows its own switches, and the times of its last check and sync',()=>{
  const s=snapshot();s.registry.targets[0]={...s.registry.targets[0],enabled:false,exclusive:true};s.sync.targets.t1={checked:String(Math.floor(Date.now()/1000)),synced:null};
- const html=harnessSheet(viewState(s),s.registry.targets[0]);
+ const html=harnessPanel(viewState(s),s.registry.targets[0]);
  assert.doesNotMatch(html,/name="enabled" checked/);assert.match(html,/name="exclusive" checked/);assert.match(html,/Checked today \d\d:\d\d · last sync never/);
 });
 test('a found harness fills in its folder, executable and name and says it did',()=>{
- const html=harnessSheet(viewState(snapshot()),undefined,found('claude-code','Claude Code'));
+ const html=harnessPanel(viewState(snapshot()),undefined,found('claude-code','Claude Code'));
  assert.match(html,/Muro filled in the folder where this harness keeps its plugin configuration by default\. Change it for a custom installation\./);
  assert.match(html,/name="name" value="Claude Code"/);assert.match(html,/name="root" value="\/config\/claude-code"/);assert.match(html,/name="executable" value="claude-code"/);assert.match(html,/<option value="claude-code" selected>/);
- assert.match(harnessSheet(viewState(snapshot()),undefined,found('pi','Pi',{config_root:null})),/Tell Muro where this harness keeps its plugin configuration\./,'with no folder found it asks for one');
+ assert.match(harnessPanel(viewState(snapshot()),undefined,found('pi','Pi',{config_root:null})),/Tell Muro where this harness keeps its plugin configuration\./,'with no folder found it asks for one');
 });
 test('Installed here lists what the harness holds, and offers Add to my list only for what is outside the list',()=>{
- const s=snapshot(),html=harnessSheet(viewState(s),s.registry.targets[0]);
+ const s=snapshot(),html=harnessPanel(viewState(s),s.registry.targets[0]);
  const installedSection=html.match(/<section\b[^>]*id="installed-here"[^>]*>/)![0];
  assert.match(installedSection,/\btabindex="-1"/);assert.match(html,/<h3>Installed here<\/h3>/);
  assert.match(html,/Package<\/strong><small>1 · in your list/);assert.match(html,/old-snippets<\/strong><small>0\.2\.0 · not in your list/);
  assert.equal(html.match(/data-action="add-to-list"/g)?.length,1);assert.match(html,/data-action="add-to-list" data-id="t1" data-native="native-old"/);
- assert.match(harnessSheet(viewState(s),s.registry.targets[1]),/No plugins installed here\./);
+ assert.match(harnessPanel(viewState(s),s.registry.targets[1]),/No plugins installed here\./);
  const broken=snapshot();broken.inventory[1]={...broken.inventory[1],complete:false,error:'Configuration folder not found <x>'};
- assert.match(harnessSheet(viewState(broken),broken.registry.targets[1]),/Configuration folder not found &lt;x&gt;/);
+ assert.match(harnessPanel(viewState(broken),broken.registry.targets[1]),/Configuration folder not found &lt;x&gt;/);
  const added=snapshot();added.registry.plugins.push(listedPlugin(outside,added.registry.targets[0]));
- assert.doesNotMatch(harnessSheet(viewState(added),added.registry.targets[0]),/add-to-list/,'what the list already points at is not offered again');
- assert.match(harnessSheet(viewState(added),added.registry.targets[0]),/old-snippets<\/strong><small>0\.2\.0 · in your list/);
+ assert.doesNotMatch(harnessPanel(viewState(added),added.registry.targets[0]),/add-to-list/,'what the list already points at is not offered again');
+ assert.match(harnessPanel(viewState(added),added.registry.targets[0]),/old-snippets<\/strong><small>0\.2\.0 · in your list/);
 });
 test('the harness sheet escapes names, folders, plugin names and errors',()=>{
  const s=snapshot();s.registry.targets[0]={...s.registry.targets[0],name:'<u>H</u>',root:'"><i>r'};s.inventory[0]={...s.inventory[0],plugins:[{...outside,name:'<b>P</b>',version:'<v>'}]};
- const html=harnessSheet(viewState(s),s.registry.targets[0]);
+ const html=harnessPanel(viewState(s),s.registry.targets[0]);
  for(const raw of ['<u>H','<i>r','<b>P','<v>'])assert.ok(!html.includes(raw),raw);
  assert.ok(html.includes('&lt;u&gt;H')&&html.includes('&lt;b&gt;P'));
 });
@@ -267,7 +267,7 @@ test('the section escapes plugin and harness names; an empty list still offers t
 test('every action the markup of this task names has an owner among the page modules',()=>{
  const owned=new Set([...Object.values(modules).flatMap(m=>Object.keys(m.actions)),'page','refresh','commands','views']);
  const s=snapshot(),state=viewState(s,{discovered:[found('claude-code','Claude Code')]});
- const pieces=[pluginDialog(state,plugin),pluginDialog(state),harnessSheet(state,s.registry.targets[0]),harnessSheet(state),adaptDialog(state,plugin),syncPage({discovered:[found('claude-code','Claude Code')]})];
+ const pieces=[pluginPanel(state,plugin),pluginPanel(state),harnessPanel(state,s.registry.targets[0]),harnessPanel(state),adaptDialog(state,plugin),syncPage({discovered:[found('claude-code','Claude Code')]})];
  for(const html of pieces)for(const action of tags(html,'data-action'))assert.ok(owned.has(action),`${action} has no owner`);
  for(const wanted of ['set-exclusive','add-to-list','resolve-plugin','adapt-plugin','reinstall-plugin','open-custom-instructions','reload-instructions','remove-plugin','remove-target','remove-distribution','menu'])assert.ok(owned.has(wanted),`${wanted} is declared`);
 });
@@ -281,7 +281,7 @@ test('the source field of a new plugin says how to reach a plugin in a folder of
 // ---------- a record without files, and the words of the rule that asks first (work package F) ----------
 test('an installed entry whose files are gone says so, in Installed here and among the plugins outside the list; one with its files, or that does not say, does not',()=>{
  const s=snapshot();s.inventory[0].plugins=[s.inventory[0].plugins[0],{...outside,present:false},{...outside,id:'native-here',name:'kept-here',present:true},{...outside,id:'native-old2',name:'no-field'}];
- const sheet=harnessSheet(viewState(s),s.registry.targets[0]);
+ const sheet=harnessPanel(viewState(s),s.registry.targets[0]);
  assert.match(sheet,/old-snippets<\/strong><small>0\.2\.0 · not in your list · files missing<\/small>/);
  for(const name of ['Package','kept-here','no-field'])assert.doesNotMatch(sheet,new RegExp(`${name}</strong><small>[^<]*files missing`),name);
  const page=syncPage({},s);
