@@ -764,15 +764,15 @@ mod tests {
             &outside.join(".claude-plugin/plugin.json"),
             r#"{"name":"o","version":"1.0.0"}"#,
         );
-        put(&s.join("x/keep.txt"), "");
+        // A folder inside the source that a valid entry lists is a plugin even without a manifest,
+        // as Claude Code installs it (the tests on manifest-less plugins below).
         let marketplace = json!({"name":"m","plugins":[
             {"name":"a","source":"../outside"},
             {"name":"b","source":"./x/../../outside"},
             {"name":"c","source":{"source":"github","repo":"owner/repository"}},
             {"name":"d","source":"./missing"},
             {"name":"e","source":"outside"},
-            {"name":"f","source":outside},
-            {"name":"g","source":"./x"}]});
+            {"name":"f","source":outside}]});
         put(
             &s.join(".claude-plugin/marketplace.json"),
             &marketplace.to_string(),
