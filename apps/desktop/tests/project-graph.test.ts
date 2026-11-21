@@ -395,7 +395,7 @@ async function session(over: { scenario?: string; wrap?: (r: (a: string, p?: any
   state.projects = { ...blankProjects(), info: await fake.request('project', { id: 'marionette' }), infoId: 'marionette' };
   fake.calls.length = 0;
   let renders = 0;
-  const app = { state, request: (over.wrap ?? ((r: any) => r))(fake.request), render: () => { renders++; }, notify: (text: string) => void toasts.push(text), openDialog: (html: string, kind?: string) => { dialogs.push({ html, kind }); return {}; }, closeDialog: () => {} } as unknown as App;
+  const app = { state, request: (over.wrap ?? ((r: any) => r))(fake.request), render: () => { renders++; }, notify: (text: string) => void toasts.push(text), openInspector: (html: string) => { dialogs.push({ html }); return {}; }, closeInspector: () => {} } as unknown as App;
   const act = (name: string, data: Record<string, string> = {}, el: unknown = {}) => Promise.resolve(graph.actions[name](app, data as DOMStringMap, el as HTMLElement));
   return { fake, state, app, act, toasts, dialogs, sim: () => state.project!.sim, view: () => graph.view(state, state.projects.info!), calls: () => fake.calls.map(c => c.action), renders: () => renders };
 }
@@ -688,13 +688,13 @@ it('the step hears no key of its own: the text is always what the input events b
 });
 
 // ---------- the capability sheet ----------
-it('a capability opens a sheet with its role, entry, sources, intents, branches and what it produces', async () => {
+it('a capability opens in the inspector with its role, entry, sources, intents, branches and what it produces', async () => {
   const s = await session();
   s.state.projects.info = info();
   await s.act('open-capability', { id: 'design-taste' });
   assert.equal(s.dialogs.length, 1);
   const html = s.dialogs[0].html, text = words(html);
-  assert.match(html, /<h2 id="dlg-title">design-taste<\/h2>/);
+  assert.match(html, /<h2 class="im-panel-title">design-taste<\/h2>/);
   assert.match(text, /DESIGN-TASTE/);
   assert.match(text, /Role worker/);
   assert.match(text, /Entry marionette-design Use when designing/);
@@ -702,8 +702,9 @@ it('a capability opens a sheet with its role, entry, sources, intents, branches 
   assert.match(text, /Activates when the request means design-taste-intent Make a design Not for: Reviewing one/);
   assert.match(text, /Produces design-brief palette/);
   assert.doesNotMatch(text, /Branches/, 'a capability with no branch has no section for it');
-  assert.match(html, /<button type="button" class="im-btn" data-close autofocus>Close<\/button>/);
-  assert.match(html, /class="im-form-head"/);
+  assert.match(html, /<header class="im-panel-header">/);
+  assert.match(html, /<button type="button" class="im-icon-btn" data-action="close-inspector" aria-label="Close" title="Close">/, 'a Close with its tooltip');
+  assert.match(html, /<div class="im-panel-body">/);
 });
 it('the branches of a capability are its conditions, what never runs with it, and what always runs before it', async () => {
   const s = await session();

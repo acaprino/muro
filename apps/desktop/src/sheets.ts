@@ -34,6 +34,11 @@ function panel(id:string,title:string,sub:string,body:string,foot:{submit:string
  return `<form id="${id}" novalidate${attrs}><header class="im-panel-header"><h2 class="im-panel-title" id="${id}-title">${esc(title)}</h2><span class="im-spacer"></span>${iconButtonHtml('Close','close-inspector','close')}</header><div class="im-panel-body"><div class="im-form"><p class="im-muted">${esc(sub)}</p>${body}</div></div><div class="im-panel-foot">${foot.leadingHtml??''}<span class="im-spacer"></span>${button('Cancel','close-inspector')}<button type="submit" class="im-btn"${foot.disabled?' disabled':''}>${esc(foot.submit)}</button></div></form>`;
 }
 
+/** What the inspector shows of an object that is read, not edited (a capability, a prompt): a header with the title and Close, and a body that scrolls. */
+export function infoPanel(title:string,sub:string,bodyHtml:string):string {
+ return `<div><header class="im-panel-header"><h2 class="im-panel-title">${esc(title)}</h2><span class="im-spacer"></span>${iconButtonHtml('Close','close-inspector','close')}</header><div class="im-panel-body"><div class="im-form">${sub?`<p class="im-muted">${esc(sub)}</p>`:''}${bodyHtml}</div></div></div>`;
+}
+
 /** The plugin panel opened by a row, or by Add plugin. A plugin that is in the list has More: check its source, adapt it, plan a reinstall, open its instructions folder, remove it. One that is not (a new one, or an installed plugin being added) has none of them. */
 export function pluginPanel(state:ViewState,plugin?:Plugin):string {
  const s=state.snapshot!,saved=!!plugin&&s.registry.plugins.some(p=>p.id===plugin.id),id=plugin?.id??'';
