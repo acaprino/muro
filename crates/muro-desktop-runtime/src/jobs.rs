@@ -44,7 +44,7 @@ pub fn agent_args(agent: &str, task: &str, budget: f64) -> Result<Vec<String>> {
     Ok(args)
 }
 
-fn now() -> u64 {
+pub(crate) fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
@@ -95,12 +95,12 @@ pub fn validate_custom_binding(data: &Path, plugin: &Value, package: &Path,
             "AI changed the custom-instructions input snapshot; originals must stay unchanged");
     Ok(())
 }
-fn job_dir(data: &Path, id: &str) -> Result<PathBuf> {
+pub(crate) fn job_dir(data: &Path, id: &str) -> Result<PathBuf> {
     uuid::Uuid::parse_str(id).context("Invalid job ID")?;
     Ok(data.join("jobs").join(id))
 }
 
-fn write_state(dir: &Path, state: &Value) -> Result<()> {
+pub(crate) fn write_state(dir: &Path, state: &Value) -> Result<()> {
     let path = dir.join("state.json");
     // The lock serializes readers; persist replaces atomically on Windows as well.
     let lock = OpenOptions::new()
@@ -153,7 +153,7 @@ pub fn cancel(data: &Path, id: &str) -> Result<Value> {
     )
 }
 
-fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &str) -> Result<()> {
+pub(crate) fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &str) -> Result<()> {
     ensure!(!dir.join("cancel").exists(), "Job cancelled");
     ensure!(
         !mukade::exe::is_batch(exe),

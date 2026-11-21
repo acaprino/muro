@@ -110,6 +110,30 @@ elif args[:2] == ["project", "simulate"]:
         print(held["simulate_error"], file=sys.stderr)
         sys.exit(1)
     print(json.dumps(held.get("result", {"valid": True, "steps": []})))
+elif args[:2] == ["project", "edit"]:
+    # the descriptor takes the edit: a test reads back what the runtime asked for
+    mp = Path(args[2])
+    if option("--expect-digest") != hashlib.sha256(mp.read_bytes()).hexdigest():
+        print("Project edit failed: The project file changed since it was opened: open it again and repeat the change", file=sys.stderr)
+        sys.exit(1)
+    held = json.loads(mp.read_text(encoding="utf-8"))
+    edited = held.setdefault("edited", {})
+    for key in ("--name", "--author", "--repository", "--branch", "--tag-prefix"):
+        if option(key) is not None:
+            edited[key] = option(key)
+    if "--no-repository" in args:
+        edited["--no-repository"] = True
+    if option("--records") is not None:
+        edited["records"] = json.loads(Path(option("--records")).read_text(encoding="utf-8"))["records"]
+    if option("--changelog") is not None:
+        edited["changelog"] = Path(option("--changelog")).read_text(encoding="utf-8")
+    mp.write_text(json.dumps(held), encoding="utf-8")
+    print(json.dumps({"path": str(mp), "digest": hashlib.sha256(mp.read_bytes()).hexdigest()}))
+elif args[:1] == ["baseline"]:
+    # exit 1: something moved, and the JSON is the report all the same
+    print(json.dumps({"baseline": [{"id": "alpha", "pin": "release", "pinned": "v1.0.0", "upstream": "v2.0.0", "status": "behind", "note": ""},
+                                   {"id": "beta", "pin": "head", "pinned": "abc", "upstream": "abc", "status": "current", "note": ""}]}))
+    sys.exit(1)
 else:
     print("unknown command", file=sys.stderr)
     sys.exit(2)
