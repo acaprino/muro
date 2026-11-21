@@ -1,4 +1,4 @@
-import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, keyCaps, mountApp, PALETTE_COMMAND, SEARCH_COMMAND, footerKeys, showAfter, LOADING_DELAY_MS } from '@acaprino/imago/ui';
+import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, inspector, keyCaps, mountApp, PALETTE_COMMAND, SEARCH_COMMAND, footerKeys, showAfter, LOADING_DELAY_MS } from '@acaprino/imago/ui';
 import { graphView, type GraphViewport } from '@acaprino/imago/graph';
 import { guardDesktop, mountZoom, mountWindowControls, type WindowApi } from '@acaprino/imago/shell';
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
@@ -20,7 +20,7 @@ export const REFRESH_MS=30_000;
 export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,ALONE);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,slow:{},error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
- root.classList.add('im-shell');root.dataset.imSidebar='off';renderShellFrame(root,frame(state));
+ root.classList.add('im-shell');root.dataset.imSidebar='off';root.dataset.imInspector='wide';renderShellFrame(root,frame(state));
  const titlebar=root.querySelector<HTMLElement>('.im-titlebar')!,body=root.querySelector<HTMLElement>('.im-body')!;
  const dialogView=createContentDialog(root,{canDismiss:()=>!state.applying,onClose:()=>render(),fallbackFocus:()=>root.querySelector<HTMLElement>('#main')});
  const dialog=dialogView.element;
@@ -73,7 +73,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   }
   restoreDomState(root,dom,{focus:false});
   const main=root.querySelector<HTMLElement>('#main');
-  if(state.busy)root.querySelectorAll<HTMLButtonElement>('button[data-action]:not([data-action=page])').forEach(b=>b.disabled=true);
+  if(state.busy)root.querySelectorAll<HTMLButtonElement>('button[data-action]:not([data-action=page])').forEach(b=>{if(!b.closest('.im-inspector'))b.disabled=true;});
   if(state.discovering)root.querySelectorAll<HTMLButtonElement>('button[data-action=rescan]').forEach(b=>b.disabled=true);
   if(wantedFocus&&!hasModal())restoreFocus(root,wantedFocus,{fallback:main});
  }
@@ -106,14 +106,33 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   return dialogView.show(html);
  }
  const closeDialog=()=>dialogView.close();
+ // The inspector holds the form of the plugin and of the harness: not modal, the page stays usable beside it. Leaving it with changes asks once.
+ const inspect=inspector(root);let guarded:{dirty:()=>boolean;name:string}|null=null;
+ const askDiscard=(name:string)=>confirmDialog(root,{title:`Discard changes to ${name}?`,body:'What you changed is not saved.',confirm:'Discard changes',cancel:'Keep editing'});
+ function openInspector(html:string,options:{opener?:HTMLElement;dirty?:()=>boolean;name?:string}={}):HTMLElement{
+  const holder=document.createElement('template');holder.innerHTML=html.trim();const element=holder.content.firstElementChild as HTMLElement;
+  guarded=options.dirty?{dirty:options.dirty,name:options.name??'this form'}:null;
+  inspect.open(element,options.opener);
+  if(guarded){const g=guarded;inspect.guard(g.dirty,()=>askDiscard(g.name));}
+  return element;
+ }
+ function closeInspector(force=false){
+  if(!inspect.isOpen())return;
+  if(force){inspect.guard(()=>false,async()=>true);guarded=null;}
+  inspect.close();
+ }
  function confirm(title:string,text:string,ok:string,then:()=>void,danger=false){
   if(disposed||(dialog.open&&!dialogView.dismiss()))return;
   void confirmDialog(root,{title,body:text,confirm:ok,cancel:'Cancel',danger}).then(accepted=>{if(accepted&&!disposed)then();}).catch(fail);
  }
- const app:App={state,request,render,run,loading,notify,reload,replan,adopt,discover,openDialog,closeDialog,confirm};
+ const app:App={state,request,render,run,loading,notify,reload,replan,adopt,discover,openDialog,closeDialog,openInspector,closeInspector,confirm};
 
  const canNavigate=()=>!disposed&&!!state.snapshot&&!setupNeeded(state);
- const go=(page:Page)=>{if(!canNavigate())return;state.page=page;render();void modules[page].opened?.(app);};
+ const go=(page:Page)=>{
+  if(!canNavigate())return;
+  // Another page closes the inspector; with unsaved changes it asks first, and the click is lost unless the person discards.
+  if(guarded?.dirty()){const g=guarded;void askDiscard(g.name).then(ok=>{if(ok&&!disposed){closeInspector(true);go(page);}});return;}
+  closeInspector(true);state.page=page;render();void modules[page].opened?.(app);};
  // The Projects tab, clicked while a project is open, goes back to the list.
  // A page button inside a dialog (the Adapt with AI dialog links to Settings) takes the person there: the dialog closes first, unless an apply is running in it.
  const actions:Actions={page:(_app,d)=>{if(!state.applying)closeDialog();if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload(),views:(_app,_d,el)=>{openMenu(el,PAGES.map(page=>({label:tabLabel(page),checked:()=>state.page===page,run:()=>go(page)})));},commands:()=>{registry.get(PALETTE_COMMAND)?.run();}};
@@ -170,5 +189,5 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   catch(e){fail(e);}finally{polling=false;}
  },3000);
  void reload().then(()=>{if(!disposed&&state.snapshot){void discover();void modules[state.page].opened?.(app);}});
- return ()=>{disposed=true;stopGraph();dialogView.dispose();root.removeEventListener('click',click);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();stopImago();stopTabs();stopSteps();stopWindow();stopZoom();stopGuard();clearNotices(root);root.replaceChildren();};
+ return ()=>{disposed=true;closeInspector(true);stopGraph();dialogView.dispose();root.removeEventListener('click',click);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();stopImago();stopTabs();stopSteps();stopWindow();stopZoom();stopGuard();clearNotices(root);root.replaceChildren();};
 }

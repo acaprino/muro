@@ -1,9 +1,11 @@
 import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFieldRow, removeRepeatedFieldRow, replaceHtmlRegion, noteHtml, type MenuItem, type Tone } from '@acaprino/imago/ui';
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
+import { surfaceOf, surfaceOpen } from '../context.ts';
+import { surfaceOf, surfaceOpen } from '../context.ts';
 import { cellState, harnessState, syncHeadline, mustReview, applyPayload, appliedNotice, filesMissing, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
-import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
+import { reviewSheet, pluginPanel, harnessPanel, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
 
 const POLICY:Record<string,string>={stable:'Latest release',pinned:'Pinned version',head:'Latest commit'};
@@ -145,27 +147,30 @@ function harnessMenu(app:App,anchor:HTMLElement):void { imagoMenu(anchor,harness
 // ---------- the plugin dialog, the harness sheet and what they do ----------
 /** Runs a request that a control of the open dialog started. A failure shows in the dialog's own error line (the page behind a modal cannot be seen), and a second click while it runs is ignored. From the page it is an ordinary `app.run`. */
 async function attempt<T>(app:App,el:HTMLElement,label:string,work:()=>Promise<T>,after:(value:T)=>void|Promise<void>):Promise<void> {
- const dialog=el.closest('dialog');
- if(!dialog)return app.run(label,work,after);
+ const surface=surfaceOf(el);
+ if(!surface)return app.run(label,work,after);
  if(app.state.busy)return;
- const form=el.closest('form')??dialog;
- await runFormOperation(form,work,{error:dialog.querySelector<HTMLElement>('#form-error'),after,lockFields:true,current:()=>dialog.open&&dialog.contains(form),fallbackFocus:()=>form.querySelector<HTMLElement>('#installed-here')??dialog});
+ const form=el.closest('form')??surface;
+ await runFormOperation(form,work,{error:surface.querySelector<HTMLElement>('#form-error'),after,lockFields:true,current:()=>surfaceOpen(surfaceOf(form)),fallbackFocus:()=>form.querySelector<HTMLElement>('#installed-here')??surface});
 }
-/** Saves what a dialog's form holds. It keeps the form, with its values, and says why when the save is refused; on success it closes and the registry the service returned is the app's. */
-async function submit(app:App,dialog:HTMLDialogElement,form:HTMLFormElement,action:string,payload:Record<string,unknown>,done:string):Promise<void> {
+/** Saves what the form of the inspector holds. It keeps the form, with its values, and says why when the save is refused; on success it closes (without asking: what was typed is saved) and the registry the service returned is the app's. */
+async function submit(app:App,form:HTMLFormElement,action:string,payload:Record<string,unknown>,done:string):Promise<void> {
  await runFormOperation(form,()=>app.request<Snapshot>(action,{...payload,revision:app.state.snapshot!.registry.revision}),{
-  error:dialog.querySelector<HTMLElement>('#form-error'),lockFields:true,current:()=>dialog.open&&dialog.contains(form),
-  after:saved=>{app.adopt(saved);app.closeDialog();app.notify(done);}
+  error:form.querySelector<HTMLElement>('#form-error'),lockFields:true,current:()=>surfaceOpen(surfaceOf(form)),
+  after:saved=>{app.adopt(saved);app.closeInspector(true);app.notify(done);}
  });
 }
-function editPlugin(app:App,plugin?:Plugin):void {
- const dialog=app.openDialog(pluginDialog(app.state,plugin)),form=dialog.querySelector<HTMLFormElement>('#plugin-form')!;
+function editPlugin(app:App,plugin?:Plugin,opener?:HTMLElement):void {
+ let form!:HTMLFormElement;
+ form=app.openInspector(pluginPanel(app.state,plugin),{opener,name:plugin?.name||'the new plugin',dirty:()=>signature(form)!==form.dataset.initial}) as HTMLFormElement;
  form.dataset.initial=signature(form);
- form.onsubmit=e=>{e.preventDefault();const next=readPlugin(form,plugin);if(showErrors(form,pluginErrors(next)))void submit(app,dialog,form,'save_plugin',{plugin:next},'Saved.');};
+ form.onsubmit=e=>{e.preventDefault();const next=readPlugin(form,plugin);if(showErrors(form,pluginErrors(next)))void submit(app,form,'save_plugin',{plugin:next},'Saved.');};
 }
-function editTarget(app:App,target?:Target,found?:Discovered):void {
- const dialog=app.openDialog(harnessSheet(app.state,target,found)),form=dialog.querySelector<HTMLFormElement>('#target-form')!;
- form.onsubmit=e=>{e.preventDefault();const next=readTarget(form,target);if(showErrors(form,targetErrors(next)))void submit(app,dialog,form,'save_target',{target:next},`${next.name} saved.`);};
+function editTarget(app:App,target?:Target,found?:Discovered,opener?:HTMLElement):void {
+ let form!:HTMLFormElement;
+ form=app.openInspector(harnessPanel(app.state,target,found),{opener,name:target?.name||found?.name||'the new harness',dirty:()=>signature(form)!==form.dataset.initial}) as HTMLFormElement;
+ form.dataset.initial=signature(form);
+ form.onsubmit=e=>{e.preventDefault();const next=readTarget(form,target);if(showErrors(form,targetErrors(next)))void submit(app,form,'save_target',{target:next},`${next.name} saved.`);};
 }
 /** The actions under More work on the saved plugin: with changes in the form that are not saved, they say so rather than drop them. */
 function unsaved(el:HTMLElement):boolean {
@@ -177,7 +182,7 @@ async function resolvePlugin(app:App,d:DOMStringMap,el:HTMLElement):Promise<void
  const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
  await attempt(app,el,'Checking the source…',()=>app.request<Snapshot>('resolve',{id:p.id}),v=>{
   const after=v.registry.plugins.find(x=>x.id===p.id),version=after?versionOf(after).version:'',found=!!after?.upstream_revision&&after.upstream_revision!==p.upstream_revision;
-  app.adopt(v);app.closeDialog();app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`);
+  app.adopt(v);app.closeInspector(true);app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`);
  });
 }
 /** Plan a reinstall: the plan the service makes for it opens in the review sheet, and is applied from there. It is never the plan the strip and the columns read. */
@@ -199,19 +204,19 @@ function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
 }
 /** Paints the instructions section of the open plugin dialog again, keeping it open and, when the control that was used lives in it, the keyboard where it was. */
 function repaintNotes(app:App,id:string,_from:HTMLElement,status=''):void {
- const notes=document.querySelector<HTMLElement>('dialog[open] .im-notes'),p=pluginOf(app.state,id);if(!notes||!p)return;
+ const notes=document.querySelector<HTMLElement>('.im-inspector .im-notes'),p=pluginOf(app.state,id);if(!notes||!p)return;
  const fresh=replaceHtmlRegion(notes,instructionDetails(p,app.state));
  const slot=fresh.querySelector('#notes-status');if(slot)slot.textContent=status;
 }
 /** Paints "Installed here" of the open harness sheet again, after something in it was added to the list. */
 function repaintInstalled(app:App,id:string):void {
- const t=targetOf(app.state,id),section=document.querySelector<HTMLElement>('dialog[open] #installed-here');if(!t||!section)return;
- replaceHtmlRegion(section,installedHere(app.state,t),{fallbackFocus:()=>document.querySelector<HTMLElement>('dialog[open] #installed-here')});
+ const t=targetOf(app.state,id),section=document.querySelector<HTMLElement>('.im-inspector #installed-here');if(!t||!section)return;
+ replaceHtmlRegion(section,installedHere(app.state,t),{fallbackFocus:()=>document.querySelector<HTMLElement>('.im-inspector #installed-here')});
 }
 /** Add to my list: an installed plugin becomes a plugin of the list, as `listedPlugin` says. One with no folder to point at has no source yet, so the plugin dialog opens for the person to give one. */
 async function addToList(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
  const t=targetOf(app.state,d.id),p=app.state.snapshot?.inventory.find(i=>i.target_id===d.id)?.plugins.find(x=>x.id===d.native);if(!t||!p)return;
- if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]});return;}
+ if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]},el);return;}
  await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',listing(p,t,app.state.snapshot!.registry.revision)),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`);repaintInstalled(app,t.id);});
 }
 /** The service refuses to remove a harness that a plugin still lists, so the plugins that list it are saved without it first, one after the other, each with the revision the one before returned; then the harness goes. A failure says how many plugins were already taken off it, and those stay saved. */
@@ -243,13 +248,14 @@ export const actions:Actions={
  check,review,apply:applyReview('confirm'),'apply-keep':applyReview('skip'),'apply-all':applyAll,
  'clear-filter':app=>{app.state.query='';app.state.filter='all';app.render();},
  menu:(app,_d,el)=>harnessMenu(app,el),
- 'open-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)editPlugin(app,p);},
- 'add-plugin':app=>editPlugin(app),
- 'add-target':app=>{closeMenu(true);editTarget(app);},
- 'edit-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)editTarget(app,t);},
- 'manage-found':(app,d)=>{closeMenu(true);editTarget(app,undefined,foundHarnesses(app.state).find(f=>f.harness===d.id));},
- 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm(`Stop managing ${t.name}?`,'Its plugins stay installed. Muro only stops syncing it.','Stop managing',()=>void app.run('Updating harnesses…',()=>stopManaging(app,t),v=>{app.adopt(v);app.notify(`Muro no longer manages ${t.name}.`);}),true);},
- 'remove-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)app.confirm(`Remove ${p.name} from your list?`,'It stays installed where it is, unless plugins outside your list are always uninstalled.','Remove',()=>void app.run('Updating your list…',()=>app.request<Snapshot>('remove_plugin',{id:p.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.notify(`${p.name} removed from your list.`);}),true);},
+ 'open-plugin':(app,d,el)=>{const p=pluginOf(app.state,d.id);if(p)editPlugin(app,p,el);},
+ 'add-plugin':(app,_d,el)=>editPlugin(app,undefined,el),
+ 'add-target':(app,_d,el)=>{closeMenu(true);editTarget(app,undefined,undefined,el);},
+ 'edit-target':(app,d,el)=>{const t=targetOf(app.state,d.id);if(t)editTarget(app,t,undefined,el);},
+ 'manage-found':(app,d,el)=>{closeMenu(true);editTarget(app,undefined,foundHarnesses(app.state).find(f=>f.harness===d.id),el);},
+ 'close-inspector':app=>app.closeInspector(),
+ 'remove-target':(app,d)=>{const t=targetOf(app.state,d.id);if(t)app.confirm(`Stop managing ${t.name}?`,'Its plugins stay installed. Muro only stops syncing it.','Stop managing',()=>void app.run('Updating harnesses…',()=>stopManaging(app,t),v=>{app.adopt(v);app.closeInspector(true);app.notify(`Muro no longer manages ${t.name}.`);}),true);},
+ 'remove-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)app.confirm(`Remove ${p.name} from your list?`,'It stays installed where it is, unless plugins outside your list are always uninstalled.','Remove',()=>void app.run('Updating your list…',()=>app.request<Snapshot>('remove_plugin',{id:p.id,revision:app.state.snapshot!.registry.revision}),v=>{app.adopt(v);app.closeInspector(true);app.notify(`${p.name} removed from your list.`);}),true);},
  'add-distribution':(_app,_d,el)=>{const rows=el.closest('form')?.querySelector<HTMLElement>('#distributions');if(rows)appendRepeatedFieldRow(rows,distributionRow(),{focusSelector:'select'});},
  'remove-distribution':(_app,_d,el)=>{const row=el.closest('.im-repeat-row'),add=el.closest('form')?.querySelector<HTMLElement>('[data-action=add-distribution]');if(row)removeRepeatedFieldRow(row,{focusSelector:'select',fallback:add});},
  'resolve-plugin':resolvePlugin,'reinstall-plugin':reinstall,'adapt-plugin':adapt,
@@ -264,7 +270,7 @@ export function input(app:App,el:TextBox):boolean {
   // Only the rows are painted again: a full render would take the caret out of the box.
   app.state.query=el.value;const body=document.getElementById('rows');if(body)body.innerHTML=rows(app.state);return true;
  }
- if(!el.closest('dialog'))return false;
+ if(!surfaceOf(el))return false;
  clearError(el);
  // A new plugin is named after its source until a name is typed.
  const form=el.closest<HTMLFormElement>('#plugin-form');
@@ -274,7 +280,7 @@ export function input(app:App,el:TextBox):boolean {
 }
 export function change(app:App,el:TextBox):boolean {
  if(el.name==='filter'&&el.closest('.im-content-toolbar')){app.state.filter=el.value as Filter;app.render();return true;}
- if(el.name==='policy'&&el.closest('dialog')){const pinned=el.closest('dialog')!.querySelector<HTMLElement>('#pinned-field');if(pinned)pinned.hidden=el.value!=='pinned';return true;}
+ if(el.name==='policy'&&surfaceOf(el)){const pinned=surfaceOf(el)!.querySelector<HTMLElement>('#pinned-field');if(pinned)pinned.hidden=el.value!=='pinned';return true;}
  if(el.name==='excl'){void setExclusive(app,el.value==='remove'?'remove':'keep');return true;}
  return false;
 }

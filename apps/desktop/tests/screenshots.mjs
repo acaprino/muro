@@ -33,7 +33,7 @@ for (const scheme of ['dark', 'light']) {
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });
     await page.locator('th button[data-action="edit-target"]', { hasText: 'Claude Code' }).click();
-    await page.locator('dialog[open] h2').getByText('Claude Code', { exact: true }).waitFor();
+    await page.locator('.im-inspector:not([hidden]) h2').getByText('Claude Code', { exact: true }).waitFor();
     await shot(page, 'harness');
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });

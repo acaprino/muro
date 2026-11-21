@@ -5,7 +5,7 @@ import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.
 import { frame, modules } from '../src/views.ts';
 import { cell, rows, actions as syncActions } from '../src/pages/sync.ts';
 import type { App } from '../src/context.ts';
-import { reviewSheet, pluginDialog, harnessSheet, adaptDialog } from '../src/sheets.ts';
+import { reviewSheet, pluginPanel, harnessPanel, adaptDialog } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
 import { blankProjects } from '../src/pages/project/state.ts';
@@ -524,7 +524,7 @@ test('every page, state and sheet writes data-im-tone only in the four tones, an
  const none=snapshot();none.registry.targets=[];shells.push(frame(viewState(none,{projects:blankProjects(),project:null})));
  const ok=snapshot();ok.sync=recordedSync({pending:0});shells.push(frame(viewState(ok,{projects:blankProjects(),project:null})));
  const v=viewState(snapshot(),{projects:blankProjects(),project:null,plan:plan([op('install','','2'),op('update','1','2'),op('remove','1','','')],4,['blocked'])});
- shells.push(reviewSheet(v,v.plan!,null),reviewSheet(v,v.plan!,{index:1}),pluginDialog(v),pluginDialog(v,plugin),harnessSheet(v),harnessSheet(v,v.snapshot!.registry.targets[0]),adaptDialog(v,plugin));
+ shells.push(reviewSheet(v,v.plan!,null),reviewSheet(v,v.plan!,{index:1}),pluginPanel(v),pluginPanel(v,plugin),harnessPanel(v),harnessPanel(v,v.snapshot!.registry.targets[0]),adaptDialog(v,plugin));
  assert.ok(shells.length>=20);
  assert.deepEqual(shells.flatMap(toneFindings),[]);
 });

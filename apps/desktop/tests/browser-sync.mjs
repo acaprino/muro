@@ -113,12 +113,12 @@ await test('a plan without anything ready has no Apply button', 'default', {}, a
   await page.getByLabel('Source', { exact: false }).fill('https://example.com/plugin');
   await page.getByRole('checkbox', { name: /Codex isolated test/ }).check();
   await page.evaluate(() => { window.flags.rejectSave = true; });
-  await page.locator('dialog[open]').getByRole('button', { name: 'Add plugin', exact: true }).click();
+  await page.locator('.im-inspector:not([hidden])').getByRole('button', { name: 'Add plugin', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: 'Version conflict' }).waitFor();
   assert.equal(await page.getByLabel('Name', { exact: true }).inputValue(), '<Test plugin>', 'a failed save keeps the form');
   await page.evaluate(() => { window.flags.rejectSave = false; });
   const before = (await app.calls()).length;
-  await page.locator('dialog[open]').getByRole('button', { name: 'Add plugin', exact: true }).click();
+  await page.locator('.im-inspector:not([hidden])').getByRole('button', { name: 'Add plugin', exact: true }).click();
   await page.locator('#rows').getByText('<Test plugin>', { exact: true }).waitFor();
   assert.equal(await page.locator('test').count(), 0, 'a plugin name is escaped');
   await page.getByText('Some plugins are not ready', { exact: true }).waitFor();
@@ -161,7 +161,7 @@ await test('a paused harness shows Paused', 'changes', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Codex isolated test', exact: true }).click();
   await page.getByLabel('Keep this harness in sync').uncheck();
-  await page.locator('dialog[open]').getByRole('button', { name: 'Save', exact: true }).click();
+  await page.locator('.im-inspector:not([hidden])').getByRole('button', { name: 'Save', exact: true }).click();
   await page.locator('th .im-cell-meta').getByText('Paused').waitFor();
   assert.equal(await page.locator('#rows').getByText('Paused').count(), 1);
   await page.getByText('No harness is managed', { exact: true }).waitFor();
@@ -323,6 +323,17 @@ await test('Ctrl+F and / search the current view: Sync focuses its search box, t
   assert.equal(await page.evaluate(() => document.activeElement?.tagName), before, 'focus stays where it was');
   await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Activity', 'the page does not change');
+});
+
+await test('a plugin row opens its inspector, and Plan a reinstall opens the review dialog over it (not run locally: the owner's rule)', 'changes', {}, async ({ page }) => {
+  const panel = page.locator('.im-inspector:not([hidden])');
+  await page.locator('#rows [data-action=open-plugin]').first().click();
+  await panel.locator('h2.im-panel-title').waitFor();
+  assert.equal(await page.evaluate(() => document.querySelector('.im-body').inert), false, 'the inspector is not modal');
+  await panel.getByText('More', { exact: true }).click();
+  await panel.getByRole('button', { name: 'Plan a reinstall' }).click();
+  await page.locator('dialog[open] h2').getByText('Review changes', { exact: true }).waitFor();
+  assert.equal(await panel.count(), 1, 'the inspector stays under the review');
 });
 
 for (const width of [1100, 760]) {

@@ -2,7 +2,7 @@ import type { ViewState, Plan, Plugin, Target, Discovered } from './types.ts';
 import { esc, icon, plural, mark, button, spin, field } from './ui.ts';
 import { harnessNames, inList, stamp, engineOf, removals, removalLabel, filesMissing } from './model.ts';
 import { choice, pluginForm, targetForm } from './forms.ts';
-import { formHeaderHtml as dlHead, formFooterHtml, fieldErrorHtml } from '@acaprino/imago/ui';
+import { formHeaderHtml as dlHead, formFooterHtml, fieldErrorHtml, iconButtonHtml } from '@acaprino/imago/ui';
 export { formHeaderHtml as dlHead } from '@acaprino/imago/ui';
 
 
@@ -29,11 +29,16 @@ export function instructionDetails(p:Plugin,state:ViewState):string {
 
 const errorSlot=fieldErrorHtml('form-error','','div');
 
-/** The plugin dialog opened by a row, or by Add plugin. A plugin that is in the list has More: check its source, adapt it, plan a reinstall, open its instructions folder, remove it. One that is not (a new one, or an installed plugin being added) has none of them. */
-export function pluginDialog(state:ViewState,plugin?:Plugin):string {
+/** A form in the inspector: a header with the title and Close, a body that scrolls (what the person reads first is the sentence under the title), and a foot with the danger action first, then Cancel, then Save as a neutral button: the one primary of the window is in the action bar. */
+function panel(id:string,title:string,sub:string,body:string,foot:{submit:string;leadingHtml?:string;disabled?:boolean},attrs=''):string {
+ return `<form id="${id}" novalidate${attrs}><header class="im-panel-header"><h2 class="im-panel-title" id="${id}-title">${esc(title)}</h2><span class="im-spacer"></span>${iconButtonHtml('Close','close-inspector','close')}</header><div class="im-panel-body"><div class="im-form"><p class="im-muted">${esc(sub)}</p>${body}</div></div><div class="im-panel-foot">${foot.leadingHtml??''}<span class="im-spacer"></span>${button('Cancel','close-inspector')}<button type="submit" class="im-btn"${foot.disabled?' disabled':''}>${esc(foot.submit)}</button></div></form>`;
+}
+
+/** The plugin panel opened by a row, or by Add plugin. A plugin that is in the list has More: check its source, adapt it, plan a reinstall, open its instructions folder, remove it. One that is not (a new one, or an installed plugin being added) has none of them. */
+export function pluginPanel(state:ViewState,plugin?:Plugin):string {
  const s=state.snapshot!,saved=!!plugin&&s.registry.plugins.some(p=>p.id===plugin.id),id=plugin?.id??'';
  const more=saved?`<details id="plugin-more" class="im-disclosure-section"><summary>More</summary><div class="im-action-row">${button('Check for updates','resolve-plugin',{id,icon:'sync'})}${button('Adapt with AI','adapt-plugin',{id})}${button('Plan a reinstall','reinstall-plugin',{id})}${button('Open instructions folder','open-custom-instructions',{id,icon:'folder'})}${button('Remove from my list','remove-plugin',{id,danger:true})}</div></details>`:'';
- return `<form class="im-form" id="plugin-form" novalidate${plugin?.name?' data-named="1"':''}>${dlHead(saved?plugin!.name:'Add a plugin',saved?'Installed as its author ships it.':'A plugin installed as its author ships it.')}${pluginForm(s,plugin)}${saved?instructionDetails(plugin!,state):''}${more}${errorSlot}${formFooterHtml({submit:saved?'Save':'Add plugin'})}</form>`;
+ return panel('plugin-form',saved?plugin!.name:'Add a plugin',saved?'Installed as its author ships it.':'A plugin installed as its author ships it.',`${pluginForm(s,plugin)}${saved?instructionDetails(plugin!,state):''}${more}${errorSlot}`,{submit:saved?'Save':'Add plugin'},plugin?.name?' data-named="1"':'');
 }
 
 /** What a harness holds, by the snapshot's inventory: what is in the list, and what is not, with a way to add it. Its own element, so adding one repaints only this. */
@@ -41,11 +46,11 @@ export function installedHere(state:ViewState,target:Target):string {
  const s=state.snapshot!,inventory=s.inventory.find(i=>i.target_id===target.id);
  return `<section id="installed-here" class="im-form-section" tabindex="-1"><h3>Installed here</h3>${inventory&&!inventory.complete&&inventory.error?`<p class="im-field-error" role="alert">${esc(inventory.error)}</p>`:''}<ul class="im-operation-list">${inventory?.plugins.map(p=>{const listed=inList(s,target,p);return `<li><div><strong>${esc(p.name)}</strong><small>${esc(p.version)} · ${listed?'in your list':'not in your list'}${filesMissing(p)}</small></div>${listed?'':button('Add to my list','add-to-list',{id:target.id,attrs:{'data-native':p.id}})}</li>`;}).join('')||'<li class="im-muted">No plugins installed here.</li>'}</ul></section>`;
 }
-/** The sheet of a harness: to add one (`found` is what the computer was searched for), or to change one, with what is installed there. */
-export function harnessSheet(state:ViewState,target?:Target,found?:Discovered):string {
+/** The panel of a harness: to add one (`found` is what the computer was searched for), or to change one, with what is installed there. */
+export function harnessPanel(state:ViewState,target?:Target,found?:Discovered):string {
  const times=target?state.snapshot!.sync.targets[target.id]:undefined;
  const sub=target?`Checked ${stamp(times?.checked??null)} · last sync ${stamp(times?.synced??null)}`:found?.config_root?'Muro filled in the folder where this harness keeps its plugin configuration by default. Change it for a custom installation.':'Tell Muro where this harness keeps its plugin configuration.';
- return `<form class="im-form" id="target-form" novalidate>${dlHead(target?target.name:'Add a harness',sub)}${targetForm(target,found)}${target?installedHere(state,target):''}${errorSlot}${formFooterHtml({submit:target?'Save':'Add harness',leadingHtml:target?button('Stop managing','remove-target',{id:target.id,danger:true,cls:'im-push-start'}):''})}</form>`;
+ return panel('target-form',target?target.name:'Add a harness',sub,`${targetForm(target,found)}${target?installedHere(state,target):''}${errorSlot}`,{submit:target?'Save':'Add harness',leadingHtml:target?button('Stop managing','remove-target',{id:target.id,danger:true}):''});
 }
 
 /** What the dialog says, before anything starts, when the coding agent of the AI settings is Codex: adapting holds the run to a dollar budget, which only Claude Code allows. */
