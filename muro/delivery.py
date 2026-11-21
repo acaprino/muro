@@ -37,6 +37,8 @@ _SERVER_KEYS = {"name", "source", "run"}
 _SERVER_OPTIONAL = {"env"}
 _SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_PACKAGE_ROOT = "<package_root>"
+MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
 
 
 def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
@@ -54,6 +56,39 @@ def session_text(document: dict[str, Any] | None) -> str:
 def mcp_servers(document: dict[str, Any] | None) -> list[dict[str, Any]]:
     """The MCP servers a release registers: the ones its delivery document declares, and no other."""
     return (document or {}).get("mcp_servers", []) or []
+
+
+def server_launch(server: dict[str, Any], package_root: str) -> dict[str, Any]:
+    """One declared server as a program, its arguments and its environment, with the package root in place."""
+    place = lambda value: value.replace(_PACKAGE_ROOT, package_root)
+    return {"command": server["run"][0], "args": [place(part) for part in server["run"][1:]],
+            "env": {name: place(value) for name, value in server.get("env", {}).items()}}
+
+
+def claude_code_mcp(document: dict[str, Any] | None, command: str) -> dict[str, Any] | None:
+    """The `.mcp.json` a Claude Code plugin registers when enabled, or None when no server is declared."""
+    root = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{command}"
+    servers = {server["name"]: server_launch(server, root) for server in mcp_servers(document)}
+    return {"mcpServers": servers} if servers else None
+
+
+def agent_plugins_mcp(document: dict[str, Any] | None, package_root: str) -> dict[str, Any] | None:
+    """The `mcp.json` of an Agent Plugins v1 package (Codex, Hermes), or None when no server is declared."""
+    servers = {server["name"]: {"type": "stdio", **server_launch(server, package_root)}
+               for server in mcp_servers(document)}
+    return {"$schema": MCP_SCHEMA, "mcpServers": servers} if servers else None
+
+
+def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> list[str]:
+    """A declared server must start from files the release carries. A path check, not a judgment."""
+    errors = []
+    for server in mcp_servers(document):
+        for value in [*server["run"], *server.get("env", {}).values()]:
+            # shortcut: only a value that begins with the root is checked, upgrade when a server needs a path list.
+            if value.startswith(_PACKAGE_ROOT + "/") and not (package_dir / value[len(_PACKAGE_ROOT) + 1:]).exists():
+                errors.append(f"mcp server {server['name']} names a file that is not packaged: "
+                              f"{value[len(_PACKAGE_ROOT) + 1:]}")
+    return errors
 
 
 def _text(value: Any) -> bool:
@@ -303,11 +338,24 @@ def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[s
     return {"description": f"{name}: declared delivery", "hooks": events} if events else None
 
 
+# Where each host reads a plugin's servers. A host is listed once its registration was run on it (ADR-0030).
+_SERVER_CHANNELS = {
+    "claude-code": "the plugin's `.mcp.json`, when the plugin is enabled",
+    "codex": "the plugin's `mcp.json`",
+}
+
+
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
     """What this host's adapter registers by itself, and what it does not."""
-    if not document or not (session_text(document) or document.get("hooks")):
+    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document)):
         return ""
     notes = []
+    channel = _SERVER_CHANNELS.get(host)
+    if mcp_servers(document) and channel:
+        names = ", ".join(f"`{server['name']}`" for server in mcp_servers(document))
+        notes.append(f"MCP server {names}: registered automatically through {channel}, and started from this "
+                     "package's own files. If a server with the same tools is already configured on this host "
+                     "(the original this package absorbed), remove it: two copies offer the same tools twice.")
     if session_text(document):
         channels = {
             "claude-code": "a native `prompt.compose` module in `hooks/hooks.json`, adding a system-prompt section while preserving the host's other sections. Requires Claude Code mods (2.1.287+) enabled",

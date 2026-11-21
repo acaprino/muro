@@ -5,7 +5,8 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 
-from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
+from .delivery import (DELIVERY_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp, codex_hooks,
+                       install_note, session_text)
 from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
@@ -358,6 +359,9 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             if registered:
                 (root / "hooks").mkdir(exist_ok=True)
                 (root / "hooks" / "hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+            servers = claude_code_mcp(delivery, plugin["command"])
+            if servers:
+                (root / ".mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
         elif host == "codex":
             # Both modern and compatibility entrypoints refer to the same packaged resources.
             portable = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
@@ -379,6 +383,10 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             if registered:
                 (root / "hooks").mkdir()
                 (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+            # Beside the root Agent Plugins manifest written above, which is where Codex looks for it.
+            servers = agent_plugins_mcp(delivery, f"${{PLUGIN_ROOT}}/skills/{plugin['command']}")
+            if servers:
+                (root / "mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
         elif host == "pi":
             write_pi_adapter(root, plugin, bool(policy))
         elif host == "opencode":
