@@ -61,8 +61,9 @@ try {
   const page = await until('the WebView page', () => browser.contexts().flatMap(c => c.pages()).find(p => !p.url().startsWith('devtools:')));
   page.setDefaultTimeout(60000);
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  const strip = page.locator('section.im-summary');
-  const headline = () => strip.locator('strong').first().textContent();
+  const strip = page.locator('#sync-state');   // the note of the Sync page; its buttons are in the action bar
+  const bar = page.locator('.im-actions');
+  const headline = () => strip.locator('b').first().textContent();
   const status = () => json(join(data, 'sync-status.json'));
 
   // 1. The first run: three steps in place of the tabs. Mukade's discovery takes a while on a real computer.
@@ -96,7 +97,7 @@ try {
   // 2. A plugin is added: a folder source with a prepared OpenCode build.
   await page.getByText('Your list is empty').waitFor();
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
-  const dialog = page.locator('dialog[open]');
+  const dialog = page.locator('.im-inspector:not([hidden])');   // the plugin form is the inspector
   await dialog.getByLabel('Source', { exact: false }).fill(artifact);
   await dialog.getByLabel('Name', { exact: true }).fill('Native IPC smoke');
   assert.equal(await dialog.getByRole('checkbox', { name: /OpenCode/ }).isChecked(), true, 'the one harness is ticked in the new plugin');
@@ -119,16 +120,16 @@ try {
   await delay(1100);    // the plan after the save recorded a time; the times are in seconds
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
   await until('the check', async () => (await status()).last_check !== checkedBefore);
-  await strip.locator('strong', { hasText: '1 change ready to apply' }).waitFor();
-  await strip.getByRole('button', { name: 'Apply all 1 change' }).waitFor();
+  await strip.locator('b', { hasText: '1 change ready to apply' }).waitFor();
+  await bar.getByRole('button', { name: 'Apply all 1 change' }).waitFor();
   assert.match(await page.locator('#rows td').nth(2).textContent(), /Install 1\.0\.0/, 'the cell says what a sync would do');
   assert.deepEqual((await json(join(profile, 'opencode.json'))).plugins, [], 'checking installs nothing');
   checks.push('Check now shows "1 change ready to apply" and installs nothing');
 
   // 4. Apply all installs it into the profile, and the profile's own settings stay.
-  await strip.getByRole('button', { name: 'Apply all 1 change' }).click();
+  await bar.getByRole('button', { name: 'Apply all 1 change' }).click();
   await page.locator('[data-im-notices]').getByText('1 change applied.').waitFor();
-  await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
+  await strip.locator('b', { hasText: 'Everything is in sync' }).waitFor();
   const config = await json(join(profile, 'opencode.json'));
   assert.equal(config.theme, 'retained-test-setting');
   assert.equal(config.plugins.length, 1);
@@ -150,7 +151,7 @@ try {
   const id = registry.targets[0].id;
   assert.ok(Number(second.targets[id].checked) > Number(synced.targets[id].checked), 'the harness was checked again');
   assert.equal(second.last_sync, synced.last_sync, 'a check that applies nothing leaves Last sync alone');
-  await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
+  await strip.locator('b', { hasText: 'Everything is in sync' }).waitFor();
   assert.deepEqual(await page.locator('nav button .label').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings']);
   assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 1, 'still one plugin: a second plan changed nothing');
   checks.push('a second Check shows "Everything is in sync" with Last check and the harness\'s checked time moved, and Last sync as it was');
@@ -172,7 +173,7 @@ try {
   assert.equal(adopted.length, 1, 'the service wrote one receipt for the installation that was there');
   assert.deepEqual([adopted[0].version, adopted[0].path, adopted[0].adopted], ['2.0.0', own, true]);
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
+  await strip.locator('b', { hasText: 'Everything is in sync' }).waitFor();
   assert.doesNotMatch(await page.locator('#rows').textContent(), /Install\b/, 'the plugin is not planned for installation');
   assert.deepEqual((await json(join(profile, 'opencode.json'))).plugins.length, 2, 'no second copy was installed');
   assert.equal((await status()).pending, 0);
@@ -199,9 +200,9 @@ try {
   // 7. Stop managing: the service refuses a harness that a plugin still lists, so the page takes it off the plugin first.
   await page.locator('nav').getByRole('tab', { name: /^Sync/ }).click();
   await page.locator('th button[data-action="edit-target"]').click();
-  const sheet = page.locator('dialog[open]');
+  const sheet = page.locator('.im-inspector:not([hidden])');
   await sheet.getByRole('button', { name: 'Stop managing' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: /^Stop managing .+/ }).click();
   await page.locator('[data-im-notices]').getByText(/Muro no longer manages/).waitFor();
   registry = await json(join(data, 'registry.json'));
   assert.deepEqual([registry.targets.length, registry.plugins.length, registry.plugins.flatMap(p => p.targets).length], [0, 2, 0], 'the harness is gone and the plugins kept their place in the list');

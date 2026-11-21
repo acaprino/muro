@@ -357,4 +357,19 @@ for (const width of [1100, 500]) {
   });
 }
 
+await test('a window of 500 with the inspector open (a drawer under 1000) and the review over it: no sideways scroll, every control named', 'demo', { viewport: { width: 500, height: 900 } }, async app => {
+  const { page } = app;
+  await check(page);
+  await page.locator('#rows [data-action=open-plugin]').first().click();
+  const panel = page.locator('.im-inspector:not([hidden])');
+  await panel.locator('h2.im-panel-title').waitFor();
+  assert.ok(await sideways(page) <= 0, 'no sideways scroll with the inspector open');
+  const unnamed = await panel.locator('button, input, select, textarea').evaluateAll(els => els.filter(el => el.type !== 'hidden' && !(el.getAttribute('aria-label') || el.textContent.trim() || el.labels?.length || el.closest('label'))).length);
+  assert.equal(unnamed, 0, 'every control of the inspector has a name');
+  await panel.getByText('More', { exact: true }).click();
+  await panel.getByRole('button', { name: 'Plan a reinstall' }).click();
+  await page.locator('dialog[open] h2').getByText('Review changes', { exact: true }).waitFor();
+  assert.ok(await sideways(page) <= 0, 'and with the review dialog over the inspector');
+});
+
 console.log('PASS: ' + done.join('; '));

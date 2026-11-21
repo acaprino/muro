@@ -138,6 +138,20 @@ await test('an operation shows its loader in the status row only after 300 ms: a
   assert.equal(await page.locator('.im-status .im-loader').count(), 0, 'it goes when the run ends');
 });
 
+await test('the scroll of the content is kept when the window reads the registry again', 'changes', { clock: true, viewport: { width: 1100, height: 320 } }, async app => {
+  const { page } = app;
+  await strip(page).getByText('Not checked yet').waitFor();
+  const body = '#main > .im-panel-body';
+  await page.evaluate(selector => document.querySelector(selector).scrollTo(0, 120), body);
+  const before = await page.evaluate(selector => document.querySelector(selector).scrollTop, body);
+  assert.ok(before > 0, 'the page is taller than the window and was scrolled');
+  await page.clock.pauseAt(new Date(Date.now() + 2_000));
+  await behind(page, () => window.behind.check());
+  await page.clock.fastForward(35_000);
+  await strip(page).locator('b', { hasText: '1 change ready to apply' }).waitFor();
+  assert.equal(await page.evaluate(selector => document.querySelector(selector).scrollTop, body), before, 'the refresh keeps the scroll of the content panel');
+});
+
 await test('every 30 s while it has the focus the window shows what the worker recorded', 'changes', { clock: true }, async app => {
   const { page } = app;
   await strip(page).getByText('Not checked yet').waitFor();

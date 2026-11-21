@@ -191,6 +191,7 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await app.flags({ rejectSettings: false });
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
+  await page.locator('.im-notice-text').getByText('Saved.').waitFor();   // the failure stays as a notice until it is dismissed; the save that works says Saved.
 });
 
 await test('Python and the factory folder are saved when they are left, trimmed', 'default', {}, async app => {
@@ -651,6 +652,7 @@ await test('AI: a save the service refuses puts the engine back and shows the se
   await app.flags({ rejectSettings: false });
   await useEngine(page, 'OpenAI-compatible API');
   await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
+  await page.locator('.im-notice-text').getByText('Saved.').waitFor();
 });
 
 for (const width of [1100, 500]) {
