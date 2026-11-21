@@ -431,4 +431,222 @@ mod tests {
         let resolved = resolve(tmp.path(), &plugin).unwrap();
         assert_eq!(resolved["distributions"], plugin["distributions"]);
     }
+
+    // Owner, 2026-11-21: "un plugin per codex o claude code hanno le loro strutture", "muro applica
+    // la sua struttura nei suoi adattamenti", "ma possono esistere tutte". Each harness finds its
+    // plugin in a source as that harness does; `adapters/<harness>` is only the layout of Muro's
+    // own builds; the structures of different harnesses live side by side in one source.
+    fn put(path: &Path, text: &str) {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    fn dist(harness: &str, path: &str, version: &str) -> (String, String, String) {
+        (harness.into(), path.into(), version.into())
+    }
+    /// The native distributions resolving the local folder `source` finds: harness, folder relative
+    /// to the source, version.
+    fn found(source: &Path) -> Vec<(String, String, String)> {
+        let data = tempfile::tempdir().unwrap();
+        let plugin = json!({"id":"p","source":source,"policy":"head","distributions":[]});
+        let resolved = resolve(data.path(), &plugin).unwrap();
+        let base = source.canonicalize().unwrap();
+        resolved["distributions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| {
+                let path = Path::new(d["path"].as_str().unwrap());
+                let relative = path.strip_prefix(&base).unwrap();
+                dist(
+                    d["harness"].as_str().unwrap(),
+                    &relative.to_string_lossy().replace('\\', "/"),
+                    d["version"].as_str().unwrap(),
+                )
+            })
+            .collect()
+    }
+    #[test]
+    fn a_claude_code_marketplace_leads_to_the_plugin_folder_it_lists() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"x","source":"./plugins/x"}]}"#,
+        );
+        put(
+            &s.join("plugins/x/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.2.0"}"#,
+        );
+        assert_eq!(found(s), [dist("claude-code", "plugins/x", "1.2.0")]);
+    }
+    #[test]
+    fn a_codex_marketplace_leads_to_its_local_plugin_folder() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".agents/plugins/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"y","source":{"source":"local","path":"./sub/y"}}]}"#,
+        );
+        put(
+            &s.join("sub/y/.codex-plugin/plugin.json"),
+            r#"{"name":"y","version":"0.3.0"}"#,
+        );
+        assert_eq!(found(s), [dist("codex", "sub/y", "0.3.0")]);
+    }
+    #[test]
+    fn the_structures_of_several_harnesses_live_side_by_side_in_one_source() {
+        // Claude Code finds its plugin at the root, Codex through its marketplace, Pi in the layout
+        // of a Muro build.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        put(
+            &s.join(".agents/plugins/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"x","source":{"source":"local","path":"./codex"}}]}"#,
+        );
+        put(
+            &s.join("codex/.codex-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.1"}"#,
+        );
+        put(
+            &s.join("adapters/pi/package.json"),
+            r#"{"name":"x","version":"1.0.2"}"#,
+        );
+        assert_eq!(
+            found(s),
+            [
+                dist("claude-code", "", "1.0.0"),
+                dist("codex", "codex", "1.0.1"),
+                dist("pi", "adapters/pi", "1.0.2")
+            ]
+        );
+    }
+    #[test]
+    fn a_package_repository_is_found_from_its_address_through_its_root_marketplaces() {
+        // acaprino/marionette: the build in marionette/, the marketplaces `muro marketplace` writes
+        // at the root. Pi, OpenCode and Hermes have no marketplace there: their builds are reached
+        // with #marionette.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"marionette","plugins":[{"name":"marionette","source":"./marionette/adapters/claude-code","version":"0.5.2"}]}"#,
+        );
+        put(
+            &s.join(".agents/plugins/marketplace.json"),
+            r#"{"name":"marionette","plugins":[{"name":"marionette","source":{"source":"local","path":"./marionette/adapters/codex"}}]}"#,
+        );
+        for (harness, manifest) in [
+            ("claude-code", ".claude-plugin/plugin.json"),
+            ("codex", ".codex-plugin/plugin.json"),
+            ("pi", "package.json"),
+        ] {
+            put(
+                &s.join("marionette/adapters").join(harness).join(manifest),
+                r#"{"name":"marionette","version":"0.5.2"}"#,
+            );
+        }
+        assert_eq!(
+            found(s),
+            [
+                dist("claude-code", "marionette/adapters/claude-code", "0.5.2"),
+                dist("codex", "marionette/adapters/codex", "0.5.2")
+            ]
+        );
+        assert_eq!(found(&s.join("marionette")).len(), 3);
+    }
+    #[test]
+    fn a_bare_name_is_a_folder_under_the_marketplace_plugin_root() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","metadata":{"pluginRoot":"./plugins"},"plugins":[{"name":"x","source":"x"}]}"#,
+        );
+        put(
+            &s.join("plugins/x/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        assert_eq!(found(s), [dist("claude-code", "plugins/x", "1.0.0")]);
+    }
+    #[test]
+    fn a_source_starting_with_dot_slash_ignores_the_plugin_root() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","metadata":{"pluginRoot":"./plugins"},"plugins":[{"name":"x","source":"./x"}]}"#,
+        );
+        put(
+            &s.join("x/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"2.0.0"}"#,
+        );
+        put(
+            &s.join("plugins/x/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        assert_eq!(found(s), [dist("claude-code", "x", "2.0.0")]);
+    }
+    #[test]
+    fn marketplace_entries_outside_the_source_or_from_elsewhere_are_not_followed() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path().join("source");
+        let outside = t.path().join("outside");
+        put(
+            &outside.join(".claude-plugin/plugin.json"),
+            r#"{"name":"o","version":"1.0.0"}"#,
+        );
+        put(&s.join("x/keep.txt"), "");
+        let marketplace = json!({"name":"m","plugins":[
+            {"name":"a","source":"../outside"},
+            {"name":"b","source":"./x/../../outside"},
+            {"name":"c","source":{"source":"github","repo":"owner/repository"}},
+            {"name":"d","source":"./missing"},
+            {"name":"e","source":"outside"},
+            {"name":"f","source":outside},
+            {"name":"g","source":"./x"}]});
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            &marketplace.to_string(),
+        );
+        assert!(found(&s).is_empty());
+    }
+    #[test]
+    fn a_marketplace_listing_several_plugins_is_not_chosen_from() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"a","source":"./plugins/a"},{"name":"b","source":"./plugins/b"}]}"#,
+        );
+        for name in ["a", "b"] {
+            put(
+                &s.join("plugins")
+                    .join(name)
+                    .join(".claude-plugin/plugin.json"),
+                &json!({"name":name,"version":"1.0.0"}).to_string(),
+            );
+        }
+        assert!(found(s).is_empty());
+    }
+    #[test]
+    fn the_layout_of_a_muro_build_comes_before_a_manifest_at_the_root() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        put(
+            &s.join("adapters/claude-code/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"2.0.0"}"#,
+        );
+        assert_eq!(
+            found(s),
+            [dist("claude-code", "adapters/claude-code", "2.0.0")]
+        );
+    }
 }
