@@ -3,7 +3,7 @@ import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } fr
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, versionOf } from '../model.ts';
 import { esc, plural, sym, tag, button, head, empty, icon } from '../ui.ts';
-import { loadingPanel } from '../panels.ts';
+import { loadingPanel, failedPanel } from '../panels.ts';
 import { STEPS, STATE, fresh } from './project/state.ts';
 import * as inputs from './project/inputs.ts';
 import * as install from './project/install.ts';
@@ -47,7 +47,7 @@ function published(state: ViewState): string {
 function listPage(state: ViewState): string {
   const pr = state.projects, open = pr.noPicker ? '' : button('Open project file…', 'open-project-file', { icon: 'folder' });
   const body = pr.list === null
-    ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : loadingPanel(3))
+    ? (pr.error ? failedPanel(`Projects could not be read. ${pr.error}`, button('Try again', 'retry-projects')) : loadingPanel(!!state.slow?.projects))
     : pr.list.length ? `<ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Open a project file to add it here.', open);
   return head('Projects', 'A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.', open) + body + (state.snapshot ? published(state) : '');
 }
@@ -73,9 +73,9 @@ function tabs(state: ViewState, info: ProjectInfo): string {
 }
 function projectPage(state: ViewState): string {
   const pv = state.project!, pr = state.projects, crumb = `<div class="im-breadcrumb-space">${button('Projects', 'close-project', { sm: true, icon: 'back' })}</div>`;
-  if (pr.infoError && pr.infoId === pv.id) return crumb + empty('This project could not be read', pr.infoError, button('Try again', 'retry-projects'));
+  if (pr.infoError && pr.infoId === pv.id) return crumb + failedPanel(`This project could not be read. ${pr.infoError}`, button('Try again', 'retry-projects'));
   const info = pr.infoId === pv.id ? pr.info : null;
-  if (!info) return crumb + loadingPanel(3);
+  if (!info) return crumb + loadingPanel(!!state.slow?.project);
   return crumb + projectHead(state, info) + tabs(state, info) + stepPanelHtml(steps[pv.step].view(state,info),'step-panel',`step-tab-${pv.step}`);
 }
 export function view(state: ViewState): string {
@@ -87,7 +87,7 @@ export function view(state: ViewState): string {
 async function loadList(app: App): Promise<void> {
   const pr = app.state.projects;
   pr.loading = true; pr.error = null; app.render();
-  try { pr.list = await app.request<ProjectSummary[]>('projects'); }
+  try { pr.list = await app.loading('projects', () => app.request<ProjectSummary[]>('projects')); }
   catch (e) { pr.error = message(e); }
   finally { pr.loading = false; app.render(); }
 }
@@ -96,7 +96,7 @@ async function loadInfo(app: App, id: string): Promise<void> {
   const pr = app.state.projects;
   if (pr.infoId !== id) pr.info = null;
   pr.infoId = id; pr.infoLoading = true; pr.infoError = null; app.render();
-  try { const info = await app.request<ProjectInfo>('project', { id }); if (app.state.project?.id === id && pr.infoId === id) pr.info = info; }
+  try { const info = await app.loading('project', () => app.request<ProjectInfo>('project', { id })); if (app.state.project?.id === id && pr.infoId === id) pr.info = info; }
   catch (e) { if (app.state.project?.id === id && pr.infoId === id) pr.infoError = message(e); }
   finally { if (pr.infoId === id) pr.infoLoading = false; app.render(); }
 }

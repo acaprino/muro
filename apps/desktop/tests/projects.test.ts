@@ -152,7 +152,8 @@ test('Open project file is offered while the shell can open a file dialog, and i
 });
 test('the list while it is read, after it failed, and when it is empty', () => {
   const s = snapshot();
-  assert.match(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
+  assert.doesNotMatch(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /data-im-state-layer/, 'under 300 ms nothing shows');
+  assert.match(projects.view(blank({ snapshot: s, slow: { projects: true }, projects: { ...blankProjects(), loading: true } })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/, 'then the loading layer');
   const failed = projects.view(blank({ snapshot: s, projects: { ...blankProjects(), error: 'The factory did not answer' } }));
   assert.match(failed, /Projects could not be read/);
   assert.match(failed, /The factory did not answer/);
@@ -211,7 +212,7 @@ test('the tabs read: number, name and a line of what the step holds', () => {
   assert.deepEqual(tabs, ['1 Inputs 3 inputs', '2 Harmonize Harmonized', '3 Graph & simulator 3 capabilities · 2 examples', '4 Install On 1 harness · in sync']);
 });
 test('while the project is read, and when it cannot be, the page says so and offers to try again', () => {
-  const loading = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
+  const loading = projects.view(blank({ snapshot: snapshot(), slow: { project: true }, project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
   assert.match(loading, /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   assert.match(loading, /data-action="close-project"/, 'the way back is there');
   assert.doesNotMatch(loading, /role="tablist"/);
@@ -223,6 +224,7 @@ test('while the project is read, and when it cannot be, the page says so and off
 test('the information of another project is never shown for this one', () => {
   const state = opened({}, 'inputs', info());
   state.projects.infoId = 'other';
+  state.slow = { project: true };
   assert.match(projects.view(state), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
 });
 test('the project page escapes everything it shows', () => {

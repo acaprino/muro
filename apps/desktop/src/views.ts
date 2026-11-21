@@ -2,7 +2,8 @@ import type { ViewState, Page } from './types.ts';
 import type { PageModule } from './context.ts';
 import { chipHtml, pageContentHtml, shellFrameHtml, tabNavigationHtml, titlebarHtml } from '@acaprino/imago/ui';
 import { syncHeadline, stamp, nextCheck } from './model.ts';
-import { esc, plural, button, head, empty } from './ui.ts';
+import { esc, plural, button, head } from './ui.ts';
+import { loadingPanel, failedPanel } from './panels.ts';
 import * as projects from './pages/projects.ts';
 import * as sync from './pages/sync.ts';
 import * as activity from './pages/activity.ts';
@@ -30,6 +31,6 @@ export function frame(state:ViewState):string {
  const badge:Record<string,[number,string]>={sync:[waiting,`${plural(waiting,'change')} waiting`],activity:[running,`${plural(running,'run')} in progress`]};
  const shown=!!s&&!first;
  const nav=first?'':tabNavigationHtml(tabs.map(([id,icon,label])=>{const [count,countLabel]=badge[id]||[0,''];return {id,icon,label,count,countLabel};}),state.page,{label:'Main',action:'page'});
- const page=!s?pageContentHtml(head('Sync','Your plugins and the harnesses they are installed in.')+empty(state.busy?'Opening your registry.':'Registry not available',state.error||'Loading local data.',button('Try again','refresh')),'narrow'):first?setup.view(state):pageContentHtml(modules[state.page].view(state),state.page==='sync'||state.page==='projects'?'normal':'narrow');
+ const page=!s?pageContentHtml(head('Sync','Your plugins and the harnesses they are installed in.')+(state.error?failedPanel(`Registry not available. ${state.error}`,button('Try again','refresh')):loadingPanel(!!state.slow?.busy)),'narrow'):first?setup.view(state):pageContentHtml(modules[state.page].view(state),state.page==='sync'||state.page==='projects'?'normal':'narrow');
  return shellFrameHtml({skipLabel:'Skip to content',busy:!!state.busy,contentHtml:page,contentLabel:state.snapshot&&!first?tabs.find(t=>t[0]===state.page)![2]:first?'Set up Muro':'Sync',inspectorLabel:'Details',statusHtml:shown?statusRow(state):undefined,actionsHtml:shown?modules[state.page].bar?.(state)||undefined:undefined,footerHtml:shown?footerRow(state):undefined,titlebarHtml:titlebarHtml({brand:{name:'Muro'},navigationHtml:nav,views:first?undefined:{label:'Views',action:'views'},commands:{label:'Commands',action:'commands'},windowControls:typeof window!=='undefined'&&'__TAURI_INTERNALS__' in window})});
 }
