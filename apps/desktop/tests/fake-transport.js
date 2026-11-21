@@ -173,7 +173,7 @@ export function createTransport(scenario = 'default') {
         const want = p.distributions.find(d => d.harness === t.harness && d.path), have = inv.plugins.find(i => i.registry_id === p.id);
         if (have) wanted.add(have.id);
         if (flags.projectChanged && p.project) { blockers.push(`${t.name} / ${p.name}: Project file changed: open the project again`); continue; }   // the registry's words for a build older than its project file
-        if (!want) { blockers.push(`${t.name} / ${p.name}: No version for this harness`); continue; }
+        if (!want) { blockers.push(`${t.name} / ${p.name}: no build for this harness: point the source at the plugin's folder, or adapt the plugin with AI`); continue; }
         const kind = !have ? 'install' : reinstall === p.id ? 'reinstall' : have.version !== want.version ? 'update' : null;
         if (kind) operations.push({ target_id: t.id, plugin_id: p.id, name: p.name, kind, from_version: have?.version || '', to_version: want.version, reason: kind === 'install' ? 'Missing desired distribution' : 'Reconcile desired artifact' });
       }

@@ -1,7 +1,7 @@
 import { nextStepId, stepNavigationHtml, stepNavigationKey, stepPanelHtml } from '@acaprino/imago/ui';
 import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
-import { cellState } from '../model.ts';
+import { cellState, versionOf } from '../model.ts';
 import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
 import { STEPS, STATE, fresh } from './project/state.ts';
 import * as inputs from './project/inputs.ts';
@@ -33,13 +33,14 @@ function item(state: ViewState, p: ProjectSummary): string {
   const counts = [count(p.inputs, 'input'), count(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
   return `<li class="im-list-link"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="im-grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="im-muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="im-chip">Included with Muro</span>' : ''}</strong><small class="im-ellipsis" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="im-nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="im-nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
 }
-/** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no version of them. */
+/** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no build of them. */
 function published(state: ViewState): string {
   const s = state.snapshot!, own = s.registry.plugins.filter(p => !p.project);
   if (!own.length) return '';
   return `<div class="im-section-heading"><h2>Installed as published</h2><span class="im-count">${own.length}</span></div><p class="im-section-description im-muted">Plugins Muro installs as their author ships them.</p><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${own.map(p => {
     const missing = s.registry.targets.filter(t => t.enabled && p.targets.includes(t.id) && cellState(p, t, s, state.plan).kind === 'needs-build');
-    return `<li>${sym(p.name)}<div class="im-grow"><strong>${esc(p.name)}${p.upstream_version ? ` <span class="im-muted">${esc(p.upstream_version)}</span>` : ''}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></div>${missing.length ? tag(`No version for ${missing.map(t => t.name).join(', ')}`, 'warn') : ''}</li>`;
+    const version = versionOf(p).version;
+    return `<li>${sym(p.name)}<div class="im-grow"><strong>${esc(p.name)}${version ? ` <span class="im-muted">${esc(version)}</span>` : ''}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></div>${missing.length ? tag(`Needs a build for ${missing.map(t => t.name).join(', ')}`, 'warn') : ''}</li>`;
   }).join('')}</ul>`;
 }
 function listPage(state: ViewState): string {

@@ -1,7 +1,7 @@
 import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFieldRow, removeRepeatedFieldRow, replaceHtmlRegion, type MenuItem } from '@acaprino/imago/ui';
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf } from '../model.ts';
+import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
@@ -44,7 +44,7 @@ export function cell(state:ViewState,p:Plugin,t:Target):string {
   case 'reinstall':return tag(`Reinstall ${c.to}`,'accent');
   case 'activate':return tag(`Activate ${c.to}`,'accent');
   case 'remove':return tag(`Remove ${c.from}`,'bad');
-  case 'needs-build':return tag('No version','warn');
+  case 'needs-build':return tag('Needs a build','warn');
   case 'unknown':return '<span class="im-muted">Unknown</span>';
   case 'paused':return '<span class="im-muted">Paused</span>';
   default:return '<span class="im-muted" aria-label="Not installed here">—</span>';
@@ -56,7 +56,7 @@ function hstate(state:ViewState,t:Target):string {
  switch(h.kind){
   case 'paused':return tag('Paused');
   case 'changes':return button(`Sync ${plural(h.count,'change')}`,'review',{id:t.id,sm:true,accent:true,icon:'sync'});
-  case 'needs-build':return tag(`${plural(h.count,'plugin')} without a version`,'warn');
+  case 'needs-build':return tag(`${plural(h.count,'plugin')} need${h.count===1?'s':''} a build`,'warn');
   case 'unknown':return tag(h.count?`${plural(h.count,'plugin')} to check`:'Cannot be read','warn');
   case 'unseen':return tag('Check to see the changes','accent');
   default:return `<span class="im-inline-cell im-tone-ok">${icon('check')}<span>In sync</span></span>`;
@@ -65,7 +65,7 @@ function hstate(state:ViewState,t:Target):string {
 /** The rows of the table (a plugin per row), also what typing in the search repaints. */
 export function rows(state:ViewState):string {
  const s=state.snapshot!,ts=s.registry.targets;
- return filterPlugins(s.registry.plugins,state.query,state.filter,s,state.plan).map(p=>`<tr><td><button type="button" class="im-btn im-btn--ghost im-record-button" data-action="open-plugin" data-id="${esc(p.id)}">${sym(p.name)}<span><strong>${esc(p.name)}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></span></button></td><td><span class="im-text-stack"><strong>${esc(p.upstream_version||'Not checked')}</strong><small>${POLICY[p.policy]||''}</small></span></td>${ts.map(t=>`<td>${cell(state,p,t)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${ts.length+2}" class="im-muted im-none">No plugin matches.${state.query||state.filter!=='all'?' <button type="button" class="im-btn im-btn--ghost im-btn--sm" data-action="clear-filter">Clear the filter</button>':''}</td></tr>`;
+ return filterPlugins(s.registry.plugins,state.query,state.filter,s,state.plan).map(p=>{const v=versionOf(p);return `<tr><td><button type="button" class="im-btn im-btn--ghost im-record-button" data-action="open-plugin" data-id="${esc(p.id)}">${sym(p.name)}<span><strong>${esc(p.name)}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></span></button></td><td><span class="im-text-stack"><strong>${esc(v.version||'Not checked')}</strong><small>${POLICY[p.policy]||''}${v.commit?` · ${esc(v.commit)}`:''}</small></span></td>${ts.map(t=>`<td>${cell(state,p,t)}</td>`).join('')}</tr>`;}).join('')||`<tr><td colspan="${ts.length+2}" class="im-muted im-none">No plugin matches.${state.query||state.filter!=='all'?' <button type="button" class="im-btn im-btn--ghost im-btn--sm" data-action="clear-filter">Clear the filter</button>':''}</td></tr>`;
 }
 function table(state:ViewState):string {
  const s=state.snapshot!;
@@ -166,7 +166,7 @@ function unsaved(el:HTMLElement):boolean {
 async function resolvePlugin(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
  const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
  await attempt(app,el,'Checking the source…',()=>app.request<Snapshot>('resolve',{id:p.id}),v=>{
-  const version=v.registry.plugins.find(x=>x.id===p.id)?.upstream_version,found=!!version&&version!==p.upstream_version;
+  const after=v.registry.plugins.find(x=>x.id===p.id),version=after?versionOf(after).version:'',found=!!after?.upstream_revision&&after.upstream_revision!==p.upstream_revision;
   app.adopt(v);app.closeDialog();app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`,found?'good':undefined);
  });
 }

@@ -39,7 +39,7 @@ await test('Projects is the first tab, the app still opens on Sync, and the list
   assert.match(text, /Harmonized/);
   assert.match(text, /Not installed anywhere/);
   const published = page.locator('li', { hasText: 'commit-helper' });
-  assert.match(await published.textContent(), /No version for Codex/);
+  assert.match(await published.textContent(), /Needs a build for Codex/);
   assert.equal(await page.locator('h2', { hasText: 'Installed as published' }).count(), 1);
   assert.equal(await page.getByText(/New project|Create a project/).count(), 0, 'the write side is plan 3');
   assert.deepEqual((await actions(app)).filter(a => a === 'projects' || a === 'project'), ['projects']);

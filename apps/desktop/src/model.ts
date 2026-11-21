@@ -101,6 +101,14 @@ export function stamp(value:string|null,now=new Date()):string {
 /** `action` keeps the plugins with a cell still to act on (anything but in sync or not here); any other filter is a plugin state kind. */
 const needsAction=(p:Plugin,s:Snapshot,plan:Plan|null)=>s.registry.targets.some(t=>t.enabled&&!['ok','none'].includes(cellState(p,t,s,plan).kind));
 export function filterPlugins(plugins:Plugin[],query:string,filter:string,snapshot:Snapshot,plan:Plan|null=null):Plugin[] {return plugins.filter(p=>(p.name+' '+p.source).toLocaleLowerCase().includes(query.toLocaleLowerCase())&&(filter==='all'||(filter==='action'?needsAction(p,snapshot,plan):filter===pluginState(p,snapshot).kind)));}
+/** What a plugin's row says for its version. A release or a pin is its version; the latest commit (`HEAD`) and a folder on this computer (`local`) have none, so the versions their builds declare stand in, and `commit` is the commit when the version is not it. */
+export function versionOf(p:Plugin):{version:string;commit:string} {
+ const resolved=p.upstream_version||'';
+ if(resolved!=='HEAD'&&resolved!=='local')return {version:resolved,commit:''};
+ const builds=[...new Set(p.distributions.map(d=>d.version).filter(Boolean))].join(', ');
+ const commit=resolved==='HEAD'&&p.upstream_revision?`@${p.upstream_revision.slice(0,7)}`:'';
+ return builds?{version:builds,commit}:{version:commit||resolved,commit:''};
+}
 export const harnessNames:Record<string,string>={'claude-code':'Claude Code',codex:'Codex',opencode:'OpenCode',pi:'Pi',hermes:'Hermes',deepseek:'DeepSeek'};
 export const harnessInitials:Record<string,string>={'claude-code':'CC',codex:'CX',opencode:'OC',pi:'PI',hermes:'HM',deepseek:'DS'};
 // Readers of data the page did not write (a project file from elsewhere, a service older than the window): a field of the wrong type is left out, never guessed.

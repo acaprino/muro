@@ -123,6 +123,16 @@ def test_replaying_the_publication_step_preserves_the_open_pr_head(tmp_path):
     staged = tmp_path / "release" / "marionette"
     staged.mkdir(parents=True)
     (staged / "sources.json").write_text('{"plugin":{"version":"0.5.1"}}', encoding="utf-8")
+    # The adapters' own marketplaces, from which the step writes the repository's root ones with the
+    # factory of the Muro checkout ($GITHUB_WORKSPACE).
+    for relative, source in ((".claude-plugin/marketplace.json", "./"),
+                             (".agents/plugins/marketplace.json", {"source": "local", "path": "./"})):
+        host = "claude-code" if relative.startswith(".claude") else "codex"
+        path = staged / "adapters" / host / relative
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"name": "marionette", "plugins": [{"name": "marionette", "source": source}]}),
+                        encoding="utf-8")
+    (tmp_path / "muro").symlink_to(ROOT / "muro", target_is_directory=True)
     summary = tmp_path / "summary"
     env = dict(os.environ, GITHUB_REPOSITORY="acaprino/muro", GITHUB_SHA="a" * 40,
                PKG_TAG=tag, PKG_VERSION="0.5.1", MANIFEST=MANIFEST, RUNNER_TEMP=str(tmp_path),
@@ -138,5 +148,9 @@ def test_replaying_the_publication_step_preserves_the_open_pr_head(tmp_path):
         if attempt == "first":
             release_head = git(remote, "rev-parse", branch)
             assert git(remote, "show", f"{branch}:marionette/sources.json") == (staged / "sources.json").read_text()
+            claude = json.loads(git(remote, "show", f"{branch}:.claude-plugin/marketplace.json"))
+            codex = json.loads(git(remote, "show", f"{branch}:.agents/plugins/marketplace.json"))
+            assert claude["plugins"][0]["source"] == "./marionette/adapters/claude-code"
+            assert codex["plugins"][0]["source"]["path"] == "./marionette/adapters/codex"
     assert git(remote, "rev-parse", branch) == release_head
     assert "/pull/7" in summary.read_text()

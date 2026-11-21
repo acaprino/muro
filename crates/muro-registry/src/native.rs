@@ -245,43 +245,113 @@ fn local_path(s: &str, root: &Path) -> Option<PathBuf> {
         }
     }
 }
-pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
-    let manifest = match h {
+/// The manifest of a harness's plugin, from the plugin's folder.
+pub fn manifest(h: &str) -> Result<&'static str> {
+    Ok(match h {
         "claude-code" => ".claude-plugin/plugin.json",
         "codex" => ".codex-plugin/plugin.json",
         "pi" | "opencode" => "package.json",
         "hermes" => "plugin.yaml",
         _ => bail!("Adapter not available for {h}"),
-    };
+    })
+}
+/// The marketplace file of a harness that has one, from the folder that is the marketplace: how the
+/// harness finds the plugins of a repository, and where Muro writes the one it installs from.
+pub fn marketplace(h: &str) -> Option<&'static str> {
+    match h {
+        "claude-code" => Some(".claude-plugin/marketplace.json"),
+        "codex" => Some(".agents/plugins/marketplace.json"),
+        _ => None,
+    }
+}
+/// The name a person reads for a harness.
+pub fn harness_name(h: &str) -> &str {
+    match h {
+        "claude-code" => "Claude Code",
+        "codex" => "Codex",
+        "opencode" => "OpenCode",
+        "pi" => "Pi",
+        "hermes" => "Hermes",
+        "deepseek" => "DeepSeek",
+        other => other,
+    }
+}
+/// A name the harness can install a plugin under, and Muro can put in a native id.
+pub fn valid_name(h: &str, name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('-') && !name.contains(['@', '/', '\\'])
+        || matches!(h, "pi" | "opencode")
+}
+pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
+    let manifest = manifest(h)?;
     let v: Value = if h == "hermes" {
         serde_yaml::from_slice(&fs::read(artifact.join(manifest))?)?
     } else {
         read(&artifact.join(manifest))?
     };
     let name = str_field(&v, "name")?.to_owned();
-    ensure!(
-        !name.is_empty() && !name.starts_with('-') && !name.contains(['@', '/', '\\'])
-            || matches!(h, "pi" | "opencode"),
-        "Invalid native plugin name"
-    );
+    ensure!(valid_name(h, &name), "Invalid native plugin name");
     Ok((name, v["version"].as_str().unwrap_or("").to_owned()))
 }
-pub fn native_id(h: &str, plugin_id: &str, artifact: &Path) -> Result<String> {
-    let (name, _) = identity(h, artifact)?;
+/// The name and version a harness installs the plugin in `path` under, `recorded` being its
+/// distribution or receipt: the manifest's. Claude Code needs neither in the manifest, nor the
+/// manifest itself: it takes them from the marketplace entry, which Muro writes from `recorded`
+/// (`name`, `version`), so a missing one is taken from there.
+pub fn distribution_identity(h: &str, path: &Path, recorded: &Value) -> Result<(String, String)> {
+    let version = recorded["version"].as_str().unwrap_or("");
+    let claude = h == "claude-code";
+    let (name, declared) = if claude && !path.join(manifest(h)?).exists() {
+        let name = recorded["name"].as_str().unwrap_or("");
+        ensure!(
+            valid_name(h, name),
+            "No .claude-plugin/plugin.json and no valid plugin name recorded for it; check for updates"
+        );
+        (name.to_owned(), String::new())
+    } else {
+        identity(h, path)?
+    };
+    if declared.is_empty() {
+        ensure!(
+            claude && !version.is_empty(),
+            "Plugin manifest must declare its version"
+        );
+        return Ok((name, version.to_owned()));
+    }
+    ensure!(
+        declared == version,
+        "Distribution version differs from its manifest"
+    );
+    Ok((name, declared))
+}
+pub fn native_id(h: &str, plugin_id: &str, name: &str, artifact: &Path) -> Result<String> {
     match h {
         "claude-code" | "codex" => Ok(format!("{name}@muro-{plugin_id}")),
         "opencode" => Ok(url::Url::from_directory_path(artifact)
             .map_err(|_| anyhow::anyhow!("Cannot form artifact URL"))?
             .to_string()),
         "pi" => Ok(artifact.to_string_lossy().to_string()),
-        "hermes" => Ok(name),
+        "hermes" => Ok(name.to_owned()),
         _ => bail!("Unsupported adapter"),
     }
 }
+/// The marketplace Muro installs one artifact from on Claude Code or Codex. Claude Code reads the
+/// plugin's name and version from its entry when the plugin's manifest lacks them, so the entry
+/// carries the ones the plan resolved.
+fn market_document(h: &str, plugin_id: &str, name: &str, version: &str, digest: &str) -> Value {
+    let relative = format!("./releases/{digest}");
+    let entry = if h == "claude-code" {
+        json!({"name":name,"source":relative,"version":version})
+    } else {
+        json!({"name":name,"source":{"source":"local","path":relative},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"})
+    };
+    json!({"name":format!("muro-{plugin_id}"),"owner":{"name":"Muro"},"interface":{"displayName":"Muro registry"},"plugins":[entry]})
+}
+/// Installs `artifact` on `target` as the plugin `name` at `version`, the identity the plan
+/// resolved for it (`distribution_identity`).
 pub fn install(
     target: &Value,
     plugin_id: &str,
     artifact: &Path,
+    (name, version): (&str, &str),
     previous: Option<&str>,
     kind: &str,
 ) -> Result<String> {
@@ -290,7 +360,7 @@ pub fn install(
         "Invalid native install operation: {kind}"
     );
     let h = str_field(target, "harness")?;
-    let id = native_id(h, plugin_id, artifact)?;
+    let id = native_id(h, plugin_id, name, artifact)?;
     if matches!(h, "pi" | "opencode") {
         let path = config(target)?;
         let mut value = optional(&path)?;
@@ -404,7 +474,6 @@ pub fn install(
         }
         run(target, &args)?;
     } else {
-        let name = identity(h, artifact)?.0;
         let data = artifact
             .parent()
             .and_then(Path::parent)
@@ -420,25 +489,10 @@ pub fn install(
             tree_hash(&release)? == digest,
             "Native marketplace copy is corrupt"
         );
-        let relative = format!("./releases/{digest}");
-        let meta = if h == "claude-code" {
-            ".claude-plugin"
-        } else {
-            ".agents/plugins"
-        };
-        let source = if h == "claude-code" {
-            json!(relative)
-        } else {
-            json!({"source":"local","path":relative})
-        };
-        let entry = if h == "claude-code" {
-            json!({"name":name,"source":source,"version":identity(h,artifact)?.1})
-        } else {
-            json!({"name":name,"source":source,"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"})
-        };
+        let file = marketplace(h).with_context(|| format!("{h} has no marketplace"))?;
         write(
-            &market.join(meta).join("marketplace.json"),
-            &json!({"name":format!("muro-{plugin_id}"),"owner":{"name":"Muro"},"interface":{"displayName":"Muro registry"},"plugins":[entry]}),
+            &market.join(file),
+            &market_document(h, plugin_id, name, version, &digest),
         )?;
         let marketplaces: Value = serde_json::from_str(&run(
             target,
@@ -571,6 +625,7 @@ mod tests {
             &target,
             "pi-test",
             &new,
+            ("pi-test", "1.0.0"),
             Some(old.to_str().unwrap()),
             "update",
         )
@@ -601,7 +656,8 @@ mod tests {
         .unwrap();
         fs::write(artifact.join("skills/verify/SKILL.md"), "ORIGINAL").unwrap();
         let target = json!({"id":"test","harness":"claude-code","root":profile,"executable":exe});
-        let id = install(&target, "demo", &artifact, None, "install").unwrap();
+        let identity = ("muro-native-verify", "1.0.0");
+        let id = install(&target, "demo", &artifact, identity, None, "install").unwrap();
         let entries = inventory(&target, &json!({}));
         assert_eq!(entries["complete"], true, "{entries}");
         let installed = entries["plugins"]
@@ -636,7 +692,7 @@ mod tests {
                 .unwrap()["enabled"],
             true
         );
-        install(&target, "demo", &artifact, Some(&id), "reinstall").unwrap();
+        install(&target, "demo", &artifact, identity, Some(&id), "reinstall").unwrap();
         let repaired = inventory(&target, &json!({}));
         let installed = repaired["plugins"]
             .as_array()
@@ -652,7 +708,7 @@ mod tests {
             tree_hash(&artifact).unwrap()
         );
         fs::write(&skill, "BROKEN AGAIN").unwrap();
-        install(&target, "demo", &artifact, Some(&id), "update").unwrap();
+        install(&target, "demo", &artifact, identity, Some(&id), "update").unwrap();
         let updated = inventory(&target, &json!({}));
         let installed = updated["plugins"]
             .as_array()
@@ -662,5 +718,89 @@ mod tests {
             .unwrap();
         let skill = Path::new(installed["path"].as_str().unwrap()).join("skills/verify/SKILL.md");
         assert_eq!(fs::read_to_string(skill).unwrap(), "ORIGINAL");
+    }
+
+    // Owner, 2026-11-21, "fixalo": Claude Code installs a plugin without a manifest, or whose
+    // manifest declares no version, taking both from the marketplace entry. Run live that day in an
+    // isolated profile: an entry's name and version became the installed id and version, and with
+    // no version anywhere Claude Code recorded "unknown".
+    fn plugin_folder(manifest: Option<&str>) -> tempfile::TempDir {
+        let t = tempfile::tempdir().unwrap();
+        fs::create_dir_all(t.path().join("skills/hello")).unwrap();
+        fs::write(t.path().join("skills/hello/SKILL.md"), "Say hello.").unwrap();
+        if let Some(text) = manifest {
+            fs::create_dir_all(t.path().join(".claude-plugin")).unwrap();
+            fs::write(t.path().join(".claude-plugin/plugin.json"), text).unwrap();
+        }
+        t
+    }
+    #[test]
+    fn a_claude_code_plugin_takes_what_its_manifest_lacks_from_its_distribution() {
+        let recorded = json!({"name":"ay","version":"1.4.0"});
+        let none = plugin_folder(None);
+        assert_eq!(
+            distribution_identity("claude-code", none.path(), &recorded).unwrap(),
+            ("ay".to_owned(), "1.4.0".to_owned())
+        );
+        let unversioned = plugin_folder(Some(r#"{"name":"bee"}"#));
+        assert_eq!(
+            distribution_identity("claude-code", unversioned.path(), &recorded).unwrap(),
+            ("bee".to_owned(), "1.4.0".to_owned())
+        );
+        let versioned = plugin_folder(Some(r#"{"name":"bee","version":"1.4.0"}"#));
+        assert_eq!(
+            distribution_identity("claude-code", versioned.path(), &recorded).unwrap(),
+            ("bee".to_owned(), "1.4.0".to_owned())
+        );
+    }
+    #[test]
+    fn what_a_manifest_declares_still_binds_and_other_harnesses_still_need_it() {
+        let declared = plugin_folder(Some(r#"{"name":"bee","version":"2.0.0"}"#));
+        let error =
+            distribution_identity("claude-code", declared.path(), &json!({"version":"1.4.0"}));
+        assert_eq!(
+            error.unwrap_err().to_string(),
+            "Distribution version differs from its manifest"
+        );
+        let none = plugin_folder(None);
+        for recorded in [
+            json!({"version":"1.4.0"}),
+            json!({"name":"a@b","version":"1.4.0"}),
+        ] {
+            assert!(distribution_identity("claude-code", none.path(), &recorded).is_err());
+        }
+        assert!(distribution_identity("claude-code", none.path(), &json!({"name":"ay"})).is_err());
+        let codex = tempfile::tempdir().unwrap();
+        fs::create_dir_all(codex.path().join(".codex-plugin")).unwrap();
+        fs::write(
+            codex.path().join(".codex-plugin/plugin.json"),
+            r#"{"name":"cx"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            distribution_identity(
+                "codex",
+                codex.path(),
+                &json!({"name":"cx","version":"1.0.0"})
+            )
+            .unwrap_err()
+            .to_string(),
+            "Plugin manifest must declare its version"
+        );
+    }
+    #[test]
+    fn the_marketplace_muro_installs_from_carries_the_resolved_name_and_version() {
+        let claude = market_document("claude-code", "p1", "ay", "0123456789ab", "d1");
+        assert_eq!(claude["name"], "muro-p1");
+        assert_eq!(
+            claude["plugins"],
+            json!([{"name":"ay","source":"./releases/d1","version":"0123456789ab"}])
+        );
+        let codex = market_document("codex", "p1", "cx", "1.0.0", "d1");
+        assert_eq!(codex["plugins"][0]["name"], "cx");
+        assert_eq!(
+            codex["plugins"][0]["source"],
+            json!({"source":"local","path":"./releases/d1"})
+        );
     }
 }

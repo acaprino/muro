@@ -16,7 +16,7 @@ export function distributionRow(harness='codex',path='',version=''):string {
 /** The fields of a plugin. A new one starts with every enabled harness checked; the policy is a segmented choice, the pinned version shows only for a pinned plugin. */
 export function pluginForm(snapshot:Snapshot,plugin?:Plugin):string {
  const policy=plugin?.policy||'stable',checked=(t:Target)=>plugin?plugin.targets.includes(t.id):t.enabled,targets=snapshot.registry.targets;
- return field('Source','source',plugin?.source,{mono:true,placeholder:'https://github.com/owner/repository',autofocus:true,hint:plugin?'Changing the source removes the prepared builds: check for updates or adapt again after saving.':'A repository, a marketplace entry or a folder.'})
+ return field('Source','source',plugin?.source,{mono:true,placeholder:'https://github.com/owner/repository',autofocus:true,hint:plugin?'Changing the source removes the prepared builds: check for updates or adapt again after saving.':'A repository or a folder on this computer. For a plugin in a folder of its repository, add #folder to the address.'})
   +field('Name','name',plugin?.name)
   +formGroupHtml('Install on',targets.length?targets.map(t=>checkboxOptionHtml({name:'targets',value:t.id,checked:checked(t),label:t.name,leadingHtml:mark(t.harness)})).join(''):'<p class="im-muted">No harness yet. Add one in Sync.</p>')
   +formGroupHtml('Updates',`${seg('policy',policy,[['stable','Latest release'],['pinned','Pinned version'],['head','Latest commit']],'Updates')}<div id="pinned-field" class="im-field-space" ${policy==='pinned'?'':'hidden'}>${field('Pinned version','pinned_version',plugin?.pinned_version,{placeholder:'0.4.1'})}</div>`)

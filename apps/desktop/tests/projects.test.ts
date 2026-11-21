@@ -125,15 +125,15 @@ test('a project file that cannot be read is listed with its reason and no way in
   assert.match(html, /The project file is missing: D:\/old\/gone\.mp/);
   assert.doesNotMatch(html, /data-action="open-project"/, 'nothing to open');
 });
-test('the plugins Muro installs as published are listed apart, with the harnesses that have no version of them', () => {
+test('the plugins Muro installs as published are listed apart, with the harnesses that have no build of them', () => {
   const published = registryPlugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' });
   const project = registryPlugin('marionette', 'Marionette', ['t1'], [build('claude-code', '0.5.0')], { project: 'marionette' });
   const html = projects.view(blank({ snapshot: snapshot({ plugins: [published, project] }), projects: { ...blankProjects(), list: [summary()] } }));
   const section = html.slice(html.indexOf('Installed as published'));
   assert.match(html, /<h2>Installed as published<\/h2><span class="im-count">1<\/span>/, 'the project plugin is not among them');
-  assert.match(words(section), /commit-helper v2\.1\.0 github\.com\/example\/commit-helper No version for Codex/);
+  assert.match(words(section), /commit-helper v2\.1\.0 github\.com\/example\/commit-helper Needs a build for Codex/);
   assert.doesNotMatch(section, /Marionette/);
-  assert.doesNotMatch(words(html.slice(0, html.indexOf('Installed as published'))), /No version for/);
+  assert.doesNotMatch(words(html.slice(0, html.indexOf('Installed as published'))), /Needs a build for/);
 });
 test('without a plugin installed as published, there is no such section', () => {
   assert.doesNotMatch(projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary()] } })), /Installed as published/);
@@ -285,12 +285,12 @@ test('Install: one switch per harness, on where the project is installed, with i
   assert.match(rows[0], /^CC Claude Code Checked never · last sync never 0\.5\.0$/, 'in sync here');
   assert.match(rows[1], /^CX Codex Checked never · last sync never —$/, 'switched off: not here');
 });
-test('Install: a harness the plan changes shows the change, and one with no version of the project says so', () => {
+test('Install: a harness the plan changes shows the change, and one with no build of the project says so', () => {
   const held = plan([op('marionette', 'install', 't2')]);
   const rows = install.view(live({ targetsOn: ['t1', 't2'], plan: held }), info()).split('<li>').slice(1).map(words);
   assert.match(rows[1], /Install 0\.5\.0$/);
   const none = install.view(live({ targetsOn: ['t1', 't2'], builds: [build('claude-code', '0.5.0')] }), info()).split('<li>').slice(1).map(words);
-  assert.match(none[1], /No version$/);
+  assert.match(none[1], /Needs a build$/);
 });
 test('Install: a harness that is paused has no switch', () => {
   const html = install.view(live({ targets: [claude, { ...codex, enabled: false }] }), info());
@@ -591,7 +591,7 @@ test('Install: a harness whose build is older than the project file says so and 
   assert.equal(install.installLine(both, 'marionette'), 'On 2 harnesses · 1 harness to install again', 'the line of the tab and of the list says it too: not "in sync"');
 });
 test('Install: only the registry\'s own words for a changed project file mark a build, and only for a plan of the registry the page holds', () => {
-  const other = { ...plan([]), blockers: ['Claude Code / Marionette: No version for this harness', 'Claude Code / Other: Project file changed: open the project again', 'Codex / Marionette: Project file changed: open the project again'] };
+  const other = { ...plan([]), blockers: ['Claude Code / Marionette: no Claude Code build: the source has none of .claude-plugin/plugin.json, .claude-plugin/marketplace.json, adapters/claude-code', 'Claude Code / Other: Project file changed: open the project again', 'Codex / Marionette: Project file changed: open the project again'] };
   assert.doesNotMatch(install.view(live({ plan: other }), info()), /install-again/, 'another reason, another plugin, a harness the project is not on');
   const old = { ...plan([], 7), blockers: [CHANGED_BY_THE_PLAN('Claude Code')] };
   assert.doesNotMatch(install.view(live({ plan: old }), info()), /install-again/, 'a plan of another revision is no plan of this snapshot');

@@ -194,6 +194,26 @@ muro install /tmp/stage/marionette/adapters/claude-code \
   --harness claude-code --home ~/.claude-test
 ```
 
+### `muro marketplace <repository> <folder>`
+
+Writes, at the root of a repository that publishes a built release in its
+subfolder `<folder>`, the marketplace of each host that has one:
+`.claude-plugin/marketplace.json` (Claude Code) and
+`.agents/plugins/marketplace.json` (Codex). Each is the adapter's own
+marketplace with every plugin's source moved to the adapter folder
+(`./<folder>/adapters/<harness>`), so the format stays where the build writes
+it. Claude Code (`claude plugin marketplace add owner/repo`), Codex and the
+desktop app then find the plugin from the repository's address. Every file is
+read before any is written: a folder that is not inside the repository, or
+holds no built Claude Code or Codex adapter, writes nothing and exits `1`.
+The `Release Marionette` workflow runs it in `acaprino/marionette`.
+
+```sh
+muro marketplace ./package marionette
+# Wrote package/.claude-plugin/marketplace.json
+# Wrote package/.agents/plugins/marketplace.json
+```
+
 ### `muro mcp [--manifest PATH] [--tools NAME[,NAME...]]`
 
 Serves the factory as an MCP stdio server (newline-delimited JSON-RPC 2.0).

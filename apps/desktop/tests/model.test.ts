@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listedPlugin, listing, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp } from '../src/model.ts';
+import { listedPlugin, listing, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp, versionOf } from '../src/model.ts';
 import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.ts';
 import { frame, modules } from '../src/views.ts';
+import { cell, rows } from '../src/pages/sync.ts';
 import { reviewSheet } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
@@ -363,4 +364,25 @@ test('every action has one owner: no two page modules, and none of them the app,
  assert.equal(new Set(names).size,names.length,'a name is declared twice: '+names.filter((n,i)=>names.indexOf(n)!==i));
  for(const reserved of ['page','refresh'])assert.ok(!names.includes(reserved),`${reserved} belongs to app.ts`);
  for(const wanted of ['check','review','apply','apply-all','open-plugin','edit-target','add-plugin','add-target','manage-found','rescan'])assert.ok(names.includes(wanted),`${wanted} is declared`);
+});
+
+// Owner, 2026-11-21: Marionette read "HEAD" and "No version" in Sync, which said neither what it was on nor what was missing.
+test('a plugin on its latest commit shows the versions its builds declare and the commit, never HEAD',()=>{
+ const head:Plugin={...plugin,policy:'head',upstream_version:'HEAD',upstream_revision:'4ae20142bd43bfdd98d1e3762d8fc1d8730bd177'};
+ assert.deepEqual(versionOf(head),{version:'2',commit:'@4ae2014'});
+ assert.deepEqual(versionOf({...head,distributions:[]}),{version:'@4ae2014',commit:''});
+ assert.deepEqual(versionOf({...plugin,upstream_version:'marionette-v0.5.1'}),{version:'marionette-v0.5.1',commit:''});
+ assert.deepEqual(versionOf(plugin),{version:'',commit:''});
+ const folder:Plugin={...plugin,upstream_version:'local',distributions:[{harness:'codex',path:'/a',version:'1.0.0'},{harness:'pi',path:'/b',version:'1.0.0'}]};
+ assert.deepEqual(versionOf(folder),{version:'1.0.0',commit:''});
+ const s=snapshot();s.registry.plugins=[head];
+ assert.match(rows(viewState(s)).replace(/<[^>]+>/g,' '),/ 2 +Latest commit · @4ae2014 /);
+});
+test('a harness with no build of a plugin says it needs one, in its cell and in its column',()=>{
+ const s=snapshot(),p={...plugin,distributions:[]};s.registry.plugins=[p];
+ const state=viewState(s);
+ assert.match(cell(state,p,s.registry.targets[0]),/Needs a build/);
+ const html=frame(state);
+ assert.match(html,/1 plugin needs a build/);
+ assert.doesNotMatch(html,/No version|without a version/);
 });
