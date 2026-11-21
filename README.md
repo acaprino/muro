@@ -42,9 +42,9 @@ A project is one `.mp` file that holds a unified plugin and everything behind it
 Muro finds the coding agents installed on this computer and manages the ones you pick, in the first run or later with **Add harness**. A harness is a column of the Sync table. For each one Muro knows where its plugin configuration lives, which program runs it and what is installed.
 
 - **Add harness** lists every agent detected through [Mukade](https://github.com/acaprino/mukade) and also takes one by hand.
-- A column header opens the harness's sheet: its configuration folder and executable, **Keep this harness in sync** (off pauses it), the rule for plugins outside your list on this harness, and **Installed here**, which shows plugins outside your list too; **Add to my list** imports one. **Stop managing** removes the column and leaves the plugins installed.
+- A column header opens the harness in the panel at the right: its configuration folder and executable, **Keep this harness in sync** (off pauses it), the rule for plugins outside your list on this harness, and **Installed here**, which shows plugins outside your list too; **Add to my list** imports one. **Stop managing** removes the column and leaves the plugins installed.
 
-<img src="docs/assets/screenshots/harness.png" alt="The sheet of the Claude Code harness over the Sync page: name, configuration folder, executable, Keep this harness in sync, Always uninstall plugins that are not in my list, and what is installed there, with old-snippets marked as not in the list and an Add to my list button." width="880">
+<img src="docs/assets/screenshots/harness.png" alt="The panel of the Claude Code harness at the right of the Sync page: name, configuration folder, executable, Keep this harness in sync, Always uninstall plugins that are not in my list, and what is installed there, with old-snippets marked as not in the list and an Add to my list button." width="880">
 
 ### Plugin sync
 
@@ -76,12 +76,12 @@ Muro can stay in the notification area and keep your harnesses in line without a
 Every plugin follows an update policy: latest stable release, a pinned version or the latest commit. **Check now** reads every plugin's source, records the upstream version and revision, and takes the native build the source publishes for each harness; **Check for updates** in a plugin's dialog does the same for that one plugin. Sync then installs the new version.
 
 - The *Latest version* column shows what the source offers, and each harness cell shows what is installed there, or the change that is waiting, such as **Update 0.3.0 → 0.4.0**.
-- **Plan a reinstall**, under **More** in a plugin's dialog, puts back the last verified build, not whatever the source holds today.
+- **Plan a reinstall**, under **More** in a plugin's panel, puts back the last verified build, not whatever the source holds today.
 - **Settings → Maintenance** verifies the stored builds and deletes the ones nothing uses.
 
 ### AI adaptation
 
-A plugin with no build for one of its harnesses shows **Needs a build** in that cell. **Adapt with AI**, under **More** in the plugin's dialog, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+A plugin with no build for one of its harnesses shows **Needs a build** in that cell. **Adapt with AI**, under **More** in the plugin's panel, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
 
 <img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
 
