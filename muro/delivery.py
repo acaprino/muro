@@ -349,6 +349,8 @@ _SERVER_CHANNELS = {
     "codex": "the plugin's `mcp.json`",
     "pi": "`pi.registerMcpServer` in the package's `extensions/mcp.js`, at every load",
     "opencode": "the package plugin's `mcp.transform`",
+    "hermes": ("the portable package in `../hermes-mcp`, a second plugin to install and enable beside this one "
+               "(Hermes reads a plugin's servers only from a package whose one manifest is `plugin.json`)"),
 }
 
 

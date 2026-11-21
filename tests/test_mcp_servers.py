@@ -315,3 +315,45 @@ def test_a_release_registers_the_declared_server_on_pi_and_opencode(portable_pro
     assert '"stub"' in (release / "adapters/opencode/index.js").read_text(encoding="utf-8")
     for host in ("pi", "opencode"):
         assert "MCP server `stub`" in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+
+
+# --- Hermes: a portable package beside the native plugin ---------------------------------------------------------
+# Read in Hermes v0.23.1 (hermes_cli/plugin_validate.py, agent_plugins.py): a folder with plugin.yaml is
+# native and its mcp.json is ignored; only a plugin.json-only Agent Plugins package registers servers.
+
+def test_hermes_gets_a_portable_package_beside_the_native_one(portable_project, tmp_path):
+    declare(portable_project)
+    release = build(portable_project, tmp_path)
+    native, portable = release / "adapters/hermes", release / "adapters/hermes-mcp"
+    assert (native / "plugin.yaml").is_file()
+    assert not (native / "mcp.json").exists() and not (native / "plugin.json").exists()
+    assert not (portable / "plugin.yaml").exists() and not (portable / "skills").exists()
+    manifest = json.loads((portable / "plugin.json").read_text(encoding="utf-8"))
+    assert manifest == {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+                        "name": "muro-mcp", "version": "0.1.0",
+                        "description": "Muro: MCP servers of the unified plugin"}
+    mcp = json.loads((portable / "mcp.json").read_text(encoding="utf-8"))
+    assert set(mcp) == {"$schema", "mcpServers"} and mcp["$schema"] == MCP_SCHEMA
+    assert mcp["mcpServers"] == {"stub": {"type": "stdio", "command": "python",
+                                          "args": ["${PLUGIN_ROOT}/scripts/demo/SKILL.source.md", "--stdio"],
+                                          "env": {"STUB_HOME": "${PLUGIN_ROOT}/scripts/demo"}}}
+    assert (portable / "scripts/demo/SKILL.source.md").read_bytes() == (release / "scripts/demo/SKILL.source.md").read_bytes()
+    install = (native / "INSTALL.md").read_text(encoding="utf-8")
+    assert "MCP server `stub`" in install and "hermes-mcp" in install
+
+
+def test_a_release_without_servers_has_no_hermes_companion(portable_project, tmp_path):
+    assert not (build(portable_project, tmp_path) / "adapters/hermes-mcp").exists()
+
+
+def test_the_native_hermes_plugin_is_the_same_with_and_without_servers(portable_project, tmp_path):
+    policy = doc(decisions=[*doc()["decisions"], decision("always-on", [])], always_on="Keep the complete scope.")
+    (portable_project / "delivery.json").write_text(json.dumps(policy), encoding="utf-8")
+    before = build_release(portable_project / "sources.json", portable_project, tmp_path / "before") / "adapters/hermes"
+    both = declare(portable_project)
+    both["decisions"].append(decision("always-on", []))
+    both["always_on"] = "Keep the complete scope."
+    (portable_project / "delivery.json").write_text(json.dumps(both), encoding="utf-8")
+    after = build_release(portable_project / "sources.json", portable_project, tmp_path / "after") / "adapters/hermes"
+    for name in ("plugin.yaml", "__init__.py", "policy.md"):
+        assert (before / name).read_bytes() == (after / name).read_bytes()

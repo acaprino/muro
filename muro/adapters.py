@@ -6,11 +6,11 @@ from pathlib import Path, PurePosixPath
 import shutil
 
 from .delivery import (DELIVERY_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp, codex_hooks,
-                       install_note, placeholder_launches, session_text)
+                       install_note, mcp_servers, placeholder_launches, session_text)
 from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
-from .hermes_adapter import write_hermes_adapter
+from .hermes_adapter import write_hermes_adapter, write_hermes_servers
 from .native_policy import write_opencode_adapter, write_pi_adapter
 
 
@@ -393,6 +393,10 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             write_opencode_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "hermes":
             write_hermes_adapter(root, plugin, bool(policy))
+            servers = agent_plugins_mcp(delivery, "${PLUGIN_ROOT}")
+            if servers:
+                write_hermes_servers(dist / "adapters" / "hermes-mcp", plugin, servers, dist / "scripts",
+                                     {server["source"] for server in mcp_servers(delivery)})
 
 
 def _repository_source(source, adapter: PurePosixPath):
