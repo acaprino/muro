@@ -38,6 +38,9 @@ _SERVER_OPTIONAL = {"env"}
 _SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
 _ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PACKAGE_ROOT = "<package_root>"
+# A packaged path inside a value: alone, after `--option=`, or in a list joined by `;` or `:`.
+_PACKAGED_PATH = re.compile(re.escape(_PACKAGE_ROOT) + r"/([^;:]*)")
+_RESERVED_ENV = ("PLUGIN_ROOT", "PLUGIN_DATA")   # an Agent Plugins host drops a server that sets them
 MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
 
 
@@ -88,11 +91,15 @@ def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> 
     """A declared server must start from files the release carries. A path check, not a judgment."""
     errors = []
     for server in mcp_servers(document):
+        own = f"scripts/{server['source']}/"
         for value in [*server["run"], *server.get("env", {}).values()]:
-            # shortcut: only a value that begins with the root is checked, upgrade when a server needs a path list.
-            if value.startswith(_PACKAGE_ROOT + "/") and not (package_dir / value[len(_PACKAGE_ROOT) + 1:]).exists():
-                errors.append(f"mcp server {server['name']} names a file that is not packaged: "
-                              f"{value[len(_PACKAGE_ROOT) + 1:]}")
+            for relative in _PACKAGED_PATH.findall(value):
+                # Its own source's folder is all a server may name: a host that installs the servers as a
+                # package of their own (Hermes) carries nothing else.
+                if ".." in relative.split("/") or not (relative + "/").startswith(own):
+                    errors.append(f"mcp server {server['name']} names a path outside {own}: {relative}")
+                elif not (package_dir / relative).exists():
+                    errors.append(f"mcp server {server['name']} names a file that is not packaged: {relative}")
     return errors
 
 
@@ -137,6 +144,11 @@ def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str])
         else:
             declared.add(source)
         errors += _run_errors(server["run"], f"mcp server {name}")
+        if isinstance(server["run"], list) and server["run"] and isinstance(server["run"][0], str) \
+                and _PACKAGE_ROOT in server["run"][0]:
+            # Codex and Hermes accept only a bare program name, and no host form substitutes the program.
+            errors.append(f"mcp server {name}: the program (first part of run) is a command on the host, never a "
+                          f"{_PACKAGE_ROOT} path; pass the packaged file as an argument")
         env = server.get("env", {})
         if not isinstance(env, dict):
             errors.append(f"mcp server {name}: env must be an object of names and text values")
@@ -144,6 +156,9 @@ def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str])
             errors.append(f"mcp server {name}: env names must be plain variable names")
         elif any(not isinstance(value, str) for value in env.values()):
             errors.append(f"mcp server {name}: env values must be text")
+        elif any(key.upper() in _RESERVED_ENV for key in env):
+            errors.append(f"mcp server {name}: env names {' and '.join(_RESERVED_ENV)} are reserved by the hosts, "
+                          "which set them for the server")
     for source in sorted(server_sources - declared):
         errors.append(f"source {source} has an mcp-server decision but declares no server")
     return errors

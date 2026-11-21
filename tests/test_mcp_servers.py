@@ -385,4 +385,65 @@ def test_the_guide_names_a_server_decision(portable_project, tmp_path):
 
 def test_the_factory_names_no_real_server():
     for path in [*(ROOT / "muro").glob("*.py"), *(ROOT / "prompts").glob("*.md"), Path(__file__)]:
-        assert "supercmo" not in path.read_text(encoding="utf-8").lower().replace('"supercmo" not in', ""), path
+        assert "super" + "cmo" not in path.read_text(encoding="utf-8").lower(), path
+
+
+# --- Findings of the whole-branch review (2026-11-21) ------------------------------------------------------------
+
+def test_the_program_of_a_server_is_a_command_never_a_packaged_path():
+    # Codex and Hermes accept only a bare program name; the packaged file is an argument.
+    errors = errors_for(served(run=["<package_root>/scripts/demo/bin/server"]))
+    assert any("program" in error and "<package_root>" in error for error in errors), errors
+
+
+@pytest.mark.parametrize("name", ["PLUGIN_ROOT", "PLUGIN_DATA"])
+def test_env_cannot_set_a_name_the_hosts_reserve(name):
+    errors = errors_for(served(env={name: "x"}))
+    assert any("reserved" in error for error in errors), errors
+
+
+@pytest.mark.parametrize("run, env, message", [
+    (["python", "--config=<package_root>/scripts/demo/absent.json"], {}, "not packaged: scripts/demo/absent.json"),
+    (["python", "<package_root>/scripts/demo/../../ROUTER.md"], {}, "outside scripts/demo/"),
+    (["python", "<package_root>/ROUTER.md"], {}, "outside scripts/demo/"),
+    (["python", "-m", "stub"], {"PYTHONPATH": "<package_root>/scripts/demo;<package_root>/scripts/demo/absent"},
+     "not packaged: scripts/demo/absent"),
+])
+def test_every_packaged_path_a_server_names_is_checked(portable_project, tmp_path, run, env, message):
+    (portable_project / "delivery.json").write_text(json.dumps(served(run=run, env=env)), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        build(portable_project, tmp_path)
+
+
+@pytest.mark.parametrize("separator", [";", ":"])
+def test_a_list_of_packaged_folders_builds(portable_project, tmp_path, separator):
+    value = separator.join(["<package_root>/scripts/demo", "<package_root>/scripts/demo"])
+    document = served(run=["python", PACKAGED], env={"PYTHONPATH": value})
+    (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    entry = json.loads((build(portable_project, tmp_path) / "adapters/claude-code/.mcp.json").read_text(encoding="utf-8"))
+    root = "${CLAUDE_PLUGIN_ROOT}/skills/muro/scripts/demo"
+    assert entry["mcpServers"]["stub"]["env"]["PYTHONPATH"] == separator.join([root, root])
+
+
+def test_the_hermes_companion_carries_the_licenses_of_what_it_ships(portable_project, tmp_path):
+    declare(portable_project)
+    release = build(portable_project, tmp_path)
+    portable = release / "adapters/hermes-mcp"
+    assert (portable / "LICENSES/demo.txt").read_bytes() == (release / "LICENSES/demo.txt").read_bytes()
+    assert (portable / "NOTICE.md").read_bytes() == (release / "NOTICE.md").read_bytes()
+
+
+def test_a_dollar_sign_in_the_install_path_stays_a_dollar_sign(tmp_path):
+    # String.replaceAll reads $$, $& and $' in a replacement string.
+    root = package(tmp_path / "price $& a$$b $'")
+    write_pi_adapter(root, PLUGIN, False, LAUNCH)
+    calls = node(tmp_path, root, r"""
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const extension = (await import(pathToFileURL(path.join(process.argv[2], 'extensions', 'mcp.js')).href)).default;
+const calls = [];
+extension({on() {}, registerMcpServer: (name, config) => calls.push({name, config})});
+console.log(JSON.stringify(calls));
+""")
+    home, server = expected_paths(root)
+    assert Path(calls[0]["config"]["args"][0]) == server and Path(calls[0]["config"]["env"]["STUB_HOME"]) == home

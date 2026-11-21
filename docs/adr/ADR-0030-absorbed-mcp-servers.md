@@ -206,6 +206,21 @@ hook `run` check is shared with servers (`_run_errors`). The packaged-path
 check applies to servers only; a hook wiring that names a missing file still
 builds, as before.
 
+**After the whole-branch review (same day).** A fresh reviewer found inputs
+the first version accepted and shipped broken. Now refused: a `<package_root>`
+path as the program (no host form substitutes it, and Codex and Hermes accept
+only a bare program name); the env names `PLUGIN_ROOT` and `PLUGIN_DATA`
+(Hermes drops a server that sets them); a packaged path outside
+`scripts/<the server's source>/`, with `..`, or missing from the release,
+wherever it stands in a value (alone, after `--option=`, in a list joined by
+`;` or `:`). The Hermes companion carries `NOTICE.md` and the license of each
+serving source: it is installed on its own and ships absorbed files. The
+generated Pi and OpenCode modules substitute the root with a function, because
+`replaceAll` reads `$$`, `$&` and `$'` in a replacement string and an install
+path may hold them. Left as they are, recorded: a double quote in a server
+argument is refused though no shell is involved; a `.cmd` or `.bat` program is
+accepted for a server and refused for a hook only at run time.
+
 **Verified.** `tests/test_mcp_servers.py`: the declaration's refusals; the
 files written for all five hosts; a stub server started from the emitted
 Claude Code entry with the plugin root in a path with spaces, an accent, `&`

@@ -183,10 +183,15 @@ server once, for every host:
 - `name`: the name the host shows for the server. Keep the source's own name
   unless two servers of the package would share it.
 - `source`: the source whose files it runs.
-- `run`: the command as a list of parts, with `<package_root>` for packaged
-  files. Literal data, under the rules of a hook's `run`.
+- `run`: the command as a list of parts. The first part is a program found on
+  the host (`python`, `node`), never a packaged path: two hosts accept only a
+  bare program name. Packaged files are arguments, with `<package_root>`.
+  Literal data, under the rules of a hook's `run`.
 - `env`: only what the server needs to find its own packaged files (a module
-  path, a data folder), with `<package_root>`. Never a key, a token or another
+  path, a data folder), with `<package_root>`. A server names only files of
+  its own source, under `<package_root>/scripts/<source-id>/`; the build
+  refuses any other packaged path and one the release does not carry. The
+  names `PLUGIN_ROOT` and `PLUGIN_DATA` belong to the hosts. Never a key, a token or another
   secret: carry the source's own way of receiving them as content in the
   capability that sets the server up.
 

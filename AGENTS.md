@@ -256,8 +256,10 @@ installation, publication or replacement of existing dist output without request
   (Codex), `pi.registerMcpServer` in a second extension (Pi), `ctx.mcp.transform`
   (OpenCode) and, because Hermes ignores `mcp.json` beside a native
   `plugin.yaml`, a portable package `adapters/hermes-mcp` with its own copy of
-  the serving source's files. The build refuses a server that names a packaged
-  path the release does not carry. A server the source only calls and does not
+  the serving source's files, licenses and notice. A server's program is a
+  command on the host and its packaged files are arguments; it names only
+  files under `scripts/<its source>/`, and the build refuses a path outside
+  that folder or one the release does not carry. A server the source only calls and does not
   ship stays a runtime dependency. Python never chooses a name or a host
   (ADR-0030).
 - `eval-cases.json` (optional): AI-authored requests with expected status and
@@ -280,8 +282,9 @@ the wiring and grants no permissions.
 Owner correction of 2026-11-12 ("se installo il plugin generato da muro, allora
 può attivare da solo prompt, hook, tools, skills", "tutto ciò che serve"):
 installing a generated plugin is the consent, so a release may register by
-itself what its package declares in `delivery.json`: text for every session and
-hooks with policy `active`. May is not should. Same day, on a design system
+itself what its package declares in `delivery.json`: text for every session,
+hooks with policy `active` and, since 2026-11-21, the MCP servers a source
+ships (ADR-0030). May is not should. Same day, on a design system
 prompt offered to Marionette: it "non deve fagocitare tutto" in a package that
 is "multi theme, context e intent"; it becomes capabilities found from context,
 harmonized with the others, and "questo è anche il tipo di sensibilità che mi

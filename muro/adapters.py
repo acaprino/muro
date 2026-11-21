@@ -395,7 +395,7 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             write_hermes_adapter(root, plugin, bool(policy))
             servers = agent_plugins_mcp(delivery, "${PLUGIN_ROOT}")
             if servers:
-                write_hermes_servers(dist / "adapters" / "hermes-mcp", plugin, servers, dist / "scripts",
+                write_hermes_servers(dist / "adapters" / "hermes-mcp", plugin, servers, dist,
                                      {server["source"] for server in mcp_servers(delivery)})
 
 

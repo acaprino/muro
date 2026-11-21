@@ -57,7 +57,7 @@ call per host.
 
 ## Tests
 
-`tests/test_mcp_servers.py` (36 tests): the declaration's refusals; the files
+`tests/test_mcp_servers.py` (47 tests after the review's fixes): the declaration's refusals; the files
 written for the five hosts; the build refusing a declared path the release
 does not carry; a stub started from the emitted Claude Code entry with the
 plugin root in a path with spaces, an accent, `&` and `%`, and with `$`, `%`

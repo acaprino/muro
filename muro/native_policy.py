@@ -15,7 +15,8 @@ def _servers_js(servers: list[dict], package_url: str) -> str:
     Neither host gives a plugin-root variable inside a server entry, so the module resolves its own location.
     """
     return ('const serverRoot = fileURLToPath(new URL(%s, import.meta.url));\n'
-            'const place = (value) => value.replaceAll("<package_root>", serverRoot);\n'
+            # A function, not a string: replaceAll reads $$, $& and $' in a replacement string.
+            'const place = (value) => value.replaceAll("<package_root>", () => serverRoot);\n'
             'const servers = %s.map((server) => ({...server, args: server.args.map(place),\n'
             '  env: Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, place(value)]))}));\n'
             % (json.dumps(package_url), json.dumps(list(servers), ensure_ascii=True, indent=2)))
