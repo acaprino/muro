@@ -234,7 +234,7 @@ installation, publication or replacement of existing dist output without request
 - `delivery.json` (optional) and `prompts/delivery.md`: what each part of each
   source becomes in this package, decided by the host AI at intake and reviewed
   at harmonization: `decisions` of `{source, content, form, targets, reason}`
-  with form `capability`, `always-on`, `hook` or `dropped`, the `always_on`
+  with form `capability`, `always-on`, `hook`, `mcp-server` or `dropped`, the `always_on`
   session text (the contributing sources' own words plus marked coexistence
   lines; at most 6000 characters for each source with an `always-on` decision,
   owner rule of 2026-11-12: the limit is proportional to the intakes that go
@@ -247,6 +247,19 @@ installation, publication or replacement of existing dist output without request
   package can have no capabilities: header-only router, authored no_match guide
   examples, no entries and no discoverable SKILL.md. The policy and delivery
   declarations participate in catalog_digest and are supplied to routing evals.
+  Owner, 2026-11-21, on a source whose skills call the tools of a server it
+  ships ("Secondo me Muro dovrebbe inglobare anche server mcp"): the server is
+  absorbed with its source. The intake selects the files it runs from, and
+  `mcp_servers` declares it once, host-neutral, as `{name, source, run}` with
+  an optional `env` for its own packaged files (never a secret). Each adapter
+  writes the form its host reads: `.mcp.json` (Claude Code), root `mcp.json`
+  (Codex), `pi.registerMcpServer` in a second extension (Pi), `ctx.mcp.transform`
+  (OpenCode) and, because Hermes ignores `mcp.json` beside a native
+  `plugin.yaml`, a portable package `adapters/hermes-mcp` with its own copy of
+  the serving source's files. The build refuses a server that names a packaged
+  path the release does not carry. A server the source only calls and does not
+  ship stays a runtime dependency. Python never chooses a name or a host
+  (ADR-0030).
 - `eval-cases.json` (optional): AI-authored requests with expected status and
   ordered capabilities. Use `expect.selections` to test the actual operation
   when a capability serves several intents or depends on a conditional prerequisite.

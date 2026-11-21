@@ -357,3 +357,32 @@ def test_the_native_hermes_plugin_is_the_same_with_and_without_servers(portable_
     after = build_release(portable_project / "sources.json", portable_project, tmp_path / "after") / "adapters/hermes"
     for name in ("plugin.yaml", "__init__.py", "policy.md"):
         assert (before / name).read_bytes() == (after / name).read_bytes()
+
+
+# --- The judgment stays the AI's: the prompts carry the form, Python carries no source ----------------------------
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_the_delivery_prompt_states_the_server_form_and_its_cost():
+    text = (ROOT / "prompts" / "delivery.md").read_text(encoding="utf-8")
+    assert "- `mcp-server`:" in text and '"mcp_servers"' in text
+    section = text.split("## MCP servers", 1)[1].split("\n## ", 1)[0]
+    for required in ("every session", "intake_only_paths", "<package_root>", "same tools"):
+        assert required in section, required
+
+
+def test_the_intake_prompt_sends_a_shipped_server_to_the_delivery_protocol():
+    text = (ROOT / "prompts" / "intake.md").read_text(encoding="utf-8")
+    assert "`mcp-server`" in text and "runtime dependency" in text
+
+
+def test_the_guide_names_a_server_decision(portable_project, tmp_path):
+    declare(portable_project)
+    guide = (build(portable_project, tmp_path) / "GUIDE.html").read_text(encoding="utf-8")
+    assert "MCP server registered by the plugin" in guide
+
+
+def test_the_factory_names_no_real_server():
+    for path in [*(ROOT / "muro").glob("*.py"), *(ROOT / "prompts").glob("*.md"), Path(__file__)]:
+        assert "supercmo" not in path.read_text(encoding="utf-8").lower().replace('"supercmo" not in', ""), path

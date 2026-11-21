@@ -9,7 +9,7 @@ declares; it never chooses a form, counts lines or matches file names for you.
 ## What the plugin may do
 
 Installing the generated plugin is the user's consent. The plugin may register by
-itself whatever it needs: session text, hooks, tools, skills. That it may does not
+itself whatever it needs: session text, hooks, MCP servers, tools, skills. That it may does not
 mean it should. Each thing that activates by itself is paid for in every session
 by a user who may be doing something unrelated, so each one needs its own reason.
 
@@ -45,6 +45,9 @@ every reference to it from the bodies. Decide per file and say why.
 - `always-on`: permanent guidance the native adapter adds to the host's
   system/developer instruction channel.
 - `hook`: something the host runs on its own events, registered by the release.
+- `mcp-server`: an MCP server the source ships, whose tools its procedures call.
+  The release carries its files and registers it, so the tools exist as soon as
+  the plugin is installed.
 - `dropped`: not carried. Typical: the source's own routing between its skills,
   installing the source itself, marketing, a duplicate of what the catalog has.
 
@@ -105,7 +108,7 @@ your judgment, not instructions to execute during intake. Their names and orderi
 do not assign authority or scope. Give every file at least one delivery decision
 with `source` equal to its full package-relative path, for example
 `custom-instructions/recap-adhd.md`; `content` names the relevant part or section.
-Use the same four forms and explain coexistence with the absorbed sources.
+Use the same forms and explain coexistence with the absorbed sources.
 Do not silently drop an owner requirement; an unresolved outcome-changing
 contradiction must be reported for clarification.
 
@@ -171,6 +174,46 @@ executable instead. When the source declares a timeout for its hook, carry it
 as `timeout` (whole seconds) in the wiring; without it the host's default
 applies. Host permissions and trust still govern activation.
 
+## MCP servers
+
+A source that ships its own MCP server is absorbed with it. Select the files the
+server runs from, like every file the method uses at run time, and declare the
+server once, for every host:
+
+- `name`: the name the host shows for the server. Keep the source's own name
+  unless two servers of the package would share it.
+- `source`: the source whose files it runs.
+- `run`: the command as a list of parts, with `<package_root>` for packaged
+  files. Literal data, under the rules of a hook's `run`.
+- `env`: only what the server needs to find its own packaged files (a module
+  path, a data folder), with `<package_root>`. Never a key, a token or another
+  secret: carry the source's own way of receiving them as content in the
+  capability that sets the server up.
+
+Start the server from the packaged files, not from a published package the
+source's own registration downloads: what runs is then the pinned commit the
+license gate verified. The original's registration and installer (its
+`.mcp.json`, host manifests, an install script) are evidence of how the server
+starts; list them in `intake_only_paths`. What the server needs and does not
+ship (an interpreter, a library, an external program) stays a runtime
+dependency, with how it is checked and installed.
+
+The cost question applies in full. A registered server is paid for in
+every session of every user of the package: the host loads its tool
+descriptions whether or not the task is about them. State in the decision's reason how many
+tools it registers and roughly what their descriptions weigh, and say why the
+package pays it. The decision's `targets` are the capabilities whose steps call
+the server's tools; their `tools` field still names each operation and its side
+effects.
+
+A server the source only calls and does not ship is not declared: it is a
+runtime dependency of the capability that needs it.
+
+If the original plugin or its server may already be configured on a user's
+host, say so in the reason and in the capability that sets the server up: two
+servers with the same tools offer every tool twice, and on some hosts a server
+the user configured under the same name wins over the plugin's.
+
 ## Output
 
 Write `delivery.json` in the package directory:
@@ -179,7 +222,7 @@ Write `delivery.json` in the package directory:
 {
   "decisions": [
     {"source": "<source id>", "content": "<which part of the source>",
-     "form": "capability | always-on | hook | dropped",
+     "form": "capability | always-on | hook | mcp-server | dropped",
      "targets": ["<capability id>"], "reason": "<answers that decided it, and open doubts>"}
   ],
   "always_on": "<the session text, only with an always-on decision>",
@@ -187,11 +230,17 @@ Write `delivery.json` in the package directory:
     {"host": "<host>", "capability": "<capability id>", "event": "<host event>",
      "matcher": "", "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"],
      "timeout": 600}
+  ],
+  "mcp_servers": [
+    {"name": "<server name>", "source": "<source id>",
+     "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"],
+     "env": {"<NAME>": "<package_root>/scripts/<source-id>/<path>"}}
   ]
 }
 ```
 
-Every source has at least one decision. `capability` and `hook` name their target
-capabilities; `always-on` and `dropped` name none. Omit `always_on` and `hooks`
-when no decision uses them, and `timeout` when the source declares none. Reasons cite source paths or sections, like
+Every source has at least one decision. `capability`, `hook` and `mcp-server` name
+their target capabilities; `always-on` and `dropped` name none. Omit `always_on`,
+`hooks` and `mcp_servers` when no decision uses them, `timeout` when the source
+declares none and `env` when the server needs none. Reasons cite source paths or sections, like
 `## Sources` does.

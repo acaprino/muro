@@ -290,7 +290,7 @@ Start with Marionette's layout and give the new package its own identity and sou
 | `ROUTER.md` | Catalog index with one row per capability and the harmonization record |
 | `guide-examples.json` | Reviewed requests with explicit decisions that the guide validates and illustrates |
 | `entries.json` | Optional discovery skills that point into the same catalog. Each entry's `absorbs` names the originals from `plugin.replaces` it stands in for, written into its description by the build ([ADR-0019](docs/adr/ADR-0019-absorbed-originals-named-at-discovery.md)) |
-| `delivery.json` | Optional delivery decisions, session text, and hook declarations |
+| `delivery.json` | Optional delivery decisions, session text, hook declarations and the MCP servers a source ships ([ADR-0030](docs/adr/ADR-0030-absorbed-mcp-servers.md)) |
 | `custom-instructions/**/*.md` | Your own instructions in free Markdown; the host AI decides their form and scope during harmonization |
 | `eval-cases.json` | Optional routing examples. Each case names the expected status and ordered capabilities. Add `expect.selections` to score intents, repeated steps and conditional prerequisites. Use `alternatives` for additional complete routes the request allows. |
 

@@ -15,7 +15,7 @@ keyword checker, scoring script or fixed checklist to perform it for you.
   change must be listed with the collision that required it ("Changes for
   coexistence"); a rewrite without a recorded collision is a finding.
 - **Delivery decisions.** Every source has a decision; every decided form
-  (capability, always-on, hook, dropped) still has something real behind it,
+  (capability, always-on, hook, mcp-server, dropped) still has something real behind it,
   and the reason recorded still matches what the source says.
 - **Harmonization records.** Merges, alternatives, handoffs and conflicts still
   describe the capabilities as they stand; a graph edge whose reason is gone is

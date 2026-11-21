@@ -99,7 +99,8 @@ without it as an unresolved gap for the owner.
 
 Not every part of a source becomes a capability. Before extracting, decide with
 the Delivery protocol appended below what each part becomes in this package: an
-on-demand capability, text for every session, an active hook, or nothing. Record
+on-demand capability, text for every session, an active hook, a registered MCP
+server, or nothing. Record
 the decisions in `delivery.json` and account in `## Sources` for the parts that
 were delivered in another form or dropped.
 
@@ -190,6 +191,12 @@ Inventory tool calls, MCP dependencies, scripts and default hooks from the selec
 source material. `tools` records logical operations, their purpose/side effects and
 whether required, not guessed host API signatures. The host AI maps these to tools
 actually available in its session. Include tools needed by adopted hooks.
+
+An MCP server the source ships in the selected repository is part of the source:
+select the files it runs from and decide its delivery with the form `mcp-server`
+(Delivery protocol, "MCP servers"), so the release carries and registers it. A
+server the source only calls and does not ship is a runtime dependency of the
+capability that needs it. Either way `tools` names each operation a step calls.
 
 For each adopted hook use exactly `{event, action, tools, policy}`: a nonempty
 event/action description, an array of declared tool names and policy `manual`,
