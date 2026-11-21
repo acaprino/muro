@@ -97,4 +97,4 @@ GitHub Actions, branch `fix/source-structures`:
   `https://github.com/acaprino/marionette#marionette`.
 - Claude Code plugins without `.claude-plugin/plugin.json` or without a
   `version` in it (both allowed by Claude Code) are still refused by Muro, as
-  before.
+  before. Lifted the same day: `2026-11-21-claude-plugins-without-manifest.md`.

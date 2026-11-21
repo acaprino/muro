@@ -564,15 +564,7 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
         "Distribution not found: {}",
         source.display()
     );
-    let (_name, version) = native::identity(h, source)?;
-    ensure!(
-        !version.is_empty(),
-        "Plugin manifest must declare its version"
-    );
-    ensure!(
-        version == str_field(d, "version")?,
-        "Distribution version differs from its manifest"
-    );
+    let (name, version) = native::distribution_identity(h, source, d)?;
     if plugin["policy"] == "pinned" {
         if plugin["upstream_revision"].is_string() && plugin["upstream_version"] != "local" {
             ensure!(
@@ -620,9 +612,9 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
         );
         fs::rename(tmp.path(), &artifact)?;
     }
-    let native_id = native::native_id(h, str_field(plugin, "id")?, &artifact)?;
+    let native_id = native::native_id(h, str_field(plugin, "id")?, &name, &artifact)?;
     Ok(
-        json!({"source":source,"path":artifact,"digest":digest,"version":version,"native_id":native_id,
+        json!({"source":source,"path":artifact,"digest":digest,"name":name,"version":version,"native_id":native_id,
                "custom_instructions_digest":custom_digest}),
     )
 }
@@ -646,13 +638,11 @@ fn retained_artifact(root: &Path, receipt: &Value, harness: &str) -> Result<Valu
         tree_hash(path)? == digest,
         "Recorded artifact is missing or changed"
     );
-    let (_, version) = native::identity(harness, path)?;
-    ensure!(
-        version == str_field(receipt, "version")?,
-        "Recorded artifact version changed"
-    );
+    // A receipt written before receipts kept the name has a plugin whose manifest names it.
+    let (name, version) = native::distribution_identity(harness, path, receipt)
+        .context("Recorded artifact version changed")?;
     Ok(
-        json!({"source":path,"path":path,"digest":digest,"version":version,"native_id":str_field(receipt,"native_id")?,
+        json!({"source":path,"path":path,"digest":digest,"name":name,"version":version,"native_id":str_field(receipt,"native_id")?,
                "custom_instructions_digest":receipt["custom_instructions_digest"]}),
     )
 }
@@ -937,10 +927,17 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                 native::activate(target, str_field(op, "previous_id")?)?;
             } else {
                 let artifact = &op["artifact"];
+                let path = Path::new(str_field(artifact, "path")?);
+                let name = match artifact["name"].as_str() {
+                    Some(name) => name.to_owned(),
+                    // A plan made before artifacts carried the name: its plugin's manifest names it.
+                    None => native::identity(str_field(target, "harness")?, path)?.0,
+                };
                 let native_id = native::install(
                     target,
                     str_field(op, "plugin_id")?,
-                    Path::new(str_field(artifact, "path")?),
+                    path,
+                    (&name, str_field(artifact, "version")?),
                     op["previous_id"].as_str(),
                     str_field(op, "kind")?,
                 )?;
@@ -952,7 +949,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                     .as_object_mut()
                     .context("receipts")?
                     .retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id);
-                receipts[&key] = json!({"target_id":op["target_id"],"plugin_id":op["plugin_id"],"native_id":native_id,"version":op["to_version"],"digest":artifact["digest"],"path":artifact["path"],"custom_instructions_digest":artifact["custom_instructions_digest"]});
+                receipts[&key] = json!({"target_id":op["target_id"],"plugin_id":op["plugin_id"],"native_id":native_id,"name":name,"version":op["to_version"],"digest":artifact["digest"],"path":artifact["path"],"custom_instructions_digest":artifact["custom_instructions_digest"]});
             }
             if op["kind"] != "remove" {
                 let observed = native::inventory(target, receipts);
@@ -1155,5 +1152,26 @@ mod tests {
         assert!(!reinstalled_files_match("claude-code", &json!({"path":tmp.path().join("missing")}), &op));
         assert!(reinstalled_files_match("codex", &json!({"path":""}), &op));
         assert!(reinstalled_files_match("hermes", &entry, &op));
+    }
+    #[test]
+    fn a_claude_code_plugin_without_a_manifest_is_prepared_under_its_resolved_name_and_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let source = tmp.path().join("ay");
+        fs::create_dir_all(&data).unwrap();
+        fs::create_dir_all(source.join("skills/hello")).unwrap();
+        fs::write(source.join("skills/hello/SKILL.md"), "Say hello.").unwrap();
+        let plugin = json!({"id":"p1","name":"Ay","policy":"head","distributions":[
+            {"harness":"claude-code","path":source,"name":"ay","version":"0123456789ab","origin":"native"}]});
+        let artifact = prepare(&data, &plugin, "claude-code").unwrap();
+        assert_eq!(artifact["name"], "ay");
+        assert_eq!(artifact["version"], "0123456789ab");
+        assert_eq!(artifact["native_id"], "ay@muro-p1");
+        // The receipt keeps the name, so a reinstall of the retained copy needs no manifest either.
+        let receipt = json!({"path":artifact["path"],"digest":artifact["digest"],"native_id":"ay@muro-p1",
+            "name":"ay","version":"0123456789ab"});
+        let retained = retained_artifact(&data, &receipt, "claude-code").unwrap();
+        assert_eq!(retained["name"], "ay");
+        assert_eq!(retained["version"], "0123456789ab");
     }
 }

@@ -223,8 +223,8 @@ fn checkout_in(
 const HARNESSES: [&str; 5] = ["claude-code", "codex", "opencode", "pi", "hermes"];
 /// What a source holds for one harness.
 enum Found {
-    /// The plugin's folder.
-    One(PathBuf),
+    /// The plugin's folder, and the marketplace entry that lists it.
+    One(PathBuf, Option<Value>),
     /// The harness's marketplace lists these plugin folders, relative to the source.
     Many(Vec<String>),
     None,
@@ -238,14 +238,14 @@ fn find(h: &str, source: &Path) -> Result<Found> {
     let adapter = source.join("adapters").join(h);
     if adapter.is_dir() {
         return Ok(match native::identity(h, &adapter) {
-            Ok(_) => Found::One(adapter),
+            Ok(_) => Found::One(adapter, None),
             Err(_) => Found::None,
         });
     }
     if native::identity(h, source).is_ok()
         && (!matches!(h, "opencode" | "pi") || read(&source.join("package.json"))?.get(h).is_some())
     {
-        return Ok(Found::One(source.to_path_buf()));
+        return Ok(Found::One(source.to_path_buf(), None));
     }
     let Some(file) = native::marketplace(h).map(|m| source.join(m)) else {
         return Ok(Found::None);
@@ -257,24 +257,33 @@ fn find(h: &str, source: &Path) -> Result<Found> {
         read(&file).with_context(|| format!("Invalid marketplace {}", file.display()))?;
     let base = source.canonicalize()?;
     let plugin_root = document["metadata"]["pluginRoot"].as_str();
-    let mut folders: Vec<PathBuf> = vec![];
+    let mut folders: Vec<(PathBuf, Value)> = vec![];
     for entry in document["plugins"].as_array().into_iter().flatten() {
         let Some(dir) =
             local_source(h, &entry["source"], plugin_root).and_then(|r| inside(&base, &r))
         else {
             continue;
         };
-        if native::identity(h, &dir).is_ok() && !folders.contains(&dir) {
-            folders.push(dir);
+        // Claude Code installs a folder without a manifest: the entry is then its manifest.
+        let bare = h == "claude-code"
+            && !dir.join(native::manifest(h)?).exists()
+            && entry["name"]
+                .as_str()
+                .is_some_and(|n| native::valid_name(h, n));
+        if (bare || native::identity(h, &dir).is_ok()) && !folders.iter().any(|(f, _)| *f == dir) {
+            folders.push((dir, entry.clone()));
         }
     }
     Ok(match folders.len() {
         0 => Found::None,
-        1 => Found::One(folders.remove(0)),
+        1 => {
+            let (dir, entry) = folders.remove(0);
+            Found::One(dir, Some(entry))
+        }
         _ => Found::Many(
             folders
                 .iter()
-                .map(|f| {
+                .map(|(f, _)| {
                     f.strip_prefix(&base)
                         .unwrap_or(f)
                         .to_string_lossy()
@@ -283,6 +292,34 @@ fn find(h: &str, source: &Path) -> Result<Found> {
                 .collect(),
         ),
     })
+}
+/// The name and version harness `h` installs the plugin in `dir` under: its manifest's. Claude Code
+/// takes what the manifest lacks, the manifest itself included, from the marketplace `entry` that
+/// lists it, and with no version anywhere the revision's first 12 characters, as it does for a plugin
+/// from a Git repository (the folder Muro installs from is not one: Claude Code would say `unknown`).
+fn identity_in(
+    h: &str,
+    dir: &Path,
+    entry: Option<&Value>,
+    revision: &str,
+) -> Result<(String, String)> {
+    let listed = |key: &str| {
+        entry
+            .and_then(|e| e[key].as_str())
+            .filter(|v| !v.is_empty())
+    };
+    let (name, version) = match (native::identity(h, dir), listed("name")) {
+        (Ok(found), _) => found,
+        (Err(_), Some(name)) if h == "claude-code" => (name.to_owned(), String::new()),
+        (Err(e), _) => return Err(e),
+    };
+    if !version.is_empty() || h != "claude-code" {
+        return Ok((name, version));
+    }
+    let version = listed("version")
+        .map(str::to_owned)
+        .unwrap_or_else(|| revision.chars().take(12).collect());
+    Ok((name, version))
 }
 /// The folder a marketplace entry's `source` names inside the marketplace, as the harness writes it:
 /// Claude Code `./path`, or a bare name under `metadata.pluginRoot`; Codex `{"source":"local",
@@ -381,9 +418,9 @@ pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
         if distributions.iter().any(|d| d["harness"] == h) {
             continue;
         }
-        if let Found::One(dir) = find(h, &source)? {
-            let (_, native_version) = native::identity(h, &dir)?;
-            distributions.push(json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"version":native_version,"origin":"native","source_revision":revision}));
+        if let Found::One(dir, entry) = find(h, &source)? {
+            let (name, version) = identity_in(h, &dir, entry.as_ref(), &revision)?;
+            distributions.push(json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"name":name,"version":version,"origin":"native","source_revision":revision}));
         }
     }
     for old in plugin["distributions"].as_array().into_iter().flatten() {
