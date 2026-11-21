@@ -93,3 +93,10 @@ marionette, creando PR verso branch marionette". Until then Marionette
 Implementation choices, not the owner's words: the deploy key, the branch
 name, the notes file and the build kept whole in Git (280 MiB, 12,060 files,
 none over 5 MiB, measured on the 0.4.0 build of 2026-11-19).
+
+## Amendment of 2026-11-21
+
+Merging a change to `examples/marionette/sources.json`'s `plugin.version` into Muro's `main`
+requests a new package build. GitHub Actions starts it automatically. The manual trigger remains
+available for recovery. The owner can review the generated package in its release PR before merging
+it to publish the archive and checksum. The factory and package retain their independent versions.

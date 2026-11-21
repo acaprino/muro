@@ -374,7 +374,7 @@ The two tests that drive the real executable, `native.mjs` and `native-shell.mjs
 
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
 
-The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release. Marionette is released on request: the `Release Marionette` workflow builds it and opens a pull request in [acaprino/marionette](https://github.com/acaprino/marionette), and merging that pull request publishes the release there.
+The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release. When a merge changes Marionette's `plugin.version` on Muro's `main`, GitHub Actions builds the package and opens a release PR. Merging that PR publishes the ZIP and its SHA-256 in [acaprino/marionette](https://github.com/acaprino/marionette).
 
 [Routing verification](docs/verification/2026-11-09-ai-owned-routing.md) · [Guide verification](docs/verification/2026-11-10-release-html-guide.md) · [Routing eval and development principles](docs/adr/ADR-0015-design-principles-from-first-real-use.md)
 

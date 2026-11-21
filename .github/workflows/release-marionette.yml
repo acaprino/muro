@@ -1,6 +1,6 @@
 name: Release Marionette
 
-# Builds the Marionette package (marionette-v<version>) from the commit it runs on, on the owner's request, and
+# Builds the Marionette package (marionette-v<version>) when its version changes on main or on manual dispatch, and
 # opens its release pull request in acaprino/marionette, the package's own public repository: the build goes as
 # the folder marionette/, with its notes in releases/<tag>.md, to the branch release/<tag>, and that repository
 # opens the pull request into main. Merging it publishes the release there. Run again before the merge, it
@@ -8,40 +8,51 @@ name: Release Marionette
 # The factory and its desktop app (muro-v<version>) are released by release.yml at every merge of develop into
 # main. See AGENTS.md, "Releasing".
 on:
+  push:
+    # Compare the two manifest versions directly, including when a large merge changes hundreds of paths.
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: release-marionette
-  cancel-in-progress: false
+env:
+  MANIFEST: examples/marionette/sources.json
+  PACKAGE_REPOSITORY: acaprino/marionette
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: plan
+        name: Check the version and published tags
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == push && "$BEFORE" != 0000000000000000000000000000000000000000 ]]; then
+            git fetch --no-tags --depth=1 origin "$BEFORE"
+          fi
+          python3 .github/scripts/marionette_release.py
+
   release:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    concurrency:
+      group: release-marionette-${{ needs.plan.outputs.version }}
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     env:
-      MANIFEST: examples/marionette/sources.json
-      PACKAGE_REPOSITORY: acaprino/marionette
+      PKG_VERSION: ${{ needs.plan.outputs.version }}
+      PKG_TAG: marionette-v${{ needs.plan.outputs.version }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
-      - name: Read the version
-        run: |
-          echo "PKG_VERSION=$(python -c 'import json,os; print(json.load(open(os.environ["MANIFEST"]))["plugin"]["version"])')" >> "$GITHUB_ENV"
-      - name: Refuse a tag that already exists
-        # Marionette 0.2.0 to 0.4.0 were published in this repository, later versions in the package's own.
-        run: |
-          PKG_TAG="marionette-v$PKG_VERSION"
-          echo "PKG_TAG=$PKG_TAG" >> "$GITHUB_ENV"
-          for repository in "$GITHUB_REPOSITORY" "$PACKAGE_REPOSITORY"; do
-            found=$(git ls-remote --tags "https://github.com/$repository.git" "refs/tags/$PKG_TAG")
-            if [ -n "$found" ]; then
-              echo "::error::$PKG_TAG already exists in $repository; bump the version instead"; exit 1
-            fi
-          done
       - name: Test the release commit
         run: |
           python -m pip install pytest
@@ -61,6 +72,28 @@ jobs:
         working-directory: package
         run: |
           branch="release/$PKG_TAG"
+          provenance="Built by Muro from $GITHUB_REPOSITORY@$GITHUB_SHA."
+          # An earlier run may have prepared or published this version while this build was queued.
+          published=$(git ls-remote --tags origin "refs/tags/$PKG_TAG")
+          if [ -n "$published" ]; then
+            echo "$PKG_TAG is already published." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          existing=$(git ls-remote --heads origin "refs/heads/$branch")
+          head=${existing%%$'\t'*}
+          if [ -n "$head" ]; then
+            git fetch --no-tags --depth=1 origin "$head"
+            previous=$(git show -s --format=%b "$head")
+            if [ "$previous" = "$provenance" ]; then
+              pulls=$(curl --fail --silent --show-error --get "$GITHUB_API_URL/repos/$PACKAGE_REPOSITORY/pulls" \
+                --data-urlencode state=open --data-urlencode base=main --data-urlencode "head=${PACKAGE_REPOSITORY%/*}:$branch")
+              number=$(jq -r '.[0].number // empty' <<< "$pulls")
+              if [ -n "$number" ]; then
+                echo "Already prepared in https://github.com/$PACKAGE_REPOSITORY/pull/$number" >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            fi
+          fi
           git switch -c "$branch"
           rm -rf marionette
           cp -a "$RUNNER_TEMP/release/marionette" marionette
@@ -71,7 +104,11 @@ jobs:
             echo "Built by Muro from $GITHUB_REPOSITORY@$GITHUB_SHA ($MANIFEST)."
           } > "releases/$PKG_TAG.md"
           git add -A marionette releases
+          if git diff --cached --quiet; then
+            echo "$PKG_TAG is already on the package main." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -q -m "Marionette $PKG_VERSION" -m "Built by Muro from $GITHUB_REPOSITORY@$GITHUB_SHA."
-          git push --force origin "$branch"
+            commit -q -m "Marionette $PKG_VERSION" -m "$provenance"
+          git push --force-with-lease="refs/heads/$branch:$head" origin "$branch"
           echo "Pushed $branch to $PACKAGE_REPOSITORY; its pull request opens at https://github.com/$PACKAGE_REPOSITORY/pulls" >> "$GITHUB_STEP_SUMMARY"
