@@ -343,14 +343,16 @@ def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[s
     return {"description": f"{name}: declared delivery", "hooks": events} if events else None
 
 
-# Where each host reads a plugin's servers. A host is listed once its registration was run on it (ADR-0030).
+# Where each host reads a plugin's servers (ADR-0030). Run live on 2026-11-21: Claude Code, Pi and OpenCode in a
+# session, Codex up to `codex mcp list`; Hermes only through its own validator and loader.
 _SERVER_CHANNELS = {
     "claude-code": "the plugin's `.mcp.json`, when the plugin is enabled",
     "codex": "the plugin's `mcp.json`",
     "pi": "`pi.registerMcpServer` in the package's `extensions/mcp.js`, at every load",
     "opencode": "the package plugin's `mcp.transform`",
     "hermes": ("the portable package in `../hermes-mcp`, a second plugin to install and enable beside this one "
-               "(Hermes reads a plugin's servers only from a package whose one manifest is `plugin.json`)"),
+               "(Hermes reads a plugin's servers only from a package whose one manifest is `plugin.json`; accepted by "
+               "Hermes's own validator and loader, not run in a live Hermes session)"),
 }
 
 

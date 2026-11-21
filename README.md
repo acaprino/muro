@@ -198,17 +198,17 @@ Then ask in plain words, or run `/marionette:marionette`. To build Marionette fr
 
 ## Supported harnesses
 
-| Harness | Desktop app | Package adapter | Native session instructions | Declared source command hooks |
-| --- | --- | --- | --- | --- |
-| <img src="docs/assets/branding/harnesses/claude-code.svg" width="24" alt=""> **[Claude Code](https://code.claude.com/docs/en/plugins/mods/reference)** | Yes | `adapters/claude-code/` | `prompt.compose` system section | Supported |
-| <img src="docs/assets/branding/harnesses/codex.svg" width="24" alt=""> **[Codex](https://developers.openai.com/codex/hooks/)** | Yes | `adapters/codex/` | Developer context on session and subagent start | Supported |
-| <img src="docs/assets/branding/harnesses/opencode.svg" width="24" alt=""> **[OpenCode](https://opencode.ai/)** | Yes | `adapters/opencode/` | System parts via the V2 package plugin API | — |
-| <img src="docs/assets/branding/harnesses/pi.svg" width="24" alt=""> **[Pi](https://pi.dev/)** | Yes | `adapters/pi/` | Named system section via a package extension | — |
-| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | Yes | `adapters/hermes/` | Registered system prompt section up to 4,000 characters; a longer policy goes whole through `pre_llm_call` | — |
+| Harness | Desktop app | Package adapter | Native session instructions | Declared source command hooks | Declared MCP servers |
+| --- | --- | --- | --- | --- | --- |
+| <img src="docs/assets/branding/harnesses/claude-code.svg" width="24" alt=""> **[Claude Code](https://code.claude.com/docs/en/plugins/mods/reference)** | Yes | `adapters/claude-code/` | `prompt.compose` system section | Supported | `.mcp.json` of the plugin |
+| <img src="docs/assets/branding/harnesses/codex.svg" width="24" alt=""> **[Codex](https://developers.openai.com/codex/hooks/)** | Yes | `adapters/codex/` | Developer context on session and subagent start | Supported | `mcp.json` of the plugin |
+| <img src="docs/assets/branding/harnesses/opencode.svg" width="24" alt=""> **[OpenCode](https://opencode.ai/)** | Yes | `adapters/opencode/` | System parts via the V2 package plugin API | — | `mcp.transform` in the package plugin |
+| <img src="docs/assets/branding/harnesses/pi.svg" width="24" alt=""> **[Pi](https://pi.dev/)** | Yes | `adapters/pi/` | Named system section via a package extension | — | `registerMcpServer` in a package extension |
+| <img src="docs/assets/branding/harnesses/hermes.png" width="24" alt=""> **[Hermes Agent](https://github.com/NousResearch/hermes-agent)** | Yes | `adapters/hermes/` | Registered system prompt section up to 4,000 characters; a longer policy goes whole through `pre_llm_call` | — | A second, portable package: `adapters/hermes-mcp/` |
 
 The desktop app also finds DeepSeek, which has no plugin adapter yet. Each package adapter is a native adapter in the generated release; its `INSTALL.md` covers the host API, installation and activation limits.
 
-Installing the **complete adapter** lets the harness load the session instructions and active hooks declared in `delivery.json`, subject to the host's permissions and trust settings. For on-demand capabilities, the standalone `skills/<command>/` directory includes its launcher, catalog, prompts, helpers, notices and offline guide. Keep the directory intact and install any discovery entries alongside it.
+Installing the **complete adapter** lets the harness load the session instructions, the active hooks and the MCP servers declared in `delivery.json`, subject to the host's permissions and trust settings. A source that ships its own MCP server is absorbed with it: the server starts from the files packaged at the pinned commit ([ADR-0030](docs/adr/ADR-0030-absorbed-mcp-servers.md)). A session reached the server's tool on Claude Code, Pi and OpenCode; Codex lists it; Hermes accepts the portable package and no Hermes session was run. See the [live runs](docs/verification/2026-11-21-absorbed-mcp-servers.md). For on-demand capabilities, the standalone `skills/<command>/` directory includes its launcher, catalog, prompts, helpers, notices and offline guide. Keep the directory intact and install any discovery entries alongside it.
 
 Each adapter's `INSTALL.md` ends with the host's own install command. The Claude Code and Codex adapters are their own marketplace (`claude plugin marketplace add <adapter>`, `codex plugin marketplace add <adapter>`); Pi uses `pi install <adapter>`; OpenCode lists the adapter under `plugins` in `opencode.json`. On Claude Code, Pi and OpenCode the declared session instructions are active with no further step. Codex runs a plugin's hooks only after you trust them once in `/hooks`. See the [live activation runs](docs/verification/2026-11-12-policy-active-by-default-live.md).
 

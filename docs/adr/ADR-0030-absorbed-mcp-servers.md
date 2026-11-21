@@ -211,5 +211,12 @@ files written for all five hosts; a stub server started from the emitted
 Claude Code entry with the plugin root in a path with spaces, an accent, `&`
 and `%`; the generated Pi and OpenCode modules executed with Node against fake
 host objects; a release without the declaration writes none of these files.
-Fixtures prove mechanics only. The live host runs and what they did not cover
-are in `docs/verification/2026-11-21-absorbed-mcp-servers.md`.
+Fixtures prove mechanics only.
+
+**Live, with a stub server (2026-11-21).** A session called the server's tool
+on Claude Code 2.1.330, Pi 1.4.0 and OpenCode 2.2.5. Codex 0.169.0 lists the
+server as enabled after the plugin is installed; no Codex session called it.
+Hermes v0.23.1 validates the portable package and its own loader translates
+the server; it was not installed and no Hermes session was run. No real
+absorbed server has been started on any host. Details and what was not run:
+`docs/verification/2026-11-21-absorbed-mcp-servers.md`.

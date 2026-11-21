@@ -452,7 +452,9 @@ under `~/.claude/projects/`. With the owner's own plugins and MCP servers loaded
 every turn carried about 114,000 tokens and cost about 2 dollars on the default
 model (2026-11-14), and `--max-budget-usd` is checked between turns. To test the
 package alone add `--setting-sources project,local --strict-mcp-config`, name the
-model with `--model`, and record both in the result.
+model with `--model`, and record both in the result. `--strict-mcp-config` also
+drops the MCP servers a plugin registers: leave it out for a package that
+declares `mcp_servers` (run of 2026-11-21).
 
 ## Adding or re-pinning a source
 
