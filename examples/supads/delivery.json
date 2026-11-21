@@ -43,6 +43,7 @@
         "competitor-list",
         "competitor-ads-research",
         "own-ads-audit",
+        "campaign-plan",
         "video-prompt",
         "storyboard",
         "image-generation",
@@ -57,7 +58,7 @@
         "video-ad-clone",
         "audio-generation"
       ],
-      "reason": "Breadth and timing: the skills do their work only through this server's tools, so a plugin without it would hand the user an install step before any task; the owner asked that the server be absorbed (2026-11-21). It starts from the packaged files at the pinned release, on the standard library; the source's own registration downloads the published package with uvx. Cost in every session: 22 tools whose descriptions and schemas are 46 KB, about 11,500 tokens where a host loads every schema at start (the packaged server's own tools/list, read on 2026-11-21; a host that defers tool schemas pays less). The package pays it because every capability but four calls these tools. It also registers tools no skill calls (caption_video, video_overlay, transcribe, four calendar tools): they come with the server as shipped. What the tools send, and to which provider, is stated in each capability; the server's own opt-out telemetry is in media-setup. If the original plugin or a server named supercmo is already configured on the host, every tool is offered twice and on some hosts the user's own entry wins: media-setup says so. Open doubt: on Codex and Hermes the server starts in the plugin's folder and its default output folder lands there; media-setup carries the source's variable for it."
+      "reason": "Breadth and timing: the skills do their work only through this server's tools, so a plugin without it would hand the user an install step before any task; the owner asked that the server be absorbed (2026-11-21). It starts from the packaged files at the pinned release, on the standard library; the source's own registration downloads the published package with uvx. Cost in every session: 22 tools whose descriptions and schemas are 46 KB, about 11,500 tokens where a host loads every schema at start (the packaged server's own tools/list, read on 2026-11-21; a host that defers tool schemas pays less). The package pays it because every capability but three calls these tools. It also registers tools no skill calls (caption_video, video_overlay, transcribe, four calendar tools): they come with the server as shipped. What the tools send, and to which provider, is stated in each capability; the server's own opt-out telemetry is in media-setup. If the original plugin or a server named supercmo is already configured on the host, every tool is offered twice and on some hosts the user's own entry wins: media-setup says so. Open doubt: on Codex and Hermes the server starts in the plugin's folder and its default output folder lands there; media-setup carries the source's variable for it."
     },
     {
       "source": "supercmo-skills",
