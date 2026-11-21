@@ -63,7 +63,7 @@ Your list says which plugin goes on which harness. The strip at the top of **Syn
 Muro can stay in the notification area and keep your harnesses in line without a window.
 
 - **Start Muro when Windows starts** (Settings → Background) starts it in the notification area, with no window. Closing the window leaves Muro there unless you turn off **Keep running when the window is closed**; **Quit Muro** in the tray menu ends it, after the sync in progress.
-- At start and then at every interval (every hour by default) Muro resolves your plugins' sources, reads every harness and records the result, so the tray icon and the Sync page say how things stand. With **Automatic sync** on it also applies what is ready, removals on harnesses set to *Always uninstall* included; with it off it only checks, and the tray says how many changes are waiting.
+- At start and then at every interval (every hour by default) Muro resolves your plugins' sources, reads every harness and records the result, so the tray icon and the Sync page say how things stand. With **Automatic sync** on it also applies what is ready, except removals: it never uninstalls, and says how many removals wait for your confirmation; with it off it only checks, and the tray says how many changes are waiting.
 - The tray menu has **Open Muro**, **Sync now**, **Pause automatic sync** and **Quit Muro**.
 - **Activity** lists what Muro did, newest first, with the adaptations that are running, and filters for Sync, AI adaptation and Problems.
 
@@ -116,7 +116,7 @@ The first time Muro opens, and until it manages a harness, three steps take the 
 
    <img src="docs/assets/screenshots/first-run-3.png" alt="First run, step 3 of 3: Keep them in sync by itself? Automatic sync and Start Muro when Windows starts, both on, with Back and Finish buttons." width="880">
 
-Then, on **Sync**, **Add plugin**: give its source (a repository, or a folder on this computer) and tick the harnesses it goes on. Muro finds each harness's plugin where that harness looks for it (its manifest or its marketplace at the root, or `adapters/<harness>` in a Muro build); for a plugin in a folder of its repository, add `#folder` to the address, as in `https://github.com/acaprino/marionette#marionette`. Press **Check now**, read the strip, and press **Apply all**.
+Then, on **Sync**, **Add plugin**: give its source (a repository, or a folder on this computer) and tick the harnesses it goes on. Muro finds each harness's plugin where that harness looks for it (its manifest or its marketplace at the root, or `adapters/<harness>` in a Muro build), and a Muro build published in a folder of its repository is found from the repository's address alone, as in `https://github.com/acaprino/marionette`; for any other plugin in a folder of its repository, add `#folder` to the address. Press **Check now**, read the strip, and press **Apply all**.
 
 ## Usage examples
 
@@ -143,7 +143,7 @@ Adaptation runs the coding agent chosen under **Settings → AI** (today it need
 
 ### Remove what you did not choose
 
-Under **Installed, not in your list**, or in **Settings → Sync**, choose **Always uninstall**: at every sync Muro removes from each harness what is installed there but is not in your list. A harness can differ in its own sheet. The next check lists the removals, each marked *Removed at the next sync*; nothing is uninstalled until you apply, or until automatic sync does. To keep one of those plugins, press **Add to my list** beside it.
+Under **Installed, not in your list**, or in **Settings → Sync**, choose **Uninstall, asking first**: Muro plans the removal of what is installed on a harness but is not in your list. A harness can differ in its own sheet. The next check lists the removals, each marked *Removal waits for your confirmation*; nothing is uninstalled until you confirm in the review sheet, whose button says how many plugins it uninstalls (**Apply without uninstalling** applies the rest), and automatic sync never uninstalls. To keep one of those plugins, press **Add to my list** beside it.
 
 ### Your own instructions for a plugin
 

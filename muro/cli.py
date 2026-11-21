@@ -17,7 +17,7 @@ from .core import (
     parse_capability,
     parse_router,
 )
-from .sources import check_sources
+from .sources import check_sources, licenses_in
 from .release import build_release
 from .factory import harmonize_prompt, prepare_intake, review_prompt
 
@@ -196,6 +196,19 @@ def _run_marketplace(repository: Path, folder: str) -> int:
     except (OSError, ValueError) as e:
         print(f"marketplace failed: {e}", file=sys.stderr)
         return 1
+
+
+def _run_license_check(folder: Path) -> int:
+    """`muro license-check FOLDER`: the license files of a folder, as JSON; the bare reason on stderr when none."""
+    if not folder.is_dir():
+        print(f"folder not found: {folder}", file=sys.stderr)
+        return 1
+    licenses = licenses_in(folder)
+    if not licenses:
+        print("no file in the source is the complete MIT or Apache-2.0 text the factory accepts", file=sys.stderr)
+        return 1
+    _print_json({"licenses": licenses})
+    return 0
 
 
 def _run_project(args: argparse.Namespace) -> int:
@@ -490,6 +503,9 @@ def _modern_main(argv: list[str]) -> int:
                                            "that publishes a built release in a subfolder")
     p.add_argument("repository", type=Path, help="The repository's folder")
     p.add_argument("folder", help="The release's folder inside it (holds adapters/<harness>), e.g. marionette")
+    p = sub.add_parser("license-check", help="List the files of a folder that are the complete MIT or Apache-2.0 text "
+                                             "(a preflight, not the license gate; exit 1 when there is none)")
+    p.add_argument("folder", type=Path, help="The folder to search, e.g. a source's repository root")
     p = sub.add_parser("mcp", parents=[common],
                        help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
     p.add_argument("--tools", metavar="NAME[,NAME...]",
@@ -596,6 +612,8 @@ def _modern_main(argv: list[str]) -> int:
         return _run_install(args.adapter_dir, args.harness, args.home)
     if args.command == "marketplace":
         return _run_marketplace(args.repository, args.folder)
+    if args.command == "license-check":
+        return _run_license_check(args.folder)
     if args.command == "absorb":
         return _run_absorb(args.directory, args.repo_url, slug=args.slug,
                            license_name=args.license_name, goal=args.goal, selected=args.select,

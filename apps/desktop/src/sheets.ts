@@ -1,6 +1,6 @@
 import type { ViewState, Plan, Plugin, Target, Discovered } from './types.ts';
 import { esc, icon, plural, mark, button, spin, field } from './ui.ts';
-import { harnessNames, inList, stamp, engineOf } from './model.ts';
+import { harnessNames, inList, stamp, engineOf, removals, removalLabel, filesMissing } from './model.ts';
 import { choice, pluginForm, targetForm } from './forms.ts';
 import { formHeaderHtml as dlHead, formFooterHtml, fieldErrorHtml } from '@acaprino/imago/ui';
 export { formHeaderHtml as dlHead } from '@acaprino/imago/ui';
@@ -10,7 +10,7 @@ const KINDS:Record<string,string>={install:'Install',update:'Update',reinstall:'
 const tone=(kind:string)=>kind==='remove'?'bad':kind==='update'?'warn':'accent';
 /** The review sheet: what a plan would change, harness by harness, and what it leaves out. `scope` is the harness a one-harness plan was made for; `running` is an apply in progress (`index` operations done), which locks the sheet. */
 export function reviewSheet(state:ViewState,plan:Plan,running:{index:number}|null,scope:Target|null=null):string {
- const s=state.snapshot!,ops=plan.operations,removing=ops.filter(o=>o.kind==='remove').length;
+ const s=state.snapshot!,ops=plan.operations,removing=removals(plan).total;
  const sections=s.registry.targets.map(t=>({t,own:ops.filter(o=>o.target_id===t.id)})).filter(x=>x.own.length);
  const line=(o:Plan['operations'][number])=>{const i=ops.indexOf(o),st=running?(i<running.index?`<span class="im-text-ok">${icon('check')}</span>`:spin):'';return `<li><span class="im-chip" data-im-tone="${tone(o.kind)==='bad'?'err':tone(o.kind)}">${esc(KINDS[o.kind]||o.kind)}</span><div><strong>${esc(o.name)}</strong><small>${o.kind==='remove'?`${esc(o.from_version)}${o.reason?` · ${esc(o.reason)}`:''}`:o.kind==='update'?`${esc(o.from_version)} → ${esc(o.to_version)}`:esc(o.to_version)}</small></div><span class="im-operation-status">${st}</span></li>`;};
  return `<div class="im-form">${dlHead(scope?`Sync ${scope.name}`:'Review changes',(scope?'Only the changes of this harness. ':'')+'Nothing changes until you apply.',!!running)}
@@ -18,7 +18,7 @@ export function reviewSheet(state:ViewState,plan:Plan,running:{index:number}|nul
  ${!ops.length?'<p class="im-muted">No change is ready to apply.</p>':''}
  ${plan.blockers.length&&!running?`<section class="im-operation-list"><h3><span class="im-text-warn">${icon('alert')}</span>Not ready yet</h3><ul>${plan.blockers.map(b=>`<li><div><strong class="im-wrap-text">${esc(b)}</strong><small>It is left out of this sync.</small></div></li>`).join('')}</ul></section>`:''}
  ${state.error&&!running?`<p class="im-field-error" role="alert">${esc(state.error)}</p>`:''}
- <footer>${removing&&!running?`<small class="im-push-start">${plural(removing,'plugin')} will be uninstalled.</small>`:''}<button type="button" class="im-btn" data-close ${running?'disabled':''}>${ops.length?'Cancel':'Close'}</button>${ops.length?`<button type="button" class="im-btn im-btn--primary" data-action="apply" autofocus ${running?'disabled':''}>${running?`Applying ${plural(ops.length,'change')}…`:`Apply ${plural(ops.length,'change')}`}</button>`:''}</footer></div>`;
+ <footer>${removing&&!running?`<small class="im-push-start">${plural(removing,'plugin')} will be uninstalled.</small>`:''}<button type="button" class="im-btn" data-close ${running?'disabled':''}>${ops.length?'Cancel':'Close'}</button>${removing&&ops.length>removing?`<button type="button" class="im-btn" data-action="apply-keep" ${running?'disabled':''}>Apply without uninstalling</button>`:''}${ops.length?`<button type="button" class="im-btn im-btn--primary" data-action="apply" autofocus ${running?'disabled':''}>${running?`Applying ${plural(ops.length,'change')}…`:removalLabel(plan)}</button>`:''}</footer></div>`;
 }
 
 /** A plugin's custom-instructions folder and files as its dialog shows them: what the folder holds, what changed, what cannot be read, and a way to read it again (opening the folder is under More). `#notes-status` says what the last action did. */
@@ -39,7 +39,7 @@ export function pluginDialog(state:ViewState,plugin?:Plugin):string {
 /** What a harness holds, by the snapshot's inventory: what is in the list, and what is not, with a way to add it. Its own element, so adding one repaints only this. */
 export function installedHere(state:ViewState,target:Target):string {
  const s=state.snapshot!,inventory=s.inventory.find(i=>i.target_id===target.id);
- return `<section id="installed-here" class="im-form-section" tabindex="-1"><h3>Installed here</h3>${inventory&&!inventory.complete&&inventory.error?`<p class="im-field-error" role="alert">${esc(inventory.error)}</p>`:''}<ul class="im-operation-list">${inventory?.plugins.map(p=>{const listed=inList(s,target,p);return `<li><div><strong>${esc(p.name)}</strong><small>${esc(p.version)} · ${listed?'in your list':'not in your list'}</small></div>${listed?'':button('Add to my list','add-to-list',{id:target.id,attrs:{'data-native':p.id}})}</li>`;}).join('')||'<li class="im-muted">No plugins installed here.</li>'}</ul></section>`;
+ return `<section id="installed-here" class="im-form-section" tabindex="-1"><h3>Installed here</h3>${inventory&&!inventory.complete&&inventory.error?`<p class="im-field-error" role="alert">${esc(inventory.error)}</p>`:''}<ul class="im-operation-list">${inventory?.plugins.map(p=>{const listed=inList(s,target,p);return `<li><div><strong>${esc(p.name)}</strong><small>${esc(p.version)} · ${listed?'in your list':'not in your list'}${filesMissing(p)}</small></div>${listed?'':button('Add to my list','add-to-list',{id:target.id,attrs:{'data-native':p.id}})}</li>`;}).join('')||'<li class="im-muted">No plugins installed here.</li>'}</ul></section>`;
 }
 /** The sheet of a harness: to add one (`found` is what the computer was searched for), or to change one, with what is installed there. */
 export function harnessSheet(state:ViewState,target?:Target,found?:Discovered):string {

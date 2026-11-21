@@ -169,37 +169,13 @@ fn scan(target: &Value) -> Result<(Vec<Value>, String)> {
         "claude-code" => {
             let path = root.join("plugins/installed_plugins.json");
             let doc = optional(&path)?;
-            let mut entries = vec![];
-            if let Some(plugins) = doc.get("plugins") {
-                for (id, installs) in plugins
-                    .as_object()
-                    .context("Invalid Claude installed plugins")?
-                {
-                    for p in installs.as_array().context("Invalid Claude install list")? {
-                        if p["scope"] != "user" {
-                            continue;
-                        }
-                        entries.push(json!({"id":id,"name":id,"version":p["version"].as_str().unwrap_or(""),"path":p["installPath"].as_str().unwrap_or(""),"managed":false}));
-                    }
-                }
-            }
             let listed: Value = serde_json::from_str(&run(
                 target,
                 &["plugin".into(), "list".into(), "--json".into()],
             )?)
             .context("Claude plugin list did not return JSON")?;
             let listed = listed.as_array().context("Expected Claude plugin array")?;
-            for entry in &mut entries {
-                let id = entry["id"].as_str().unwrap_or("");
-                let installed = listed
-                    .iter()
-                    .find(|p| p["id"] == id || p["name"] == id)
-                    .with_context(|| format!("Claude plugin {id} missing from CLI inventory"))?;
-                entry["enabled"] = installed["enabled"]
-                    .as_bool()
-                    .context("Claude plugin list omitted enabled state")?
-                    .into();
-            }
+            let entries = claude_entries(&doc, listed)?;
             Ok((entries, hash(&json!({"installed":doc,"list":listed}))))
         }
         "hermes" => {
@@ -230,6 +206,41 @@ fn scan(target: &Value) -> Result<(Vec<Value>, String)> {
         }
         _ => unreachable!(),
     }
+}
+/// The user-scope entries of Claude Code's `installed_plugins.json` (`installed`), each with the
+/// enabled state of its row in `claude plugin list --json` (`listed`) and `present`, whether the
+/// folder it records exists. The command returns one row per scope: the entry takes the user-scope
+/// row, or the first row of its id when none says its scope.
+fn claude_entries(installed: &Value, listed: &[Value]) -> Result<Vec<Value>> {
+    let mut entries = vec![];
+    if let Some(plugins) = installed.get("plugins") {
+        for (id, installs) in plugins
+            .as_object()
+            .context("Invalid Claude installed plugins")?
+        {
+            for p in installs.as_array().context("Invalid Claude install list")? {
+                if p["scope"] != "user" {
+                    continue;
+                }
+                let path = p["installPath"].as_str().unwrap_or("");
+                let present = !path.is_empty() && Path::new(path).is_dir();
+                entries.push(json!({"id":id,"name":id,"version":p["version"].as_str().unwrap_or(""),"path":path,"managed":false,"present":present}));
+            }
+        }
+    }
+    for entry in &mut entries {
+        let id = entry["id"].as_str().unwrap_or("");
+        let row = listed
+            .iter()
+            .find(|p| (p["id"] == id || p["name"] == id) && p["scope"] == "user")
+            .or_else(|| listed.iter().find(|p| p["id"] == id || p["name"] == id))
+            .with_context(|| format!("Claude plugin {id} missing from CLI inventory"))?;
+        entry["enabled"] = row["enabled"]
+            .as_bool()
+            .context("Claude plugin list omitted enabled state")?
+            .into();
+    }
+    Ok(entries)
 }
 fn local_path(s: &str, root: &Path) -> Option<PathBuf> {
     if s.starts_with("file:") {
@@ -531,22 +542,42 @@ pub fn install(
                 ],
             )?;
         }
-        if h == "claude-code" && previous.is_some() {
-            run(
-                target,
-                &[
-                    "plugin".into(),
-                    "uninstall".into(),
-                    previous.unwrap().into(),
-                    "--scope".into(),
-                    "user".into(),
-                ],
-            )?;
+        for (args, ignored) in install_commands(h, &id, previous) {
+            let done = run(target, &args);
+            if !ignored {
+                done?;
+            }
         }
-        let op = if h == "codex" { "add" } else { "install" };
-        run(target, &vec!["plugin".into(), op.into(), id.clone()])?;
     }
     Ok(id)
+}
+/// The commands that put `id` on Claude Code or Codex and take `previous`, the copy it replaces,
+/// off, in the order they run, each with whether its failure is ignored. A copy under another id
+/// is removed after the new one is installed, so a failed install leaves it; its removal failing
+/// does not fail the install. A copy under the same id is replaced: Claude Code uninstalls it
+/// first, and Codex's add replaces it.
+fn install_commands(h: &str, id: &str, previous: Option<&str>) -> Vec<(Vec<String>, bool)> {
+    let codex = h == "codex";
+    let op = if codex { "add" } else { "install" };
+    let add: Vec<String> = vec!["plugin".into(), op.into(), id.into()];
+    let uninstall = |old: &str| -> Vec<String> {
+        if codex {
+            vec!["plugin".into(), "remove".into(), old.into()]
+        } else {
+            vec![
+                "plugin".into(),
+                "uninstall".into(),
+                old.into(),
+                "--scope".into(),
+                "user".into(),
+            ]
+        }
+    };
+    match previous {
+        Some(old) if old != id => vec![(add, false), (uninstall(old), true)],
+        Some(old) if !codex => vec![(uninstall(old), false), (add, false)],
+        _ => vec![(add, false)],
+    }
 }
 pub fn activate(target: &Value, native_id: &str) -> Result<()> {
     ensure!(
@@ -801,6 +832,162 @@ mod tests {
         assert_eq!(
             codex["plugins"][0]["source"],
             json!({"source":"local","path":"./releases/d1"})
+        );
+    }
+
+    fn entry<'a>(entries: &'a [Value], id: &str) -> &'a Value {
+        entries.iter().find(|e| e["id"] == id).unwrap()
+    }
+    #[test]
+    fn a_claude_code_entry_says_whether_its_folder_exists() {
+        let tmp = tempfile::tempdir().unwrap();
+        let there = tmp.path().join("cache/there");
+        fs::create_dir_all(&there).unwrap();
+        let gone = tmp.path().join("cache/gone");
+        let installed = json!({"plugins":{
+            "there@m":[{"scope":"user","version":"1.0.0","installPath":there.to_string_lossy()}],
+            "gone@m":[{"scope":"user","version":"1.0.0","installPath":gone.to_string_lossy()}],
+            "blank@m":[{"scope":"user","version":"1.0.0","installPath":""}],
+            "nopath@m":[{"scope":"user","version":"1.0.0"}],
+            "project@m":[{"scope":"project","version":"1.0.0","installPath":there.to_string_lossy()}]
+        }});
+        let listed = vec![
+            json!({"id":"there@m","scope":"user","enabled":true}),
+            json!({"id":"gone@m","scope":"user","enabled":true}),
+            json!({"id":"blank@m","scope":"user","enabled":true}),
+            json!({"id":"nopath@m","scope":"user","enabled":true}),
+            json!({"id":"project@m","scope":"project","enabled":true}),
+        ];
+        let entries = claude_entries(&installed, &listed).unwrap();
+        assert_eq!(entries.len(), 4, "only user-scope entries are listed");
+        assert_eq!(entry(&entries, "there@m")["present"], true);
+        assert_eq!(
+            entry(&entries, "there@m")["path"],
+            json!(there.to_string_lossy())
+        );
+        assert_eq!(entry(&entries, "gone@m")["present"], false);
+        assert_eq!(entry(&entries, "blank@m")["present"], false);
+        assert_eq!(entry(&entries, "nopath@m")["present"], false);
+        assert_eq!(entry(&entries, "there@m")["managed"], false);
+        assert_eq!(entry(&entries, "there@m")["version"], "1.0.0");
+    }
+    #[test]
+    fn a_claude_code_entry_takes_its_enabled_state_from_its_user_scope_row() {
+        let installed = json!({"plugins":{
+            "codebase-map@daodan":[{"scope":"user","version":"1.0.0","installPath":""}]
+        }});
+        let id = "codebase-map@daodan";
+        let enabled = |listed: Vec<Value>| {
+            let entries = claude_entries(&installed, &listed).unwrap();
+            entry(&entries, id)["enabled"].clone()
+        };
+        // The user-scope row decides, whichever row comes first and whichever field names the plugin.
+        assert_eq!(
+            enabled(vec![
+                json!({"id":id,"scope":"local","enabled":false}),
+                json!({"id":id,"scope":"user","enabled":true}),
+            ]),
+            true
+        );
+        assert_eq!(
+            enabled(vec![
+                json!({"id":id,"scope":"user","enabled":false}),
+                json!({"id":id,"scope":"local","enabled":true}),
+            ]),
+            false
+        );
+        assert_eq!(
+            enabled(vec![
+                json!({"name":id,"scope":"project","enabled":true}),
+                json!({"name":id,"scope":"user","enabled":false}),
+            ]),
+            false
+        );
+        // With no user-scope row, or rows that carry no scope, the first row of the id decides.
+        assert_eq!(
+            enabled(vec![json!({"id":id,"scope":"local","enabled":false})]),
+            false
+        );
+        assert_eq!(
+            enabled(vec![
+                json!({"id":id,"enabled":true}),
+                json!({"id":id,"enabled":false}),
+            ]),
+            true
+        );
+    }
+    #[test]
+    fn a_claude_code_entry_with_no_row_in_the_cli_inventory_is_an_error() {
+        let installed =
+            json!({"plugins":{"a@m":[{"scope":"user","version":"1.0.0","installPath":""}]}});
+        let listed = vec![json!({"id":"b@m","scope":"user","enabled":true})];
+        assert_eq!(
+            claude_entries(&installed, &listed).unwrap_err().to_string(),
+            "Claude plugin a@m missing from CLI inventory"
+        );
+    }
+
+    fn words(commands: &[(Vec<String>, bool)]) -> Vec<(String, bool)> {
+        commands
+            .iter()
+            .map(|(args, ignored)| (args.join(" "), *ignored))
+            .collect()
+    }
+    #[test]
+    fn a_changed_native_id_is_installed_before_the_old_one_is_removed() {
+        assert_eq!(
+            words(&install_commands(
+                "claude-code",
+                "codebase-map@muro-p1",
+                Some("codebase-map@daodan")
+            )),
+            vec![
+                ("plugin install codebase-map@muro-p1".to_owned(), false),
+                (
+                    "plugin uninstall codebase-map@daodan --scope user".to_owned(),
+                    true
+                ),
+            ]
+        );
+        assert_eq!(
+            words(&install_commands(
+                "codex",
+                "codebase-map@muro-p1",
+                Some("codebase-map@daodan")
+            )),
+            vec![
+                ("plugin add codebase-map@muro-p1".to_owned(), false),
+                ("plugin remove codebase-map@daodan".to_owned(), true),
+            ]
+        );
+    }
+    #[test]
+    fn a_copy_under_the_same_native_id_is_replaced_in_the_order_each_harness_needs() {
+        assert_eq!(
+            words(&install_commands(
+                "claude-code",
+                "ay@muro-p1",
+                Some("ay@muro-p1")
+            )),
+            vec![
+                ("plugin uninstall ay@muro-p1 --scope user".to_owned(), false),
+                ("plugin install ay@muro-p1".to_owned(), false),
+            ]
+        );
+        assert_eq!(
+            words(&install_commands("codex", "ay@muro-p1", Some("ay@muro-p1"))),
+            vec![("plugin add ay@muro-p1".to_owned(), false)]
+        );
+    }
+    #[test]
+    fn a_first_install_runs_only_the_install_command() {
+        assert_eq!(
+            words(&install_commands("claude-code", "ay@muro-p1", None)),
+            vec![("plugin install ay@muro-p1".to_owned(), false)]
+        );
+        assert_eq!(
+            words(&install_commands("codex", "ay@muro-p1", None)),
+            vec![("plugin add ay@muro-p1".to_owned(), false)]
         );
     }
 }

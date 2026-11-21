@@ -1,5 +1,6 @@
 // The one fake transport of the browser tests and the demo screenshots: the registry service's actions over plain data,
-// with the same rules the service has (revision conflicts, blockers, allow_blocked, removals only on a clear harness).
+// with the same rules the service has (revision conflicts, blockers, allow_blocked, removals only on a clear harness, and an apply that
+// uninstalls only when it carries confirm_removals equal to the plan's removals, or leaves them out with skip_removals).
 // createTransport(scenario) returns {request, calls, flags}; calls records every request, flags are knobs a test turns:
 //   rejectSave, rejectSettings   the next save_* / settings request fails with a version conflict
 //   blockPlan                    every plan carries one blocker besides its operations
@@ -24,7 +25,8 @@
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
 //   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision.
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
-// installed outside the list), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
+// installed outside the list), removals (an exclusive harness: one plugin to install, one outside the list to uninstall and one record whose files are gone,
+// `present: false`, to clear), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
 // not yet installed on any), recorded / recorded-ok / recorded-errors / recorded-unseen (a check the window did not make: one change
 // waiting, nothing to do, a source not checked, a removal no cell shows), two-harnesses (a change on each of two harnesses), first-run (no harness, two found,
 // one with an installed plugin), demo (the data of the documentation screenshots), demo-synced (the same, everything
@@ -107,6 +109,7 @@ function scenarioData(scenario) {
     case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], included: true, info: projectInfo('Marionette', 'marionette', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
+    case 'removals': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false), { ...installedPlugin('ghost', 'ghost', '1.0.0', false), present: false }] } };
     case 'two-harnesses': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test'), harnessTarget('t2', 'opencode', 'OpenCode isolated test')], plugins: [plugin('p1', 'Package', ['t1', 't2'], [build('codex', '2'), build('opencode', '2')])], installed: { t1: [installedPlugin('p1', 'Package', '1')], t2: [] }, found: [] };
     case 'first-run': return { ...base, targets: [], installed: {}, found: [foundHarness('claude-code', 'Claude Code', { version: '2.1.4' }), foundHarness('codex', 'Codex')], byHarness: { 'claude-code': [installedPlugin('commit-helper', 'commit-helper', '2.1.0', false)] } };
     case 'demo': case 'demo-synced': case 'demo-activity': {
@@ -177,7 +180,7 @@ export function createTransport(scenario = 'default') {
         const kind = !have ? 'install' : reinstall === p.id ? 'reinstall' : have.version !== want.version ? 'update' : null;
         if (kind) operations.push({ target_id: t.id, plugin_id: p.id, name: p.name, kind, from_version: have?.version || '', to_version: want.version, reason: kind === 'install' ? 'Missing desired distribution' : 'Reconcile desired artifact' });
       }
-      if (t.exclusive && blockers.length === before) for (const i of inv.plugins) if (!wanted.has(i.id)) operations.push({ target_id: t.id, plugin_id: i.registry_id || '', name: i.name, kind: 'remove', from_version: i.version, to_version: '', reason: 'Not in desired registry for this target' });
+      if (t.exclusive && blockers.length === before) for (const i of inv.plugins) if (!wanted.has(i.id)) operations.push({ target_id: t.id, plugin_id: i.registry_id || '', name: i.name, kind: 'remove', from_version: i.version, to_version: '', reason: 'Not in desired registry for this target', ...(i.present === false ? { present: false } : {}) });   // the service's Contract 2: a removal copies the entry's `present` when it is false
     }
     if (flags.blockPlan) blockers.push('Codex isolated test: Inventory incomplete');
     operations.sort((a, b) => (a.kind === 'remove') - (b.kind === 'remove'));
@@ -247,18 +250,22 @@ export function createTransport(scenario = 'default') {
     if (!plan) throw new Error('Unknown plan');
     if (plan.revision !== reg.revision) throw new Error('Registry revision changed; calculate a new plan');
     if (plan.blockers.length && !payload.allow_blocked) throw new Error('Plan has blockers; resolve them before applying');
-    for (const op of plan.operations) {
+    // The service's Contract 1: a removal is executed only when the request carries the plan's number of removals; skip_removals leaves them out.
+    const skip = payload.skip_removals === true, removals = plan.operations.filter(o => o.kind === 'remove').length;
+    if (!skip && removals && payload.confirm_removals !== removals) throw new Error(`This plan uninstalls ${removals} ${removals === 1 ? 'plugin' : 'plugins'}; review it and confirm the removals`);
+    const executed = skip ? plan.operations.filter(o => o.kind !== 'remove') : plan.operations;
+    for (const op of executed) {
       const list = installed[op.target_id] ||= [], at = list.findIndex(i => (op.plugin_id ? i.registry_id === op.plugin_id : i.name === op.name));
       if (op.kind === 'remove') { if (at >= 0) list.splice(at, 1); continue; }
       if (at >= 0) list[at] = { ...list[at], version: op.to_version };
       else list.push(installedPlugin(op.plugin_id, op.name, op.to_version));
     }
-    const time = ago(0), touched = [...new Set(plan.operations.map(o => o.target_id))];
+    const time = ago(0), touched = [...new Set(executed.map(o => o.target_id))];
     for (const id of touched) sync.targets[id] = { ...sync.targets[id], synced: time };
-    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - plan.operations.length); }
-    log('apply', 'complete', `${plan.operations.length} operations applied`);
+    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('apply', 'complete', `${executed.length} operations applied`); }
     const result = snapshot();
     if (payload.allow_blocked) result.left_out = plan.blockers;
+    result.skipped_removals = skip ? removals : 0;
     return result;
   }
   const request = async (action, payload = {}) => {

@@ -227,14 +227,51 @@ enum Found {
     One(PathBuf, Option<Value>),
     /// The harness's marketplace lists these plugin folders, relative to the source.
     Many(Vec<String>),
+    /// The harness's marketplace lists these plugins, two or more of them in one folder: the
+    /// names of the plugins that share a folder, in the marketplace's order.
+    Shared(Vec<String>),
     None,
 }
 /// The plugin of harness `h` in `source`, looked for as Muro and the harness look for it: the
 /// layout of a Muro build (`adapters/<harness>`), else the harness's manifest at the root, else the
 /// one folder the harness's marketplace at the root lists. The structures of different harnesses
 /// live side by side in one source. A marketplace that lists more than one plugin is not chosen
-/// from: the person points the source at one (`missing` says how).
+/// from: the person points the source at one (`missing` says how), unless plugins share a folder,
+/// which no source can point at. A source with none of them is looked at one folder down for a Muro
+/// build (`in_a_folder`).
 fn find(h: &str, source: &Path) -> Result<Found> {
+    match at_the_root(h, source)? {
+        Found::None => in_a_folder(h, source),
+        found => Ok(found),
+    }
+}
+/// A Muro build published in a folder of its repository (`<folder>/adapters/<harness>`, as
+/// acaprino/marionette holds `marionette/`): the address of the repository is then enough, for
+/// every harness, also the ones without a marketplace. Several such folders are not chosen from.
+fn in_a_folder(h: &str, source: &Path) -> Result<Found> {
+    let base = source.canonicalize()?;
+    let mut builds: Vec<(String, PathBuf)> = vec![];
+    for entry in fs::read_dir(&base)? {
+        let Ok(name) = entry?.file_name().into_string() else {
+            continue;
+        };
+        if name.starts_with('.') {
+            continue;
+        }
+        if let Some(adapter) = inside(&base, &format!("{name}/adapters/{h}"))
+            .filter(|adapter| native::identity(h, adapter).is_ok())
+        {
+            builds.push((name, adapter));
+        }
+    }
+    builds.sort();
+    Ok(match builds.len() {
+        0 => Found::None,
+        1 => Found::One(builds.remove(0).1, None),
+        _ => Found::Many(builds.into_iter().map(|(name, _)| name).collect()),
+    })
+}
+fn at_the_root(h: &str, source: &Path) -> Result<Found> {
     let adapter = source.join("adapters").join(h);
     if adapter.is_dir() {
         return Ok(match native::identity(h, &adapter) {
@@ -257,7 +294,7 @@ fn find(h: &str, source: &Path) -> Result<Found> {
         read(&file).with_context(|| format!("Invalid marketplace {}", file.display()))?;
     let base = source.canonicalize()?;
     let plugin_root = document["metadata"]["pluginRoot"].as_str();
-    let mut folders: Vec<(PathBuf, Value)> = vec![];
+    let mut listed: Vec<(PathBuf, Value)> = vec![];
     for entry in document["plugins"].as_array().into_iter().flatten() {
         let Some(dir) =
             local_source(h, &entry["source"], plugin_root).and_then(|r| inside(&base, &r))
@@ -270,28 +307,39 @@ fn find(h: &str, source: &Path) -> Result<Found> {
             && entry["name"]
                 .as_str()
                 .is_some_and(|n| native::valid_name(h, n));
-        if (bare || native::identity(h, &dir).is_ok()) && !folders.iter().any(|(f, _)| *f == dir) {
-            folders.push((dir, entry.clone()));
+        if bare || native::identity(h, &dir).is_ok() {
+            listed.push((dir, entry.clone()));
         }
     }
-    Ok(match folders.len() {
+    // Plugins that name one folder cannot be told apart by pointing the source at it.
+    let shared: Vec<String> = listed
+        .iter()
+        .filter(|(dir, _)| listed.iter().filter(|(other, _)| other == dir).count() > 1)
+        .map(|(dir, entry)| {
+            entry["name"]
+                .as_str()
+                .map_or_else(|| relative(&base, dir), str::to_owned)
+        })
+        .collect();
+    if !shared.is_empty() {
+        return Ok(Found::Shared(shared));
+    }
+    Ok(match listed.len() {
         0 => Found::None,
         1 => {
-            let (dir, entry) = folders.remove(0);
+            let (dir, entry) = listed.remove(0);
             Found::One(dir, Some(entry))
         }
-        _ => Found::Many(
-            folders
-                .iter()
-                .map(|(f, _)| {
-                    f.strip_prefix(&base)
-                        .unwrap_or(f)
-                        .to_string_lossy()
-                        .replace('\\', "/")
-                })
-                .collect(),
-        ),
+        _ => Found::Many(listed.iter().map(|(f, _)| relative(&base, f)).collect()),
     })
+}
+/// `folder`, a folder of `base`, written relative to it with `/` separators.
+fn relative(base: &Path, folder: &Path) -> String {
+    folder
+        .strip_prefix(base)
+        .unwrap_or(folder)
+        .to_string_lossy()
+        .replace('\\', "/")
 }
 /// The name and version harness `h` installs the plugin in `dir` under: its manifest's. Claude Code
 /// takes what the manifest lacks, the manifest itself included, from the marketplace `entry` that
@@ -370,20 +418,33 @@ pub fn missing(plugin: &Value, h: &str) -> String {
             "no {name} build yet: check for updates to look for one in the source, or adapt the plugin with AI"
         );
     };
-    if let Ok(Found::Many(folders)) = find(h, Path::new(resolved)) {
-        let source = plugin["source"].as_str().unwrap_or_default();
-        let choices: Vec<_> = folders.iter().map(|f| narrowed(source, f)).collect();
-        return format!(
-            "the source's {name} marketplace lists {} plugins and Muro does not choose one: set the source to {}",
-            folders.len(),
-            choices.join(" or ")
-        );
+    match find(h, Path::new(resolved)) {
+        Err(e) => return format!("the source's {name} files cannot be read: {e:#}"),
+        Ok(Found::Many(folders)) => {
+            let source = plugin["source"].as_str().unwrap_or_default();
+            let choices: Vec<_> = folders.iter().map(|f| narrowed(source, f)).collect();
+            return format!(
+                "the source holds {} {name} plugins and Muro does not choose one: set the source to {}",
+                folders.len(),
+                choices.join(" or ")
+            );
+        }
+        Ok(Found::Shared(names)) => {
+            return format!(
+                "the source's {name} marketplace defines {} plugins in one folder ({}); Muro cannot install one of them alone yet",
+                names.len(),
+                names.join(", ")
+            );
+        }
+        Ok(Found::One(..) | Found::None) => {}
     }
     let adapters = format!("adapters/{h}");
+    let folder = format!("<folder>/adapters/{h}");
     let looked: Vec<&str> = [
         native::manifest(h).ok(),
         native::marketplace(h),
         Some(adapters.as_str()),
+        Some(folder.as_str()),
     ]
     .into_iter()
     .flatten()
@@ -418,9 +479,17 @@ pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
         if distributions.iter().any(|d| d["harness"] == h) {
             continue;
         }
-        if let Found::One(dir, entry) = find(h, &source)? {
+        // A harness whose files cannot be read has no native build here; the others are resolved.
+        let native_build = || -> Result<Option<Value>> {
+            let Found::One(dir, entry) = find(h, &source)? else {
+                return Ok(None);
+            };
             let (name, version) = identity_in(h, &dir, entry.as_ref(), &revision)?;
-            distributions.push(json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"name":name,"version":version,"origin":"native","source_revision":revision}));
+            let distribution = json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"name":name,"version":version,"origin":"native","source_revision":revision});
+            Ok(Some(distribution))
+        };
+        if let Ok(Some(distribution)) = native_build() {
+            distributions.push(distribution);
         }
     }
     for old in plugin["distributions"].as_array().into_iter().flatten() {
@@ -692,8 +761,8 @@ mod tests {
     #[test]
     fn a_package_repository_is_found_from_its_address_through_its_root_marketplaces() {
         // acaprino/marionette: the build in marionette/, the marketplaces `muro marketplace` writes
-        // at the root. Pi, OpenCode and Hermes have no marketplace there: their builds are reached
-        // with #marionette.
+        // at the root. Pi, OpenCode and Hermes have no marketplace there: their builds are found in
+        // the folder (the tests on a build in a folder below).
         let t = tempfile::tempdir().unwrap();
         let s = t.path();
         put(
@@ -718,10 +787,80 @@ mod tests {
             found(s),
             [
                 dist("claude-code", "marionette/adapters/claude-code", "0.5.2"),
-                dist("codex", "marionette/adapters/codex", "0.5.2")
+                dist("codex", "marionette/adapters/codex", "0.5.2"),
+                dist("pi", "marionette/adapters/pi", "0.5.2")
             ]
         );
         assert_eq!(found(&s.join("marionette")).len(), 3);
+    }
+    // Owner, 2026-11-21, on Sync refusing Marionette from https://github.com/acaprino/marionette
+    // ("è praticamente inutilizzabile"): the repository as marionette-v0.5.1 left it, the build in
+    // marionette/ and no marketplace at the root.
+    #[test]
+    fn a_muro_build_in_a_folder_of_the_source_is_found_from_the_source_alone() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(&s.join("README.md"), "Marionette");
+        put(&s.join("releases/marionette-v0.5.1.md"), "Notes");
+        put(
+            &s.join("marionette/.claude-plugin/plugin.json"),
+            r#"{"name":"marionette","version":"0.5.1"}"#,
+        );
+        for (harness, manifest) in [
+            ("claude-code", ".claude-plugin/plugin.json"),
+            ("codex", ".codex-plugin/plugin.json"),
+            ("pi", "package.json"),
+        ] {
+            put(
+                &s.join("marionette/adapters").join(harness).join(manifest),
+                r#"{"name":"marionette","version":"0.5.1"}"#,
+            );
+        }
+        assert_eq!(
+            found(s),
+            [
+                dist("claude-code", "marionette/adapters/claude-code", "0.5.1"),
+                dist("codex", "marionette/adapters/codex", "0.5.1"),
+                dist("pi", "marionette/adapters/pi", "0.5.1")
+            ]
+        );
+    }
+    #[test]
+    fn muro_builds_in_several_folders_are_not_chosen_from() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        for name in ["b", "a"] {
+            put(
+                &s.join(name).join("adapters/codex/.codex-plugin/plugin.json"),
+                &json!({"name":name,"version":"1.0.0"}).to_string(),
+            );
+        }
+        // A hidden folder and a folder whose adapter cannot be read are not builds.
+        put(
+            &s.join(".cache/adapters/codex/.codex-plugin/plugin.json"),
+            r#"{"name":"c","version":"1.0.0"}"#,
+        );
+        put(&s.join("d/adapters/codex/.codex-plugin/plugin.json"), "{");
+        assert!(found(s).is_empty());
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        assert_eq!(
+            missing(&plugin, "codex"),
+            "the source holds 2 Codex plugins and Muro does not choose one: set the source to o/r#a or o/r#b"
+        );
+    }
+    #[test]
+    fn what_the_root_holds_comes_before_a_build_in_a_folder() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        put(
+            &s.join("sub/adapters/claude-code/.claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"2.0.0"}"#,
+        );
+        assert_eq!(found(s), [dist("claude-code", "", "1.0.0")]);
     }
     #[test]
     fn a_bare_name_is_a_folder_under_the_marketplace_plugin_root() {
@@ -808,10 +947,113 @@ mod tests {
             assert_eq!(
                 missing(&plugin, "claude-code"),
                 format!(
-                    "the source's Claude Code marketplace lists 2 plugins and Muro does not choose one: set the source to {choices}"
+                    "the source holds 2 Claude Code plugins and Muro does not choose one: set the source to {choices}"
                 )
             );
         }
+    }
+    // anthropics/skills lists four plugins with `"source": "./"`: they were merged into the first one.
+    // Plugins that share a folder are refused, and the refusal names them.
+    #[test]
+    fn plugins_that_share_the_root_folder_are_refused_with_their_names() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"document-skills","source":"./"},{"name":"example-skills","source":"./"}]}"#,
+        );
+        assert!(found(s).is_empty());
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        assert_eq!(
+            missing(&plugin, "claude-code"),
+            "the source's Claude Code marketplace defines 2 plugins in one folder (document-skills, example-skills); Muro cannot install one of them alone yet"
+        );
+    }
+    #[test]
+    fn only_the_plugins_that_share_a_folder_are_named_and_they_come_before_a_choice_of_folders() {
+        // Three plugins, two of them in one folder, listed in an order that is not alphabetical.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"b-twin","source":"./twin"},{"name":"solo","source":"./solo"},{"name":"a-twin","source":"./twin"}]}"#,
+        );
+        put(&s.join("twin/commands/hi.md"), "Say hi.");
+        put(&s.join("solo/commands/hi.md"), "Say hi.");
+        assert!(found(s).is_empty());
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        assert_eq!(
+            missing(&plugin, "claude-code"),
+            "the source's Claude Code marketplace defines 2 plugins in one folder (b-twin, a-twin); Muro cannot install one of them alone yet"
+        );
+    }
+    #[test]
+    fn a_plugin_without_a_name_that_shares_a_folder_is_named_by_the_folder() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"first","source":"./plugins/pack"},{"source":"./plugins/pack"}]}"#,
+        );
+        put(
+            &s.join("plugins/pack/.claude-plugin/plugin.json"),
+            r#"{"name":"pack","version":"1.0.0"}"#,
+        );
+        assert!(found(s).is_empty());
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        assert_eq!(
+            missing(&plugin, "claude-code"),
+            "the source's Claude Code marketplace defines 2 plugins in one folder (first, plugins/pack); Muro cannot install one of them alone yet"
+        );
+    }
+    #[test]
+    fn a_harness_whose_files_cannot_be_read_does_not_stop_the_others() {
+        // Claude Code finds its manifest at the root; the Codex marketplace is not JSON.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        put(&s.join(".agents/plugins/marketplace.json"), "not json");
+        assert_eq!(found(s), [dist("claude-code", "", "1.0.0")]);
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        let reason = missing(&plugin, "codex");
+        assert!(
+            reason.starts_with("the source's Codex files cannot be read: "),
+            "{reason}"
+        );
+        // And the other way round.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".codex-plugin/plugin.json"),
+            r#"{"name":"x","version":"0.3.0"}"#,
+        );
+        put(&s.join(".claude-plugin/marketplace.json"), "{");
+        assert_eq!(found(s), [dist("codex", "", "0.3.0")]);
+        let plugin = json!({"source":"o/r","resolved_source":s});
+        let reason = missing(&plugin, "claude-code");
+        assert!(
+            reason.starts_with("the source's Claude Code files cannot be read: "),
+            "{reason}"
+        );
+    }
+    #[test]
+    fn a_failure_that_is_not_about_one_harness_still_fails_the_resolution() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/plugin.json"),
+            r#"{"name":"x","version":"1.0.0"}"#,
+        );
+        let data = tempfile::tempdir().unwrap();
+        let plugin = json!({"id":"p","source":s,"policy":"head","custom_instructions_dir":"relative","distributions":[]});
+        let error = resolve(data.path(), &plugin).unwrap_err();
+        assert_eq!(
+            format!("{error:#}"),
+            "custom_instructions_dir must be absolute"
+        );
     }
     #[test]
     fn a_source_without_a_build_says_where_muro_looked() {
@@ -819,9 +1061,12 @@ mod tests {
         let plugin = json!({"source":"o/r","resolved_source":t.path()});
         assert_eq!(
             missing(&plugin, "claude-code"),
-            "no Claude Code build: the source has none of .claude-plugin/plugin.json, .claude-plugin/marketplace.json, adapters/claude-code. Point the source at the plugin's folder (for a repository, add #<folder> to its address), or adapt the plugin with AI"
+            "no Claude Code build: the source has none of .claude-plugin/plugin.json, .claude-plugin/marketplace.json, adapters/claude-code, <folder>/adapters/claude-code. Point the source at the plugin's folder (for a repository, add #<folder> to its address), or adapt the plugin with AI"
         );
-        assert!(missing(&plugin, "pi").contains("none of package.json, adapters/pi."));
+        assert!(
+            missing(&plugin, "pi")
+                .contains("none of package.json, adapters/pi, <folder>/adapters/pi.")
+        );
         assert!(
             missing(&json!({"source":"o/r"}), "codex")
                 .starts_with("no Codex build yet: check for updates")

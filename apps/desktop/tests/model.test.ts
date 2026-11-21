@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listedPlugin, listing, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp, versionOf } from '../src/model.ts';
+import { listedPlugin, listing, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp, versionOf, removals, removalLabel, applyPayload, appliedNotice, mustReview } from '../src/model.ts';
 import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.ts';
 import { frame, modules } from '../src/views.ts';
-import { cell, rows } from '../src/pages/sync.ts';
+import { cell, rows, actions as syncActions } from '../src/pages/sync.ts';
+import type { App } from '../src/context.ts';
 import { reviewSheet } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
@@ -340,7 +341,8 @@ test('without a snapshot the frame is an empty state that offers Try again',()=>
 test('reviewSheet lists the operations by harness, the blockers as left out, and the removals it will make',()=>{
  const s=viewState(snapshot()),p=plan([op('install','','2','a'),op('update','1','2','b'),op('remove','1','','')],4,['Codex / D: no <build>']),html=reviewSheet(s,p,null);
  assert.match(html,/<h2 id="dlg-title">Review changes<\/h2>/);assert.match(html,/Install[\s\S]*Update[\s\S]*Remove/);assert.match(html,/Not ready yet/);assert.match(html,/no &lt;build&gt;/);assert.match(html,/It is left out of this sync\./);
- assert.match(html,/1 plugin will be uninstalled\./);assert.match(html,/data-action="apply"[^>]*>Apply 3 changes/);assert.doesNotMatch(html,/Apply 3 changes…/);
+ assert.match(html,/1 plugin will be uninstalled\./);assert.match(html,/data-action="apply"[^>]*>Apply and uninstall 1 plugin/);assert.doesNotMatch(html,/Apply and uninstall 1 plugin…/);assert.doesNotMatch(html,/Apply 3 changes/);
+ assert.match(html,/data-action="apply-keep"[^>]*>Apply without uninstalling/);
  assert.match(reviewSheet(s,p,null,s.snapshot!.registry.targets[0]),/<h2 id="dlg-title">Sync Codex<\/h2>[\s\S]*Only the changes of this harness\./);
 });
 test('reviewSheet with nothing ready has no Apply, and an apply in progress locks the sheet',()=>{
@@ -385,4 +387,109 @@ test('a harness with no build of a plugin says it needs one, in its cell and in 
  const html=frame(state);
  assert.match(html,/1 plugin needs a build/);
  assert.doesNotMatch(html,/No version|without a version/);
+});
+// ---------- work package F: removals are confirmed by the person (design: confirmed removals, CUJ 1) ----------
+/** CUJ 1: 1 install and 31 removals, of which 25 are records without files (`present: false`), 3 say `present: true` and 3 do not say: those 6 uninstall a real copy. */
+const removal=(i:number,present?:boolean):Operation=>({target_id:'target',plugin_id:'',name:`old-${i}`,kind:'remove',from_version:'1',to_version:'',reason:'',...(present===undefined?{}:{present})});
+const cuj1=(blockers:string[]=[]):Plan=>plan([op('install','','2'),...Array.from({length:31},(_,i)=>removal(i,i<25?false:i<28?true:undefined))],4,blockers);
+test('removals counts the removals of a plan: those that uninstall a copy and those that clear a record without files; a missing field is a real uninstall',()=>{
+ assert.deepEqual(removals(cuj1()),{total:31,uninstall:6,missing:25});
+ assert.deepEqual(removals(plan([op('install','','2'),op('update','1','2')])),{total:0,uninstall:0,missing:0});
+ assert.deepEqual(removals(plan([{...op('update','1','2'),present:false},removal(1)])),{total:1,uninstall:1,missing:0},'present only counts on a removal');
+ assert.deepEqual(removals(plan([removal(1,false)])),{total:1,uninstall:0,missing:1});
+ assert.deepEqual(removals(plan([])),{total:0,uninstall:0,missing:0});
+});
+test('removalLabel says what the removals do: CUJ 1 reads uninstall 6 and clear 25 without files, and the singular is 1 plugin or 1 record',()=>{
+ assert.equal(removalLabel(cuj1()),'Apply, uninstall 6 and clear 25 without files');
+ const only=(n:number,present?:boolean)=>plan([op('install','','2'),...Array.from({length:n},(_,i)=>removal(i,present))]);
+ assert.equal(removalLabel(only(6)),'Apply and uninstall 6 plugins');
+ assert.equal(removalLabel(only(1)),'Apply and uninstall 1 plugin');
+ assert.equal(removalLabel(only(25,false)),'Apply and clear 25 records without files');
+ assert.equal(removalLabel(only(1,false)),'Apply and clear 1 record without files');
+ assert.equal(removalLabel(plan([removal(1),removal(2,false)])),'Apply, uninstall 1 and clear 1 without files');
+ assert.equal(removalLabel(plan([op('install','','2'),op('update','1','2')])),'Apply 2 changes','without removals it is the plain count');
+ assert.equal(removalLabel(plan([op('install','','2')])),'Apply 1 change');
+});
+test('applyPayload: a plan with removals sends confirm_removals equal to their number or skip_removals; one without sends neither; blockers send allow_blocked',()=>{
+ const p=cuj1();
+ assert.deepEqual(applyPayload(p,'confirm'),{plan_id:'plan',confirm_removals:31});
+ assert.deepEqual(applyPayload(p,'skip'),{plan_id:'plan',skip_removals:true});
+ const clear=plan([op('install','','2'),op('update','1','2')]);
+ assert.deepEqual(applyPayload(clear,'confirm'),{plan_id:'plan'});assert.deepEqual(applyPayload(clear,'skip'),{plan_id:'plan'});
+ assert.deepEqual(applyPayload(cuj1(['Codex: no build']),'confirm'),{plan_id:'plan',allow_blocked:true,confirm_removals:31});
+ assert.deepEqual(applyPayload(cuj1(['Codex: no build']),'skip'),{plan_id:'plan',allow_blocked:true,skip_removals:true});
+ assert.deepEqual(applyPayload(plan([op('install','','2')],4,['x']),'confirm'),{plan_id:'plan',allow_blocked:true});
+ assert.equal(applyPayload(plan([removal(1)]),'confirm').confirm_removals,1,'the number is the plan\'s, not a flag');
+});
+test('appliedNotice says how many changes were applied and, when removals were left out, how many',()=>{
+ assert.equal(appliedNotice(1,31),'1 change applied. 31 removals left out.');
+ assert.equal(appliedNotice(1,1),'1 change applied. 1 removal left out.');
+ assert.equal(appliedNotice(3,0),'3 changes applied.');assert.equal(appliedNotice(3),'3 changes applied.');
+});
+test('mustReview: a fresh plan with removals, blockers, nothing to do or that differs from the one shown opens the review; only the same plan without them is applied at once',()=>{
+ const same=plan([op('update','1','2')]);
+ assert.equal(mustReview(same,plan([op('update','1','2')])),false);
+ assert.equal(mustReview(cuj1(),cuj1()),true,'a removal is never applied without the sheet, even when it is what was shown');
+ assert.equal(mustReview(same,plan([op('update','1','2')],4,['Codex: no build'])),true);
+ assert.equal(mustReview(same,plan([])),true);
+ assert.equal(mustReview(same,plan([op('update','1','3')])),true);
+ assert.equal(mustReview(null,plan([op('update','1','2')])),true,'nothing was shown');
+ assert.equal(mustReview(same,plan([op('update','1','2'),removal(1)])),true);
+});
+test('the review sheet of CUJ 1 confirms with the label of what the removals do and offers Apply without uninstalling beside it; with only removals it offers no second button',()=>{
+ const s=viewState(snapshot()),html=reviewSheet(s,cuj1(),null);
+ assert.match(html,/data-action="apply"[^>]*>Apply, uninstall 6 and clear 25 without files<\/button>/);
+ assert.match(html,/data-action="apply-keep"[^>]*>Apply without uninstalling<\/button>/);
+ assert.equal(html.match(/data-action="apply-keep"/g)?.length,1);assert.match(html,/31 plugins will be uninstalled\./,'the footer line is as it was');
+ assert.match(html,/<button type="button" class="im-btn" data-close >Cancel<\/button><button type="button" class="im-btn" data-action="apply-keep" >Apply without uninstalling<\/button><button type="button" class="im-btn im-btn--primary" data-action="apply"/,'the same buttons the sheet already has, in that order');
+ const onlyRemoving=reviewSheet(s,plan([removal(1),removal(2,false)]),null);
+ assert.match(onlyRemoving,/data-action="apply"[^>]*>Apply, uninstall 1 and clear 1 without files<\/button>/);assert.doesNotMatch(onlyRemoving,/apply-keep|Apply without uninstalling/);
+ const plain=reviewSheet(s,plan([op('install','','2'),op('update','1','2','b')]),null);
+ assert.match(plain,/data-action="apply"[^>]*>Apply 2 changes<\/button>/);assert.doesNotMatch(plain,/apply-keep|will be uninstalled/);
+ const running=reviewSheet(s,cuj1(),{index:1});
+ assert.match(running,/data-action="apply"[^>]*disabled[^>]*>Applying 32 changes…/);assert.match(running,/data-action="apply-keep"[^>]*disabled/);
+ assert.equal(html.match(/<span class="im-chip" data-im-tone="err">Remove<\/span>/g)?.length,31,'every removal is a line of the sheet');
+});
+
+/** The page's own flow for Apply all, the sheet's two buttons and the notice, over the calls a stub transport records: nothing here is the service. */
+function applyApp(fresh:Plan,shown:Plan|null){
+ const calls:{action:string;payload?:Record<string,unknown>}[]=[],notes:string[]=[],dialogs:string[]=[],state=viewState(snapshot(),{plan:shown});
+ const app={state,
+  request:async(action:string,payload?:Record<string,unknown>)=>{calls.push({action,payload});
+   if(action==='plan')return fresh;
+   if(action==='apply')return {...snapshot(),skipped_removals:payload?.skip_removals===true?fresh.operations.filter(o=>o.kind==='remove').length:0};
+   throw new Error('Unexpected '+action);},
+  run:async(_label:string,work:()=>Promise<unknown>,after?:(v:never)=>void|Promise<void>)=>{if(state.busy)return;state.busy='x';try{const v=await work();await after?.(v as never);}finally{state.busy=null;}},
+  adopt:()=>{},replan:async()=>{},render:()=>{},closeDialog:()=>{dialogs.push('closed');},
+  openDialog:(html:string)=>{dialogs.push(html);return {} as HTMLDialogElement;},notify:(text:string)=>{notes.push(text);}} as unknown as App;
+ return {app,calls,notes,dialogs,state};
+}
+test('Apply all opens the review sheet whenever the fresh plan has a removal, even when it is the plan shown, and applies nothing',async()=>{
+ const p=cuj1(),t=applyApp(p,p);
+ await syncActions['apply-all'](t.app,{} as DOMStringMap,{} as HTMLElement);
+ assert.deepEqual(t.calls.map(c=>c.action),['plan'],'no apply was sent');
+ assert.equal(t.dialogs.length,1);assert.match(t.dialogs[0],/Apply, uninstall 6 and clear 25 without files/);assert.equal(t.state.review?.plan.id,'plan');
+});
+test('Apply all still applies at once a fresh plan with no removal that is the plan shown, and sends neither removal field',async()=>{
+ const p=plan([op('update','1','2')]),t=applyApp(p,p);
+ await syncActions['apply-all'](t.app,{} as DOMStringMap,{} as HTMLElement);
+ assert.deepEqual(t.calls,[{action:'plan',payload:undefined},{action:'apply',payload:{plan_id:'plan'}}]);
+ assert.deepEqual(t.notes,['1 change applied.']);assert.deepEqual(t.dialogs,[]);
+});
+test('from the sheet, Apply sends confirm_removals equal to the plan\'s removals and Apply without uninstalling sends skip_removals and says what it left out',async()=>{
+ const p=cuj1(),confirm=applyApp(p,p);confirm.state.review={plan:p,target_id:null};
+ await syncActions.apply(confirm.app,{} as DOMStringMap,{} as HTMLElement);
+ assert.deepEqual(confirm.calls,[{action:'apply',payload:{plan_id:'plan',confirm_removals:31}}]);assert.deepEqual(confirm.notes,['32 changes applied.']);
+ const keep=applyApp(p,p);keep.state.review={plan:p,target_id:null};
+ await syncActions['apply-keep'](keep.app,{} as DOMStringMap,{} as HTMLElement);
+ assert.deepEqual(keep.calls,[{action:'apply',payload:{plan_id:'plan',skip_removals:true}}]);assert.deepEqual(keep.notes,['1 change applied. 31 removals left out.']);
+ assert.equal(keep.state.applying,null);assert.equal(keep.state.review,null);
+});
+test('the one-harness review of a plan with removals confirms that plan\'s own number',async()=>{
+ const p=plan([removal(1),removal(2,false),removal(3,false)]),t=applyApp(p,null);t.state.review={plan:p,target_id:'target'};
+ await syncActions.apply(t.app,{} as DOMStringMap,{} as HTMLElement);
+ assert.deepEqual(t.calls,[{action:'apply',payload:{plan_id:'plan',confirm_removals:3}}]);
+});
+test('every action the review sheet names has an owner: apply and apply-keep',()=>{
+ for(const wanted of ['apply','apply-keep'])assert.ok(Object.values(modules).some(m=>wanted in m.actions),`${wanted} is declared`);
 });

@@ -47,14 +47,14 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             // The receipt written for an adopted installation, until the registry is saved.
             let mut adopted = None;
             let mut removed_target = None;
+            let mut cleared_receipts = false;
             match action {
                 "save_plugin" => {
                     let p = payload["plugin"].clone();
                     validate_plugin(&p, &registry)?;
                     instructions::directory(data_dir, &p)?;
                     if let Some(expected) = payload.get("expected_custom_instructions_digest") {
-                        ensure!(expected.as_str() == Some(instructions::read(data_dir, &p)?.digest().as_str()),
-                                "custom-instructions changed during adaptation; regenerate before recording");
+                        instructions_unchanged(data_dir, &p, expected)?;
                     }
                     if let Some(old) = registry["plugins"]
                         .as_array()
@@ -101,6 +101,13 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                         .as_array_mut()
                         .context("plugins")?
                         .retain(|p| p["id"] != key);
+                    // Its receipts go with it: left behind they keep its copies managed, out of
+                    // "Installed, not in your list" and out of reach of an adoption.
+                    if let Some(all) = receipts.as_object_mut() {
+                        let before = all.len();
+                        all.retain(|_, r| r["plugin_id"] != key);
+                        cleared_receipts = all.len() != before;
+                    }
                 }
                 "remove_target" => {
                     let key = str_field(&payload, "id")?;
@@ -160,6 +167,9 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 }
                 return Err(error);
             }
+            if cleared_receipts {
+                write(&data_dir.join("receipts.json"), &receipts)?;
+            }
             if let Some(key) = removed_target {
                 sync_status::forget_target(data_dir, key)?;
             }
@@ -170,7 +180,9 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 sync_status::carry_revision(data_dir, from, to)?;
             }
             log(data_dir, action, "complete", "Registry configuration saved")?;
-            snapshot(data_dir, &registry, &receipts, false)
+            // Codex and Hermes are read from the last scan unless asked: that scan still shows
+            // the copies of a removed plugin as managed.
+            snapshot(data_dir, &registry, &receipts, cleared_receipts)
         }
         "plan" => check_plan(
             data_dir,
@@ -251,6 +263,60 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             )?;
             snapshot(data_dir, &registry, &receipts, false)
         }
+        // The result of an AI adaptation is merged into the plugin as it is now, so a registry
+        // that changed while the job ran (a setting, a rename) does not discard the run. The
+        // caller carries no revision: only the plugin's source and revision must still be the ones
+        // the job started from.
+        "register_distributions" => {
+            let key = str_field(&payload, "id")?;
+            id(key)?;
+            let index = registry["plugins"]
+                .as_array()
+                .context("plugins")?
+                .iter()
+                .position(|p| p["id"] == key)
+                .context("Plugin not found")?;
+            let plugin = registry["plugins"][index].clone();
+            ensure!(
+                plugin["source"] == payload["source"]
+                    && plugin["upstream_revision"] == payload["upstream_revision"],
+                "The plugin's source changed during adaptation; adapt again"
+            );
+            instructions_unchanged(
+                data_dir,
+                &plugin,
+                &payload["expected_custom_instructions_digest"],
+            )?;
+            let digest = str_field(&payload, "expected_custom_instructions_digest")?;
+            let asked = str_field(&payload, "asked")?;
+            let version = str_field(&payload, "version")?;
+            let adapters = payload["adapters"]
+                .as_array()
+                .context("adapters must be an array")?;
+            let current = plugin["distributions"]
+                .as_array()
+                .context("distributions")?;
+            let merged = merged_distributions(
+                current,
+                adapters,
+                asked,
+                version,
+                &plugin["upstream_revision"],
+                digest,
+            );
+            let mut updated = plugin;
+            updated["distributions"] = json!(merged);
+            validate_plugin(&updated, &registry)?;
+            registry["plugins"][index] = updated;
+            save_registry(data_dir, &mut registry)?;
+            log(
+                data_dir,
+                action,
+                "complete",
+                "Adapter distributions recorded",
+            )?;
+            snapshot(data_dir, &registry, &receipts, false)
+        }
         "maintenance" => maintenance(data_dir, &registry, &receipts, &payload),
         _ => bail!("Unknown registry action: {action}"),
     }
@@ -315,8 +381,9 @@ fn installed_digest(entry: &Value) -> String {
 /// version and digest of the copy that is there. The next plan then finds the plugin installed:
 /// nothing to do when the copy is the build, an update when it is not, never a second copy.
 /// Refused when the target is not in the registry or cannot be read, when nothing with that id
-/// is installed there, when it belongs to a plugin of the list already, or when the plugin is
-/// not a new one that lists the target. Returns the receipt's key; the caller saves the plugin.
+/// is installed there, when it belongs to a plugin of the list already, when the harness records
+/// it without its files, or when the plugin is not a new one that lists the target. Returns the
+/// receipt's key; the caller saves the plugin.
 fn adopt_installation(
     root: &Path,
     registry: &Value,
@@ -370,6 +437,12 @@ fn adopt_installation(
         "{native_id} already belongs to {} on {name}",
         text(&entry["registry_id"])
     );
+    // A harness that records a copy whose files are gone cannot hand it to the list: the receipt
+    // would describe a folder that is not there.
+    ensure!(
+        entry["present"] != false,
+        "{native_id} has no files on {name}; reinstall it there or remove it"
+    );
     let receipt = json!({"target_id":target_id,"plugin_id":plugin_id,"native_id":native_id,
         "version":entry["version"],"digest":installed_digest(entry),"path":entry["path"],
         "custom_instructions_digest":instructions::read(root, plugin)?.digest(),
@@ -381,6 +454,48 @@ fn adopt_installation(
     all.insert(key.clone(), receipt);
     write(&root.join("receipts.json"), receipts)?;
     Ok(key)
+}
+/// A job that read a plugin's custom instructions before it ran records its result only while
+/// the folder still holds what it read: `expected` is the digest it took.
+fn instructions_unchanged(root: &Path, plugin: &Value, expected: &Value) -> Result<()> {
+    ensure!(
+        expected.as_str() == Some(instructions::read(root, plugin)?.digest().as_str()),
+        "custom-instructions changed during adaptation; regenerate before recording"
+    );
+    Ok(())
+}
+/// The distributions of a plugin once an adaptation for the harness `asked` has built `adapters`
+/// (`harness`, `path`), in the order given. A harness takes the adapter when it is the one asked
+/// for, when the plugin has no distribution for it, or when its distribution is an earlier
+/// adaptation (`origin` `muro`); any other distribution, one found in the source or entered by a
+/// person, is left as it is. The adapter replaces a distribution in its place and is added at the
+/// end otherwise. `revision` is the upstream revision the adaptation was made from and `digest` the
+/// custom instructions it read.
+pub fn merged_distributions(
+    current: &[Value],
+    adapters: &[Value],
+    asked: &str,
+    version: &str,
+    revision: &Value,
+    digest: &str,
+) -> Vec<Value> {
+    let mut all = current.to_vec();
+    for adapter in adapters {
+        let harness = &adapter["harness"];
+        let existing = all.iter().position(|d| d["harness"] == *harness);
+        let takes = harness.as_str() == Some(asked)
+            || existing.is_none_or(|at| all[at]["origin"] == "muro");
+        if !takes {
+            continue;
+        }
+        let built = json!({"harness":harness,"path":adapter["path"],"version":version,"origin":"muro",
+            "source_revision":revision,"custom_instructions_digest":digest});
+        match existing {
+            Some(at) => all[at] = built,
+            None => all.push(built),
+        }
+    }
+    all
 }
 /// Plugin entries as a check compares them: the time of the check itself is not a change.
 fn without_check_times(plugins: &Value) -> Value {
@@ -740,7 +855,6 @@ fn plan(
             // A build made from a project file that has changed since is stale, whatever else holds.
             let artifact =
                 match currency.check(plugin, h).and_then(|()| if reinstall == Some(pid)
-                    && previous.is_some()
                     && !receipt.is_null()
                     && receipt["adopted"] != true
                 {
@@ -775,6 +889,15 @@ fn plan(
             if let Some(old) = previous {
                 desired_native.push(old["id"].clone());
             }
+            // An entry that reports no `present` has its files, as a harness that cannot tell does.
+            let files_missing = previous.is_some_and(|old| old["present"] == false);
+            let mut reason = if previous.is_none() {
+                "Missing desired distribution"
+            } else {
+                "Reconcile desired artifact"
+            };
+            // Only a copy Muro installed is switched on again: a person who adopted a copy and
+            // disabled it chose that.
             let kind = if previous.is_none() {
                 Some("install")
             } else if reinstall == Some(pid) {
@@ -783,13 +906,20 @@ fn plan(
                 || previous.unwrap()["version"] != artifact["version"]
             {
                 Some("update")
-            } else if previous.unwrap()["enabled"] == false && h == "claude-code" {
+            } else if previous.unwrap()["enabled"] == false
+                && h == "claude-code"
+                && !receipt.is_null()
+                && receipt["adopted"] != true
+            {
                 Some("activate")
+            } else if files_missing {
+                reason = "Files missing";
+                Some("update")
             } else {
                 None
             };
             if let Some(kind) = kind {
-                ops.push(json!({"target_id":tid,"plugin_id":pid,"name":plugin["name"],"kind":kind,"from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],"reason":if kind=="install"{"Missing desired distribution"}else{"Reconcile desired artifact"},"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())}));
+                ops.push(json!({"target_id":tid,"plugin_id":pid,"name":plugin["name"],"kind":kind,"from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],"reason":reason,"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())}));
             }
         }
         // A plan with blockers can be applied in part, so a harness that has one gets no
@@ -797,7 +927,12 @@ fn plan(
         if target["exclusive"] == true && blockers.len() == blocked_before {
             for old in installed {
                 if !desired_native.contains(&old["id"]) {
-                    ops.push(json!({"target_id":tid,"plugin_id":old["registry_id"].as_str().unwrap_or(""),"name":old["name"],"kind":"remove","from_version":old["version"],"to_version":"","reason":"Not in desired registry for this target","native_id":old["id"]}));
+                    let mut removal = json!({"target_id":tid,"plugin_id":old["registry_id"].as_str().unwrap_or(""),"name":old["name"],"kind":"remove","from_version":old["version"],"to_version":"","reason":"Not in desired registry for this target","native_id":old["id"]});
+                    // A record whose files are gone is cleared, not uninstalled: the sheet says so.
+                    if old["present"] == false {
+                        removal["present"] = json!(false);
+                    }
+                    ops.push(removal);
                 }
             }
         }
@@ -818,6 +953,38 @@ fn observed_complete(observed: &Value) -> Result<()> {
     );
     Ok(())
 }
+/// The inventory read right after an install, an update or an activation must hold the plugin at
+/// the version the operation set out to leave, switched on.
+fn installed_as_planned(observed: &Value, op: &Value) -> Result<()> {
+    observed_complete(observed)?;
+    ensure!(
+        observed["plugins"]
+            .as_array()
+            .context("plugins")?
+            .iter()
+            .any(|p| p["registry_id"] == op["plugin_id"]
+                && p["version"] == op["to_version"]
+                && p["enabled"] != false),
+        "Replacement version/activation did not match; removals stopped"
+    );
+    Ok(())
+}
+/// What `apply` answers: the snapshot, the blockers it left out when it was allowed to leave
+/// them, and the number of removals it was asked to skip.
+fn applied_snapshot(
+    root: &Path,
+    reg: &Value,
+    receipts: &Value,
+    left_out: Option<&[Value]>,
+    skipped_removals: usize,
+) -> Result<Value> {
+    let mut result = snapshot(root, reg, receipts, false)?;
+    if let Some(left_out) = left_out {
+        result["left_out"] = json!(left_out);
+    }
+    result["skipped_removals"] = json!(skipped_removals);
+    Ok(result)
+}
 fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Result<Value> {
     let pid = str_field(payload, "plan_id")?;
     id(pid)?;
@@ -826,6 +993,11 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
     let allow_blocked = match &payload["allow_blocked"] {
         Value::Null => false,
         v => v.as_bool().context("allow_blocked must be a boolean")?,
+    };
+    // With `skip_removals` the removals of the plan are left alone and counted in the answer.
+    let skip_removals = match &payload["skip_removals"] {
+        Value::Null => false,
+        v => v.as_bool().context("skip_removals must be a boolean")?,
     };
     let path = root.join("plans").join(format!("{pid}.json"));
     let plan = read(&path)?;
@@ -839,6 +1011,30 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         "Plan has blockers; resolve them before applying"
     );
     let ops = plan["operations"].as_array().context("operations")?;
+    // A plan that uninstalls runs only when the request names how many plugins it uninstalls:
+    // a caller that has not read the plan, or does not know the field, removes nothing.
+    let removals = ops.iter().filter(|o| o["kind"] == "remove").count();
+    let noun = if removals == 1 { "plugin" } else { "plugins" };
+    ensure!(
+        skip_removals
+            || removals == 0
+            || payload["confirm_removals"].as_u64() == Some(removals as u64),
+        "This plan uninstalls {removals} {noun}; review it and confirm the removals"
+    );
+    let skipped = if skip_removals { removals } else { 0 };
+    let executed: Vec<&Value> = ops
+        .iter()
+        .filter(|o| !skip_removals || o["kind"] != "remove")
+        .collect();
+    if executed.is_empty() {
+        return applied_snapshot(
+            root,
+            reg,
+            receipts,
+            allow_blocked.then_some(left_out.as_slice()),
+            skipped,
+        );
+    }
     // Only the harnesses this plan changes are locked, and only their configuration is
     // preserved: a harness whose folder was deleted is a blocker of the plan, never a stop
     // for the others.
@@ -846,7 +1042,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         .as_array()
         .context("targets")?
         .iter()
-        .filter(|t| ops.iter().any(|o| o["target_id"] == t["id"]))
+        .filter(|t| executed.iter().any(|o| o["target_id"] == t["id"]))
         .collect();
     let mut target_locks = vec![];
     for target in &changed {
@@ -870,7 +1066,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         hash(&invs) == str_field(&plan, "inventory_hash")?,
         "Installed inventory changed; calculate a new plan"
     );
-    for op in ops.iter().filter(|o| o["kind"] != "remove") {
+    for op in executed.iter().copied().filter(|o| o["kind"] != "remove") {
         let a = &op["artifact"];
         let plugin = reg["plugins"].as_array().context("plugins")?.iter()
             .find(|plugin| plugin["id"] == op["plugin_id"]).context("Plugin disappeared")?;
@@ -901,7 +1097,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         &json!({"plan_id":pid,"status":"running","completed":[]}),
     )?;
     let mut done = vec![];
-    for op in ops {
+    for &op in &executed {
         let target = reg["targets"]
             .as_array()
             .unwrap()
@@ -909,6 +1105,8 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
             .find(|t| t["id"] == op["target_id"])
             .context("Target disappeared")?;
         let result = (|| -> Result<()> {
+            // Whether this install is the first record of the plugin on the target.
+            let mut first_install = false;
             if op["kind"] == "remove" {
                 native::remove(target, str_field(op, "native_id")?)?;
                 let keys: Vec<String> = receipts
@@ -944,6 +1142,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                 let target_id = str_field(op, "target_id")?;
                 let plugin_id = str_field(op, "plugin_id")?;
                 let key = receipt_key(target_id, plugin_id);
+                first_install = receipt_for(receipts, target_id, plugin_id).is_none();
                 // Remove a legacy delimiter key for this pair while keeping other pairs intact.
                 receipts
                     .as_object_mut()
@@ -953,17 +1152,15 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
             }
             if op["kind"] != "remove" {
                 let observed = native::inventory(target, receipts);
-                observed_complete(&observed)?;
-                ensure!(
-                    observed["plugins"]
-                        .as_array()
-                        .context("plugins")?
-                        .iter()
-                        .any(|p| p["registry_id"] == op["plugin_id"]
-                            && p["version"] == op["to_version"]
-                            && p["enabled"] != false),
-                    "Replacement version/activation did not match; removals stopped"
-                );
+                if let Err(e) = installed_as_planned(&observed, op) {
+                    // A first install that fails its check is on the machine all the same: with
+                    // no receipt nothing would know it is Muro's. An update keeps the receipt of
+                    // the version it replaced, the file as it is, so a reinstall can restore it.
+                    if first_install {
+                        let _ = write(&root.join("receipts.json"), receipts);
+                    }
+                    return Err(e);
+                }
             }
             write(&root.join("receipts.json"), receipts)?;
             Ok(())
@@ -983,7 +1180,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         )?;
     }
     let post = inventories(root, reg, receipts, true)?;
-    for op in ops {
+    for &op in &executed {
         let inv = post
             .as_array()
             .unwrap()
@@ -1032,20 +1229,23 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         root,
         "sync",
         "complete",
-        &format!("{} operations verified", ops.len()),
+        &format!("{} operations verified", executed.len()),
     )?;
-    let mut synced = ops
+    let mut synced = executed
         .iter()
+        .copied()
         .map(|op| str_field(op, "target_id"))
         .collect::<Result<Vec<_>>>()?;
     synced.sort_unstable();
     synced.dedup();
-    sync_status::record_sync(root, &synced, ops.len())?;
-    let mut result = snapshot(root, reg, receipts, false)?;
-    if allow_blocked {
-        result["left_out"] = json!(left_out);
-    }
-    Ok(result)
+    sync_status::record_sync(root, &synced, executed.len())?;
+    applied_snapshot(
+        root,
+        reg,
+        receipts,
+        allow_blocked.then_some(left_out.as_slice()),
+        skipped,
+    )
 }
 fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<Value> {
     let kind = str_field(p, "kind")?;

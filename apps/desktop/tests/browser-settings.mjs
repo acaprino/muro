@@ -316,16 +316,16 @@ await test('the rule for plugins outside the list is drawn in Sync with the Sync
   const { page } = app;
   await openSettings(page);
   const group = page.getByRole('radiogroup', { name: 'Plugins that are not in my list' });
-  assert.deepEqual(await group.locator('label').allTextContents(), ['Leave alone', 'Always uninstall']);
+  assert.deepEqual(await group.locator('label').allTextContents(), ['Leave alone', 'Uninstall, asking first']);
   assert.equal(await group.getByRole('radio', { name: 'Leave alone' }).isChecked(), false, 'one harness differs: no option is chosen');
-  assert.equal(await group.getByRole('radio', { name: 'Always uninstall' }).isChecked(), false);
+  assert.equal(await group.getByRole('radio', { name: 'Uninstall, asking first' }).isChecked(), false);
   assert.equal(await row(page, 'Plugins that are not in my list').getByText('Differs per harness').count(), 1);
   // The action is the Sync page's: one save_target per harness that does not have it yet, then every harness is on one side.
-  await group.getByRole('radio', { name: 'Always uninstall' }).check({ force: true });
+  await group.getByRole('radio', { name: 'Uninstall, asking first' }).check({ force: true });
   await page.waitForFunction(() => window.calls.filter(c => c.action === 'save_target').length === 2);
   await row(page, 'Plugins that are not in my list').locator('input:checked').waitFor();
   assert.deepEqual((await calls(app, 'save_target')).map(c => [c.payload.target.id, c.payload.target.exclusive]), [['codex', true], ['opencode', true]]);
-  assert.equal(await group.getByRole('radio', { name: 'Always uninstall' }).isChecked(), true);
+  assert.equal(await group.getByRole('radio', { name: 'Uninstall, asking first' }).isChecked(), true);
   assert.equal(await row(page, 'Plugins that are not in my list').getByText('Differs per harness').count(), 0);
   assert.equal((await saves(app)).length, 0, 'it is not a setting of the registry');
 });

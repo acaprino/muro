@@ -343,6 +343,34 @@ def _license_matches(data: bytes, license_type: str) -> bool:
     return hashlib.sha256(" ".join(text.split()).encode("utf-8")).hexdigest() == expected
 
 
+_LICENSE_PREFIXES = ("license", "licence", "copying")
+
+
+def licenses_in(folder: Path) -> list[dict[str, str]]:
+    """The files of a folder, at any depth, that are the complete MIT or Apache-2.0 text.
+
+    A file is tried when its name starts with LICENSE, LICENCE or COPYING in any letter case, and
+    passes when `_license_matches` accepts it. Folders named `.git` are not entered, links and
+    unreadable files are skipped, and no Git command runs. A preflight: it does not say which of the
+    files licenses a given path, which the pinned gate decides.
+    """
+    found: list[dict[str, str]] = []
+    for current, folders, names in os.walk(folder):
+        folders[:] = [name for name in folders if name != ".git"]
+        for name in names:
+            path = Path(current) / name
+            if not name.lower().startswith(_LICENSE_PREFIXES) or path.is_symlink() or not path.is_file():
+                continue
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            kind = next((kind for kind in ("MIT", "Apache-2.0") if _license_matches(data, kind)), None)
+            if kind:
+                found.append({"path": path.relative_to(folder).as_posix(), "license": kind})
+    return sorted(found, key=lambda item: item["path"])
+
+
 def license_files(src: dict[str, Any]) -> tuple[str, str]:
     """The file that licenses a source's folder and the NOTICE that travels with it: the one beside it.
 

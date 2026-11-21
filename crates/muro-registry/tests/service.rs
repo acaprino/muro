@@ -1,4 +1,4 @@
-use muro_registry::service::request;
+use muro_registry::service::{merged_distributions, request};
 use serde_json::{Value, json};
 use std::{fs, path::Path};
 
@@ -206,7 +206,7 @@ fn sync_preserves_config_and_second_pass_is_empty() {
     let plan = request(&r, "plan", json!({})).unwrap();
     assert_eq!(plan["operations"].as_array().unwrap().len(), 2);
     assert_eq!(plan["blockers"], json!([]));
-    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    request(&r, "apply", json!({"plan_id":plan["id"],"confirm_removals":1})).unwrap();
     let config: Value =
         serde_json::from_slice(&fs::read(p.join("opencode.json")).unwrap()).unwrap();
     assert_eq!(config["model"], "untouched");
@@ -260,7 +260,9 @@ fn changed_artifact_blocks_removal() {
     plugin(&r, &a);
     let plan = request(&r, "plan", json!({})).unwrap();
     fs::write(a.join("index.js"), "changed").unwrap();
-    assert!(request(&r, "apply", json!({"plan_id":plan["id"]})).is_err());
+    let error = request(&r, "apply", json!({"plan_id":plan["id"],"confirm_removals":1}))
+        .unwrap_err();
+    assert_eq!(error.to_string(), "Artifact changed since plan; prepare again");
     assert!(
         fs::read_to_string(p.join("opencode.json"))
             .unwrap()
@@ -326,6 +328,19 @@ fn two_logical_plugins_cannot_own_one_native_install() {
             .unwrap()
             .is_empty()
     );
+}
+
+/// A second build folder whose package name differs from the fixture's, so its native id does too.
+fn second_artifact(temp: &Path) -> std::path::PathBuf {
+    let dir = temp.join("second-artifact");
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(
+        dir.join("package.json"),
+        r#"{"name":"second","version":"1.0.0","type":"module","main":"index.js"}"#,
+    )
+    .unwrap();
+    fs::write(dir.join("index.js"), "export default async () => ({})").unwrap();
+    dir
 }
 
 /// Targets `oc` and `other` with the example plugin to install on both, a disabled target
@@ -635,19 +650,6 @@ fn check_that_resolves_a_new_revision_raises_the_registry_revision() {
 mod blockers {
     use super::*;
 
-    /// A second build folder whose package name differs from the fixture's, so its native id
-    /// does too.
-    fn second_artifact(temp: &Path) -> std::path::PathBuf {
-        let dir = temp.join("second-artifact");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(
-            dir.join("package.json"),
-            r#"{"name":"second","version":"1.0.0","type":"module","main":"index.js"}"#,
-        )
-        .unwrap();
-        fs::write(dir.join("index.js"), "export default async () => ({})").unwrap();
-        dir
-    }
     /// The fixture target with the example plugin listed and the other one ready to install,
     /// and the plan for it: one install, one blocker.
     fn one_ready_one_blocked(temp: &Path, r: &Path, p: &Path, a: &Path) -> Value {
@@ -1249,6 +1251,627 @@ fn an_adoption_the_installation_does_not_support_is_refused_and_saves_nothing() 
     assert_eq!(snapshot(&r)["registry"]["revision"], revision);
 }
 
+// ---------- confirmed removals, receipts that survive a failed check, recovery ----------
+
+fn removal_count(plan: &Value) -> usize {
+    plan["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|o| o["kind"] == "remove")
+        .count()
+}
+/// The payload that applies `plan` and confirms the removals it holds.
+fn confirmed(plan: &Value) -> Value {
+    json!({"plan_id":plan["id"],"confirm_removals":removal_count(plan)})
+}
+/// The plugin entries in the fixture target's `opencode.json`.
+fn configured(profile: &Path) -> Vec<String> {
+    let config: Value =
+        serde_json::from_slice(&fs::read(profile.join("opencode.json")).unwrap()).unwrap();
+    config["plugins"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry.as_str().unwrap().to_owned())
+        .collect()
+}
+/// Rewrites, in the stored `plan`, the version each operation expects the harness to report once
+/// it has run, so the check that follows an install fails.
+fn expect_version(root: &Path, plan: &Value, version: &str) {
+    let path = root
+        .join("plans")
+        .join(format!("{}.json", plan["id"].as_str().unwrap()));
+    let mut stored: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    for op in stored["operations"].as_array_mut().unwrap() {
+        op["to_version"] = json!(version);
+    }
+    fs::write(&path, serde_json::to_vec(&stored).unwrap()).unwrap();
+}
+
+/// `apply` and the plugins a plan uninstalls: a plan that removes runs only when the request
+/// carries the number of its removals, and a request that skips them leaves every one installed.
+mod confirmed_removals {
+    use super::*;
+
+    const OUTSIDE: [&str; 3] = ["outside-a@1.0.0", "outside-b@1.0.0", "outside-c@1.0.0"];
+
+    /// Plugins the person installed and the list does not hold, in the fixture target's
+    /// configuration.
+    fn install_outside(profile: &Path, outside: &[&str]) {
+        let config = json!({"model":"untouched","plugins":outside});
+        fs::write(
+            profile.join("opencode.json"),
+            serde_json::to_vec(&config).unwrap(),
+        )
+        .unwrap();
+    }
+    /// The exclusive fixture target with the example plugin in the list and `outside` installed
+    /// beside it, and the plan for it: one install, and one removal for each of `outside`.
+    fn plan_with_removals(r: &Path, p: &Path, a: &Path, outside: &[&str]) -> Value {
+        install_outside(p, outside);
+        target(r, p);
+        plugin(r, a);
+        let plan = request(r, "plan", json!({})).unwrap();
+        assert_eq!(plan["blockers"], json!([]), "{plan}");
+        assert_eq!(
+            plan["operations"].as_array().unwrap().len(),
+            outside.len() + 1,
+            "{plan}"
+        );
+        assert_eq!(removal_count(&plan), outside.len(), "{plan}");
+        plan
+    }
+
+    #[test]
+    fn a_plan_that_uninstalls_is_refused_unless_the_request_carries_its_count() {
+        let (_t, r, p, a) = fixture();
+        let plan = plan_with_removals(&r, &p, &a, &OUTSIDE);
+        let before = fs::read(p.join("opencode.json")).unwrap();
+        let refusal = "This plan uninstalls 3 plugins; review it and confirm the removals";
+        // A request that does not know the field, and every count but the plan's own.
+        let error = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err();
+        assert_eq!(error.to_string(), refusal);
+        for confirm in [json!(null), json!(0), json!(2), json!(4), json!("3")] {
+            let payload = json!({"plan_id":plan["id"],"confirm_removals":confirm});
+            let error = request(&r, "apply", payload).unwrap_err();
+            assert_eq!(error.to_string(), refusal, "{confirm}");
+        }
+        // Nothing was written: no harness, no receipt, no journal, no copy of the configuration.
+        assert_eq!(fs::read(p.join("opencode.json")).unwrap(), before);
+        assert!(!r.join("receipts.json").exists());
+        assert!(!r.join("journal.json").exists());
+        assert!(!r.join("recovery").exists());
+        assert!(snapshot(&r)["sync"]["last_sync"].is_null());
+        // With the count the plan runs whole, and reports no removal skipped.
+        let payload = json!({"plan_id":plan["id"],"confirm_removals":3});
+        let applied = request(&r, "apply", payload).unwrap();
+        assert_eq!(applied["skipped_removals"], 0);
+        assert_eq!(applied["sync"]["pending"], 0);
+        let ids = configured(&p);
+        assert_eq!(ids.len(), 1, "{ids:?}");
+        assert!(ids.iter().all(|id| !id.starts_with("outside-")), "{ids:?}");
+    }
+
+    #[test]
+    fn the_refusal_for_one_removal_names_one_plugin() {
+        let (_t, r, p, a) = fixture();
+        let plan = plan_with_removals(&r, &p, &a, &OUTSIDE[..1]);
+        let error = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "This plan uninstalls 1 plugin; review it and confirm the removals"
+        );
+        request(&r, "apply", confirmed(&plan)).unwrap();
+        assert_eq!(configured(&p).len(), 1);
+    }
+
+    #[test]
+    fn skipped_removals_leave_every_plugin_installed_and_are_counted() {
+        let (_t, r, p, a) = fixture();
+        let plan = plan_with_removals(&r, &p, &a, &OUTSIDE);
+        let payload = json!({"plan_id":plan["id"],"skip_removals":true});
+        let applied = request(&r, "apply", payload).unwrap();
+        assert_eq!(applied["skipped_removals"], 3);
+        assert!(applied.get("left_out").is_none(), "{applied}");
+        // The install ran, the three plugins outside the list are still there.
+        let ids = configured(&p);
+        assert_eq!(ids.len(), 4, "{ids:?}");
+        for outside in OUTSIDE {
+            assert!(ids.contains(&outside.to_owned()), "{ids:?}");
+        }
+        assert_eq!(receipts(&r).as_object().unwrap().len(), 1);
+        let sync = &applied["sync"];
+        assert_eq!(sync["pending"], 3, "the removals are still pending");
+        assert!(is_epoch_seconds(&sync["targets"]["oc"]["synced"]), "{sync}");
+        // The next plan holds the removals alone.
+        let next = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(removal_count(&next), 3, "{next}");
+        assert_eq!(next["operations"].as_array().unwrap().len(), 3, "{next}");
+        let payload = json!({"plan_id":next["id"],"skip_removals":"yes"});
+        let error = request(&r, "apply", payload).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("skip_removals must be a boolean"),
+            "{error:#}"
+        );
+    }
+
+    #[test]
+    fn skipping_the_removals_of_a_plan_that_only_removes_changes_and_locks_nothing() {
+        let (_t, r, p, _a) = fixture();
+        install_outside(&p, &OUTSIDE[..2]);
+        target(&r, &p);
+        let plan = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(removal_count(&plan), 2, "{plan}");
+        assert_eq!(plan["operations"].as_array().unwrap().len(), 2, "{plan}");
+        let before = fs::read(p.join("opencode.json")).unwrap();
+        // Another instance holds the target: only an apply that executes something is stopped.
+        let held = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(p.join(".muro-plugin-writer.lock"))
+            .unwrap();
+        fs2::FileExt::try_lock_exclusive(&held).unwrap();
+        let error = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "This plan uninstalls 2 plugins; review it and confirm the removals",
+            "the refusal comes before any lock"
+        );
+        let error = request(&r, "apply", confirmed(&plan)).unwrap_err();
+        assert!(
+            error.to_string().contains("Another Muro instance"),
+            "{error:#}"
+        );
+        let payload = json!({"plan_id":plan["id"],"skip_removals":true});
+        let applied = request(&r, "apply", payload).unwrap();
+        assert_eq!(applied["skipped_removals"], 2);
+        assert_eq!(fs::read(p.join("opencode.json")).unwrap(), before);
+        assert!(!r.join("journal.json").exists());
+        assert!(!r.join("recovery").exists());
+        assert!(!r.join("receipts.json").exists());
+        let sync = &applied["sync"];
+        assert!(sync["last_sync"].is_null(), "{sync}");
+        assert_eq!(sync["pending"], 2);
+        let events = applied["activity"].as_array().unwrap();
+        assert!(events.iter().all(|e| e["action"] != "sync"), "{events:?}");
+        // Released, the same plan runs with its count.
+        fs2::FileExt::unlock(&held).unwrap();
+        request(&r, "apply", confirmed(&plan)).unwrap();
+        assert!(configured(&p).is_empty());
+    }
+
+    #[test]
+    fn an_apply_that_executes_nothing_still_reports_what_it_left_out() {
+        let (t, r, p, _a) = fixture();
+        let gone = t.path().join("gone-profile");
+        fs::create_dir_all(&gone).unwrap();
+        install_outside(&p, &OUTSIDE[..1]);
+        target(&r, &p);
+        target_as(&r, &gone, "gone", true);
+        fs::remove_dir_all(&gone).unwrap();
+        let plan = request(&r, "plan", json!({})).unwrap();
+        assert_eq!(removal_count(&plan), 1, "{plan}");
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 1, "{plan}");
+        let payload = json!({"plan_id":plan["id"],"allow_blocked":true,"skip_removals":true});
+        let applied = request(&r, "apply", payload).unwrap();
+        assert_eq!(applied["left_out"], plan["blockers"]);
+        assert_eq!(applied["skipped_removals"], 1);
+        assert_eq!(configured(&p), vec![OUTSIDE[0].to_owned()]);
+    }
+}
+
+#[test]
+fn an_install_that_fails_its_check_is_recorded_when_it_is_the_first() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    expect_version(&r, &plan, "9.9.9");
+    let error = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err();
+    assert!(error.to_string().contains("did not match"), "{error:#}");
+    let all = receipts(&r);
+    assert_eq!(all.as_object().unwrap().len(), 1, "{all}");
+    assert_eq!(
+        all.as_object().unwrap().values().next().unwrap()["plugin_id"],
+        "example"
+    );
+    // The copy is installed, and the next plan finds it managed.
+    let s = snapshot(&r);
+    let entry = &s["inventory"][0]["plugins"][0];
+    assert_eq!(entry["registry_id"], "example", "{entry}");
+}
+
+#[test]
+fn an_update_that_fails_its_check_leaves_the_receipt_of_the_version_it_replaced() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let first = request(&r, "plan", json!({})).unwrap();
+    request(&r, "apply", json!({"plan_id":first["id"]})).unwrap();
+    let recorded = fs::read(r.join("receipts.json")).unwrap();
+    // The list holds a newer build of the plugin than the installed one.
+    fs::write(
+        a.join("package.json"),
+        r#"{"name":"example","version":"1.1.0","type":"module","main":"index.js"}"#,
+    )
+    .unwrap();
+    let s = snapshot(&r);
+    let mut newer = s["registry"]["plugins"][0].clone();
+    newer["pinned_version"] = json!("1.1.0");
+    newer["distributions"][0]["version"] = json!("1.1.0");
+    request(
+        &r,
+        "save_plugin",
+        json!({"revision":s["registry"]["revision"],"plugin":newer}),
+    )
+    .unwrap();
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 1, "{plan}");
+    assert_eq!(plan["operations"][0]["kind"], "update");
+    expect_version(&r, &plan, "9.9.9");
+    let error = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err();
+    assert!(error.to_string().contains("did not match"), "{error:#}");
+    assert_eq!(fs::read(r.join("receipts.json")).unwrap(), recorded);
+}
+
+#[test]
+fn a_reinstall_puts_the_recorded_copy_back_when_nothing_is_installed() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let receipt = receipts(&r)
+        .as_object()
+        .unwrap()
+        .values()
+        .next()
+        .unwrap()
+        .clone();
+    // An update uninstalled the copy and its install failed: the receipt is still the old one.
+    fs::write(p.join("opencode.json"), r#"{"plugins":[]}"#).unwrap();
+    fs::rename(&a, a.with_extension("moved")).unwrap();
+    let plan = request(&r, "plan", json!({"reinstall":"example"})).unwrap();
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    let ops = plan["operations"].as_array().unwrap();
+    assert_eq!(ops.len(), 1, "{plan}");
+    assert_eq!(ops[0]["kind"], "install");
+    assert_eq!(ops[0]["artifact"]["path"], receipt["path"]);
+    assert_eq!(ops[0]["artifact"]["digest"], receipt["digest"]);
+    assert_eq!(ops[0]["to_version"], receipt["version"]);
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    assert_eq!(
+        configured(&p),
+        vec![receipt["native_id"].as_str().unwrap().to_owned()]
+    );
+    assert_eq!(
+        snapshot(&r)["inventory"][0]["plugins"][0]["registry_id"],
+        "example"
+    );
+}
+
+#[test]
+fn removing_a_plugin_from_the_list_deletes_its_receipts_and_frees_its_copy() {
+    let (t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    plugin_as(&r, &second_artifact(t.path()), "second", &["oc"]);
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 2, "{plan}");
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    assert_eq!(receipts(&r).as_object().unwrap().len(), 2);
+    let key = serde_json::to_string(&["oc", "example"]).unwrap();
+    let copy = receipts(&r)[&key]["native_id"].clone();
+    let revision = snapshot(&r)["registry"]["revision"].clone();
+    let removed = request(
+        &r,
+        "remove_plugin",
+        json!({"id":"example","revision":revision}),
+    )
+    .unwrap();
+    // Its receipts are gone, the other plugin's stay.
+    let all = receipts(&r);
+    assert_eq!(all.as_object().unwrap().len(), 1, "{all}");
+    assert!(
+        all.as_object()
+            .unwrap()
+            .values()
+            .all(|receipt| receipt["plugin_id"] == "second"),
+        "{all}"
+    );
+    // The snapshot the request answers already shows the copy as not managed.
+    let entries = removed["inventory"][0]["plugins"].as_array().unwrap();
+    let freed = entries.iter().find(|i| i["id"] == copy).unwrap();
+    assert_eq!(freed["managed"], false, "{freed}");
+    assert!(freed.get("registry_id").is_none(), "{freed}");
+    assert!(
+        entries
+            .iter()
+            .any(|i| i["registry_id"] == "second" && i["managed"] == true)
+    );
+    // It can be added to the list again.
+    adopting(
+        &r,
+        listed("example", &a, "1.0.0", &["oc"]),
+        json!({"target_id":"oc","native_id":copy}),
+    )
+    .unwrap();
+    assert_eq!(receipts(&r).as_object().unwrap().len(), 2);
+    assert_eq!(
+        request(&r, "plan", json!({})).unwrap()["operations"],
+        json!([])
+    );
+}
+
+#[test]
+fn one_adaptation_registers_an_adapter_for_every_harness_without_a_build() {
+    let native =
+        json!({"harness":"claude-code","path":"/source","version":"1.0.0","origin":"native"});
+    let adapters: Vec<Value> = ["claude-code", "codex", "opencode", "pi", "hermes"]
+        .iter()
+        .map(|h| json!({"harness":h,"path":format!("/release/{h}")}))
+        .collect();
+    let built = |h: &str| {
+        json!({"harness":h,"path":format!("/release/{h}"),"version":"1.2.0","origin":"muro",
+               "source_revision":"rev-1","custom_instructions_digest":"digest-1"})
+    };
+    let merged = merged_distributions(
+        &[native.clone()],
+        &adapters,
+        "codex",
+        "1.2.0",
+        &json!("rev-1"),
+        "digest-1",
+    );
+    // The native Claude Code distribution is untouched; the asked harness and the three without a
+    // build get theirs.
+    assert_eq!(
+        merged,
+        vec![
+            native,
+            built("codex"),
+            built("opencode"),
+            built("pi"),
+            built("hermes")
+        ]
+    );
+}
+
+#[test]
+fn an_adaptation_replaces_the_asked_harness_and_earlier_adaptations_only() {
+    let old = |harness: &str, origin: &str| {
+        json!({"harness":harness,"path":format!("/old/{harness}"),"version":"0.9.0","origin":origin,
+               "source_revision":"rev-0"})
+    };
+    let current = vec![
+        old("claude-code", "native"),
+        old("codex", "manual"),
+        old("opencode", "muro"),
+        old("pi", "manual"),
+    ];
+    let adapters: Vec<Value> = ["claude-code", "codex", "opencode", "pi", "hermes"]
+        .iter()
+        .map(|h| json!({"harness":h,"path":format!("/release/{h}")}))
+        .collect();
+    let built = |h: &str| {
+        json!({"harness":h,"path":format!("/release/{h}"),"version":"1.2.0","origin":"muro",
+               "source_revision":"rev-1","custom_instructions_digest":"digest-1"})
+    };
+    let merge = |asked: &str| {
+        merged_distributions(
+            &current,
+            &adapters,
+            asked,
+            "1.2.0",
+            &json!("rev-1"),
+            "digest-1",
+        )
+    };
+    // Replaced where they stand, added at the end.
+    assert_eq!(
+        merge("codex"),
+        vec![
+            current[0].clone(),
+            built("codex"),
+            built("opencode"),
+            current[3].clone(),
+            built("hermes")
+        ]
+    );
+    // A distribution a person entered is replaced only when its harness is the one asked.
+    let merged = merge("pi");
+    assert_eq!(merged[1], current[1]);
+    assert_eq!(merged[3], built("pi"));
+    assert_eq!(
+        merged_distributions(&current, &[], "codex", "1.2.0", &json!("rev-1"), "digest-1"),
+        current
+    );
+}
+
+/// `register_distributions`: the result of an adaptation lands on the plugin as it is when the job
+/// finishes.
+mod registered_adaptation {
+    use super::*;
+
+    /// The example plugin with the upstream revision `upstream`, as the registry holds it.
+    fn plugin_at(r: &Path, a: &Path, upstream: &str) -> Value {
+        let revision = snapshot(r)["registry"]["revision"].clone();
+        let plugin = json!({"id":"example","name":"Example","source":a,"policy":"pinned",
+            "pinned_version":"1.0.0","targets":["oc"],
+            "distributions":[{"harness":"opencode","path":a,"version":"1.0.0"}],
+            "upstream_revision":upstream});
+        request(
+            r,
+            "save_plugin",
+            json!({"revision":revision,"plugin":plugin}),
+        )
+        .unwrap();
+        snapshot(r)["registry"]["plugins"][0].clone()
+    }
+    fn instructions_digest(r: &Path) -> Value {
+        snapshot(r)["custom_instructions"][0]["digest"].clone()
+    }
+    /// What the job sends when it finishes: the plugin as it read it at the start, the digest of
+    /// the custom instructions it took, and the adapters it built, asked for Codex.
+    fn registration(started: &Value, digest: &Value, adapters: Value) -> Value {
+        json!({"id":started["id"],"source":started["source"],
+               "upstream_revision":started["upstream_revision"],
+               "expected_custom_instructions_digest":digest,"asked":"codex","version":"1.2.0",
+               "adapters":adapters})
+    }
+
+    #[test]
+    fn an_adaptation_that_finishes_after_the_registry_changed_lands_on_the_current_record() {
+        let (t, r, p, a) = fixture();
+        target(&r, &p);
+        let started = plugin_at(&r, &a, "rev-1");
+        let digest = instructions_digest(&r);
+        let claude = t.path().join("release").join("claude-code");
+        let codex = t.path().join("release").join("codex");
+        let adapters =
+            json!([{"harness":"claude-code","path":claude},{"harness":"codex","path":codex}]);
+        // While the job ran: a settings save raised the revision, and the person renamed the plugin.
+        save_setting(&r, "auto_sync", json!(true));
+        let mut renamed = snapshot(&r)["registry"]["plugins"][0].clone();
+        renamed["name"] = json!("Renamed");
+        let revision = snapshot(&r)["registry"]["revision"].clone();
+        request(
+            &r,
+            "save_plugin",
+            json!({"revision":revision,"plugin":renamed}),
+        )
+        .unwrap();
+        let before = snapshot(&r)["registry"]["revision"].as_u64().unwrap();
+        let registered = request(
+            &r,
+            "register_distributions",
+            registration(&started, &digest, adapters),
+        )
+        .unwrap();
+        let plugin = &registered["registry"]["plugins"][0];
+        assert_eq!(plugin["name"], "Renamed");
+        let built = |harness: &str, path: &Path| {
+            json!({"harness":harness,"path":path,"version":"1.2.0","origin":"muro",
+                   "source_revision":"rev-1","custom_instructions_digest":digest})
+        };
+        assert_eq!(
+            plugin["distributions"],
+            json!([
+                {"harness":"opencode","path":a,"version":"1.0.0"},
+                built("claude-code", &claude),
+                built("codex", &codex)
+            ])
+        );
+        assert_eq!(
+            registered["registry"]["revision"].as_u64().unwrap(),
+            before + 1
+        );
+        assert_eq!(snapshot(&r)["registry"], registered["registry"]);
+    }
+
+    #[test]
+    fn an_adaptation_is_refused_when_the_source_or_the_revision_changed_and_saves_nothing() {
+        let (t, r, p, a) = fixture();
+        target(&r, &p);
+        let started = plugin_at(&r, &a, "rev-1");
+        let digest = instructions_digest(&r);
+        let adapters = json!([{"harness":"codex","path":t.path().join("release").join("codex")}]);
+        let refused = "The plugin's source changed during adaptation; adapt again";
+        // An adapter whose folder is not absolute is refused as a plugin record is.
+        let relative = json!([{"harness":"codex","path":"release/codex"}]);
+        let state = snapshot(&r);
+        let error = request(
+            &r,
+            "register_distributions",
+            registration(&started, &digest, relative),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "Distribution path must be absolute");
+        assert_eq!(snapshot(&r)["registry"], state["registry"]);
+        // Another check resolved a newer revision.
+        plugin_at(&r, &a, "rev-2");
+        let state = snapshot(&r);
+        let error = request(
+            &r,
+            "register_distributions",
+            registration(&started, &digest, adapters.clone()),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), refused);
+        assert_eq!(snapshot(&r)["registry"], state["registry"]);
+        // The source moved: that clears the distributions and the resolved revision.
+        let mut moved = state["registry"]["plugins"][0].clone();
+        moved["source"] = json!(a.with_extension("other"));
+        moved["distributions"] = json!([]);
+        moved.as_object_mut().unwrap().remove("upstream_revision");
+        request(
+            &r,
+            "save_plugin",
+            json!({"revision":state["registry"]["revision"],"plugin":moved}),
+        )
+        .unwrap();
+        let state = snapshot(&r);
+        let error = request(
+            &r,
+            "register_distributions",
+            registration(&started, &digest, adapters),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), refused);
+        assert_eq!(snapshot(&r)["registry"], state["registry"]);
+    }
+
+    #[test]
+    fn an_adaptation_is_refused_when_the_custom_instructions_changed_or_the_plugin_is_gone() {
+        let (t, r, p, a) = fixture();
+        target(&r, &p);
+        let started = plugin_at(&r, &a, "rev-1");
+        let info = request(
+            &r,
+            "custom_instructions",
+            json!({"id":"example","create":true}),
+        )
+        .unwrap();
+        let taken = info["digest"].clone();
+        fs::write(
+            Path::new(info["path"].as_str().unwrap()).join("recap.md"),
+            "New instructions",
+        )
+        .unwrap();
+        let adapters = json!([{"harness":"codex","path":t.path().join("release").join("codex")}]);
+        let state = snapshot(&r);
+        let error = request(
+            &r,
+            "register_distributions",
+            registration(&started, &taken, adapters.clone()),
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains("changed during adaptation"),
+            "{error:#}"
+        );
+        assert_eq!(snapshot(&r)["registry"], state["registry"]);
+        request(
+            &r,
+            "remove_plugin",
+            json!({"id":"example","revision":state["registry"]["revision"]}),
+        )
+        .unwrap();
+        let error = request(
+            &r,
+            "register_distributions",
+            registration(&started, &taken, adapters),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "Plugin not found");
+    }
+}
+
 #[test]
 #[ignore = "runs an installed native Hermes in an isolated temporary home"]
 fn hermes_native_round_trip() {
@@ -1274,7 +1897,7 @@ fn hermes_native_round_trip() {
     )
     .unwrap();
     let plan = request(&r, "plan", json!({})).unwrap();
-    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    request(&r, "apply", confirmed(&plan)).unwrap();
     assert!(!p.join("plugins/muro-registry-test").exists());
 }
 
@@ -1307,7 +1930,7 @@ fn marketplace_round_trip(h: &str, exe: &str) {
     )
     .unwrap();
     let plan = request(&r, "plan", json!({})).unwrap();
-    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    request(&r, "apply", confirmed(&plan)).unwrap();
 }
 #[test]
 #[ignore = "requires installed native Claude, uses isolated home"]

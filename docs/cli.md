@@ -214,6 +214,41 @@ muro marketplace ./package marionette
 # Wrote package/.agents/plugins/marketplace.json
 ```
 
+### `muro license-check <folder>`
+
+Walks `<folder>` (the folders named `.git` are not entered) and tests every
+regular file whose name starts with `LICENSE`, `LICENCE` or `COPYING`, in any
+letter case, against the factory's own template check, first for MIT and then for
+Apache-2.0. Links and unreadable files are skipped. It runs no Git command and
+contacts nothing. It exists for a caller that wants to know before an AI run
+whether the source has any license text the factory could accept.
+
+- When at least one file passes: exit `0` and one JSON document on stdout, the
+  paths relative to `<folder>` with `/` separators, sorted by path:
+  `{"licenses": [{"path": "LICENSE", "license": "MIT"}]}`.
+- When none passes: exit `1`, nothing on stdout and the bare line `no file in the
+  source is the complete MIT or Apache-2.0 text the factory accepts` on stderr.
+- When `<folder>` does not exist or is not a folder: exit `1` and the bare line
+  `folder not found: <folder>` on stderr.
+
+Neither line has a prefix, so a caller can print it after its own words. This is
+a preflight: any license-named file that passes is enough, one inside a vendored
+dependency included, and it does not say which file licenses which path. The
+license gate is the one `check-sources` and `build` apply to the pinned commit
+(ADR-0005, ADR-0006).
+
+```sh
+muro license-check ./source
+# {
+#   "licenses": [
+#     {
+#       "path": "LICENSE",
+#       "license": "MIT"
+#     }
+#   ]
+# }
+```
+
 ### `muro mcp [--manifest PATH] [--tools NAME[,NAME...]]`
 
 Serves the factory as an MCP stdio server (newline-delimited JSON-RPC 2.0).
@@ -479,7 +514,7 @@ classification of a request.
 | `--harmonize` | `muro harmonize` |
 | `--prepare-eval` | `muro eval prepare` |
 | `--score-eval <file>` | `muro eval score <file>` |
-| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro mcp`, `muro agent`, `muro absorb`, `muro project` |
+| — | `muro review`, `muro baseline`, `muro init`, `muro install`, `muro license-check`, `muro mcp`, `muro agent`, `muro absorb`, `muro project` |
 
 ## How-to: the common workflows
 

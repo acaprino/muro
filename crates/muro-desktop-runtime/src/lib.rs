@@ -80,12 +80,13 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
 }
 
 /// One sync of the enabled harnesses, for the tray and the background worker: a registry
-/// `check`, then, when `apply` (default true) and the plan has operations, an `apply` of that
-/// plan that leaves its blockers out. With `apply` false it only checks. The outcome is
-/// recorded for the Activity page: an `Automatic sync` when it applies, a `Background check`
-/// when it only checks; failed with the error, or with the sources that could not be resolved
-/// and the blockers as the message (they are a result, not an error), else complete with what
-/// was applied or is waiting.
+/// `check`, then, when `apply` (default true) and the plan has operations other than removals,
+/// an `apply` of that plan that leaves its blockers and its removals out: the worker never
+/// uninstalls, a person confirms removals in the app. With `apply` false it only checks. The
+/// outcome is recorded for the Activity page: an `Automatic sync` when it applies, a
+/// `Background check` when it only checks; failed with the error, or with the sources that could
+/// not be resolved and the blockers as the message (they are a result, not an error), else
+/// complete with what was applied or is waiting, and how many removals wait for confirmation.
 fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
     let apply = match &payload["apply"] {
         Value::Null => true,
@@ -123,18 +124,31 @@ fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
 }
 
 /// What a sync that found no blocker tells a person: the changes it applied, or the changes
-/// that are waiting when it only checked.
+/// that are waiting when it only checked, and the removals that wait for a person to confirm
+/// them, which the sync never applies.
 fn summary(apply: bool, result: &Value) -> String {
+    let removals = result["removals"].as_u64().unwrap_or(0);
     let (count, said) = if apply {
-        (&result["applied"], "applied")
+        (result["applied"].as_u64(), "applied")
     } else {
-        (&result["pending"], "waiting")
+        // What is pending of a check holds the removals too: they are said apart.
+        (result["pending"].as_u64().map(|n| n.saturating_sub(removals)), "waiting")
     };
-    match count.as_u64() {
-        Some(1) => format!("1 change {said}"),
-        Some(n) if n > 1 => format!("{n} changes {said}"),
-        _ if apply => "Nothing to apply".into(),
-        _ => "Everything is in sync".into(),
+    let changes = match count {
+        Some(1) => Some(format!("1 change {said}")),
+        Some(n) if n > 1 => Some(format!("{n} changes {said}")),
+        _ => None,
+    };
+    let confirmation = match removals {
+        0 => None,
+        1 => Some("1 removal waits for your confirmation".to_owned()),
+        n => Some(format!("{n} removals wait for your confirmation")),
+    };
+    match (changes, confirmation) {
+        (Some(changes), Some(confirmation)) => format!("{changes}. {confirmation}"),
+        (Some(message), None) | (None, Some(message)) => message,
+        (None, None) if apply => "Nothing to apply".into(),
+        (None, None) => "Everything is in sync".into(),
     }
 }
 
@@ -158,20 +172,23 @@ fn check_and_apply(data: &Path, apply: bool) -> Result<(Value, Vec<String>)> {
         })
         .collect();
     let plan = &checked["plan"];
-    let operations = plan["operations"]
+    let planned = plan["operations"]
         .as_array()
-        .context("Plan operations missing")?
-        .len();
-    let applied = if apply && operations > 0 {
-        let payload = json!({"plan_id":plan["id"],"allow_blocked":true});
+        .context("Plan operations missing")?;
+    let operations = planned.len();
+    let removals = planned.iter().filter(|op| op["kind"] == "remove").count();
+    let others = operations - removals;
+    // A removal is applied only on a person's confirmation, which the worker cannot give.
+    let applied = if apply && others > 0 {
+        let payload = json!({"plan_id":plan["id"],"allow_blocked":true,"skip_removals":true});
         muro_registry::service::request(data, "apply", payload)?;
-        operations
+        others
     } else {
         0
     };
     Ok((
         json!({"applied":applied,"pending":operations - applied,
-               "blockers":plan["blockers"],"errors":checked["errors"]}),
+               "blockers":plan["blockers"],"errors":checked["errors"],"removals":removals}),
         unchecked,
     ))
 }

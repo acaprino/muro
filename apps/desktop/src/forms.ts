@@ -29,10 +29,10 @@ export function targetForm(target?:Target,found?:Discovered):string {
   +field('Configuration folder','root',target?.root||found?.config_root||'',{mono:true,hint:'Where the harness keeps its settings. OpenCode: the folder of opencode.json. Pi: the folder of settings.json.'})
   +field('Executable','executable',target?.executable||found?.executable,{mono:true})
   +checkboxOptionHtml({name:'enabled',checked:target?.enabled!==false,label:'Keep this harness in sync',hint:'Switch off to pause: Muro leaves it alone.',top:true})
-  +checkboxOptionHtml({name:'exclusive',checked:!!target?.exclusive,label:'Always uninstall plugins that are not in my list',hint:'Only on this harness. The rule for all of them is in Settings.',top:true});
+  +checkboxOptionHtml({name:'exclusive',checked:!!target?.exclusive,label:'Uninstall plugins that are not in my list',hint:'Muro asks before it uninstalls. Only on this harness. The rule for all of them is in Settings.',top:true});
 }
 /** The one rule for plugins outside the list, for every harness; a harness can differ in its own sheet, then neither option is chosen. A change reaches `set-exclusive`. */
-export const exclusiveSeg=(targets:Target[])=>{const mode=exclusiveMode(targets);return `${mode==='mixed'?'<small>Differs per harness</small>':''}${seg('excl',mode,[['keep','Leave alone'],['remove','Always uninstall']],'Plugins that are not in my list')}`;};
+export const exclusiveSeg=(targets:Target[])=>{const mode=exclusiveMode(targets);return `${mode==='mixed'?'<small>Differs per harness</small>':''}${seg('excl',mode,[['keep','Leave alone'],['remove','Uninstall, asking first']],'Plugins that are not in my list')}`;};
 
 // ---------- reading a form ----------
 /** The plugin a form describes. What the form does not show stays as it was: a changed source drops what was prepared from the old one (builds, resolved version and revision), the instructions folder stays. */
