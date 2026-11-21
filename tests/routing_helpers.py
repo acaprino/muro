@@ -16,7 +16,8 @@ def copy_delivery(package, source=ROOT / "examples" / "marionette"):
     source ids only, so it keeps the default plugin identity.
     """
     shutil.copy2(source / "delivery.json", package / "delivery.json")
-    shutil.copytree(source / "custom-instructions", package / "custom-instructions", dirs_exist_ok=True)
+    if (source / "custom-instructions").is_dir():      # owner Markdown is optional in a package
+        shutil.copytree(source / "custom-instructions", package / "custom-instructions", dirs_exist_ok=True)
     if not (package / "sources.json").exists():
         ids = [{"id": item["id"]} for item in json.loads((source / "sources.json").read_text(encoding="utf-8"))["sources"]]
         (package / "sources.json").write_text(json.dumps({"sources": ids}), encoding="utf-8")

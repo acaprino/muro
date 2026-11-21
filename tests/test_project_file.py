@@ -811,7 +811,7 @@ def test_info_of_a_package_without_delivery_choices_has_none(tmp_path, package, 
     (package / "custom-instructions" / "rules.md").unlink()
     result, _ = info_of(tmp_path, package, cache)
     assert result["decisions"] == []
-    assert result["inputs"][0]["became"] == {"capability": 0, "always-on": 0, "hook": 0, "dropped": 0}
+    assert result["inputs"][0]["became"] == {"capability": 0, "always-on": 0, "hook": 0, "mcp-server": 0, "dropped": 0}
 
 
 def test_each_input_says_what_it_became_by_the_delivery_document(tmp_path, described, cache):
@@ -821,10 +821,10 @@ def test_each_input_says_what_it_became_by_the_delivery_document(tmp_path, descr
     commit = json.loads((described / "sources.json").read_text(encoding="utf-8"))["sources"][0]["commit"]
     assert entry == {"id": "demo", "url": None, "pin": "head", "release": None, "commit": commit, "license": "MIT",
                      "paths": ["SKILL.md", "references"],
-                     "became": {"capability": 1, "always-on": 1, "hook": 0, "dropped": 2}}
+                     "became": {"capability": 1, "always-on": 1, "hook": 0, "mcp-server": 0, "dropped": 2}}
     for item in result["inputs"]:
         counted = {form: sum(1 for d in delivery["decisions"] if d["source"] == item["id"] and d["form"] == form)
-                   for form in ("capability", "always-on", "hook", "dropped")}
+                   for form in ("capability", "always-on", "hook", "mcp-server", "dropped")}
         assert item["became"] == counted        # and no field carries the local checkout path: the entry is exactly the above
 
 

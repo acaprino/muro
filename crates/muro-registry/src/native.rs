@@ -115,6 +115,8 @@ pub fn inventory(target: &Value, receipts: &Value) -> Value {
     let h = target["harness"].as_str().unwrap_or("");
     let result = scan(target).map(|(mut entries, fingerprint)| {
         for p in &mut entries {
+            let name = plugin_name(h, p);
+            p["plugin_name"] = name;
             for (rid,r) in receipts.as_object().into_iter().flatten() {
                 if r["target_id"] == tid && r["native_id"] == p["id"] {
                     p["managed"]=json!(true);
@@ -201,8 +203,7 @@ fn scan(target: &Value) -> Result<(Vec<Value>, String)> {
             let list = doc["installed"]
                 .as_array()
                 .context("Missing Codex installed array")?;
-            let entries=list.iter().map(|p|json!({"id":p["pluginId"],"name":p["name"],"version":p["version"],"path":"","managed":false})).collect();
-            Ok((entries, hash(&doc["installed"])))
+            Ok((codex_entries(list, root), hash(&doc["installed"])))
         }
         _ => unreachable!(),
     }
@@ -241,6 +242,51 @@ fn claude_entries(installed: &Value, listed: &[Value]) -> Result<Vec<Value>> {
             .into();
     }
     Ok(entries)
+}
+/// The entries of `codex plugin list --json` (`installed`), each with the folder Codex installed it
+/// in and whether it is switched on. `codex plugin add` puts a copy of the plugin's folder, as it is,
+/// in `plugins/cache/<marketplaceName>/<name>/<version>` of its home, and the command names neither
+/// that folder nor lists an entry whose folder is gone (read on codex-cli 0.171.0). A folder Muro
+/// cannot find there is left empty, as before, and nothing is said about its files.
+fn codex_entries(installed: &[Value], root: &Path) -> Vec<Value> {
+    installed
+        .iter()
+        .map(|p| {
+            let part = |key: &str| p[key].as_str().filter(|s| plain_component(s));
+            let folder = match (part("marketplaceName"), part("name"), part("version")) {
+                (Some(market), Some(name), Some(version)) => Some(
+                    root.join("plugins").join("cache").join(market).join(name).join(version),
+                )
+                .filter(|folder| folder.is_dir() && !folder.is_symlink()),
+                _ => None,
+            };
+            let path = folder.map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+            let mut entry = json!({"id":p["pluginId"],"name":p["name"],"version":p["version"].as_str().unwrap_or(""),"path":path,"managed":false});
+            if let Some(enabled) = p["enabled"].as_bool() {
+                entry["enabled"] = json!(enabled);
+            }
+            entry
+        })
+        .collect()
+}
+/// A name the harness reported that can be one folder of a path: not empty, not `.` or `..`, and
+/// without a separator or a drive.
+fn plain_component(s: &str) -> bool {
+    !s.is_empty() && s != "." && s != ".." && !s.contains(['/', '\\', ':'])
+}
+/// The name a harness installs a plugin under, read from its inventory entry: the part of a Claude
+/// Code or Codex id before its marketplace (`<name>@<marketplace>`), Hermes' name. The harnesses that
+/// list a plugin by its folder or its source have none. It is what a plugin's manifest calls it, so
+/// two entries of the same name on one harness are copies of the same plugin.
+fn plugin_name(h: &str, entry: &Value) -> Value {
+    match h {
+        "claude-code" | "codex" => entry["id"]
+            .as_str()
+            .and_then(|id| id.split_once('@'))
+            .map_or(Value::Null, |(name, _)| json!(name)),
+        "hermes" => entry["name"].clone(),
+        _ => Value::Null,
+    }
 }
 fn local_path(s: &str, root: &Path) -> Option<PathBuf> {
     if s.starts_with("file:") {
@@ -915,6 +961,46 @@ mod tests {
             ]),
             true
         );
+    }
+    #[test]
+    fn a_codex_entry_has_the_folder_codex_installed_it_in_and_its_enabled_state() {
+        let tmp = tempfile::tempdir().unwrap();
+        let there = tmp.path().join("plugins").join("cache").join("muro-demo").join("demo").join("1.2.3");
+        fs::create_dir_all(&there).unwrap();
+        // The rows as codex-cli 0.171.0 writes them under `installed`.
+        let row = |id: &str, market: &str, name: &str, version: &str, enabled: bool| {
+            json!({"pluginId":id,"name":name,"marketplaceName":market,"version":version,"installed":true,"enabled":enabled,
+                   "source":{"source":"local","path":"/elsewhere"},"installPolicy":"AVAILABLE","authPolicy":"ON_INSTALL"})
+        };
+        let installed = vec![
+            row("demo@muro-demo", "muro-demo", "demo", "1.2.3", true),
+            row("gone@muro-demo", "muro-demo", "gone", "1.0.0", false),
+            row("up@muro-demo", "..", "demo", "1.2.3", true),
+            row("sep@muro-demo", "muro-demo", "demo/../demo", "1.2.3", true),
+        ];
+        let entries = codex_entries(&installed, tmp.path());
+        let demo = entry(&entries, "demo@muro-demo");
+        assert_eq!(demo["path"], json!(there.to_string_lossy()));
+        assert_eq!((demo["name"].as_str(), demo["version"].as_str()), (Some("demo"), Some("1.2.3")));
+        assert_eq!((demo["enabled"].clone(), demo["managed"].clone()), (json!(true), json!(false)));
+        assert_eq!(entry(&entries, "gone@muro-demo")["path"], "", "no folder there: none is named");
+        assert_eq!(entry(&entries, "gone@muro-demo")["enabled"], false);
+        for id in ["up@muro-demo", "sep@muro-demo"] {
+            assert_eq!(entry(&entries, id)["path"], "", "{id}: a name that is not one folder is never a path");
+        }
+        let bare = codex_entries(&[json!({"pluginId":"a@m","name":"a"})], tmp.path());
+        assert_eq!((bare[0]["path"].as_str(), bare[0]["version"].as_str()), (Some(""), Some("")));
+        assert!(bare[0].get("enabled").is_none(), "a row that does not say is not said to be off");
+    }
+    #[test]
+    fn the_plugin_name_of_an_entry_is_the_name_the_harness_installed_it_under() {
+        assert_eq!(plugin_name("claude-code", &json!({"id":"marionette@marionette","name":"marionette@marionette"})), "marionette");
+        assert_eq!(plugin_name("codex", &json!({"id":"marionette@muro-marionette","name":"marionette"})), "marionette");
+        assert_eq!(plugin_name("codex", &json!({"id":"nomarket"})), Value::Null);
+        assert_eq!(plugin_name("hermes", &json!({"id":"tidy","name":"tidy"})), "tidy");
+        for h in ["opencode", "pi"] {
+            assert_eq!(plugin_name(h, &json!({"id":"/plugins/a","name":"/plugins/a"})), Value::Null, "{h}");
+        }
     }
     #[test]
     fn a_claude_code_entry_with_no_row_in_the_cli_inventory_is_an_error() {

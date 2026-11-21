@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import shutil
 
 
 _REGISTER_SKILLS = '''"""Generated native Hermes registration. No work runs until the host loads it."""
@@ -54,6 +55,29 @@ _TURN_HOOK = '''
     for piece in pieces:
         ctx.register_hook("pre_llm_call", deliver(piece))
 ''' % _PIECE_LIMIT
+
+
+def write_hermes_servers(root: Path, plugin: dict, mcp: dict, release: Path, source_ids: set[str]) -> None:
+    """A portable Agent Plugins package that carries the declared MCP servers and the files they start from.
+
+    Hermes reads `mcp.json` only from a package whose one manifest is `plugin.json`: beside a native
+    `plugin.yaml` it is ignored (hermes_cli/plugin_validate.py, read at v0.23.1, 2026-11-21). The native
+    plugin keeps the skills and the policy, which a portable package cannot register. An installed
+    package is its own root, so it holds its own copy of each serving source's files, with the license
+    of each and the release's notice.
+    """
+    root.mkdir()
+    manifest = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+                "name": plugin["slug"] + "-mcp", "version": plugin["version"],
+                "description": f"{plugin['name']}: MCP servers of the unified plugin"}
+    (root / "plugin.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "mcp.json").write_text(json.dumps(mcp, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "LICENSES").mkdir()
+    shutil.copy2(release / "NOTICE.md", root / "NOTICE.md")
+    for source in sorted(source_ids):
+        shutil.copy2(release / "LICENSES" / f"{source}.txt", root / "LICENSES" / f"{source}.txt")
+        if (release / "scripts" / source).is_dir():
+            shutil.copytree(release / "scripts" / source, root / "scripts" / source)
 
 
 def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:

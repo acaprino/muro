@@ -7,7 +7,8 @@ import shutil
 
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
-from .delivery import DELIVERY_FILE, allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
+from .delivery import (DELIVERY_FILE, allows_empty_catalog, load_delivery, packaged_path_errors,
+                       unregistered_active_hooks, validate_delivery)
 from .entries import ENTRIES_FILE, load_entries, validate_entries
 from .factory import (PROMPT_FILES, _helper_name, copy_source_helpers, prompts_dir, runtime_source,
                       unpackaged_reference_errors)
@@ -89,6 +90,10 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             errors = unpackaged_reference_errors(capabilities, src["id"], unpackaged)
             if errors:
                 raise ValueError("Invalid helper reference: " + "; ".join(errors))
+
+        errors = packaged_path_errors(delivery_doc, dist)
+        if errors:
+            raise ValueError("Invalid delivery: " + "; ".join(errors))
 
         licenses = dist / "LICENSES"
         licenses.mkdir()

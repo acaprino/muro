@@ -17,7 +17,8 @@ const target = (id: string, harness: string, name: string, extra: Partial<Target
 const claude = target('t1', 'claude-code', 'Claude Code'), codex = target('t2', 'codex', 'Codex');
 const build = (harness: string, version: string) => ({ harness, path: `D:/Muro/data/artifacts/${harness}-${version}`, version, origin: 'muro' as const });
 const registryPlugin = (id: string, name: string, targets: string[], distributions: Plugin['distributions'], extra: Partial<Plugin> = {}): Plugin => ({ id, name, source: `github.com/example/${id}`, policy: 'stable', pinned_version: '', targets, distributions, upstream_version: 'v' + (distributions[0]?.version ?? ''), ...extra });
-const snapshot = (over: { plugins?: Plugin[]; targets?: Target[]; installed?: Record<string, { id: string; registry_id?: string; name: string; version: string }[]>; sync?: Partial<Snapshot['sync']> } = {}): Snapshot => {
+type Entry = { id: string; registry_id?: string; name: string; version: string; plugin_name?: string | null; present?: boolean; enabled?: boolean };
+const snapshot = (over: { plugins?: Plugin[]; targets?: Target[]; installed?: Record<string, Entry[]>; sync?: Partial<Snapshot['sync']> } = {}): Snapshot => {
   const targets = over.targets ?? [claude, codex];
   return {
     registry: { schema: 1, revision: 1, plugins: over.plugins ?? [], targets, settings: { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '' } },
@@ -270,7 +271,7 @@ test('Inputs: a project without an input shows an empty table, not a broken one'
 });
 
 // ---------- step 4, Install ----------
-const live = (over: { targets?: Target[]; targetsOn?: string[]; installed?: Record<string, { id: string; registry_id?: string; name: string; version: string }[]>; plan?: Plan | null; builds?: Plugin['distributions'] } = {}) => {
+const live = (over: { targets?: Target[]; targetsOn?: string[]; installed?: Record<string, Entry[]>; plan?: Plan | null; builds?: Plugin['distributions'] } = {}) => {
   const p = registryPlugin('marionette', 'Marionette', over.targetsOn ?? ['t1'], over.builds ?? [build('claude-code', '0.5.0'), build('codex', '0.5.0')], { project: 'marionette' });
   return opened({ plan: over.plan ?? null }, 'install', info(), snapshot({ plugins: [p], targets: over.targets, installed: over.installed ?? { t1: [{ id: 'n1', registry_id: 'marionette', name: 'Marionette', version: '0.5.0' }], t2: [] } }));
 };
@@ -318,6 +319,46 @@ test('Install: the line says where it is installed and what waits', () => {
   assert.equal(install.installLine(live({ targetsOn: [] }), 'marionette'), 'Not installed anywhere');
   assert.equal(install.installLine(opened(), 'marionette'), 'Not installed anywhere', 'not in the list at all');
   assert.equal(install.installLine(live({ targets: [claude, { ...codex, enabled: false }], targetsOn: ['t1', 't2'] }), 'marionette'), 'On 1 harness · in sync', 'a paused harness is not counted');
+});
+// The copy of Marionette a person installed from its release, as Claude Code and Codex list it: under the plugin's own name, from a marketplace that is not Muro's.
+const published = (over: Partial<Entry> = {}): Entry => ({ id: 'marionette@marionette', name: 'marionette@marionette', plugin_name: 'marionette', version: '0.6.0', ...over });
+const copies = (installed: Record<string, Entry[]>, plugins: Plugin[] = []) => opened({}, 'install', info(), snapshot({ plugins, installed }));
+test('Install: a copy of the plugin that is not this project\'s build reads installed, says whose it is and offers this build instead', () => {
+  const state = copies({ t1: [published()], t2: [published({ id: 'marionette@marionette', name: 'marionette' })] });
+  const html = install.view(state, info());
+  const switches = [...html.matchAll(/<button[^>]*role="switch"[^>]*>/g)].map(m => m[0]);
+  assert.match(switches[0], /aria-checked="true" aria-label="Marionette is installed on Claude Code, not from this project" data-action="toggle-harness" data-id="t1" disabled/);
+  assert.match(switches[1], /aria-checked="true" aria-label="Marionette is installed on Codex, not from this project" data-action="toggle-harness" data-id="t2" disabled/);
+  const rows = html.split('<li>').slice(1).map(words);
+  assert.match(rows[0], /Installed 0\.6\.0, not from this project Use this project's build$/);
+  assert.match(html, /<button type="button" class="im-btn im-btn--sm" data-action="toggle-harness" data-id="t1" aria-label="Replace the copy on Claude Code with this project&#39;s build of Marionette">/, 'the button switches the harness on');
+  assert.equal(install.installLine(state, 'marionette'), 'On 2 harnesses · 2 not from this project');
+});
+test('Install: a copy another plugin of the list holds names that plugin, and one switched off says so', () => {
+  const adopted = registryPlugin('a1b2', 'marionette@marionette', ['t1'], [build('claude-code', '0.6.0')]);
+  const state = copies({ t1: [published({ registry_id: 'a1b2', enabled: false })] }, [adopted]);
+  assert.match(words(install.view(state, info())), /Installed 0\.6\.0, not from this project \(marionette@marionette in your list\) · switched off Use this project's build/);
+  assert.equal(install.installLine(state, 'marionette'), 'On 1 harness · 1 not from this project');
+});
+test('Install: what is not a copy of this plugin, a copy without its files, and the project\'s own build are not copies', () => {
+  for (const entry of [published({ plugin_name: 'other' }), published({ plugin_name: null }), published({ present: false })]) {
+    const state = copies({ t1: [entry] });
+    assert.doesNotMatch(install.view(state, info()), /not from this project/, JSON.stringify(entry));
+    assert.equal(install.installLine(state, 'marionette'), 'Not installed anywhere');
+  }
+  // the project switched on there: its own row, whatever else of that name is there
+  const mine = registryPlugin('marionette', 'Marionette', ['t1'], [build('claude-code', '0.5.0')], { project: 'marionette' });
+  const state = copies({ t1: [{ id: 'n1', registry_id: 'marionette', name: 'Marionette', version: '0.5.0', plugin_name: 'marionette' }, published()] }, [mine]);
+  assert.doesNotMatch(words(install.view(state, info()).split('<li>')[1]), /not from this project/);
+  assert.equal(install.installLine(state, 'marionette'), 'On 1 harness · in sync');
+});
+test('Install: a harness that is on and still holds only the other copy offers this build by installing again, not by switching off', () => {
+  const mine = registryPlugin('marionette', 'Marionette', ['t1'], [build('claude-code', '0.5.0')], { project: 'marionette' });
+  const state = copies({ t1: [published()] }, [mine]);
+  const html = install.view(state, info());
+  assert.match(html, /role="switch" aria-checked="true" aria-label="Install Marionette on Claude Code" data-action="toggle-harness" data-id="t1">/, 'its own switch, which can be switched off');
+  assert.match(html, /data-action="install-again" data-id="t1" aria-label="Replace the copy on Claude Code with this project&#39;s build of Marionette"/);
+  assert.equal(install.installLine(state, 'marionette'), 'On 1 harness · 1 change waiting · 1 not from this project', 'counted once');
 });
 
 // ---------- what a project page keeps, across renders and a reload ----------
