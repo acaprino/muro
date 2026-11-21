@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from .custom_instructions import metadata_errors, reference_errors, validate_binding
 
 DELIVERY_FILE = "delivery.json"
-FORMS = ("capability", "always-on", "hook", "dropped")
+FORMS = ("capability", "always-on", "hook", "mcp-server", "dropped")
 # Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
 # permanent place: one allowance for each source with an always-on decision (owner, 2026-11-12).
 # The allowance is sized so a real always-on source fits in its own words: content is never shortened to fit
@@ -31,6 +32,11 @@ def always_on_limit(document: Any) -> int:
 _DECISION_KEYS = {"source", "content", "form", "targets", "reason"}
 _WIRING_KEYS = {"host", "capability", "event", "matcher", "run"}
 _WIRING_OPTIONAL = {"timeout"}
+# One declaration per server, host-neutral: each adapter writes the form its host reads (ADR-0030).
+_SERVER_KEYS = {"name", "source", "run"}
+_SERVER_OPTIONAL = {"env"}
+_SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
+_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
@@ -45,14 +51,68 @@ def session_text(document: dict[str, Any] | None) -> str:
     return (document or {}).get("always_on", "") or ""
 
 
+def mcp_servers(document: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The MCP servers a release registers: the ones its delivery document declares, and no other."""
+    return (document or {}).get("mcp_servers", []) or []
+
+
 def _text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _run_errors(run: Any, label: str) -> list[str]:
+    """A declared command is literal argv, for a hook and for a server alike."""
+    if not isinstance(run, list) or not run or any(not _text(part) for part in run):
+        return [f"{label}: run must be a nonempty list of command parts"]
+    errors = []
+    if any(ch.isspace() for ch in run[0]) or '"' in run[0]:
+        errors.append(f"{label}: the program (first part of run) must be one bare word")
+    if any('"' in part for part in run[1:]):
+        errors.append(f"{label}: a run argument must not contain a double quote")
+    return errors
+
+
+def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str]) -> list[str]:
+    """Shape and references of the declared servers; which source ships a server is the AI's decision."""
+    if not isinstance(servers, list):
+        return ["mcp_servers must be an array of server declarations"]
+    errors: list[str] = []
+    names: set[str] = set()
+    declared: set[str] = set()
+    for server in servers:
+        if not isinstance(server, dict) or set(server) - _SERVER_OPTIONAL != _SERVER_KEYS:
+            errors.append("each mcp server requires exactly name, source and run, and may add env")
+            continue
+        name, source = server["name"], server["source"]
+        if not isinstance(name, str) or not _SERVER_NAME.fullmatch(name):
+            errors.append(f"mcp server {name}: name must be lowercase letters, digits and hyphens, starting with a letter")
+        elif name in names:
+            errors.append(f"mcp server {name} is declared twice")
+        else:
+            names.add(name)
+        if not isinstance(source, str) or source not in source_ids:
+            errors.append(f"mcp server {name} names unknown source {source}")
+        elif source not in server_sources:
+            errors.append(f"mcp server {name}: source {source} has no mcp-server decision")
+        else:
+            declared.add(source)
+        errors += _run_errors(server["run"], f"mcp server {name}")
+        env = server.get("env", {})
+        if not isinstance(env, dict):
+            errors.append(f"mcp server {name}: env must be an object of names and text values")
+        elif any(not isinstance(key, str) or not _ENV_NAME.fullmatch(key) for key in env):
+            errors.append(f"mcp server {name}: env names must be plain variable names")
+        elif any(not isinstance(value, str) for value in env.values()):
+            errors.append(f"mcp server {name}: env values must be text")
+    for source in sorted(server_sources - declared):
+        errors.append(f"source {source} has an mcp-server decision but declares no server")
+    return errors
+
+
 def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -> list[str]:
     """Check shape, references and that every declared form has something behind it. Forms stay the AI's decision."""
-    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "custom_instructions"}:
-        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks and custom_instructions"]
+    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "mcp_servers", "custom_instructions"}:
+        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks, mcp_servers and custom_instructions"]
     custom = document.get("custom_instructions")
     if "custom_instructions" in document:
         errors = metadata_errors(custom)
@@ -69,6 +129,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     decided_sources: set[str] = set()
     forms: set[str] = set()
     hook_targets: set[str] = set()
+    server_sources: set[str] = set()
     for item in decisions:
         if not isinstance(item, dict) or set(item) != _DECISION_KEYS:
             errors.append("each decision requires exactly source, content, form, targets and reason")
@@ -90,12 +151,14 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
         for target in targets:
             if target not in known:
                 errors.append(f"decision for {source}: unknown capability {target}")
-        if form in ("capability", "hook") and not targets:
+        if form in ("capability", "hook", "mcp-server") and not targets:
             errors.append(f"decision for {source}: form {form} needs at least one target capability")
         if form in ("dropped", "always-on") and targets:
             errors.append(f"decision for {source}: form {form} takes no targets")
         if form == "hook":
             hook_targets.update(t for t in targets if t in known)
+        if form == "mcp-server" and isinstance(source, str):
+            server_sources.add(source)
     for missing in sorted(source_ids - decided_sources):
         errors.append(f"source {missing} has no delivery decision: every intake records what it became and why")
 
@@ -141,13 +204,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
             errors.append(f"hook wiring for {capability}: event must be the host's event name")
         if not isinstance(wiring["matcher"], str):
             errors.append(f"hook wiring for {capability}: matcher must be a string (empty for every occurrence)")
-        if not isinstance(run, list) or not run or any(not _text(part) for part in run):
-            errors.append(f"hook wiring for {capability}: run must be a nonempty list of command parts")
-            continue
-        if any(ch.isspace() for ch in run[0]) or '"' in run[0]:
-            errors.append(f"hook wiring for {capability}: the program (first part of run) must be one bare word")
-        if any('"' in part for part in run[1:]):
-            errors.append(f"hook wiring for {capability}: a run argument must not contain a double quote")
+        errors += _run_errors(run, f"hook wiring for {capability}")
     for capability in sorted(hook_targets):
         if not any(h.get("policy") == "active" for h in known[capability].hooks):
             errors.append(f"capability {capability} is a hook target but its catalog declares no hook with policy active")
@@ -156,7 +213,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     for cap in capabilities:
         if cap.id not in hook_targets and any(h.get("policy") == "active" for h in cap.hooks):
             errors.append(f"capability {cap.id} declares an active hook but no hook decision targets it")
-    return errors
+    return errors + _server_errors(document.get("mcp_servers", []), source_ids, server_sources)
 
 
 def unregistered_active_hooks(capabilities: list) -> list[str]:
