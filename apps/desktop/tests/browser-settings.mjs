@@ -455,7 +455,7 @@ for (const scheme of ['dark', 'light']) {
   });
 }
 
-for (const width of [1100, 760]) {
+for (const width of [1100, 500]) {
   await test(`no sideways scroll at ${width}px, in Settings and in Activity`, 'demo', { viewport: { width, height: 900 } }, async ({ page }) => {
     await openSettings(page);
     assert.ok(await sideways(page) <= 0, `Settings scrolls sideways at ${width}px`);
@@ -650,7 +650,7 @@ await test('AI: a save the service refuses puts the engine back and shows the se
   await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
 });
 
-for (const width of [1100, 760]) {
+for (const width of [1100, 500]) {
   await test(`AI with the API: no sideways scroll at ${width}px`, 'default', { viewport: { width, height: 900 } }, async ({ page }) => {
     await openApi(page);
     assert.ok(await sideways(page) <= 0, `Settings scrolls sideways at ${width}px`);

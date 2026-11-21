@@ -336,7 +336,17 @@ await test('a plugin row opens its inspector, and Plan a reinstall opens the rev
   assert.equal(await panel.count(), 1, 'the inspector stays under the review');
 });
 
-for (const width of [1100, 760]) {
+await test('a window of 500 at 200% zoom (250): the title bar, the Views menu and the primary action stay inside the shell (not run locally: the owner's rule)', 'demo', { viewport: { width: 250, height: 700 } }, async app => {
+  const { page } = app;
+  await check(page);
+  assert.ok(await sideways(page) <= 0, 'no sideways scroll at 250');
+  const inside = selector => page.locator(selector).first().evaluate(el => { const r = el.getBoundingClientRect(), s = document.querySelector('.im-shell').getBoundingClientRect(); return r.right <= s.right + 1 && r.left >= s.left - 1; });
+  for (const selector of ['.im-window-button[data-im-window=close]', '.im-views-menu', '.im-actions .im-btn--primary']) assert.equal(await inside(selector), true, `${selector} is inside the shell`);
+  await page.locator('.im-views-menu').click();
+  assert.equal(await page.locator('.im-menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), true, 'the Views menu stays on screen');
+});
+
+for (const width of [1100, 500]) {
   await test(`no sideways scroll at ${width}px`, 'demo', { viewport: { width, height: 900 } }, async app => {
     const { page } = app;
     await check(page);
