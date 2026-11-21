@@ -2,7 +2,6 @@ import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFie
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { surfaceOf, surfaceOpen } from '../context.ts';
-import { surfaceOf, surfaceOpen } from '../context.ts';
 import { cellState, harnessState, syncHeadline, mustReview, applyPayload, appliedNotice, filesMissing, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginPanel, harnessPanel, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';

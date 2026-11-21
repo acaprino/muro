@@ -579,7 +579,7 @@ await test('Graph & simulator: the nodes are reached with the keyboard, in order
   await panelOf(page, 'design-taste').waitFor();
 });
 
-await test('A capability in the inspector: docked beside the graph at 1512, a drawer over it at 900, and the graph stays usable (not run locally: the owner's rule)', 'projects', {}, async app => {
+await test('A capability in the inspector: docked beside the graph at 1512, a drawer over it at 900, and the graph stays usable', 'projects', {}, async app => {
   const { page } = app;
   await graphTab(page);
   await gnode(page, 'design-review').click();
