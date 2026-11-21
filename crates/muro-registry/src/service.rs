@@ -41,6 +41,22 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 .find(|p| p["id"] == key).context("Plugin not found")?;
             instructions::info(data_dir, plugin, payload["create"] == true)
         }
+        "take_over" => {
+            revision(&registry, &payload)?;
+            let before = receipts.clone();
+            if !take_over(data_dir, &mut registry, &mut receipts, &payload)? {
+                return snapshot(data_dir, &registry, &receipts, false);
+            }
+            write(&data_dir.join("receipts.json"), &receipts)?;
+            if let Err(error) = save_registry(data_dir, &mut registry) {
+                // The registry was not saved: the copy stays whose it was.
+                let _ = write(&data_dir.join("receipts.json"), &before);
+                return Err(error);
+            }
+            log(data_dir, action, "complete", "Installed copy taken over")?;
+            // Codex and Hermes are read from the last scan unless asked: it still names the old owner.
+            snapshot(data_dir, &registry, &receipts, true)
+        }
         "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings"
         | "save_projects" | "remove_project" => {
             revision(&registry, &payload)?;
@@ -366,8 +382,8 @@ fn receipt_for<'a>(receipts: &'a Value, target_id: &str, plugin_id: &str) -> Opt
         .find(|r| r["target_id"] == target_id && r["plugin_id"] == plugin_id)
 }
 /// The digest of the copy a person already has: its folder, hashed as Muro hashes the build it
-/// installs. A harness that reports no folder (Codex) gives none, and the plan then takes the
-/// copy for an older one and updates it.
+/// installs. An entry with no folder (a Codex copy outside the cache Muro reads) gives none, and the
+/// plan then takes the copy for an older one and updates it.
 fn installed_digest(entry: &Value) -> String {
     entry["path"]
         .as_str()
@@ -443,10 +459,7 @@ fn adopt_installation(
         entry["present"] != false,
         "{native_id} has no files on {name}; reinstall it there or remove it"
     );
-    let receipt = json!({"target_id":target_id,"plugin_id":plugin_id,"native_id":native_id,
-        "version":entry["version"],"digest":installed_digest(entry),"path":entry["path"],
-        "custom_instructions_digest":instructions::read(root, plugin)?.digest(),
-        "adopted":true});
+    let receipt = adopted_receipt(root, target_id, plugin, entry)?;
     let key = receipt_key(target_id, plugin_id);
     let all = receipts.as_object_mut().context("receipts")?;
     // A legacy delimiter key for this pair goes, as at an install.
@@ -454,6 +467,98 @@ fn adopt_installation(
     all.insert(key.clone(), receipt);
     write(&root.join("receipts.json"), receipts)?;
     Ok(key)
+}
+/// The receipt that binds `plugin` to `entry`, a copy on `target_id` that Muro did not install for
+/// it: written as an install by Muro leaves it, with the version and digest of the copy that is there,
+/// and marked adopted (a copy the person switched off is not switched on again).
+fn adopted_receipt(root: &Path, target_id: &str, plugin: &Value, entry: &Value) -> Result<Value> {
+    Ok(json!({"target_id":target_id,"plugin_id":plugin["id"],"native_id":entry["id"],
+        "version":entry["version"],"digest":installed_digest(entry),"path":entry["path"],
+        "custom_instructions_digest":instructions::read(root, plugin)?.digest(),
+        "adopted":true}))
+}
+/// `take_over {plugin_id, target_id, name}`: the copy installed on the target under the native name
+/// `name` (`plugin_name` of its inventory entry) becomes the plugin's, so the next plan replaces it with
+/// the plugin's build (an update) instead of installing a second copy of the same plugin beside it. The
+/// copy may be one the person installed, or one another plugin of the list holds: that plugin then lets
+/// the target go, since one copy has one owner. The plugin must list the target. Nothing changes, and
+/// `false` is returned, when the harness cannot be read, the plugin has a copy of its own there or no
+/// copy of that name is there with its files. The caller saves the registry and the receipts.
+fn take_over(root: &Path, registry: &mut Value, receipts: &mut Value, payload: &Value) -> Result<bool> {
+    let plugin_id = str_field(payload, "plugin_id")?;
+    let target_id = str_field(payload, "target_id")?;
+    let name = str_field(payload, "name")?;
+    let target = registry["targets"]
+        .as_array()
+        .context("targets")?
+        .iter()
+        .find(|t| t["id"] == target_id)
+        .cloned()
+        .context("Target not found")?;
+    let inventory = native::inventory(&target, receipts);
+    // A harness that cannot be read has its blocker in the next plan; once it reads, installing the
+    // project there again takes the copy over.
+    if inventory["complete"] != true {
+        return Ok(false);
+    }
+    let entries = inventory["plugins"].as_array().context("inventory plugins")?;
+    claim(root, registry, receipts, plugin_id, target_id, name, entries)
+}
+/// What `take_over` does with the entries of the target's inventory, as `native::inventory` gives them.
+fn claim(
+    root: &Path,
+    registry: &mut Value,
+    receipts: &mut Value,
+    plugin_id: &str,
+    target_id: &str,
+    name: &str,
+    entries: &[Value],
+) -> Result<bool> {
+    let plugin = registry["plugins"]
+        .as_array()
+        .context("plugins")?
+        .iter()
+        .find(|p| p["id"] == plugin_id)
+        .cloned()
+        .with_context(|| format!("{plugin_id} is not in your list"))?;
+    let label = registry["targets"]
+        .as_array()
+        .context("targets")?
+        .iter()
+        .find(|t| t["id"] == target_id)
+        .map(|t| text(&t["name"]))
+        .context("Target not found")?;
+    ensure!(
+        plugin["targets"].as_array().context("targets")?.contains(&json!(target_id)),
+        "{} must list {label} to take over the copy there",
+        text(&plugin["name"])
+    );
+    if entries.iter().any(|e| e["registry_id"] == plugin_id) {
+        return Ok(false);
+    }
+    let Some(entry) = entries
+        .iter()
+        .find(|e| e["plugin_name"] == name && e["present"] != false)
+    else {
+        return Ok(false);
+    };
+    if let Some(owner) = entry["registry_id"].as_str() {
+        for other in registry["plugins"].as_array_mut().context("plugins")? {
+            if other["id"] == owner {
+                if let Some(targets) = other["targets"].as_array_mut() {
+                    targets.retain(|t| t.as_str() != Some(target_id));
+                }
+            }
+        }
+    }
+    let receipt = adopted_receipt(root, target_id, &plugin, entry)?;
+    let all = receipts.as_object_mut().context("receipts")?;
+    // The old owner's receipt for the copy goes, and so does any older one of the plugin there.
+    all.retain(|_, r| {
+        r["target_id"] != target_id || (r["native_id"] != entry["id"] && r["plugin_id"] != plugin_id)
+    });
+    all.insert(receipt_key(target_id, plugin_id), receipt);
+    Ok(true)
 }
 /// A job that read a plugin's custom instructions before it ran records its result only while
 /// the folder still holds what it read: `expected` is the digest it took.
@@ -733,8 +838,8 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
                "custom_instructions_digest":custom_digest}),
     )
 }
-/// A repair must restore the files, not only the version. Codex reports no install path, and
-/// Hermes installs a Git clone whose `.git` is not part of the artifact, so neither is compared.
+/// A repair must restore the files, not only the version. An entry with no folder cannot be
+/// compared, and Hermes installs a Git clone whose `.git` is not part of the artifact, so it is not.
 fn reinstalled_files_match(harness: &str, entry: &Value, op: &Value) -> bool {
     match entry["path"].as_str().filter(|p| !p.is_empty() && harness != "hermes") {
         Some(path) => tree_hash(Path::new(path)).ok().as_deref() == op["artifact"]["digest"].as_str(),
@@ -1334,11 +1439,58 @@ mod tests {
         fs::write(tmp.path().join("SKILL.md"), "INSTALLED").unwrap();
         let digest = tree_hash(tmp.path()).unwrap();
         assert_eq!(installed_digest(&json!({"path":tmp.path()})), digest);
-        // Codex reports no folder, a folder that is gone is none either: the plan then updates.
+        // An entry with no folder, or one whose folder is gone, has none: the plan then updates.
         for path in [json!(""), json!(null), json!(tmp.path().join("gone"))] {
             assert_eq!(installed_digest(&json!({"path":path})), "");
         }
         assert_eq!(installed_digest(&json!({})), "");
+    }
+    #[test]
+    fn a_copy_of_the_same_name_is_taken_over_from_the_person_or_from_another_plugin_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path();
+        let copy = root.join("cache/marionette/marionette/0.6.0");
+        fs::create_dir_all(&copy).unwrap();
+        fs::write(copy.join("SKILL.md"), "PUBLISHED").unwrap();
+        let mut registry = json!({"targets":[{"id":"cc","name":"Claude Code"},{"id":"cx","name":"Codex"}],"plugins":[
+            {"id":"marionette","name":"Marionette","targets":["cc","cx"]},
+            {"id":"adopted","name":"marionette","targets":["cc","cx"]}]});
+        let entry = |registry_id: Option<&str>| {
+            let mut e = json!({"id":"marionette@marionette","name":"marionette@marionette","plugin_name":"marionette",
+                "version":"0.6.0","path":copy.to_string_lossy(),"managed":registry_id.is_some()});
+            if let Some(owner) = registry_id { e["registry_id"] = json!(owner); }
+            e
+        };
+        // Held by another plugin of the list: it lets that harness go, and its receipt goes with it.
+        let mut receipts = json!({});
+        for target in ["cc", "cx"] {
+            receipts[receipt_key(target, "adopted")] =
+                json!({"target_id":target,"plugin_id":"adopted","native_id":"marionette@marionette"});
+        }
+        assert!(claim(root, &mut registry, &mut receipts, "marionette", "cc", "marionette", &[entry(Some("adopted"))]).unwrap());
+        assert_eq!(registry["plugins"][1]["targets"], json!(["cx"]), "only that harness");
+        let all = receipts.as_object().unwrap();
+        assert_eq!(all.len(), 2, "{receipts}");
+        let taken = &receipts[receipt_key("cc", "marionette")];
+        assert_eq!((taken["native_id"].as_str(), taken["version"].as_str(), taken["adopted"].as_bool()), (Some("marionette@marionette"), Some("0.6.0"), Some(true)));
+        assert_eq!(taken["digest"], json!(tree_hash(&copy).unwrap()));
+        assert_eq!(receipts[receipt_key("cx", "adopted")]["plugin_id"], "adopted", "the other harness is untouched");
+        // A copy the person installed, that no plugin of the list holds.
+        assert!(claim(root, &mut registry, &mut receipts, "marionette", "cx", "marionette", &[entry(None)]).unwrap());
+        assert_eq!(receipts[receipt_key("cx", "marionette")]["plugin_id"], "marionette");
+        // Nothing to take: the plugin has its own copy there, the name differs, or the files are gone.
+        let before = (registry.clone(), receipts.clone());
+        let mut gone = entry(None);
+        gone["present"] = json!(false);
+        for entries in [vec![entry(Some("marionette")), entry(None)], vec![entry(None)], vec![gone]] {
+            let name = if entries.len() == 1 && entries[0]["present"] != false { "other" } else { "marionette" };
+            assert!(!claim(root, &mut registry, &mut receipts, "marionette", "cx", name, &entries).unwrap());
+        }
+        assert_eq!((registry.clone(), receipts.clone()), before);
+        // A plugin that does not list the harness takes nothing there.
+        registry["plugins"][0]["targets"] = json!(["cx"]);
+        let error = claim(root, &mut registry, &mut receipts, "marionette", "cc", "marionette", &[entry(None)]).unwrap_err();
+        assert_eq!(error.to_string(), "Marionette must list Claude Code to take over the copy there");
     }
     #[test]
     fn reinstall_check_compares_installed_files_with_the_artifact() {
