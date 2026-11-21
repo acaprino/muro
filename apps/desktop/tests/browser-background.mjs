@@ -15,12 +15,12 @@ async function test(name, scenario, options, body) {
   catch (error) { failed.push(`${name}: ${String(error.message).split(/\r?\n/).slice(0, 3).join(' | ')}`); }
   finally { await app.close().catch(error => failed.push(`${name}: ${error.message}`)); }
 }
-const strip = page => page.locator('section.strip');
+const strip = page => page.locator('section.im-summary');
 const title = page => strip(page).locator('strong').first().textContent();
 const count = async (app, action) => (await app.calls()).filter(c => c.action === action).length;
 const focus = page => page.evaluate(() => window.dispatchEvent(new Event('focus')));
 const behind = (page, change) => page.evaluate(change);
-const stateButton = page => page.locator('.tstatus');
+const stateButton = page => page.locator('.im-titlebar-status');
 
 // ---------- F1: the recorded check shows on open ----------
 await test('a check the window did not make shows on open: its count, Review and Apply all', 'recorded', {}, async app => {
@@ -28,28 +28,28 @@ await test('a check the window did not make shows on open: its count, Review and
   await strip(page).locator('strong', { hasText: '1 change ready to apply' }).waitFor();
   assert.deepEqual(await strip(page).locator('button').allTextContents(), ['Check now', 'Review', 'Apply all 1 change']);
   assert.equal(await strip(page).locator('small').first().textContent(), 'Nothing changes until you apply.', 'no breakdown, no leading full stop');
-  assert.match(await strip(page).locator('.meta').textContent(), /Last check\s*(today|yesterday)/);
+  assert.match(await strip(page).locator('.im-summary-meta').textContent(), /Last check\s*(today|yesterday)/);
   assert.match(await stateButton(page).textContent(), /1 change waiting · checked/);
-  assert.equal(await page.locator('nav button', { hasText: 'Sync' }).locator('.n').textContent(), '1', 'the tab badge agrees');
+  assert.equal(await page.locator('nav button', { hasText: 'Sync' }).locator('.im-count').textContent(), '1', 'the tab badge agrees');
   assert.match(await page.locator('#rows td').nth(2).textContent(), /Update 1 → 2/, 'the cells are the snapshot\'s');
   assert.equal(await page.getByText('Not checked yet').count(), 0);
   assert.deepEqual((await app.calls()).map(c => c.action).filter(a => a === 'plan' || a === 'check'), [], 'opening checks nothing');
   // Review plans again before it shows anything.
   await strip(page).getByRole('button', { name: 'Review' }).click();
-  await page.locator('dialog.sheet[open]').waitFor();
+  await page.locator('dialog.im-content-dialog--drawer[open]').waitFor();
   assert.equal(await count(app, 'plan'), 1);
 });
 
 await test('a recorded check with nothing to do is Everything is in sync, and its columns agree', 'recorded-ok', {}, async ({ page }) => {
   await strip(page).locator('strong', { hasText: 'Everything is in sync' }).waitFor();
-  assert.match(await page.locator('th .hstate').last().textContent(), /In sync/);
+  assert.match(await page.locator('th .im-cell-meta').last().textContent(), /In sync/);
   assert.match(await stateButton(page).textContent(), /In sync · checked/);
 });
 
 await test('a column the record cannot describe says to check, never In sync', 'recorded-unseen', {}, async app => {
   const { page } = app;
   await strip(page).locator('strong', { hasText: '1 change ready to apply' }).waitFor();
-  const column = page.locator('th .hstate').last();
+  const column = page.locator('th .im-cell-meta').last();
   assert.match(await column.textContent(), /Check to see the changes/);
   assert.doesNotMatch(await column.textContent(), /In sync/);
   await strip(page).getByRole('button', { name: 'Check now' }).click();
@@ -67,12 +67,12 @@ await test('a source the last check could not resolve is not in sync, and a clea
   assert.match(await strip(page).getByRole('button', { name: 'Check now' }).getAttribute('class'), /primary/, 'Check now leads');
   await app.flags({ checkErrors: true });
   await strip(page).getByRole('button', { name: 'Check now' }).click();
-  await page.locator('.banner[role=alert]').getByText('1 source could not be checked').waitFor();
+  await page.locator('.im-banner[role=alert]').getByText('1 source could not be checked').waitFor();
   assert.equal(await title(page), '1 source could not be checked', 'the check found it again');
   await app.flags({ checkErrors: false });
   await strip(page).getByRole('button', { name: 'Check now' }).click();
   await strip(page).locator('strong', { hasText: 'Everything is in sync' }).waitFor();
-  assert.equal(await page.locator('.banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
 });
 
 // ---------- F4: the window follows the registry ----------
@@ -87,13 +87,13 @@ await test('the window reads the registry again when it gets the focus, and asks
   assert.equal(await count(app, 'snapshot'), before + 1);
   assert.equal(await count(app, 'plan'), 0, 'a refresh asks for no plan');
   // The save that failed with "Registry revision changed" before now goes through, over what the worker saved.
-  await page.getByRole('button', { name: /^Settings/ }).click();
+  await page.getByRole('tab', { name: /^Settings/ }).click();
   await page.getByRole('switch', { name: 'Keep running when the window is closed' }).click();
-  await page.locator('#toasts').getByText('Saved.').waitFor();
+  await page.locator('[data-im-notices]').getByText('Saved.').waitFor();
   const save = (await app.calls()).filter(c => c.action === 'settings').at(-1).payload;
   assert.equal(save.revision, 2);
   assert.deepEqual([save.settings.auto_sync, save.settings.close_to_tray], [true, false], 'what the worker saved is kept');
-  assert.equal(await page.locator('.banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
 });
 
 await test('the shell telling the window it was shown again reads the registry again, and asks for no plan', 'changes', {}, async app => {
@@ -118,7 +118,7 @@ await test('every 30 s while it has the focus the window shows what the worker r
   assert.equal(await count(app, 'snapshot'), 1, 'not yet');
   await page.clock.fastForward(25_000);
   await strip(page).locator('strong', { hasText: '1 change ready to apply' }).waitFor();
-  assert.match(await strip(page).locator('.meta').textContent(), /Last check\s*today/);
+  assert.match(await strip(page).locator('.im-summary-meta').textContent(), /Last check\s*today/);
   assert.equal(await count(app, 'plan'), 0);
 });
 
@@ -151,33 +151,33 @@ await test('nothing under way is disturbed: not a dialog that is open, not a box
 
 await test('a settings save refused because the registry moved reads it again and sends the same change once more, once', 'default', {}, async app => {
   const { page } = app;
-  await page.getByRole('button', { name: /^Settings/ }).click();
+  await page.getByRole('tab', { name: /^Settings/ }).click();
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
   await behind(page, () => window.behind.settings({ auto_sync: true }));
   const tail = async n => (await app.calls()).slice(-n).map(c => c.action);
   await page.getByRole('switch', { name: 'Keep running when the window is closed' }).click();
-  await page.locator('#toasts').getByText('Saved.').waitFor();
+  await page.locator('[data-im-notices]').getByText('Saved.').waitFor();
   assert.deepEqual(await tail(3), ['settings', 'snapshot', 'settings'], 'refused, read again, sent again');
-  assert.equal(await page.locator('.banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
   // Refused twice: the person sees it, after exactly one more try.
   await app.flags({ staleSettings: 2 });
   await page.getByRole('switch', { name: 'Automatic sync' }).click();
-  await page.locator('.banner[role=alert]').getByText('Registry revision changed').waitFor();
+  await page.locator('.im-banner[role=alert]').getByText('Registry revision changed').waitFor();
   assert.deepEqual(await tail(3), ['settings', 'snapshot', 'settings']);
   // And the next try, with the registry as it is, goes through.
   await page.getByRole('button', { name: 'Reload' }).click();
   const sent = await count(app, 'settings');
   await page.getByRole('switch', { name: 'Automatic sync' }).click();
   await page.waitForFunction(n => window.calls.filter(c => c.action === 'settings').length > n, sent);
-  await page.locator('.busy').waitFor({ state: 'detached' });
-  assert.equal(await page.locator('.banner[role=alert]').count(), 0);
+  await page.locator('.im-busy').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
 });
 
 // ---------- F7: a plugin added from what is installed ----------
 await test('Add to my list sends the installation it takes over, and the next check finds it installed', 'unlisted', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Add to my list' }).click();
-  await page.locator('#toasts').getByText('old-snippets added to your list.').waitFor();
+  await page.locator('[data-im-notices]').getByText('old-snippets added to your list.').waitFor();
   const save = (await app.calls()).filter(c => c.action === 'save_plugin').at(-1).payload;
   assert.deepEqual(save.adopt, { target_id: 't1', native_id: 'native-old-snippets' });
   await strip(page).getByRole('button', { name: 'Check now' }).click();

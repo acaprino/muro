@@ -16,9 +16,9 @@ const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, ag
 const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const calls = async (app, ...actions) => (await app.calls()).filter(c => actions.includes(c.action));
 const saves = async app => (await calls(app, 'settings')).map(c => c.payload);
-const tab = (page, name) => page.locator('nav').getByRole('button', { name: new RegExp('^' + name) });
+const tab = (page, name) => page.locator('nav').getByRole('tab', { name: new RegExp('^' + name) });
 /** A row of the page, found by its title. */
-const row = (page, title) => page.locator('.row').filter({ has: page.locator('strong').filter({ hasText: new RegExp('^' + escapeRe(title) + '$') }) });
+const row = (page, title) => page.locator('.im-setting-row').filter({ has: page.locator('strong').filter({ hasText: new RegExp('^' + escapeRe(title) + '$') }) });
 const hint = (page, title) => row(page, title).locator('small');
 const switchOf = (page, label) => page.getByRole('switch', { name: label, exact: true });
 const AUTO = 'Automatic sync', TRAY = 'Keep running when the window is closed', START = 'Start Muro when Windows starts';
@@ -26,7 +26,7 @@ async function openSettings(page) {
   await tab(page, 'Settings').click();
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
   // `autostart` is read when the page opens: the switch is disabled until it is known.
-  await page.waitForFunction(label => { const s = document.querySelector(`[aria-label="${label}"]`); return !!s && (!s.disabled || s.closest('.row').textContent.includes('Available on Windows')); }, START);
+  await page.waitForFunction(label => { const s = document.querySelector(`[aria-label="${label}"]`); return !!s && (!s.disabled || s.closest('.im-setting-row').textContent.includes('Available on Windows')); }, START);
 }
 async function openActivity(page) {
   await tab(page, 'Activity').click();
@@ -34,14 +34,14 @@ async function openActivity(page) {
 }
 const checked = async (page, label) => (await switchOf(page, label).getAttribute('aria-checked')) === 'true';
 const waitSwitch = (page, label, on) => page.locator(`[role=switch][aria-label="${label}"][aria-checked="${on}"]`).waitFor();
-const bannerText = page => page.locator('.banner[role=alert]').allTextContents();
+const bannerText = page => page.locator('.im-banner[role=alert]').allTextContents();
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const titles = page => page.locator('ul.act li strong').allTextContents();
+const titles = page => page.locator('ul.im-activity-list li strong').allTextContents();
 
 await test('Settings: five sections, saved on change, no Save button', 'default', {}, async app => {
   const { page } = app;
   await openSettings(page);
-  assert.deepEqual(await page.locator('section.set > h2').allTextContents(), ['Sync', 'Background', 'Appearance', 'AI', 'Maintenance']);
+  assert.deepEqual(await page.locator('section.im-settings > h2').allTextContents(), ['Sync', 'Background', 'Appearance', 'AI', 'Maintenance']);
   assert.equal(await page.getByRole('button', { name: /save/i }).count(), 0, 'there is no Save button');
   assert.equal(await page.getByText('Saved as you change them.').count(), 1);
   assert.equal((await calls(app, 'autostart')).length, 1, 'autostart is read once when the page opens');
@@ -107,7 +107,7 @@ await test('an interval outside 1 to 1440 is refused where it enters, and the co
   for (const bad of ['0', '1441', '5000', '-5', '1.5', 'abc']) {
     await interval.evaluate((el, value) => { el.add(new Option('Injected', value)); }, bad);
     await interval.selectOption(bad);
-    await page.locator('.banner[role=alert]').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
+    await page.locator('.im-banner[role=alert]').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
     assert.equal(await page.getByRole('combobox', { name: 'Check interval' }).inputValue(), '45', `${bad} is not kept`);
     assert.deepEqual(await saves(app), [], `${bad} was never sent`);
   }
@@ -132,7 +132,7 @@ await test('Start Muro when Windows starts: on also switches automatic sync on, 
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, false);
   assert.equal(await hint(page, START).textContent(), 'Automatic sync is off: Muro starts and watches, but applies changes only when you ask.');
-  assert.equal(await row(page, START).locator('small .warn').count(), 1, 'the hint is a warning');
+  assert.equal(await row(page, START).locator('small .im-text-warn').count(), 1, 'the hint is a warning');
   // Off: set_autostart alone, and automatic sync stays as it is.
   const before = (await saves(app)).length;
   await switchOf(page, START).click();
@@ -164,11 +164,11 @@ await test('Keep running when the window is closed: off shows its warning', 'def
   await openSettings(page);
   assert.equal(await checked(page, TRAY), true);
   assert.equal(await hint(page, TRAY).textContent(), 'Closing the window leaves Muro in the notification area. Quit from its icon there.');
-  assert.equal(await row(page, TRAY).locator('small .warn').count(), 0);
+  assert.equal(await row(page, TRAY).locator('small .im-text-warn').count(), 0);
   await switchOf(page, TRAY).click();
   await waitSwitch(page, TRAY, false);
   assert.equal(await hint(page, TRAY).textContent(), 'Closing the window quits Muro: nothing syncs until you open it again.');
-  assert.equal(await row(page, TRAY).locator('small .warn').count(), 1, 'the hint is a warning');
+  assert.equal(await row(page, TRAY).locator('small .im-text-warn').count(), 1, 'the hint is a warning');
 });
 
 await test('a rejected save leaves the control as it was and shows the error', 'default', {}, async app => {
@@ -176,7 +176,7 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await switchOf(page, AUTO).click();
-  await page.locator('.banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await checked(page, AUTO), false, 'the switch is as it was');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), AUTO, 'and keeps the focus');
   // A text box too: what was typed goes back to what is stored.
@@ -214,7 +214,7 @@ await test('Python and the factory folder are saved when they are left, trimmed'
   // An empty Python is no value: it is refused where it enters and the stored one comes back.
   await python.fill('   ');
   await python.blur();
-  await page.locator('.banner[role=alert]').getByText('Enter the Python command or its full path.').waitFor();
+  await page.locator('.im-banner[role=alert]').getByText('Enter the Python command or its full path.').waitFor();
   assert.equal((await saves(app)).length, 3, 'it was never sent');
   assert.equal(await python.inputValue(), 'C:/Tools/Python 3/python.exe');
 });
@@ -227,15 +227,15 @@ await test('a value that is not changed saves nothing', 'default', {}, async app
   await python.fill('python ');
   await python.blur();
   await page.getByRole('radio', { name: 'Light' }).check({ force: true });
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  await page.waitForFunction(() => document.documentElement.dataset.imTheme === 'light');
   assert.deepEqual(await saves(app), [], 'trimmed to the stored value, and a theme is not a registry setting');
 });
 
 await test('a settings save keeps the last plan: no new plan, the strip stays, Apply all still works', 'changes', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await page.locator('section.strip strong', { hasText: '1 change ready to apply' }).waitFor();
-  const meta = async n => page.locator('section.strip .meta span').nth(n).textContent();
+  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
+  const meta = async n => page.locator('section.im-summary .im-summary-meta span').nth(n).textContent();
   const [lastCheck, lastSync] = [await meta(0), await meta(1)];
   const before = (await app.calls()).length;
   await openSettings(page);
@@ -245,14 +245,14 @@ await test('a settings save keeps the last plan: no new plan, the strip stays, A
   await waitSwitch(page, AUTO, true);
   assert.deepEqual((await app.calls()).slice(before).map(c => c.action), ['autostart', 'settings', 'settings'], 'no plan, no check, no snapshot after a save');
   await tab(page, 'Sync').click();
-  await page.locator('section.strip strong', { hasText: '1 change ready to apply' }).waitFor();
-  assert.equal(await page.locator('section.strip button', { hasText: 'Apply all 1 change' }).count(), 1);
+  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
+  assert.equal(await page.locator('section.im-summary button', { hasText: 'Apply all 1 change' }).count(), 1);
   assert.match(await meta(2), /^Next check/, 'the strip reads the new setting');
   assert.equal(await meta(0), lastCheck, 'Last check is as it was');
   assert.equal(await meta(1), lastSync, 'and so is Last sync');
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
-  await page.locator('#toasts').getByText('1 change applied.').waitFor();
-  assert.equal(await page.locator('section.strip strong').first().textContent(), 'Everything is in sync');
+  await page.locator('[data-im-notices]').getByText('1 change applied.').waitFor();
+  assert.equal(await page.locator('section.im-summary strong').first().textContent(), 'Everything is in sync');
 });
 
 await test('the first settings save of a session, with nothing checked yet, asks for no plan', 'default', {}, async app => {
@@ -271,23 +271,23 @@ await test('the first settings save of a session, with nothing checked yet, asks
 await test('Theme: Light is the root\'s data-theme and survives a reload', 'default', { colorScheme: 'dark' }, async app => {
   const { page } = app;
   await openSettings(page);
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.imTheme), 'dark');
   const group = page.getByRole('radiogroup', { name: 'Theme' });
   assert.deepEqual(await group.locator('label').allTextContents(), ['System', 'Light', 'Dark']);
   assert.equal(await row(page, 'Theme').locator('small').textContent(), 'System follows Windows.');
   await group.getByRole('radio', { name: 'Light' }).check({ force: true });
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+  await page.waitForFunction(() => document.documentElement.dataset.imTheme === 'light');
   assert.equal(await page.evaluate(() => localStorage.getItem('muro.theme')), 'light');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'light', 'the radio keeps the focus');
   assert.equal((await calls(app, 'settings')).length, 0, 'a theme is the window\'s, not the registry\'s');
   await page.screenshot({ path: shots + '/settings-light.png' });
   await page.reload();
   await page.locator('nav').waitFor();
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light', 'still Light after a reload, against a dark system');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.imTheme), 'light', 'still Light after a reload, against a dark system');
   await openSettings(page);
   assert.equal(await page.getByRole('radio', { name: 'Light' }).isChecked(), true);
   await page.getByRole('radio', { name: 'System' }).check({ force: true });
-  await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await page.waitForFunction(() => document.documentElement.dataset.imTheme === 'dark');
 });
 
 await test('Verify and Clean up', 'default', {}, async app => {
@@ -299,10 +299,10 @@ await test('Verify and Clean up', 'default', {}, async app => {
   assert.deepEqual((await calls(app, 'maintenance')).map(c => c.payload), [{ kind: 'verify' }]);
   // Clean up deletes files: it asks first, and Cancel does nothing.
   await page.getByRole('button', { name: 'Clean up…', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Clean up unused builds?' });
+  const dialog = page.getByRole('alertdialog', { name: 'Clean up unused builds?' });
   await dialog.getByText('Only stored builds that nothing uses are deleted.').waitFor();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await dialog.waitFor({ state: 'detached' });
   assert.equal((await calls(app, 'maintenance')).length, 1);
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Clean up…', 'the focus goes back to where the dialog opened');
   await page.getByRole('button', { name: 'Clean up…', exact: true }).click();
@@ -343,7 +343,7 @@ await test('Activity: running adaptations first with their phase and Cancel, the
   const snapshots = (await calls(app, 'snapshot')).length;
   await openActivity(page);
   await page.waitForFunction(count => window.calls.filter(c => c.action === 'snapshot').length > count, snapshots);
-  const job = page.locator('article.job');
+  const job = page.locator('article.im-task-card');
   assert.equal(await job.count(), 1);
   const text = await job.textContent();
   assert.match(text, /docs-writer/);
@@ -360,30 +360,30 @@ await test('Activity: running adaptations first with their phase and Cancel, the
   assert.equal(await job.getByRole('button', { name: 'Cancel' }).count(), 1);
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Activity');
   assert.deepEqual(await titles(page), ['Checked sources and harnesses', 'Apply'], 'newest first; an action the page has no title for is shown as the service named it');
-  assert.equal(await page.locator('ul.act li').first().locator('time').textContent().then(t => /today|yesterday|\d/.test(t)), true);
-  assert.equal(await page.locator('section.set').count(), 0);
+  assert.equal(await page.locator('ul.im-activity-list li').first().locator('time').textContent().then(t => /today|yesterday|\d/.test(t)), true);
+  assert.equal(await page.locator('section.im-settings').count(), 0);
   await page.screenshot({ path: shots + '/activity-dark.png' });
 });
 
 await test('Activity: the time a running adaptation has run moves with the poll of the jobs', 'demo', { clock: true }, async app => {
   const { page } = app;
   await openActivity(page);
-  const elapsed = page.locator('article.job .elapsed');
+  const elapsed = page.locator('article.im-task-card .im-task-elapsed');
   await elapsed.filter({ hasText: /^Running for 3 min \d+ s$/ }).waitFor();
   // Time stands still from here: what passes is what the test lets pass. The adaptation started three minutes before.
   await page.clock.pauseAt(new Date(Date.now() + 2_000));
   await page.clock.fastForward(125_000);
   await elapsed.filter({ hasText: /^Running for 5 min \d+ s$/ }).waitFor();
-  assert.equal(await page.locator('article.job [role=progressbar]').getAttribute('aria-valuenow'), null, 'still no value');
+  assert.equal(await page.locator('article.im-task-card [role=progressbar]').getAttribute('aria-valuenow'), null, 'still no value');
 });
 
 await test('Activity: Cancel stops the adaptation, which stays in the list as cancelled', 'demo', {}, async app => {
   const { page } = app;
   await openActivity(page);
-  await page.locator('article.job').getByRole('button', { name: 'Cancel' }).click();
-  await page.locator('article.job').waitFor({ state: 'detached' });
+  await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   assert.deepEqual((await calls(app, 'cancel_job')).map(c => c.payload), [{ id: 'job-1' }]);
-  const first = page.locator('ul.act li').first();
+  const first = page.locator('ul.im-activity-list li').first();
   assert.match(await first.textContent(), /AI adaptation of docs-writer for OpenCode/);
   assert.match(await first.textContent(), /Cancelled/);
   assert.match(await first.textContent(), /log\.txt/, 'its log stays reachable');
@@ -395,42 +395,42 @@ await test('Activity: the filters, and Problems shows only what failed or was ca
   // A failed check, and a cancelled adaptation, besides the two events that completed.
   await app.flags({ checkErrors: true });
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await page.locator('.banner.warn').waitFor();
+  await page.locator('.im-banner[data-im-tone="warn"]').waitFor();
   await openActivity(page);
-  await page.locator('article.job').getByRole('button', { name: 'Cancel' }).click();
-  await page.locator('article.job').waitFor({ state: 'detached' });
+  await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   const filter = page.getByRole('radiogroup', { name: 'Filter activity' });
   assert.deepEqual(await filter.locator('label').allTextContents(), ['All', 'Sync', 'AI adaptation', 'Problems']);
   assert.equal(await filter.getByRole('radio', { name: 'All' }).isChecked(), true);
   assert.equal((await titles(page)).length, 4, 'all: two completed, a failed check, a cancelled adaptation');
   await filter.getByRole('radio', { name: 'Problems' }).check({ force: true });
-  await page.waitForFunction(() => document.querySelectorAll('ul.act li').length === 2);
-  const problems = await page.locator('ul.act li').allTextContents();
+  await page.waitForFunction(() => document.querySelectorAll('ul.im-activity-list li').length === 2);
+  const problems = await page.locator('ul.im-activity-list li').allTextContents();
   assert.equal(problems.length, 2);
   assert.ok(problems.some(t => /Check with problems/.test(t) && /Failed/.test(t) && /sources not resolved/.test(t)), problems.join(' | '));
   assert.ok(problems.some(t => /AI adaptation of docs-writer/.test(t) && /Cancelled/.test(t)), problems.join(' | '));
   assert.equal(problems.some(t => /Checked sources and harnesses|Apply/.test(t)), false, 'no completed event under Problems');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'problems', 'the radio keeps the focus');
   await filter.getByRole('radio', { name: 'AI adaptation' }).check({ force: true });
-  await page.waitForFunction(() => document.querySelectorAll('ul.act li').length === 1);
-  assert.match(await page.locator('ul.act li').textContent(), /AI adaptation of docs-writer for OpenCode/);
+  await page.waitForFunction(() => document.querySelectorAll('ul.im-activity-list li').length === 1);
+  assert.match(await page.locator('ul.im-activity-list li').textContent(), /AI adaptation of docs-writer for OpenCode/);
   await filter.getByRole('radio', { name: 'Sync' }).check({ force: true });
-  await page.waitForFunction(() => document.querySelectorAll('ul.act li').length >= 2);
+  await page.waitForFunction(() => document.querySelectorAll('ul.im-activity-list li').length >= 2);
   const synced = await titles(page);
   assert.ok(synced.includes('Checked sources and harnesses') && synced.includes('Check with problems'), synced.join(' | '));
   assert.equal(synced.some(t => /AI adaptation/.test(t)), false, 'no adaptation under Sync');
   await filter.getByRole('radio', { name: 'All' }).check({ force: true });
-  await page.waitForFunction(() => document.querySelectorAll('ul.act li').length === 4);
+  await page.waitForFunction(() => document.querySelectorAll('ul.im-activity-list li').length === 4);
 });
 
 await test('Activity: empty states', 'default', {}, async app => {
   const { page } = app;
   await openActivity(page);
-  assert.equal(await page.locator('.empty strong').textContent(), 'Nothing yet');
-  assert.equal(await page.locator('.empty span').textContent(), 'Sync runs and AI adaptations show up here.');
+  assert.equal(await page.locator('.im-empty strong').textContent(), 'Nothing yet');
+  assert.equal(await page.locator('.im-empty span').textContent(), 'Sync runs and AI adaptations show up here.');
   await page.getByRole('radio', { name: 'Problems' }).check({ force: true });
-  await page.locator('.empty strong', { hasText: 'Nothing here' }).waitFor();
-  assert.equal(await page.locator('article.job').count(), 0);
+  await page.locator('.im-empty strong', { hasText: 'Nothing here' }).waitFor();
+  assert.equal(await page.locator('article.im-task-card').count(), 0);
 });
 
 // Pictures to look at, in both themes: the whole of Settings (a tall window, the page scrolls inside), and Activity with
@@ -447,10 +447,10 @@ for (const scheme of ['dark', 'light']) {
     await app.flags({ checkErrors: true });
     await tab(page, 'Sync').click();
     await page.getByRole('button', { name: 'Check now', exact: true }).click();
-    await page.locator('.banner.warn').waitFor();
+    await page.locator('.im-banner[data-im-tone="warn"]').waitFor();
     await openActivity(page);
-    await page.locator('article.job').getByRole('button', { name: 'Cancel' }).click();
-    await page.locator('article.job').waitFor({ state: 'detached' });
+    await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+    await page.locator('article.im-task-card').waitFor({ state: 'detached' });
     await page.screenshot({ path: `${shots}/activity-${scheme}-full.png`, clip: { x: 0, y: 0, width: 1280, height: 700 } });
   });
 }
@@ -468,7 +468,7 @@ for (const width of [1100, 760]) {
 
 // ---- Settings, section AI (plan 2, Task 9): the engine, its fields, the variable that holds the key ----
 // The radios of the engine are saved by the service before the page shows the new engine, so they are clicked (a click states no expectation of its state), never `check`ed.
-// A segmented control lays its radio over its label (`.seg input{position:absolute;inset:0;opacity:0}`), so a click aimed at the label's text lands on the radio, as a person's does:
+// A segmented control lays its radio over its label (`.im-seg input{position:absolute;inset:0;opacity:0}`), so a click aimed at the label's text lands on the radio, as a person's does:
 // the radio is the element to click, with `force` because Playwright refuses a target that something else covers (the other files do the same, see `check({ force: true })`).
 const KEY = 'Key from the environment variable';
 const useEngine = (page, label) => page.getByRole('radiogroup', { name: 'Use', exact: true }).getByRole('radio', { name: label, exact: true }).click({ force: true });
@@ -504,7 +504,7 @@ await test('AI: the engine is a radio group and a keyboard moves it; the API sho
   assert.equal(await page.getByRole('combobox', { name: 'Coding agent' }).count(), 0, 'the coding agent waits for the coding agent');
   assert.equal(await page.getByRole('textbox', { name: 'Budget per request in USD' }).count(), 0);
   assert.match(await hintOf(page, 'Model').textContent(), /^Required: a request cannot run without a model\.$/);
-  assert.equal(await row(page, 'Model').locator('small .warn').count(), 1, 'a warning');
+  assert.equal(await row(page, 'Model').locator('small .im-text-warn').count(), 1, 'a warning');
   // The page holds the name and the runtime's answer, never a key: there is no box for one.
   assert.equal(await page.locator('input[type=password]').count(), 0);
   await page.getByText('MURO_API_KEY is not set for Muro.', { exact: true }).waitFor();
@@ -515,7 +515,7 @@ await test('AI: the engine is a radio group and a keyboard moves it; the API sho
   await tab(page, 'Sync').click();
   await openSettings(page);
   await page.getByText('MURO_API_KEY is set for Muro.', { exact: true }).waitFor();
-  assert.equal(await row(page, KEY).locator('.good').count(), 1);
+  assert.equal(await row(page, KEY).locator('.im-text-ok').count(), 1);
   // A runtime that cannot answer is a line in the row, no banner.
   await app.flags({ noEnvCheck: true });
   await tab(page, 'Sync').click();
@@ -602,7 +602,7 @@ await test('AI: the model is saved trimmed, and its warning goes with it', 'defa
   await saved(page, 2);
   assert.equal((await saves(app))[1].settings.ai.model, 'org/model:7b');
   await page.locator('#hint-ai_model', { hasText: 'The model name as the API knows it.' }).waitFor();
-  assert.equal(await row(page, 'Model').locator('small .warn').count(), 0, 'the warning went with the empty model');
+  assert.equal(await row(page, 'Model').locator('small .im-text-warn').count(), 0, 'the warning went with the empty model');
   await boxIs(page, 'ai_model', 'org/model:7b');
 });
 
@@ -642,7 +642,7 @@ await test('AI: a save the service refuses puts the engine back and shows the se
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await useEngine(page, 'OpenAI-compatible API');
-  await page.locator('.banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Coding agent on this computer' }).isChecked(), true, 'the stored engine is shown');
   assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).count(), 0);
   await app.flags({ rejectSettings: false });

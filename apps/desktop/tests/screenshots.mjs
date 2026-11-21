@@ -18,7 +18,7 @@ async function demo(scenario, scheme, body) {
   const app = await open(scenario, { viewport: SIZE, colorScheme: scheme, reducedMotion: 'reduce' });
   try { await body(app.page); } finally { await app.close(); }
 }
-const tab = (page, name) => page.locator('nav').getByRole('button', { name: new RegExp('^' + name) });
+const tab = (page, name) => page.locator('nav').getByRole('tab', { name: new RegExp('^' + name) });
 const check = async (page, headline) => { await page.getByRole('button', { name: 'Check now' }).click(); await page.getByText(headline, { exact: true }).waitFor(); };
 
 for (const scheme of ['dark', 'light']) {
@@ -28,12 +28,12 @@ for (const scheme of ['dark', 'light']) {
     await shot(page, `sync-changes-${scheme}`);
     if (scheme !== 'dark') return;
     await page.getByRole('button', { name: 'Review', exact: true }).click();
-    await page.locator('dialog.sheet[open]').getByText('Not ready yet').waitFor();
+    await page.locator('dialog.im-content-dialog--drawer[open]').getByText('Not ready yet').waitFor();
     await shot(page, 'review');
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });
-    await page.locator('th .hbtn', { hasText: 'Claude Code' }).click();
-    await page.locator('dialog.sheet[open] h2').getByText('Claude Code', { exact: true }).waitFor();
+    await page.locator('th button[data-action="edit-target"]', { hasText: 'Claude Code' }).click();
+    await page.locator('dialog.im-content-dialog--drawer[open] h2').getByText('Claude Code', { exact: true }).waitFor();
     await shot(page, 'harness');
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });
@@ -63,7 +63,7 @@ await demo('demo-activity', 'dark', async page => {
   await page.setViewportSize(SIZE);
   await tab(page, 'Activity').click();
   await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
-  await page.locator('ul.act li').first().waitFor();
+  await page.locator('ul.im-activity-list li').first().waitFor();
   await shot(page, 'activity');
 });
 
@@ -72,20 +72,20 @@ await demo('demo-activity', 'dark', async page => {
 await demo('projects', 'dark', async page => {
   await page.locator('nav button', { hasText: 'Projects' }).click();
   await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor();
-  await page.locator('li.go', { hasText: 'Marionette' }).waitFor();
+  await page.locator('li.im-list-link', { hasText: 'Marionette' }).waitFor();
   await shot(page, 'projects');
   await page.getByRole('button', { name: /Marionette/ }).click();
   await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
   await page.locator('#step-panel table').first().waitFor();
   await shot(page, 'project-inputs');
   await page.getByRole('tab', { name: /^Graph/ }).click();
-  await page.locator('.two svg.graph').waitFor();
-  await page.locator('.exlist button').first().click();
-  await page.locator('.simres').waitFor();
+  await page.locator('[data-project-graph] .im-graph').waitFor();
+  await page.locator('.im-choice-list button').first().click();
+  await page.locator('.im-numbered-result').waitFor();
   await shot(page, 'project-graph');
   await page.locator('textarea[name="simtask"]').fill('Write a letter as a Word file');
   await page.locator('button[data-action="graph-simulate"]').click();
-  await page.locator('.simres', { hasText: 'Asked' }).waitFor();
+  await page.locator('.im-numbered-result', { hasText: 'Asked' }).waitFor();
   await shot(page, 'project-simulation');
 });
 

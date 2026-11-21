@@ -1,3 +1,4 @@
+import { nextStepId, stepNavigationHtml, stepNavigationKey, stepPanelHtml } from '@acaprino/imago/ui';
 import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState } from '../model.ts';
@@ -28,24 +29,24 @@ const nameOf = (p: ProjectSummary) => p.project?.name || p.plugin?.name || p.id;
 /** "Remove from list" on every project but the one Muro ships (`included`, which the runtime says: never a field of the project file, which anyone can write). The file is not touched. */
 const removal = (p: ProjectSummary) => p.included ? '' : button('Remove from list', 'remove-project', { sm: true, id: p.id, attrs: { 'aria-label': `Remove ${nameOf(p)} from the list` } });
 function item(state: ViewState, p: ProjectSummary): string {
-  if (p.error) return `<li>${sym(nameOf(p))}<div class="grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="break">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}${removal(p)}</li>`;
+  if (p.error) return `<li>${sym(nameOf(p))}<div class="im-grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="im-wrap-text">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}${removal(p)}</li>`;
   const counts = [count(p.inputs, 'input'), count(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
-  return `<li class="go"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="tag">Included with Muro</span>' : ''}</strong><small class="pfile" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
+  return `<li class="im-list-link"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="im-grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="im-muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="im-chip">Included with Muro</span>' : ''}</strong><small class="im-ellipsis" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="im-nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="im-nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
 }
 /** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no version of them. */
 function published(state: ViewState): string {
   const s = state.snapshot!, own = s.registry.plugins.filter(p => !p.project);
   if (!own.length) return '';
-  return `<div class="sec"><h2>Installed as published</h2><span class="count">${own.length}</span></div><p class="sub muted">Plugins Muro installs as their author ships them.</p><ul class="card list">${own.map(p => {
+  return `<div class="im-section-heading"><h2>Installed as published</h2><span class="im-count">${own.length}</span></div><p class="im-section-description im-muted">Plugins Muro installs as their author ships them.</p><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${own.map(p => {
     const missing = s.registry.targets.filter(t => t.enabled && p.targets.includes(t.id) && cellState(p, t, s, state.plan).kind === 'needs-build');
-    return `<li>${sym(p.name)}<div class="grow"><strong>${esc(p.name)}${p.upstream_version ? ` <span class="muted">${esc(p.upstream_version)}</span>` : ''}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></div>${missing.length ? tag(`No version for ${missing.map(t => t.name).join(', ')}`, 'warn') : ''}</li>`;
+    return `<li>${sym(p.name)}<div class="im-grow"><strong>${esc(p.name)}${p.upstream_version ? ` <span class="im-muted">${esc(p.upstream_version)}</span>` : ''}</strong><small title="${esc(p.source)}">${esc(p.source)}</small></div>${missing.length ? tag(`No version for ${missing.map(t => t.name).join(', ')}`, 'warn') : ''}</li>`;
   }).join('')}</ul>`;
 }
 function listPage(state: ViewState): string {
   const pr = state.projects, open = pr.noPicker ? '' : button('Open project file…', 'open-project-file', { icon: 'folder' });
   const body = pr.list === null
-    ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : `<div class="card empty">${spin}<strong>Reading your projects…</strong></div>`)
-    : pr.list.length ? `<ul class="card list">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Open a project file to add it here.', open);
+    ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading your projects…</strong></div>`)
+    : pr.list.length ? `<ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Open a project file to add it here.', open);
   return head('Projects', 'A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.', open) + body + (state.snapshot ? published(state) : '');
 }
 
@@ -58,23 +59,22 @@ function sub(state: ViewState, info: ProjectInfo, step: ProjectStep): string {
   return install.installLine(state, state.project!.id);
 }
 function holds(info: ProjectInfo): string {
-  return `<details class="grow" id="project-files"><summary>What this project file holds</summary><ul class="card pfiles">${info.files.map(f => `<li><strong>${esc(f.part)}</strong><span>${esc(f.detail)}</span><code class="muted">${esc(f.path)}</code></li>`).join('')}<li><strong class="muted">Offline</strong><span class="muted">The file carries everything: the project rebuilds and installs without the network.</span><span></span></li></ul></details>`;
+  return `<details class="im-grow" id="project-files"><summary>What this project file holds</summary><ul class="im-panel im-surface im-file-list" data-im-surface="sheet">${info.files.map(f => `<li><strong>${esc(f.part)}</strong><span>${esc(f.detail)}</span><code class="im-muted">${esc(f.path)}</code></li>`).join('')}<li><strong class="im-muted">Offline</strong><span class="im-muted">The file carries everything: the project rebuilds and installs without the network.</span><span></span></li></ul></details>`;
 }
 function projectHead(state: ViewState, info: ProjectInfo): string {
   const p = info.project, file = state.projects.list?.find(x => x.id === state.project!.id)?.path, repo = p.repository;
-  return `<div class="projhead">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(STATE.label, STATE.tone)}${info.included ? tag('Included with Muro') : ''}</div>`
-    + `<div class="projfile">${file ? `<code>${esc(file)}</code>${state.projects.noFolder ? '' : button('Open folder', 'open-folder', { sm: true, icon: 'folder', id: file })}` : ''}<span>${repo ? `Repository <code>${esc(repo.url.replace(/^https?:\/\//, ''))}</code> · ${esc(repo.branch)}` : 'No Git repository set'} · by ${esc(p.author)} · created ${esc(day(p.created))}</span>${holds(info)}</div>`;
+  return `<div class="im-record-heading">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(STATE.label, STATE.tone)}${info.included ? tag('Included with Muro') : ''}</div>`
+    + `<div class="im-record-meta">${file ? `<code>${esc(file)}</code>${state.projects.noFolder ? '' : button('Open folder', 'open-folder', { sm: true, icon: 'folder', id: file })}` : ''}<span>${repo ? `Repository <code>${esc(repo.url.replace(/^https?:\/\//, ''))}</code> · ${esc(repo.branch)}` : 'No Git repository set'} · by ${esc(p.author)} · created ${esc(day(p.created))}</span>${holds(info)}</div>`;
 }
 function tabs(state: ViewState, info: ProjectInfo): string {
-  const now = state.project!.step;
-  return `<div class="steps4" role="tablist" aria-label="Project steps">${STEPS.map(([id, label], i) => `<button type="button" role="tab" id="step-tab-${id}" aria-selected="${now === id}" aria-controls="step-panel" tabindex="${now === id ? 0 : -1}" ${now === id ? 'aria-current="step" ' : ''}data-action="step" data-id="${id}"><span class="num" aria-hidden="true">${i + 1}</span><span class="t"><strong>${label}</strong><small>${esc(sub(state, info, id))}</small></span></button>`).join('')}</div>`;
+  return stepNavigationHtml(STEPS.map(([id,label])=>({id,label,detail:sub(state,info,id)})),state.project!.step,{label:'Project steps',action:'step',tabIdPrefix:'step-tab-',panelId:'step-panel'});
 }
 function projectPage(state: ViewState): string {
-  const pv = state.project!, pr = state.projects, crumb = `<div class="crumb">${button('Projects', 'close-project', { sm: true, icon: 'back' })}</div>`;
+  const pv = state.project!, pr = state.projects, crumb = `<div class="im-breadcrumb-space">${button('Projects', 'close-project', { sm: true, icon: 'back' })}</div>`;
   if (pr.infoError && pr.infoId === pv.id) return crumb + empty('This project could not be read', pr.infoError, button('Try again', 'retry-projects'));
   const info = pr.infoId === pv.id ? pr.info : null;
-  if (!info) return crumb + `<div class="card empty">${spin}<strong>Reading the project…</strong></div>`;
-  return crumb + projectHead(state, info) + tabs(state, info) + `<div role="tabpanel" id="step-panel" aria-labelledby="step-tab-${pv.step}">${steps[pv.step].view(state, info)}</div>`;
+  if (!info) return crumb + `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading the project…</strong></div>`;
+  return crumb + projectHead(state, info) + tabs(state, info) + stepPanelHtml(steps[pv.step].view(state,info),'step-panel',`step-tab-${pv.step}`);
 }
 export function view(state: ViewState): string {
   return state.project ? projectPage(state) : listPage(state);
@@ -166,21 +166,12 @@ const own: Actions = {
 export const actions: Actions = merge(own, ...Object.values(steps).map(s => s.actions));
 
 /** The step a key moves to from the one it is pressed on: arrows wrap around, Home and End go to the ends; any other key moves nowhere. */
-export function nextStep(step: ProjectStep, key: string): ProjectStep | null {
-  const ids = STEPS.map(([id]) => id), at = ids.indexOf(step);
-  if (at < 0) return null;
-  return key === 'ArrowRight' ? ids[(at + 1) % ids.length] : key === 'ArrowLeft' ? ids[(at + ids.length - 1) % ids.length] : key === 'Home' ? ids[0] : key === 'End' ? ids[ids.length - 1] : null;
-}
-/** The tablist: the arrow keys select the neighbouring step and bring the keyboard with them. The keyboard goes to the new tab first, so the render that follows finds it there. */
-export function keydown(app: App, e: KeyboardEvent): boolean {
+export const nextStep = (step: ProjectStep, key: string): ProjectStep | null => nextStepId(STEPS.map(([id])=>id),step,key);
+/** Imago owns keyboard navigation; this page owns the selected project step. */
+export function keydown(app: App, event: KeyboardEvent): boolean {
   const pv = app.state.project;
-  if (app.state.page !== 'projects' || !pv || e.ctrlKey || e.metaKey || e.altKey) return false;
-  const tab = e.target instanceof Element ? e.target.closest<HTMLElement>('[role=tab][data-action=step]') : null;
-  if (!tab) return false;
-  const next = nextStep(tab.dataset.id as ProjectStep, e.key);
-  if (!next) return false;
-  e.preventDefault(); tab.parentElement?.querySelector<HTMLElement>(`[data-id="${next}"]`)?.focus(); pv.step = next; app.render();
-  return true;
+  if (app.state.page !== 'projects' || !pv) return false;
+  return stepNavigationKey(event,{ids:STEPS.map(([id])=>id),action:'step',onSelect:id=>{pv.step=id;app.render();}});
 }
 export function input(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));

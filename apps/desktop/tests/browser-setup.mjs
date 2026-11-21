@@ -36,10 +36,10 @@ await test('with no harness the three steps take the place of the tabs, and a ha
   const { page } = app;
   await step(page, 1, ONE);
   assert.equal(await page.locator('nav').count(), 0, 'no tabs');
-  assert.equal(await page.locator('.tstatus').count(), 0, 'no state button');
-  assert.equal(await page.locator('.steps i.on').count(), 1, 'one bar of three is on');
+  assert.equal(await page.locator('.im-titlebar-status').count(), 0, 'no state button');
+  assert.equal(await page.locator('.im-steps li:is([data-im-step="done"],[data-im-step="now"])').count(), 1, 'one bar of three is on');
   assert.deepEqual(await page.getByRole('checkbox').evaluateAll(boxes => boxes.map(b => [b.checked, b.disabled])), [[false, false], [false, false]], 'two harnesses found, nothing chosen for the person');
-  assert.match(await page.locator('.pick').textContent(), /D:\/config\/claude-code/);
+  assert.match(await page.locator('.im-choice-rows').textContent(), /D:\/config\/claude-code/);
   assert.deepEqual((await app.calls()).map(c => c.action).filter(a => a !== 'snapshot' && a !== 'discover'), [], 'opening the setup changes nothing');
   await page.getByRole('region', { name: ONE }).waitFor();
 });
@@ -73,8 +73,8 @@ await test('choosing one harness saves it once and scans; step 2 lists what is i
   assert.deepEqual(order, ['save_target', 'scan'], 'it saves, then reads what is installed');
   const keep = box(page, /commit-helper/);
   assert.equal(await keep.isChecked(), true, 'kept by default');
-  assert.match(await page.locator('.pick').textContent(), /Claude Code 2\.1\.0/);
-  assert.equal(await page.locator('.steps i.on').count(), 2);
+  assert.match(await page.locator('.im-choice-rows').textContent(), /Claude Code 2\.1\.0/);
+  assert.equal(await page.locator('.im-steps li:is([data-im-step="done"],[data-im-step="now"])').count(), 2);
   await button(page, 'Back').click();
   await step(page, 1, ONE);
   assert.equal(await box(page, /Claude Code/).isChecked(), true, 'still chosen');
@@ -156,7 +156,7 @@ await test('a failure stays in its step, announced, and loses nothing the person
   await step(page, 1, ONE);
   assert.equal(await box(page, /Claude Code/).isChecked(), true);
   assert.equal(await box(page, /Codex/).isChecked(), true);
-  assert.equal(await page.locator('.banner').count(), 0, 'not a banner of the app');
+  assert.equal(await page.locator('.im-banner').count(), 0, 'not a banner of the app');
   await page.screenshot({ path: shots + '/setup-error.png' });
   await app.flags({ rejectSave: false });
   await button(page, 'Continue').click();
@@ -296,9 +296,9 @@ await test('on a long list the footer of the step stays in the window and Contin
   const { page } = app;
   await toStepTwo(app);
   // The fake has one plugin installed: forty more rows of its kind make the step taller than the window.
-  await page.evaluate(() => { const list = document.querySelector('.pick'), row = list.querySelector('li'); for (let i = 0; i < 40; i++) list.append(row.cloneNode(true)); });
+  await page.evaluate(() => { const list = document.querySelector('.im-choice-rows'), row = list.querySelector('li'); for (let i = 0; i < 40; i++) list.append(row.cloneNode(true)); });
   const geometry = () => page.evaluate(() => {
-    const main = document.getElementById('main'), foot = document.querySelector('.setupfoot').getBoundingClientRect(), last = document.querySelector('.pick li:last-child').getBoundingClientRect();
+    const main = document.getElementById('main'), foot = document.querySelector('.im-wizard-actions').getBoundingClientRect(), last = document.querySelector('.im-choice-rows li:last-child').getBoundingClientRect();
     return { scrollable: main.scrollHeight > main.clientHeight + 200, footTop: foot.top, footBottom: foot.bottom, lastBottom: last.bottom, height: window.innerHeight };
   });
   const scrollTo = top => page.evaluate(y => document.getElementById('main').scrollTo(0, y), top);

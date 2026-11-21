@@ -1,7 +1,8 @@
 import type { ViewState, SetupState, Snapshot, Target, Discovered, InstalledPlugin, Autostart } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { inList, listing, intervalOptions } from '../model.ts';
-import { esc, mark, sw, button, empty, spin } from '../ui.ts';
+import { esc, mark, sw, button, empty } from '../ui.ts';
+import { bannerHtml, choiceRowsHtml, enterWizardStep, fieldErrorHtml, loadingStateHtml, settingsGroupHtml, settingsRowHtml, wizardActionsHtml, wizardHeadingHtml, wizardHtml } from '@acaprino/imago/ui';
 
 /** The first run: three steps in place of the tabs while Muro manages no harness, and while the person is still going through them.
  * Step 1 saves the chosen harnesses and scans them (Back keeps them), step 2 lists what is installed on them, step 3 asks for the two switches;
@@ -70,44 +71,34 @@ const kept = (s: Held, item: Item) => !item.why && s.keep[item.key] !== false;
 const newTarget = (found: Discovered): Target => ({ id: crypto.randomUUID(), harness: found.harness, name: found.name, root: found.config_root!, executable: found.executable, enabled: true, exclusive: false });
 
 // --- the view ------------------------------------------------------------------------------------------------------------
-const card = (s: Held, body: string) => `<div class="setupwrap"><section class="setupcard" aria-labelledby="setup-title"><div class="steps" aria-hidden="true">${[1, 2, 3].map(n => `<i class="${n <= s.step ? 'on' : ''}"></i>`).join('')}</div><small id="setup-step">Step ${s.step} of 3</small>${body}</section></div>`;
-const title = (s: Held, text: string, sub: string) => `<h1 id="setup-title" tabindex="-1" aria-describedby="setup-step${s.err ? ' setup-error' : ''}">${esc(text)}</h1><p class="muted">${esc(sub)}</p>`;
-const failure = (s: Held) => `<p class="err" id="setup-error" role="alert">${esc(s.err)}</p>`;
-/** The footer of a step: Back on the left, the way on on the right. It is the last box of the card, which the stylesheet keeps at the bottom of the window while a long list scrolls (`.setupfoot` is sticky), so a step puts nothing after it. */
-const foot = (left: string, right: string) => `<div class="setupfoot">${left || '<span></span>'}${right}</div>`;
-const row = (label: string, hint: string, control: string) => `<div class="row"><div><strong>${esc(label)}</strong><small>${esc(hint)}</small></div>${control}</div>`;
-/** A row of step 1 or 2: a real checkbox wrapped by its label. `lead` and `note` are HTML the caller has escaped. */
-const check = (name: string, value: string, on: boolean, off: boolean, lead: string, label: string, note: string) => `<li><label><input type="checkbox" name="${name}" value="${esc(value)}" ${on ? 'checked' : ''} ${off ? 'disabled' : ''}>${lead}<span><strong>${esc(label)}</strong><small>${note}</small></span></label></li>`;
+const headingDescription = (s: Held) => ['setup-step', ...(s.err ? ['setup-error'] : [])];
 
 function stepOne(state: ViewState, s: Held): string {
   const list = rows(state), nothing = !list.some(r => !r.why);
-  const body = list.length ? `<ul class="card list pick">${list.map(r => check('pick', r.harness, picked(s, r), !!r.why || !!state.busy, mark(r.harness), r.name, r.why ? esc(r.why) : `<code>${esc(r.root)}</code>`)).join('')}</ul>`
-    : state.discovering ? `<div class="card empty" role="status">${spin}<span>Looking for harnesses on this computer…</span></div>`
+  const body = list.length ? choiceRowsHtml(list.map(r => ({name:'pick',value:r.harness,checked:picked(s,r),disabled:!!r.why||!!state.busy,leadingHtml:mark(r.harness),label:r.name,hintHtml:r.why?esc(r.why):`<code>${esc(r.root)}</code>`})))
+    : state.discovering ? loadingStateHtml('Looking for harnesses on this computer…')
     : empty('No harness found', 'Muro looks for the coding agents installed on this computer. Add one by hand from Sync, with its configuration folder.', button('Look again', 'setup-discover'));
   const later = nothing && !state.discovering ? button('Set up later', 'setup-later') : '';
-  return title(s, 'Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.') + body + failure(s) + foot(later, button('Continue', 'setup-next', { primary: true }));
+  return wizardHeadingHtml('Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.',{id:'setup-title',describedBy:headingDescription(s)}) + body + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(later, button('Continue', 'setup-next', { primary: true }));
 }
 function stepTwo(state: ViewState, s: Held): string {
   const { items, unread } = installed(state, s);
-  const warn = unread.map(u => `<div class="banner warn" role="alert"><div><strong>${esc(u.name)} cannot be read</strong><p>${esc(u.error)}</p></div></div>`).join('');
-  const list = items.length ? `<ul class="card list pick">${items.map(i => check('keep', i.key, kept(s, i), !!i.why || !!state.busy, '', i.plugin.name, `${esc(i.target.name)}${i.plugin.version ? ' ' + esc(i.plugin.version) : ''}${i.why ? ' · ' + esc(i.why) : ''}`)).join('')}</ul>`
+  const warn = unread.map(u => bannerHtml({title:`${u.name} cannot be read`,message:u.error,tone:'warn'})).join('');
+  const list = items.length ? choiceRowsHtml(items.map(i => ({name:'keep',value:i.key,checked:kept(s,i),disabled:!!i.why||!!state.busy,label:i.plugin.name,hint:`${i.target.name}${i.plugin.version?' '+i.plugin.version:''}${i.why?' · '+i.why:''}`})))
     : unread.length ? '' : empty('Nothing installed yet', 'Your list starts empty. Add plugins from Sync afterwards.');
-  return title(s, 'Start from what is installed', 'These plugins are already on the harnesses you picked. The ones you keep become your list.') + warn + list + failure(s) + foot(button('Back', 'setup-back'), button('Continue', 'setup-next', { primary: true }));
+  return wizardHeadingHtml('Start from what is installed', 'These plugins are already on the harnesses you picked. The ones you keep become your list.',{id:'setup-title',describedBy:headingDescription(s)}) + warn + list + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(button('Back', 'setup-back'), button('Continue', 'setup-next', { primary: true }));
 }
 function stepThree(state: ViewState, s: Held): string {
   const minutes = state.snapshot?.registry.settings.interval_minutes ?? 60, every = intervalOptions(minutes).find(([m]) => m === minutes)![1], cannot = s.canAutostart === false;
-  const rowsHtml = row('Automatic sync', `Checks ${every.charAt(0).toLowerCase() + every.slice(1)} and applies what changed.`, sw(s.auto, 'Automatic sync', 'setup-auto'))
-    + row('Start Muro when Windows starts', cannot ? 'Available on Windows' : 'Starts in the notification area, without opening a window.', sw(cannot ? false : s.autostart, 'Start Muro when Windows starts', 'setup-autostart', '', cannot));
-  return title(s, 'Keep them in sync by itself?', 'Muro can stay in the notification area and apply changes without you opening it.') + `<div class="card set">${rowsHtml}</div>` + failure(s) + foot(button('Back', 'setup-back'), button('Finish', 'setup-finish', { primary: true }));
+  const rowsHtml = settingsRowHtml({title:'Automatic sync',hintHtml:esc(`Checks ${every.charAt(0).toLowerCase() + every.slice(1)} and applies what changed.`),controlHtml:sw(s.auto, 'Automatic sync', 'setup-auto')})
+    + settingsRowHtml({title:'Start Muro when Windows starts',hintHtml:esc(cannot ? 'Available on Windows' : 'Starts in the notification area, without opening a window.'),controlHtml:sw(cannot ? false : s.autostart, 'Start Muro when Windows starts', 'setup-autostart', '', cannot)});
+  return wizardHeadingHtml('Keep them in sync by itself?', 'Muro can stay in the notification area and apply changes without you opening it.',{id:'setup-title',describedBy:headingDescription(s)}) + settingsGroupHtml(rowsHtml) + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(button('Back', 'setup-back'), button('Finish', 'setup-finish', { primary: true }));
 }
-export const view = (state: ViewState): string => { const s = held(state) ?? fresh(); return card(s, [stepOne, stepTwo, stepThree][s.step - 1](state, s)); };
+export const view = (state: ViewState): string => { const s = held(state) ?? fresh(); return wizardHtml([stepOne, stepTwo, stepThree][s.step - 1](state, s),{headingId:'setup-title',counterId:'setup-step',counter:`Step ${s.step} of 3`,progressLabel:'Setup progress',steps:['Harnesses','Plugins','Preferences'],current:s.step-1}); };
 
 // --- the actions ---------------------------------------------------------------------------------------------------------
 /** A new step starts at its heading, so a screen reader reads where the person is; the same step keeps the focus where it was. */
-function arrive() {
-  const doc = globalThis.document; if (!doc) return;
-  doc.getElementById('main')?.scrollTo(0, 0); doc.getElementById('setup-title')?.focus();
-}
+const arrive = () => enterWizardStep(globalThis.document,'setup-title','main');
 async function go(app: App, label: string, work: (s: Held) => Promise<void>) {
   const s = begin(app.state), before = s.step;
   await app.run(label, async () => { try { await work(s); s.err = ''; } catch (e) { s.err = message(e); } if (app.state.setup === s) remember(s); });

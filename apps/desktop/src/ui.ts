@@ -1,28 +1,15 @@
+// Application formatting and domain labels. Every visual primitive is supplied by Imago.
+import { avatarHtml } from '@acaprino/imago/ui';
 import { harnessInitials } from './model.ts';
-const paths:Record<string,string>={plus:'<path d="M12 5v14M5 12h14"/>',sync:'<path d="M20 11a8 8 0 0 0-14.9-3M4 5v3.5h3.5M4 13a8 8 0 0 0 14.9 3M20 19v-3.5h-3.5"/>',check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>',box:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9zM4 7.5l8 4.5 8-4.5M12 12v9"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',sliders:'<path d="M4 7h8M16 7h4M4 12h3M11 12h9M4 17h10M18 17h2"/><circle cx="14" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="17" r="2"/>',alert:'<path d="M12 4l9 15.5H3zM12 10v4.5M12 17.2v.3"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',folder:'<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',spark:'<path d="M12 4v4M12 16v4M4 12h4M16 12h4M6.5 6.5L9 9M15 15l2.5 2.5M17.5 6.5L15 9M9 15l-2.5 2.5"/>',chev:'<path d="M9 6l6 6-6 6"/>',back:'<path d="M15 6l-6 6 6 6"/>',play:'<path d="M8 5.5v13l10-6.5z"/>',shield:'<path d="M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/>',arrow:'<path d="M5 12h14M14 7l5 5-5 5"/>'};
-/** An inline icon of the set; `x` closes, `chev` opens a menu, `sync` is the circle of arrows. */
-export const icon=(name:string)=>`<svg class="i" aria-hidden="true" viewBox="0 0 24 24">${paths[name]||paths.box}</svg>`;
-export const esc=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+export {
+ escapeHtml as esc, iconHtml as icon, spinnerHtml as spin, initialsAvatarHtml as sym,
+ chipHtml as tag, buttonHtml as button, pageHeadingHtml as head, emptyStateHtml as empty,
+ switchHtml as sw, segmentedHtml as seg, textFieldHtml as field,
+} from '@acaprino/imago/ui';
+
 export const plural=(n:number,one:string,many=one+'s')=>`${n} ${n===1?one:many}`;
-export const spin='<i class="spin" aria-hidden="true"></i>';
-/** The two-letter mark of a harness, and the two-letter symbol of a plugin: decoration, the name always sits beside it. */
-export const mark=(harness:string)=>`<span class="mk" aria-hidden="true">${esc(harnessInitials[harness]||harness.slice(0,2).toUpperCase())}</span>`;
-export const sym=(name:string)=>`<span class="sym" aria-hidden="true">${esc(name.slice(0,2).toUpperCase())}</span>`;
-export const tag=(label:string,tone='')=>`<span class="tag ${tone}">${esc(label)}</span>`;
-/** A button that runs an action of a page module: `data-action`, and `data-id` for what it acts on. */
-/** `attrs` are further attributes (names are the code's, values are escaped), `cls` further classes. */
-export const button=(label:string,action:string,options:{primary?:boolean;danger?:boolean;accent?:boolean;sm?:boolean;busy?:boolean;icon?:string;id?:string;disabled?:boolean;cls?:string;attrs?:Record<string,string>}={})=>`<button ${[`type="button"`,`class="btn${options.primary?' primary':''}${options.danger?' danger':''}${options.accent?' accent':''}${options.sm?' sm':''}${options.cls?' '+options.cls:''}"`,`data-action="${action}"`,options.id!==undefined?`data-id="${esc(options.id)}"`:'',...Object.entries(options.attrs||{}).map(([k,v])=>`${k}="${esc(v)}"`),options.disabled?'disabled':''].filter(Boolean).join(' ')}>${options.busy?spin:options.icon?icon(options.icon):''}<span>${esc(label)}</span></button>`;
-export const head=(title:string,sub:string,actions='')=>`<header class="ph"><div><h1>${esc(title)}</h1><p>${esc(sub)}</p></div>${actions?`<div class="acts">${actions}</div>`:''}</header>`;
-export const empty=(title:string,description:string,action='')=>`<div class="card empty"><strong>${esc(title)}</strong><span>${esc(description)}</span>${action}</div>`;
-/** A switch for a setting; `action` and `id` say what its click runs; `disabled` for one the host cannot honour. */
-export const sw=(on:boolean,label:string,action:string,id='',disabled=false)=>`<button type="button" class="switch" role="switch" aria-checked="${on}" aria-label="${esc(label)}" data-action="${action}" data-id="${esc(id)}" ${disabled?'disabled':''}><i></i></button>`;
-/** A segmented choice: radios named `name`, the checked one `value`; a change reaches the page module's `change`. */
-export const seg=(name:string,value:string,options:[string,string][],label:string)=>`<div class="seg" role="radiogroup" aria-label="${esc(label)}">${options.map(([v,l])=>`<label><input type="radio" name="${esc(name)}" value="${esc(v)}" ${v===value?'checked':''}><span>${esc(l)}</span></label>`).join('')}</div>`;
-/** A text field of a form: its label, the hint, and a slot for its error, which the input is described by (`error:false` for a field repeated in a row, where one slot covers the row). `attrs` are further attributes of the input. */
-export const field=(label:string,name:string,value='',options:{required?:boolean;type?:string;hint?:string;readonly?:boolean;mono?:boolean;placeholder?:string;optional?:boolean;autofocus?:boolean;error?:boolean;attrs?:Record<string,string>}={})=>{
- const slot=options.error!==false,described=[options.hint?`hint-${name}`:'',slot?`err-${name}`:''].filter(Boolean).join(' ');
- return `<label class="fld"><span>${esc(label)}${options.optional?'<em>optional</em>':''}</span><input ${[`name="${name}"`,`value="${esc(value)}"`,`type="${options.type||'text'}"`,options.mono?'class="mono"':'',options.placeholder?`placeholder="${esc(options.placeholder)}"`:'',options.required?'aria-required="true"':'',options.readonly?'readonly':'',options.autofocus?'autofocus':'',...Object.entries(options.attrs||{}).map(([k,v])=>`${k}="${esc(v)}"`),described?`aria-describedby="${described}"`:''].filter(Boolean).join(' ')}>${options.hint?`<small id="hint-${name}">${esc(options.hint)}</small>`:''}${slot?`<small class="err" id="err-${name}" role="alert"></small>`:''}</label>`;
-};
+/** The label mapping belongs to the domain; avatar rendering belongs to Imago. */
+export const mark=(harness:string)=>avatarHtml(harnessInitials[harness]||harness.slice(0,2).toUpperCase());
 /** A stamp the service wrote, in epoch seconds (10 digits) or milliseconds (13), as milliseconds; null for anything else. */
 const stamp=(value:unknown)=>{const s=String(value??'');return /^\d{10}(\d{3})?$/.test(s)?Number(s)*(s.length===10?1000:1):null;};
 /** The service stamps some events in epoch seconds: shown as a date, anything else as it came. */

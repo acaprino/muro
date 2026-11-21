@@ -71,19 +71,19 @@ const WRITES = /\b(Edit|Add a record|Add input|Harmonize|Harmonize again|Move pi
 // ---------- the state strip ----------
 test('the strip says Harmonized, when the last run was, its version and its agent', () => {
   const html = panel(opened());
-  const strip = html.match(/<section class="strip[^"]*" aria-label="Harmonization state">[\s\S]*?<\/section>/)![0];
-  assert.match(strip, /class="strip good"/);
+  const strip = html.match(/<section class="im-summary"[^>]* aria-label="Harmonization state">[\s\S]*?<\/section>/)![0];
+  assert.match(strip, /class="im-summary" data-im-tone="ok"/);
   assert.match(words(strip), /^Harmonized Last run 18 Nov 2026, 12:00 Version 0\.5\.0 Agent Claude Code$/, 'the newest run, wherever it is in the file');
 });
 test('the strip leaves the agent out when the last run names none, and says never when there is no run', () => {
-  const noAgent = words(panel(opened('records', {}, info({ history: [run('r', '2026-11-18T12:00:00Z', '0.5.0')] }))).match(/<section class="strip[\s\S]*?<\/section>/)![0]);
+  const noAgent = words(panel(opened('records', {}, info({ history: [run('r', '2026-11-18T12:00:00Z', '0.5.0')] }))).match(/<section class="im-summary[\s\S]*?<\/section>/)![0]);
   assert.equal(noAgent, 'Harmonized Last run 18 Nov 2026, 12:00 Version 0.5.0');
-  const none = words(panel(opened('records', {}, info({ history: [] }))).match(/<section class="strip[\s\S]*?<\/section>/)![0]);
+  const none = words(panel(opened('records', {}, info({ history: [] }))).match(/<section class="im-summary[\s\S]*?<\/section>/)![0]);
   assert.equal(none, 'Harmonized Last run never Version 0.5.0');
 });
 test('an agent the page has no name for is shown as it came, a time that is no date too', () => {
   const html = panel(opened('records', {}, info({ history: [run('r', 'sometime', '0.5.0', { engine: '<local>' })] })));
-  assert.match(words(html.match(/<section class="strip[\s\S]*?<\/section>/)![0]), /Last run sometime .* Agent <local>/);
+  assert.match(words(html.match(/<section class="im-summary[\s\S]*?<\/section>/)![0]), /Last run sometime .* Agent <local>/);
   assert.match(html, /&lt;local&gt;/, 'escaped');
 });
 test('step 2 writes nothing: no Edit, no Add a record, no Harmonize button, in any view', () => {
@@ -98,8 +98,8 @@ test('step 2 writes nothing: no Edit, no Add a record, no Harmonize button, in a
 // ---------- the four views ----------
 test('the views are a labelled radio group named hview, with their counts, and the current one is checked', () => {
   const html = panel(opened('choices'));
-  const group = html.match(/<div class="seg" role="radiogroup" aria-label="Harmonization views">[\s\S]*?<\/div>/)![0];
-  assert.deepEqual([...group.matchAll(/<input type="radio" name="hview" value="(\w+)" (checked)?[^>]*><span>([^<]+)<\/span>/g)].map(m => [m[1], !!m[2], m[3]]), [
+  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Harmonization views">[\s\S]*?<\/div>/)![0];
+  assert.deepEqual([...group.matchAll(/<input type="radio" name="hview" value="(\w+)"( checked)?[^>]*><span>([^<]+)<\/span>/g)].map(m => [m[1], !!m[2], m[3]]), [
     ['records', false, 'Decision records · 3'], ['choices', true, 'Choices by part · 7'], ['history', false, 'History · 3'], ['prompts', false, 'Prompts'],
   ]);
 });
@@ -120,13 +120,13 @@ test('a view the state does not know shows the records', () => {
 test('Decision records: who wrote each, its date, its subjects and its text, in the file\'s order', () => {
   const html = panel(opened('records'));
   assert.match(words(html), /Why the project is the way it is\. Muro writes a record when a harmonization takes a decision that shapes the project\. A binding record is a rule the next harmonization has to follow\./);
-  assert.deepEqual(items(html.slice(html.indexOf('<ul class="card list dec">'))), [
+  assert.deepEqual(items(html.slice(html.indexOf('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">'))), [
     'By Muro 2026-11-10 · design-taste, ai-design-skills One owner per output.',
     'Yours · binding 2026-11-12 Documents keep the source\'s limits.',
     'By Muro · binding 2026-11-19 · office-docs Never <b>bold</b> & "quoted"',
   ]);
-  assert.match(html, /<span class="tag accent">Yours · binding<\/span>/);
-  assert.match(html, /<span class="tag ">By Muro<\/span>/, 'a record of Muro that does not bind is not highlighted');
+  assert.match(html, /<span class="im-chip" data-im-tone="accent">Yours · binding<\/span>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="">By Muro<\/span>/, 'a record of Muro that does not bind is not highlighted');
 });
 test('Decision records: every value is escaped', () => {
   const html = panel(opened('records'));
@@ -136,65 +136,68 @@ test('Decision records: every value is escaped', () => {
 test('Decision records: none yet is said, not an empty list', () => {
   const html = panel(opened('records', {}, info({ records: [] })));
   assert.match(words(html), /No record yet/);
-  assert.doesNotMatch(html, /<ul class="card list dec">/);
+  assert.doesNotMatch(html, /<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">/);
 });
 
 // ---------- choices by part ----------
 test('Choices by part: each decision with its form, its source, the part, the reason and its capabilities as links', () => {
   const html = panel(opened('choices'));
-  const list = html.slice(html.indexOf('<ul class="card list dec">'));
+  const list = html.slice(html.indexOf('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">'));
   assert.deepEqual(items(list), [
-    'Capability taste-skill SKILL.md Its method is a design capability. → design-taste',
-    'Capability taste-skill references/anti-slop.md Read by the capability on demand. → design-taste → design-review',
+    'Capability taste-skill SKILL.md Its method is a design capability. design-taste',
+    'Capability taste-skill references/anti-slop.md Read by the capability on demand. design-taste design-review',
     'Dropped taste-skill README.md Describes the repository, not a method.',
-    'Capability genoffice skills/docx Produces Word files. → office-docs',
-    'Hook genoffice hooks/guard.json The source declares it for every session. → office-docs',
+    'Capability genoffice skills/docx Produces Word files. office-docs',
+    'Hook genoffice hooks/guard.json The source declares it for every session. office-docs',
     'Always on superpowers skills/using-superpowers Acts in every session.',
     'Always on custom-instructions/house-style.md house-style.md The owner\'s own words.',
   ]);
   assert.match(words(html), /What each part of each input became, and why\. 7 of 7/);
-  assert.deepEqual([...list.matchAll(/<span class="tag (\w*)">(Capability|Always on|Hook|Dropped)<\/span>/g)].map(m => [m[2], m[1]]).slice(0, 4), [['Capability', 'accent'], ['Capability', 'accent'], ['Dropped', ''], ['Capability', 'accent']]);
-  assert.match(list, /<span class="tag warn">Always on<\/span>/);
-  assert.match(list, /<span class="tag good">Hook<\/span>/);
+  assert.deepEqual([...list.matchAll(/<span class="im-chip" data-im-tone="(\w*)">(Capability|Always on|Hook|Dropped)<\/span>/g)].map(m => [m[2], m[1]]).slice(0, 4), [['Capability', 'accent'], ['Capability', 'accent'], ['Dropped', ''], ['Capability', 'accent']]);
+  assert.match(list, /<span class="im-chip" data-im-tone="warn">Always on<\/span>/);
+  assert.match(list, /<span class="im-chip" data-im-tone="ok">Hook<\/span>/);
 });
 test('Choices by part: a capability is opened through the action of the graph, and is named for assistive tech', () => {
   const html = panel(opened('choices'));
-  assert.match(html, /<button type="button" class="tag accent" data-action="open-capability" data-id="design-review" aria-label="Open capability design-review"><span aria-hidden="true">→<\/span> design-review<\/button>/);
+  assert.match(html, /<button type="button" class="im-chip" data-im-tone="accent" data-action="open-capability" data-id="design-review" aria-label="Open capability design-review"><svg class="im-icon"[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/svg>design-review<\/button>/);
   assert.equal(html.match(/data-action="open-capability"/g)?.length, 5, 'one link for each target of each decision');
 });
 test('Choices by part: the input filter is a labelled select with every input, and the form filter a labelled radio group', () => {
   const html = panel(opened('choices'));
-  assert.match(html, /<select name="dsrc" aria-label="Filter by input"><option value="">All inputs<\/option><option value="taste-skill">taste-skill<\/option><option value="genoffice">genoffice<\/option><option value="superpowers">superpowers<\/option><\/select>/);
-  const group = html.match(/<div class="seg" role="radiogroup" aria-label="Filter by form">[\s\S]*?<\/div>/)![0];
-  assert.deepEqual([...group.matchAll(/name="dform" value="([\w-]+)" (checked)?[^>]*><span>([^<]+)</g)].map(m => [m[1], !!m[2], m[3]]), [
+  const select = html.match(/<select name="dsrc" aria-label="Filter by input">([\s\S]*?)<\/select>/)![1];
+  assert.deepEqual([...select.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)].map(m=>[m[1],/\bselected\b/.test(m[2]),m[3]]), [
+    ['',true,'All inputs'],['taste-skill',false,'taste-skill'],['genoffice',false,'genoffice'],['superpowers',false,'superpowers'],
+  ]);
+  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Filter by form">[\s\S]*?<\/div>/)![0];
+  assert.deepEqual([...group.matchAll(/name="dform" value="([\w-]+)"( checked)?[^>]*><span>([^<]+)</g)].map(m => [m[1], !!m[2], m[3]]), [
     ['all', true, 'All'], ['capability', false, 'Capability'], ['always-on', false, 'Always on'], ['hook', false, 'Hook'], ['dropped', false, 'Dropped'],
   ]);
 });
 test('Choices by part: one input only', () => {
   const html = panel(opened('choices', { dsrc: 'genoffice' }));
   assert.match(html, /<option value="genoffice" selected>/);
-  assert.deepEqual(items(html.slice(html.indexOf('<ul class="card list dec">'))).map(t => t.split(' ').slice(0, 3).join(' ')), ['Capability genoffice skills/docx', 'Hook genoffice hooks/guard.json']);
+  assert.deepEqual(items(html.slice(html.indexOf('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">'))).map(t => t.split(' ').slice(0, 3).join(' ')), ['Capability genoffice skills/docx', 'Hook genoffice hooks/guard.json']);
   assert.match(words(html), /2 of 7/);
 });
 test('Choices by part: one form only, and both filters together', () => {
-  const byForm = items(panel(opened('choices', { dform: 'always-on' })).split('<ul class="card list dec">')[1]).map(t => t.split(' ').slice(0, 4).join(' '));
+  const byForm = items(panel(opened('choices', { dform: 'always-on' })).split('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">')[1]).map(t => t.split(' ').slice(0, 4).join(' '));
   assert.deepEqual(byForm, ['Always on superpowers skills/using-superpowers', 'Always on custom-instructions/house-style.md house-style.md']);
   const both = panel(opened('choices', { dsrc: 'taste-skill', dform: 'capability' }));
   assert.match(both, /value="capability" checked/);
-  assert.equal(items(both.split('<ul class="card list dec">')[1]).length, 2);
+  assert.equal(items(both.split('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">')[1]).length, 2);
   assert.match(words(both), /2 of 7/);
 });
 test('Choices by part: a filter that leaves nothing says so and keeps the filters', () => {
   const html = panel(opened('choices', { dsrc: 'superpowers', dform: 'hook' }));
   assert.match(words(html), /No choice matches this filter\./);
   assert.match(words(html), /0 of 7/);
-  assert.doesNotMatch(html, /<ul class="card list dec">/);
+  assert.doesNotMatch(html, /<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">/);
   assert.match(html, /<select name="dsrc"/, 'the person can change the filter');
 });
 test('Choices by part: a filter for an input the project does not have means all inputs, and so does an unknown form', () => {
   const html = panel(opened('choices', { dsrc: 'vanished', dform: 'nonsense' }));
   assert.match(words(html), /7 of 7/);
-  assert.doesNotMatch(html, /<option [^>]*selected/, 'All inputs is the one shown');
+  assert.deepEqual([...html.matchAll(/<option value="([^"]*)"[^>]*selected/g)].map(m=>m[1]), [''], 'All inputs is selected');
   assert.match(html, /name="dform" value="all" checked/);
 });
 test('Choices by part: a decision of a custom instruction is in "All inputs" and not under an input', () => {
@@ -226,10 +229,10 @@ test('History: one row a run, newest first, with the version, its tag, the chang
 });
 test('History: the changelog keeps its lines, and the results have their own tones', () => {
   const html = panel(opened('history', {}, info({ history: [...RUNS, run('run-4', '2026-11-20T08:00:00Z', '0.5.1', { status: 'failed' })] })));
-  assert.match(html, /<td class="note">Moved taste-skill to v1\.2\.0\.\nThe Figma step works in any tool\.<\/td>/);
-  assert.match(html, /<span class="tag good">Built and validated<\/span>/);
-  assert.match(html, /<span class="tag ">Cancelled<\/span>/);
-  assert.match(html, /<span class="tag bad">Failed<\/span>/);
+  assert.match(html, /<td class="im-log-note">Moved taste-skill to v1\.2\.0\.\nThe Figma step works in any tool\.<\/td>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="ok">Built and validated<\/span>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="">Cancelled<\/span>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="err">Failed<\/span>/);
   const rows = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].slice(1).map(m => words(m[1]));
   assert.equal(rows[0], '20 Nov 2026, 08:00 0.5.1 marionette-v0.5.1 Changes of 0.5.1. Failed — —', 'a newer run that failed is not the current one');
   assert.match(rows[1], /^18 Nov 2026, 12:00 0\.5\.0 current /);
@@ -248,7 +251,7 @@ test('History: the tag comes from the repository\'s tag prefix, and a project wi
 });
 test('History: the table is a labelled, keyboard-scrollable region, and every value is escaped', () => {
   const html = panel(opened('history', {}, info({ history: [run('x', '2026-11-18T12:00:00Z', '<0.5>', { changelog: '<img src=x>', engine: '<e>' })] })));
-  assert.match(html, /<div class="card tablewrap" role="region" aria-label="Runs" tabindex="0">/);
+  assert.match(html, /<div class="im-panel im-surface im-table-scroll" data-im-surface="sheet" role="region" aria-label="Runs" tabindex="0">/);
   assert.equal(/<img|<0\.5>|<e>/.test(html), false);
   assert.match(html, /&lt;img src=x&gt;/);
 });
@@ -268,7 +271,7 @@ test('Prompts: each file with what it is for, and an Open that is named for its 
     'classify.md How a harness picks capabilities for a request, at run time. Open',
     'custom.md Open',
   ]);
-  assert.match(html, /<button type="button" class="btn sm" data-action="harmonize-prompt" data-id="intake\.md" aria-label="Open intake\.md"><span>Open<\/span><\/button>/);
+  assert.match(html, /<button type="button" class="im-btn im-btn--sm" data-action="harmonize-prompt" data-id="intake\.md" aria-label="Open intake\.md"><span>Open<\/span><\/button>/);
 });
 test('Prompts: none is said', () => {
   assert.match(words(panel(opened('prompts', {}, info({ prompts: [] })))), /No prompt/);
@@ -282,7 +285,7 @@ test('Open shows the prompt, whole, in a sheet named for its file; the text is e
   assert.match(html, /<h2 id="dlg-title">intake\.md<\/h2>/, 'the heading names the dialog');
   assert.match(html, /Reads the inputs, classifies what they do/);
   assert.match(html, /data-close/, 'a way to close it');
-  assert.match(html, /<pre class="prompt" tabindex="0" aria-label="Text of intake\.md"># Intake\n\nRead &lt;everything&gt; first &amp; &quot;decide&quot;\.<\/pre>/);
+  assert.match(html, /<pre class="im-code-view" tabindex="0" aria-label="Text of intake\.md"># Intake\n\nRead &lt;everything&gt; first &amp; &quot;decide&quot;\.<\/pre>/);
   assert.equal(html.includes('<everything>'), false);
 });
 test('Open for a prompt the project does not hold, or with no prompt named, opens nothing', async () => {
@@ -331,7 +334,7 @@ test('the page paints what the events kept: choose a view, then filter it', () =
 // ---------- in the page ----------
 test('the page puts the step in its tab panel, and the tab still says Harmonized', () => {
   const html = projects.view(opened('records'));
-  assert.match(html, /<div role="tabpanel" id="step-panel" aria-labelledby="step-tab-harmonize"><section class="strip good"/);
+  assert.match(html, /<div role="tabpanel" id="step-panel" aria-labelledby="step-tab-harmonize"><section class="im-summary" data-im-tone="ok"/);
   assert.match(html, /id="step-tab-harmonize" aria-selected="true"[^>]*>[\s\S]*?<small>Harmonized<\/small>/);
   assert.doesNotMatch(html, /Coming in this version/);
 });
@@ -340,9 +343,9 @@ test('the state of the harmonization is one value: the page\'s head, its tab and
   Object.assign(STATE, { label: 'Waiting', tone: 'warn' });
   try {
     const html = projects.view(opened('records'));
-    assert.match(html, /<span class="tag warn">Waiting<\/span>/, 'the head');
+    assert.match(html, /<span class="im-chip" data-im-tone="warn">Waiting<\/span>/, 'the head');
     assert.match(html, /id="step-tab-harmonize"[^>]*>[\s\S]*?<small>Waiting<\/small>/, 'the tab');
-    assert.match(html, /<section class="strip warn" aria-label="Harmonization state"><span class="sico">[\s\S]*?<strong>Waiting<\/strong>/, 'the strip');
+    assert.match(html, /<section class="im-summary" data-im-tone="warn" aria-label="Harmonization state"><span class="im-summary-icon">[\s\S]*?<strong>Waiting<\/strong>/, 'the strip');
     assert.doesNotMatch(html, /Harmonized/, 'no second copy of the word');
   } finally { Object.assign(STATE, before); }
 });
