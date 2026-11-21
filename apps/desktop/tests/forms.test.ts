@@ -108,7 +108,7 @@ test('the adapt dialog asks for a harness and a budget above zero, tied to its e
  const state=viewState(snapshot()),html=adaptDialog(state,plugin);
  assert.match(html,/<h2 id="dlg-title">Adapt Package with AI<\/h2>/);assert.match(html,/Claude Code/);
  assert.match(html,/name="budget" value="2" type="number"/);assert.match(html,/aria-describedby="[^"]*err-budget"/);assert.match(html,/id="err-budget" role="alert"/);
- assert.doesNotMatch(html,/value="deepseek"/);assert.match(html,/<button type="submit" class="im-btn">Start<\/button>/);
+ assert.doesNotMatch(html,/value="deepseek"/);assert.match(html,/<button type="submit" class="im-btn im-btn--primary">Start<\/button>/);
  assert.match(adaptDialog(state,{...plugin,targets:['t1','t2']}),/<option value="opencode" selected>/,'the harness the plugin has no build for is chosen');
  const stale={...snapshot(),custom_instructions:[{plugin_id:'pkg',path:'p',files:[],digest:'',stale_harnesses:['codex']}]};
  assert.match(adaptDialog(viewState(stale),plugin),/<option value="codex" selected>/,'a harness whose instructions changed comes first');
@@ -128,7 +128,7 @@ test('the adapt dialog names Claude Code and starts from the budget of the AI se
  const claude=adaptDialog(viewState(settingsWith({harness:'claude-code',budget_usd:3.25})),plugin);
  assert.match(said(claude),/Claude Code rebuilds this plugin/);assert.match(said(claude),/It uses Claude Code's own credentials/);assert.match(claude,/name="budget" value="3.25"/);
  assert.doesNotMatch(said(claude),/needs a coding agent/,'a harness engine needs no explanation');
- assert.equal(start(claude),'<button type="submit" class="im-btn">Start</button>');assert.doesNotMatch(claude,/data-action="page"/,'no link to Settings: nothing to change');
+ assert.equal(start(claude),'<button type="submit" class="im-btn im-btn--primary">Start</button>');assert.doesNotMatch(claude,/data-action="page"/,'no link to Settings: nothing to change');
 });
 test('with Codex as the agent, whatever the engine, the dialog says adapting needs Claude Code, links to Settings and cannot be started',()=>{
  for(const [why,ai] of [['the harness engine',{harness:'codex',budget_usd:0.5}],['the API engine',{engine:'api',harness:'codex',budget_usd:1.5,model:'gpt-test'}]] as const){
@@ -143,7 +143,7 @@ test('with the API as the engine and Claude Code as the agent the dialog says ad
  const api=adaptDialog(viewState(settingsWith({engine:'api',harness:'claude-code',budget_usd:1.5,model:'gpt-test'})),plugin);
  assert.match(said(api),/Adapting a plugin needs a coding agent on this computer: Claude Code\./);
  assert.match(said(api),/It uses Claude Code's own credentials/);assert.doesNotMatch(api,/gpt-test/);assert.match(api,/name="budget" value="1.5"/);
- assert.equal(start(api),'<button type="submit" class="im-btn">Start</button>');
+ assert.equal(start(api),'<button type="submit" class="im-btn im-btn--primary">Start</button>');
 });
 test('a service with no AI settings yet falls back to its agent and to a budget of 2; a budget of nothing is not offered',()=>{
  const old=adaptDialog(viewState(settingsWith(undefined,'codex')),plugin);
