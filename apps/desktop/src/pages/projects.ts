@@ -146,7 +146,7 @@ function askRemoval(app: App, d: DOMStringMap): void {
   const p = app.state.projects.list?.find(x => x.id === d.id), s = app.state.snapshot;
   if (!p || !s) return;
   const installed = s.registry.plugins.some(x => x.project === p.id);
-  app.confirm(`Remove ${nameOf(p)} from your list?`, `Only the entry goes: the file stays where it is (${p.path}) and you can open it again.${installed ? ' Its installed plugin stays as it is; Sync shows it as changed until the project is in your list again.' : ''}`, 'Remove from list',
+  app.confirm(`Remove ${nameOf(p)} from your list?`, `Only the entry goes: the file stays where it is (${p.path}) and you can open it again.${installed ? ' Its installed plugin stays as it is; Sync shows it as changed until the project is in your list again.' : ''}`, `Remove ${nameOf(p)}`,
     () => void app.run('Removing the project from your list…', () => removeRequest(app, p.id), async saved => { app.adopt(saved); await loadList(app); app.notify(`${nameOf(p)} removed from your list.`); }), true);
 }
 

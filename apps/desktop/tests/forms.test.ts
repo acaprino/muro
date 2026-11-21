@@ -309,3 +309,7 @@ test('choosing the rule saves it and says Muro will ask before it uninstalls; ch
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(notes.at(-1),'Saved. Plugins outside your list are left alone.');
 });
+test('the destructive button of a harness names it',()=>{
+ const s=snapshot(),html=harnessPanel(viewState(s),s.registry.targets[0]);
+ assert.match(html,/data-action="remove-target" data-id="t1"[^>]*>(?:(?!<\/button>)[\s\S])*<span>Stop managing Codex<\/span>/);
+});

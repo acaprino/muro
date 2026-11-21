@@ -55,7 +55,7 @@ function jobCard(s: Snapshot, job: Job, index: number, now: number): string {
   const said = [job.phase, ran && `running for ${ran}`].filter(Boolean).join(', ');
   const rest = [job.message, budget && `budget up to ${budget}`].filter(Boolean).join(' · ');
   return taskCardHtml({id:`job-${index}`,title:`Adapting ${pluginName(s, job.plugin_id)} for ${harnessName(job.harness)}`,leadingHtml:spin,
-    actionsHtml:button('Cancel','cancel-job',{id:job.id,danger:true}),phase:job.phase,elapsed:ran?`Running for ${ran}`:'',
+    actionsHtml:button('Cancel adaptation','cancel-job',{id:job.id,danger:true,attrs:{'aria-label':`Cancel the adaptation of ${pluginName(s, job.plugin_id)} for ${harnessName(job.harness)}`}}),phase:job.phase,elapsed:ran?`Running for ${ran}`:'',
     progressLabel:'Adaptation in progress',progressText:said,description:rest,detailHtml:log(job.log_path)});
 }
 const item = (e: Entry) => timelineItemHtml({time:when(e.time),title:e.title,detail:e.message,detailHtml:log(e.log||''),trailingHtml:outcome(e.status)});
@@ -71,7 +71,12 @@ export function view(state: ViewState, now: number = Date.now()): string {
 
 export const actions: Actions = {
   /** The job is stopped by the shell; the snapshot then carries its new state. */
-  'cancel-job': (app, data) => data.id ? app.run('Cancelling…', async () => { await app.request('cancel_job', { id: data.id }); return app.request<Snapshot>('snapshot'); }, v => app.adopt(v)) : undefined,
+  'cancel-job': (app, data) => {
+    const job = data.id ? app.state.snapshot?.jobs?.find(j => j.id === data.id) : undefined;
+    if (!data.id || !job) return;
+    // It cannot be undone: the question names the plugin and the harness, and Keep running is the safe answer.
+    app.confirm('Cancel adaptation?', `${pluginName(app.state.snapshot!, job.plugin_id)} for ${harnessName(job.harness)} stops where it is. It cannot be resumed.`, 'Cancel adaptation', () => void app.run('Cancelling…', async () => { await app.request('cancel_job', { id: data.id }); return app.request<Snapshot>('snapshot'); }, v => app.adopt(v)), true, 'Keep running');
+  },
 };
 export function change(app: App, el: TextBox): boolean {
   if (el.name !== 'afilter') return false;

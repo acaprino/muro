@@ -306,7 +306,7 @@ await test('Verify and Clean up', 'default', {}, async app => {
   assert.equal((await calls(app, 'maintenance')).length, 1);
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Clean up…', 'the focus goes back to where the dialog opened');
   await page.getByRole('button', { name: 'Clean up…', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Clean up', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Delete unused builds', exact: true }).click();
   await page.locator('[role=status]', { hasText: 'Nothing to clean up' }).waitFor();
   assert.deepEqual((await calls(app, 'maintenance')).map(c => c.payload), [{ kind: 'verify' }, { kind: 'cleanup' }]);
   assert.equal(await page.locator('[role=status]', { hasText: 'Every stored build is intact' }).count(), 0, 'one result at a time');
@@ -381,6 +381,7 @@ await test('Activity: Cancel stops the adaptation, which stays in the list as ca
   const { page } = app;
   await openActivity(page);
   await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
   await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   assert.deepEqual((await calls(app, 'cancel_job')).map(c => c.payload), [{ id: 'job-1' }]);
   const first = page.locator('ul.im-activity-list li').first();
@@ -398,6 +399,7 @@ await test('Activity: the filters, and Problems shows only what failed or was ca
   await page.locator('.im-note[data-im-tone="warn"]').waitFor();
   await openActivity(page);
   await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
   await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   const filter = page.getByRole('radiogroup', { name: 'Filter activity' });
   assert.deepEqual(await filter.locator('label').allTextContents(), ['All', 'Sync', 'AI adaptation', 'Problems']);
@@ -450,6 +452,7 @@ for (const scheme of ['dark', 'light']) {
     await page.locator('.im-note[data-im-tone="warn"]').waitFor();
     await openActivity(page);
     await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
     await page.locator('article.im-task-card').waitFor({ state: 'detached' });
     await page.screenshot({ path: `${shots}/activity-${scheme}-full.png`, clip: { x: 0, y: 0, width: 1280, height: 700 } });
   });

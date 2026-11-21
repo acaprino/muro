@@ -55,7 +55,7 @@ export function installedHere(state:ViewState,target:Target):string {
 export function harnessPanel(state:ViewState,target?:Target,found?:Discovered):string {
  const times=target?state.snapshot!.sync.targets[target.id]:undefined;
  const sub=target?`Checked ${stamp(times?.checked??null)} · last sync ${stamp(times?.synced??null)}`:found?.config_root?'Muro filled in the folder where this harness keeps its plugin configuration by default. Change it for a custom installation.':'Tell Muro where this harness keeps its plugin configuration.';
- return panel('target-form',target?target.name:'Add a harness',sub,`${targetForm(target,found)}${target?installedHere(state,target):''}${errorSlot}`,{submit:target?'Save':'Add harness',leadingHtml:target?button('Stop managing','remove-target',{id:target.id,danger:true}):''});
+ return panel('target-form',target?target.name:'Add a harness',sub,`${targetForm(target,found)}${target?installedHere(state,target):''}${errorSlot}`,{submit:target?'Save':'Add harness',leadingHtml:target?button(`Stop managing ${target.name}`,'remove-target',{id:target.id,danger:true}):''});
 }
 
 /** What the dialog says, before anything starts, when the coding agent of the AI settings is Codex: adapting holds the run to a dollar budget, which only Claude Code allows. */
