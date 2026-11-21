@@ -46,7 +46,15 @@ owner: "fixalo".
 - Rust, on GitHub Actions, branch `fix/claude-plugin-identity`: the resolution
   tests alone first (commit dcebcb3), then the implementation with the unit
   tests of `distribution_identity`, `market_document` and `prepare` /
-  `retained_artifact`. Results: see the commit that adds this record.
+  `retained_artifact`. Run 44899776925 (dcebcb3): the three resolution cases
+  red at their assertions, the guard (a folder with no manifest and no
+  marketplace) green. Run 44900526209 (3c82e5b): the new tests green; red in
+  `marketplace_entries_outside_the_source_or_from_elsewhere_are_not_followed`,
+  whose entry `g` listed a folder inside the source with no manifest, now a
+  plugin by Claude Code's rule (entry removed, 8566c92), and a browser timeout
+  in `browser-harness.mjs` on a frontend this branch did not change. Run
+  44901355196 (8566c92): both jobs green, browser tests included; 1111 Python
+  tests passed.
 - The live run above checks the host protocol. The Rust install path
   (`native::install` against a real Claude Code) is covered only by the ignored
   tests that need `MURO_CLAUDE_TEST_EXE`, not run: there is no cargo on this
