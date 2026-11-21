@@ -201,6 +201,20 @@ pub fn factory_tools(settings: &Value) -> Result<(String, PathBuf)> {
     Ok((python, factory))
 }
 
+/// The repository a source is in: the nearest folder, the source's own included, that holds an entry
+/// named `.git`. A checkout Muro makes from a Git address has one at its top, a local folder has one
+/// when it is in a repository. It looks at folders only; no Git command runs.
+pub fn repository_root(plugin: &Value) -> Result<PathBuf> {
+    let source = plugin["resolved_source"]
+        .as_str()
+        .context("Resolved source missing")?;
+    Path::new(source)
+        .ancestors()
+        .find(|folder| folder.join(".git").exists())
+        .map(Path::to_path_buf)
+        .context("AI adaptation needs a Git repository: this source is a folder that is not in one")
+}
+
 pub fn start(data: &Path, payload: &Value) -> Result<Value> {
     let plugin_id = payload["id"].as_str().context("Plugin ID is required")?;
     let registry = muro_registry::service::request(data, "registry", json!({}))?;
@@ -230,6 +244,7 @@ pub fn start(data: &Path, payload: &Value) -> Result<Value> {
         ["claude-code", "codex", "opencode", "pi", "hermes"].contains(&harness),
         "No Muro adapter for this harness"
     );
+    let root = repository_root(&plugin)?;
     let agent = payload["agent"]
         .as_str()
         .or(registry["settings"]["ai"]["harness"].as_str())
@@ -237,6 +252,17 @@ pub fn start(data: &Path, payload: &Value) -> Result<Value> {
         .unwrap_or("claude-code");
     let budget = payload["budget_usd"].as_f64().unwrap_or(2.0);
     let (python, factory) = factory_tools(&registry["settings"])?;
+    // The factory builds from a commit and accepts only a complete MIT or Apache-2.0 text: a source
+    // that cannot pass is refused here, before the AI run it would pay for.
+    let licensed = crate::factory::Factory::from_settings(&registry["settings"])?.json(
+        &["license-check".to_owned(), root.to_string_lossy().into_owned()],
+        "Checking the source's license",
+        &|| false,
+        crate::factory::READ_LIMIT,
+    );
+    if let Err(error) = licensed {
+        bail!("This source cannot be adapted: {error:#}");
+    }
     let id = uuid::Uuid::new_v4().to_string();
     let dir = job_dir(data, &id)?;
     let package = dir.join("package");
@@ -317,25 +343,25 @@ pub fn start(data: &Path, payload: &Value) -> Result<Value> {
                 !dir.join("cancel").exists(),
                 "Job cancelled before registry update"
             );
-            let adapter = out.join(slug).join("adapters").join(&harness);
+            let built = out.join(slug).join("adapters");
+            let adapter = built.join(&harness);
             ensure!(
                 adapter.is_dir(),
                 "Factory did not emit the requested adapter"
             );
             validate_source_binding(&plugin, &document)?;
             validate_custom_binding(&data, &plugin, &package, &custom)?;
-            let mut updated = plugin.clone();
-            let mut distributions = updated["distributions"]
-                .as_array()
-                .cloned()
-                .unwrap_or_default();
-            distributions.retain(|d| d["harness"] != harness);
-            distributions.push(json!({"harness":harness,"path":adapter,"version":version,"origin":"muro","source_revision":plugin["upstream_revision"],"custom_instructions_digest":custom.digest()}));
-            updated["distributions"] = json!(distributions);
+            // The build wrote the adapter of every host: the registry gets each one it holds, and
+            // decides which of them replace what the plugin already has.
+            let adapters: Vec<Value> = ["claude-code", "codex", "opencode", "pi", "hermes"]
+                .into_iter()
+                .filter(|name| built.join(*name).is_dir())
+                .map(|name| json!({"harness":name,"path":built.join(name).to_string_lossy()}))
+                .collect();
             muro_registry::service::request(
                 &data,
-                "save_plugin",
-                json!({"plugin":updated,"revision":registry["revision"],"expected_custom_instructions_digest":custom.digest()}),
+                "register_distributions",
+                json!({"id":plugin["id"],"source":plugin["source"],"upstream_revision":plugin["upstream_revision"],"expected_custom_instructions_digest":custom.digest(),"asked":harness,"version":version,"adapters":adapters}),
             )?;
             Ok(())
         })();

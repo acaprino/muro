@@ -115,7 +115,7 @@ function aiSection(s: Settings): string {
 export function view(state: ViewState): string {
   const registry = state.snapshot!.registry, s = registry.settings, a = state.autostart, m = state.maintenance, verifying = state.busy === VERIFYING;
   return head('Settings', 'Saved as you change them.')
-    + settingsGroupHtml(row('Plugins that are not in my list', note('Always uninstall: at every sync Muro removes from each harness what is installed there but is not in your list. One harness can differ, in its own settings.'), exclusiveSeg(registry.targets)), { title: 'Sync' })
+    + settingsGroupHtml(row('Plugins that are not in my list', note('Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own settings.'), exclusiveSeg(registry.targets)), { title: 'Sync' })
     + settingsGroupHtml(row(AUTO, note('Checks for changes and applies them by itself.'), sw(s.auto_sync, AUTO, 'toggle-setting', 'auto_sync'))
     + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), selectHtml({ name: 'interval_minutes', value: s.interval_minutes, options: intervalOptions(s.interval_minutes), label: 'Check interval', attrs: { 'data-setting': 'interval_minutes', disabled: !s.auto_sync } }))
     + row(START, startHint(a, s), sw(!!a?.enabled, START, 'toggle-setting', 'autostart', !a?.supported))

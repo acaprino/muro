@@ -1,4 +1,5 @@
 import type { Plugin, Snapshot, Target, Plan, Operation, InstalledPlugin } from './types.ts';
+import { plural } from './ui.ts';
 export interface PluginStatus { kind:string; label:string; tone:string }
 const status=(kind:string,label:string,tone:string):PluginStatus=>({kind,label,tone});
 /** What the snapshot holds about one plugin on one target; the plugin state and the cell read it the same way. */
@@ -83,6 +84,26 @@ export function sameOperations(a:Plan|null,b:Plan|null):boolean {
   const key=(o:Operation)=>JSON.stringify([o.target_id,o.plugin_id,o.name,o.kind,o.from_version,o.to_version]),left=a.operations.map(key).sort(),right=b.operations.map(key).sort();
   return left.every((k,i)=>k===right[i]);
 }
+/** What a plan removes: `total` is its operations of kind `remove`; `missing` of them clear a record whose files are gone (`present === false`: an operation without the field is a real uninstall), `uninstall` of them remove a copy that is there. */
+export function removals(plan:Plan):{total:number;uninstall:number;missing:number} {
+ const gone=plan.operations.filter(o=>o.kind==='remove'),missing=gone.filter(o=>o.present===false).length;
+ return {total:gone.length,uninstall:gone.length-missing,missing};
+}
+/** The primary button of the review sheet. With removals it says what they do (uninstall, clear a record without files, or both), so confirming is reading; without any it is the plain count of changes. */
+export function removalLabel(plan:Plan):string {
+ const {total,uninstall,missing}=removals(plan);
+ if(!total) return `Apply ${plural(plan.operations.length,'change')}`;
+ return uninstall&&missing?`Apply, uninstall ${uninstall} and clear ${missing} without files`:missing?`Apply and clear ${plural(missing,'record')} without files`:`Apply and uninstall ${plural(uninstall,'plugin')}`;
+}
+/** The body of `apply` for a stored plan. A plan with removals sends `confirm_removals` (their number: the person read it) when the choice is `confirm`, or `skip_removals` when it is `skip`; a plan without removals sends neither. `allow_blocked` goes with blockers. */
+export function applyPayload(plan:Plan,choice:'confirm'|'skip'):Record<string,unknown> {
+ const {total}=removals(plan);
+ return {plan_id:plan.id,...(plan.blockers.length?{allow_blocked:true}:{}),...(total?choice==='skip'?{skip_removals:true}:{confirm_removals:total}:{})};
+}
+/** What the notice says after an apply: the changes it applied, and the removals it left out (`skipped`, from the service's answer). */
+export const appliedNotice=(applied:number,skipped=0):string=>`${plural(applied,'change')} applied.${skipped?` ${plural(skipped,'removal')} left out.`:''}`;
+/** Whether Apply all must open the review sheet instead of applying: a fresh plan that has blockers, nothing to do or a removal, or is not what was shown, was not seen as it is. A removal is never applied without the person's confirmation in the sheet. */
+export const mustReview=(shown:Plan|null,fresh:Plan):boolean=>!!fresh.blockers.length||!fresh.operations.length||removals(fresh).total>0||!sameOperations(shown,fresh);
 /** Installed on an enabled harness that was read completely, and that the list does not hold (`inList`: not put there by Muro, and not added to the list since): `index` is its place in the inventory. */
 export function unlisted(snapshot:Snapshot):{target:Target;plugin:InstalledPlugin;index:number}[] {
   return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!inList(snapshot,target,u.plugin)):[];});
@@ -128,3 +149,5 @@ export const listedPlugin=(installed:InstalledPlugin,target:Target):Plugin=>({id
 export const listing=(installed:InstalledPlugin,target:Target,revision:number)=>({revision,plugin:listedPlugin(installed,target),adopt:{target_id:target.id,native_id:installed.id}});
 /** Whether the list already holds this installed plugin: Muro put it there, or a plugin of the list targets the harness with a build in the folder it is installed in. */
 export const inList=(snapshot:Snapshot,target:Target,installed:InstalledPlugin):boolean=>installed.managed||(!!installed.path&&snapshot.registry.plugins.some(p=>p.targets.includes(target.id)&&p.distributions.some(d=>d.harness===target.harness&&d.path===installed.path)));
+/** What a line of an inventory adds for an entry whose files are gone (`present === false`): its record is still there, its folder is not. */
+export const filesMissing=(installed:InstalledPlugin):string=>installed.present===false?' · files missing':'';

@@ -34,7 +34,7 @@ await test('a column header opens the harness sheet; each wrong field says what 
   assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet on the right');
   assert.equal(await focused(page, 'inside'), true, 'the sheet takes the focus');
   assert.equal(await dlg.getAttribute('aria-labelledby'), 'dlg-title');
-  for (const label of ['Name', 'Harness', 'Configuration folder', 'Executable', 'Keep this harness in sync', 'Always uninstall plugins that are not in my list']) await dlg.getByLabel(label).first().waitFor();
+  for (const label of ['Name', 'Harness', 'Configuration folder', 'Executable', 'Keep this harness in sync', 'Uninstall plugins that are not in my list']) await dlg.getByLabel(label).first().waitFor();
   await dlg.getByText('Checked never · last sync never').waitFor();
   await page.screenshot({ path: shots + '/harness-sheet.png' });
   const root = dlg.locator('[name=root]'), save = dlg.getByRole('button', { name: 'Save', exact: true });
@@ -188,7 +188,7 @@ await test('Add by hand opens an empty sheet and Rescan reads the computer again
 });
 
 // ---------- plugins outside the list ----------
-await test('Always uninstall lists the removal before Apply', 'unlisted', {}, async app => {
+await test('Uninstall, asking first lists the removal before Apply', 'unlisted', {}, async app => {
   const { page } = app;
   await page.getByRole('heading', { name: 'Installed, not in your list' }).waitFor();
   const line = page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' });
@@ -196,11 +196,11 @@ await test('Always uninstall lists the removal before Apply', 'unlisted', {}, as
   await line.getByText('Left alone', { exact: true }).waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Leave alone' }).isChecked(), true);
   await page.screenshot({ path: shots + '/harness-unlisted.png' });
-  await page.getByRole('radio', { name: 'Always uninstall' }).check({ force: true });
-  await line.getByText('Removed at the next sync', { exact: true }).waitFor();
+  await page.getByRole('radio', { name: 'Uninstall, asking first' }).check({ force: true });
+  await line.getByText('Removal waits for your confirmation', { exact: true }).waitFor();
   const saved = (await callsOf(app, 'save_target')).at(-1).payload;
   assert.equal(saved.target.exclusive, true);assert.equal(saved.target.id, 't1');assert.equal(saved.revision, 1);
-  assert.equal(await toast(page).first().textContent(), 'Saved. Plugins outside your list are uninstalled at the next sync.');
+  assert.equal(await toast(page).first().textContent(), 'Saved. Muro will ask before it uninstalls plugins outside your list.');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'remove', 'the radio keeps the focus');
   assert.deepEqual((await actions(app)).slice(-2), ['save_target', 'plan'], 'the plan is asked for after the save, and nothing is applied');
   await page.locator('section.im-summary strong').getByText('1 change ready to apply').waitFor();
@@ -211,6 +211,8 @@ await test('Always uninstall lists the removal before Apply', 'unlisted', {}, as
   await sheet.getByText('Remove', { exact: true }).waitFor();
   await sheet.getByText('old-snippets').waitFor();
   await sheet.getByText('1 plugin will be uninstalled.').waitFor();
+  await sheet.getByRole('button', { name: 'Apply and uninstall 1 plugin', exact: true }).waitFor();
+  assert.equal(await sheet.getByRole('button', { name: 'Apply without uninstalling' }).count(), 0, 'a plan of removals only has nothing to apply without them');
   assert.equal((await actions(app)).includes('apply'), false, 'looking is not applying');
   await page.screenshot({ path: shots + '/harness-unlisted-review.png' });
   await page.keyboard.press('Escape');
@@ -235,7 +237,7 @@ await test('the rule is saved harness by harness; it stops at the first one that
   const before = (await callsOf(app, 'save_target')).length;
   // The second save of the rule is the one the fixture refuses.
   await page.evaluate(() => { let reads = 0; Object.defineProperty(window.flags, 'rejectSave', { get: () => ++reads >= 2, configurable: true }); });
-  await page.getByRole('radio', { name: 'Always uninstall' }).click({ force: true });
+  await page.getByRole('radio', { name: 'Uninstall, asking first' }).click({ force: true });
   await page.getByRole('alert').filter({ hasText: 'was not saved' }).waitFor();
   const saves = (await callsOf(app, 'save_target')).slice(before);
   assert.equal(saves.length, 2, 'it did not go on after the failure');
@@ -244,12 +246,12 @@ await test('the rule is saved harness by harness; it stops at the first one that
   assert.equal(saves[1].payload.revision, saves[0].payload.revision + 1, 'the second save carries the revision the first one returned');
   assert.match(await page.getByRole('alert').filter({ hasText: 'was not saved' }).textContent(), /1 harness saved\. Second was not saved: Version conflict/);
   await page.getByText('Differs per harness').waitFor();
-  assert.equal(await page.getByRole('radio', { name: 'Always uninstall' }).isChecked(), false, 'neither choice claims what is half done');
-  await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).getByText('Removed at the next sync').waitFor();
+  assert.equal(await page.getByRole('radio', { name: 'Uninstall, asking first' }).isChecked(), false, 'neither choice claims what is half done');
+  await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).getByText('Removal waits for your confirmation').waitFor();
   await page.evaluate(() => { delete window.flags.rejectSave; window.flags.rejectSave = false; });
   await page.getByRole('button', { name: 'Reload' }).click();
-  await page.getByRole('radio', { name: 'Always uninstall' }).click({ force: true });
-  await page.getByRole('radio', { name: 'Always uninstall' }).waitFor();
+  await page.getByRole('radio', { name: 'Uninstall, asking first' }).click({ force: true });
+  await page.getByRole('radio', { name: 'Uninstall, asking first' }).waitFor();
   await page.waitForFunction(() => document.querySelector('input[name=excl][value=remove]')?.checked === true);
   const again = (await callsOf(app, 'save_target')).slice(before + 2);
   assert.deepEqual(again.map(c => c.payload.target.id).filter(id => id === 't1'), [], 'the harness already saved is not saved again');
@@ -269,14 +271,48 @@ await test('Add to my list calls save_plugin and the plugin becomes a row; the l
   assert.deepEqual((await actions(app)).slice(-2), ['save_plugin', 'plan']);
 });
 
-await test('a plugin added to the list while Always uninstall is on is not shown as removed', 'unlisted', {}, async app => {
+await test('a plugin added to the list while Uninstall, asking first is on is not shown as removed', 'unlisted', {}, async app => {
   const { page } = app, line = page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' });
-  await page.getByRole('radio', { name: 'Always uninstall' }).click({ force: true });
-  await line.getByText('Removed at the next sync', { exact: true }).waitFor();
+  await page.getByRole('radio', { name: 'Uninstall, asking first' }).click({ force: true });
+  await line.getByText('Removal waits for your confirmation', { exact: true }).waitFor();
   await line.getByRole('button', { name: 'Add to my list' }).click();
   await page.locator('#rows').getByRole('button', { name: /^old-snippets/ }).waitFor();
-  assert.equal(await page.getByText('Removed at the next sync').count(), 0, 'it is in the list: the next sync keeps it');
+  assert.equal(await page.getByText('Removal waits for your confirmation').count(), 0, 'it is in the list: the next sync keeps it');
   assert.equal(await page.getByRole('heading', { name: 'Installed, not in your list' }).count(), 0, 'and it is no longer in the section');
+});
+
+// Contract 1 of the confirmed removals: Apply all never applies a plan that removes something. The plan is 1 install, 1 uninstall and 1 record without files.
+await test('Apply all on a plan with removals opens the review sheet and applies nothing; Apply without uninstalling applies the install and leaves the removals', 'removals', {}, async app => {
+  const { page } = app;
+  await check(page);
+  await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
+  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).waitFor();
+  assert.equal((await actions(app)).includes('apply'), false, 'Apply all asked for a fresh plan and applied nothing');
+  await sheet.getByText('Install', { exact: true }).waitFor();
+  assert.equal(await sheet.getByText('Remove', { exact: true }).count(), 2);
+  await page.screenshot({ path: shots + '/harness-removals-review.png' });
+  await sheet.getByRole('button', { name: 'Apply without uninstalling', exact: true }).click();
+  await sheet.waitFor({ state: 'detached' });
+  const sent = (await callsOf(app, 'apply')).at(-1).payload;
+  assert.deepEqual(Object.keys(sent).sort(), ['plan_id', 'skip_removals']);assert.equal(sent.skip_removals, true);
+  assert.equal(await toast(page).first().textContent(), '1 change applied. 2 removals left out.');
+  await page.locator('section.im-summary strong').getByText('2 changes ready to apply').waitFor();
+  await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).waitFor();
+  await page.locator('ul.im-stack-list li').filter({ hasText: 'ghost' }).getByText('files missing').waitFor();
+});
+await test('the primary button of a review with removals confirms their number and removes them', 'removals', {}, async app => {
+  const { page } = app;
+  await check(page);
+  await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
+  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).click();
+  await sheet.waitFor({ state: 'detached' });
+  const sent = (await callsOf(app, 'apply')).at(-1).payload;
+  assert.deepEqual(Object.keys(sent).sort(), ['confirm_removals', 'plan_id']);assert.equal(sent.confirm_removals, 2, 'the number of removals of the plan');
+  assert.equal(await toast(page).first().textContent(), '3 changes applied.');
+  await page.locator('section.im-summary strong').getByText('Everything is in sync').waitFor();
+  assert.equal(await page.getByRole('heading', { name: 'Installed, not in your list' }).count(), 0);
 });
 
 await test('the harness sheet lists what is installed there and adds a plugin to the list without closing', 'unlisted', {}, async app => {

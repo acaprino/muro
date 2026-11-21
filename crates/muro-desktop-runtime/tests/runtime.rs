@@ -1,3 +1,5 @@
+mod common;
+
 use muro_desktop_runtime::{autostart, discovery, jobs, single_instance, sync_gate::SyncGate, tray};
 use serde_json::{Value, json};
 use std::{
@@ -77,6 +79,46 @@ fn adapted_manifest_must_preserve_resolved_revision() {
     assert!(jobs::validate_source_binding(&plugin, &wrong).is_err());
     let matching = serde_json::json!({"sources":[{"commit":revision}]});
     assert!(jobs::validate_source_binding(&plugin, &matching).is_ok());
+}
+
+/// The repository of a source is the nearest folder with a `.git` entry, the source's own folder
+/// included; `.git` may be a file, as in a worktree. Nothing here runs Git.
+#[test]
+fn the_repository_of_a_source_is_the_nearest_folder_that_holds_a_git_entry() {
+    let temp = tempfile::tempdir().unwrap();
+    let repository = temp.path().join("repository");
+    let inside = repository.join("plugins").join("demo");
+    fs::create_dir_all(repository.join(".git")).unwrap();
+    fs::create_dir_all(&inside).unwrap();
+    let root = |source: &Path| jobs::repository_root(&json!({"resolved_source":source}));
+    assert_eq!(root(&repository).unwrap(), repository);
+    assert_eq!(root(&inside).unwrap(), repository);
+    let nested = inside.join("vendored");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(nested.join(".git"), "gitdir: ../../../.git").unwrap();
+    assert_eq!(root(&nested).unwrap(), nested);
+}
+
+/// A folder in no repository has no root, and the plugin of a source that was never resolved has
+/// no folder to look in. The system's temporary folder is in no repository on a runner; where it
+/// is in one, there is no folder outside a repository to try.
+#[test]
+fn a_source_in_no_git_repository_has_no_repository_root() {
+    let temp = tempfile::tempdir().unwrap();
+    let alone = temp.path().join("plugin");
+    fs::create_dir_all(&alone).unwrap();
+    assert_eq!(
+        jobs::repository_root(&json!({"source":alone})).unwrap_err().to_string(),
+        "Resolved source missing"
+    );
+    if alone.canonicalize().unwrap().ancestors().any(|folder| folder.join(".git").exists()) {
+        return;
+    }
+    let error = jobs::repository_root(&json!({"resolved_source":alone})).unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "AI adaptation needs a Git repository: this source is a folder that is not in one"
+    );
 }
 
 #[test]
@@ -421,11 +463,11 @@ fn sync_now_applies_a_clean_plan_and_reports_blockers_without_failing() {
     let clean = Registry::new();
     let profile = clean.harness("oc", "{}");
     clean.plugin(&["oc"]);
-    let done = json!({"applied":1,"pending":0,"blockers":[],"errors":[]});
+    let done = json!({"applied":1,"pending":0,"blockers":[],"errors":[],"removals":0});
     assert_eq!(clean.sync(json!({})), done);
     assert_eq!(plugins_in(&profile), 1);
     assert_eq!(clean.automation()["status"], "complete");
-    let nothing = json!({"applied":0,"pending":0,"blockers":[],"errors":[]});
+    let nothing = json!({"applied":0,"pending":0,"blockers":[],"errors":[],"removals":0});
     assert_eq!(clean.sync(json!({})), nothing);
 
     // A profile whose opencode.json is not JSON is a blocker, recorded as the message.
@@ -454,7 +496,7 @@ fn sync_now_applies_a_clean_plan_and_reports_blockers_without_failing() {
     let watch = Registry::new();
     let profile = watch.harness("oc", "{}");
     watch.plugin(&["oc"]);
-    let checked = json!({"applied":0,"pending":1,"blockers":[],"errors":[]});
+    let checked = json!({"applied":0,"pending":1,"blockers":[],"errors":[],"removals":0});
     assert_eq!(watch.sync(json!({"apply":false})), checked);
     assert_eq!(plugins_in(&profile), 0);
 }
@@ -604,6 +646,104 @@ fn sync_now_refuses_an_apply_that_is_not_a_boolean() {
     assert_eq!(error.to_string(), "apply must be a boolean");
     assert_eq!(plugins_in(&profile), 0);
     assert!(!registry.data().join("automation-status.json").exists());
+}
+
+/// An exclusive harness has a removal in its plan for every plugin the list lacks. The worker
+/// applies the rest, uninstalls nothing, and says how many removals wait for a person.
+#[test]
+fn sync_now_applies_what_it_can_and_leaves_the_removals_for_a_person_to_confirm() {
+    let registry = Registry::new();
+    let profile = registry.harness("oc", r#"{"plugins":["stale-a","stale-b"]}"#);
+    registry.plugin(&["oc"]);
+
+    // The install is applied, the two removals are not.
+    let waiting = json!({"applied":0,"pending":2,"blockers":[],"errors":[],"removals":2});
+    let out = registry.sync(json!({}));
+    assert_eq!(out, json!({"applied":1,"pending":2,"blockers":[],"errors":[],"removals":2}));
+    assert_eq!(plugins_in(&profile), 3);
+    let status = registry.automation();
+    assert_eq!(status["status"], "complete", "{status}");
+    assert_eq!(status["message"], "1 change applied. 2 removals wait for your confirmation", "{status}");
+
+    // Only removals are left: nothing is applied, and nothing is uninstalled.
+    assert_eq!(registry.sync(json!({})), waiting);
+    assert_eq!(plugins_in(&profile), 3);
+    let status = registry.automation();
+    assert_eq!(status["action"], "Automatic sync", "{status}");
+    assert_eq!(status["message"], "2 removals wait for your confirmation", "{status}");
+
+    // A check that only looks says the same.
+    assert_eq!(registry.sync(json!({"apply":false})), waiting);
+    let status = registry.automation();
+    assert_eq!(status["action"], "Background check", "{status}");
+    assert_eq!(status["message"], "2 removals wait for your confirmation", "{status}");
+    assert_eq!(plugins_in(&profile), 3);
+
+    // The singular.
+    let single = Registry::new();
+    let kept = single.harness("oc", r#"{"plugins":["stale"]}"#);
+    single.plugin(&["oc"]);
+    single.sync(json!({}));
+    assert_eq!(single.automation()["message"], "1 change applied. 1 removal waits for your confirmation");
+    single.sync(json!({}));
+    assert_eq!(single.automation()["message"], "1 removal waits for your confirmation");
+    assert_eq!(plugins_in(&kept), 2);
+}
+
+/// A factory that refuses a source's license the way the real one does: it keeps the arguments it
+/// was called with, as the stand-in of `common` does, and says why on stderr with exit code 1.
+const REFUSING_FACTORY: &str = r#"
+import json, sys
+from pathlib import Path
+
+with open(Path(__file__).resolve().parent / "calls.ndjson", "a", encoding="utf-8") as log:
+    log.write(json.dumps({"args": sys.argv[1:]}) + "\n")
+print("no file in the source is the complete MIT or Apache-2.0 text the factory accepts", file=sys.stderr)
+sys.exit(1)
+"#;
+
+/// An adaptation that cannot succeed is refused before it starts: no job folder is made and no AI
+/// process runs. The factory is asked about the repository the source is in, whole.
+#[test]
+fn adaptation_refuses_a_source_that_cannot_succeed_before_it_creates_anything() {
+    let adapt = |registry: &Registry| {
+        muro_desktop_runtime::request(&registry.data(), "adapt", json!({"id":"example","harness":"codex"}))
+            .unwrap_err()
+            .to_string()
+    };
+
+    // In a repository whose license the factory refuses: its reason is the error.
+    let licensed = Registry::new();
+    licensed.harness("oc", "{}");
+    licensed.plugin(&["oc"]);
+    fs::create_dir_all(licensed.temp.path().join(".git")).unwrap();
+    let factory = licensed.temp.path().join("factory");
+    fs::create_dir_all(&factory).unwrap();
+    fs::write(factory.join("muro_build.py"), REFUSING_FACTORY).unwrap();
+    let current = muro_desktop_runtime::request(&licensed.data(), "registry", json!({})).unwrap();
+    let mut settings = current["settings"].clone();
+    settings["python"] = json!(common::python());
+    settings["factory_path"] = json!(factory);
+    licensed.save("settings", "settings", settings);
+    assert_eq!(
+        adapt(&licensed),
+        "This source cannot be adapted: no file in the source is the complete MIT or Apache-2.0 text the factory accepts"
+    );
+    assert!(!licensed.data().join("jobs").exists());
+    let root = licensed.temp.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    assert_eq!(common::calls(&factory), vec![vec!["license-check".to_owned(), root]]);
+
+    // In no repository: refused before the factory is looked for (none is configured here).
+    let lone = Registry::new();
+    lone.harness("oc", "{}");
+    lone.plugin(&["oc"]);
+    if lone.temp.path().canonicalize().unwrap().ancestors().all(|folder| !folder.join(".git").exists()) {
+        assert_eq!(
+            adapt(&lone),
+            "AI adaptation needs a Git repository: this source is a folder that is not in one"
+        );
+        assert!(!lone.data().join("jobs").exists());
+    }
 }
 
 /// The registry's `status` at `revision` with the sync state the last full check left: all the

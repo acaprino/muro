@@ -1,8 +1,9 @@
 // Task 6: the forms, the plugin dialog, the harness sheet and the pieces of the Sync page that carry them (the Add harness
 // menu, the plugins outside the list). Rendering and validation only: what the DOM does with them is in browser-harness.mjs.
 import test from 'node:test';
-import { harnessMenuItems } from '../src/pages/sync.ts';
-import type { App } from '../src/context.ts';
+import { harnessMenuItems, change as syncChange } from '../src/pages/sync.ts';
+import { view as settingsPage } from '../src/pages/settings.ts';
+import type { App, TextBox } from '../src/context.ts';
 import assert from 'node:assert/strict';
 import type { Snapshot, Plugin, Target, Discovered, ViewState, InstalledPlugin } from '../src/types.ts';
 import { pluginForm, targetForm, distributionRow, pluginErrors, targetErrors, exclusiveSeg, lastPart } from '../src/forms.ts';
@@ -157,7 +158,7 @@ test('the harness sheet has the mockup\'s fields and words, and Stop managing on
  assert.match(html,/<h2 id="dlg-title">Codex<\/h2>/);assert.match(html,/Checked never · last sync never/);
  for(const name of ['name','harness','root','executable','enabled','exclusive'])assert.match(html,new RegExp(`name="${name}"`),name);
  assert.match(html,/<strong>Keep this harness in sync<\/strong>/);assert.match(html,/Switch off to pause: Muro leaves it alone\./);
- assert.match(html,/<strong>Always uninstall plugins that are not in my list<\/strong>/);assert.match(html,/Only on this harness\. The rule for all of them is in Settings\./);
+ assert.match(html,/<strong>Uninstall plugins that are not in my list<\/strong>/);assert.match(html,/<small>Muro asks before it uninstalls\. Only on this harness\. The rule for all of them is in Settings\.<\/small>/);assert.doesNotMatch(html,/Always uninstall/);
  assert.match(html,/name="enabled" checked/);assert.doesNotMatch(html,/name="exclusive" checked/);
  assert.match(html,/data-action="remove-target" data-id="t1"[^>]*>(?:(?!<\/button>)[\s\S])*Stop managing/);
  assert.match(html,/<button type="submit" class="im-btn im-btn--primary">Save<\/button>/);
@@ -201,12 +202,12 @@ test('targetForm without a target is a harness to add, with the codex mark only 
 });
 
 // ---------- plugins outside the list ----------
-test('the rule for plugins outside the list is Leave alone, Always uninstall or Differs per harness',()=>{
+test('the rule for plugins outside the list is Leave alone, Uninstall asking first or Differs per harness',()=>{
  const t=(exclusive:boolean):Target=>({id:'x',harness:'codex',name:'n',root:'/r',executable:'e',enabled:true,exclusive});
  const keep=exclusiveSeg([t(false),t(false)]),remove=exclusiveSeg([t(true),t(true)]),mixed=exclusiveSeg([t(true),t(false)]);
  assert.match(keep,/name="excl" value="keep" checked/);assert.match(remove,/name="excl" value="remove" checked/);assert.doesNotMatch(mixed,/checked/);
  assert.match(mixed,/<small>Differs per harness<\/small>/);assert.doesNotMatch(keep,/Differs/);
- assert.match(keep,/<span>Leave alone<\/span>/);assert.match(keep,/<span>Always uninstall<\/span>/);assert.match(keep,/aria-label="Plugins that are not in my list"/);
+ assert.match(keep,/<span>Leave alone<\/span>/);assert.match(keep,/<span>Uninstall, asking first<\/span>/);assert.doesNotMatch(keep,/Always uninstall/);assert.match(keep,/aria-label="Plugins that are not in my list"/);
 });
 test('a plugin takes its name from the last part of its source until a name is typed',()=>{
  assert.equal(lastPart('https://github.com/owner/repository.git'),'repository');assert.equal(lastPart('C:\\Users\\you\\my-plugin\\'),'my-plugin');assert.equal(lastPart('  owner/pkg '),'pkg');assert.equal(lastPart(''),'');
@@ -249,7 +250,7 @@ test('plugins outside the list: the section, one line each with its fate, and th
  assert.match(html,/<strong>old-snippets<\/strong><small>0\.2\.0 · on Codex<\/small><\/div><small>Left alone<\/small>/);
  assert.match(html,/data-action="add-to-list" data-id="t1" data-native="native-old"/);assert.match(html,/name="excl" value="keep" checked/);
  const s=snapshot();s.registry.targets[0].exclusive=true;
- const removing=syncPage({},s);assert.match(removing,/<span class="im-chip" data-im-tone="err">Removed at the next sync<\/span>/);assert.doesNotMatch(removing,/Left alone<\/small>/);assert.match(removing,/Differs per harness/);
+ const removing=syncPage({},s);assert.match(removing,/<span class="im-chip" data-im-tone="err">Removal waits for your confirmation<\/span>/);assert.doesNotMatch(removing,/Removed at the next sync/);assert.doesNotMatch(removing,/Left alone<\/small>/);assert.match(removing,/Differs per harness/);
  s.registry.targets[1].exclusive=true;assert.match(syncPage({},s),/name="excl" value="remove" checked/);
 });
 test('nothing outside the list, a paused harness or an unreadable one has no section',()=>{
@@ -276,4 +277,35 @@ test('the source field of a new plugin says how to reach a plugin in a folder of
  const hint=pluginForm(snapshot()).replace(/<[^>]+>/g,' ');
  assert.match(hint,/add #folder to the address/);
  assert.doesNotMatch(hint,/marketplace entry/,'Muro takes no marketplace entry as a source: it reads a repository marketplace to find the plugin');
+});
+// ---------- a record without files, and the words of the rule that asks first (work package F) ----------
+test('an installed entry whose files are gone says so, in Installed here and among the plugins outside the list; one with its files, or that does not say, does not',()=>{
+ const s=snapshot();s.inventory[0].plugins=[s.inventory[0].plugins[0],{...outside,present:false},{...outside,id:'native-here',name:'kept-here',present:true},{...outside,id:'native-old2',name:'no-field'}];
+ const sheet=harnessSheet(viewState(s),s.registry.targets[0]);
+ assert.match(sheet,/old-snippets<\/strong><small>0\.2\.0 · not in your list · files missing<\/small>/);
+ for(const name of ['Package','kept-here','no-field'])assert.doesNotMatch(sheet,new RegExp(`${name}</strong><small>[^<]*files missing`),name);
+ const page=syncPage({},s);
+ assert.match(page,/<strong>old-snippets<\/strong><small>0\.2\.0 · on Codex · files missing<\/small>/);
+ for(const name of ['kept-here','no-field'])assert.doesNotMatch(page,new RegExp(`${name}</strong><small>[^<]*files missing`),name);
+});
+test('Settings says what the rule does now: Muro plans the removal and asks, and the background sync never uninstalls',()=>{
+ const s=snapshot();s.registry.settings={...s.registry.settings,ai:{engine:'harness',harness:'claude-code',budget_usd:1,api_base:'https://api.openai.com/v1',model:'',api_key_env:'MURO_API_KEY'}};
+ const html=settingsPage(viewState(s,{page:'settings'}));
+ assert.ok(html.includes('Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own settings.'));
+ assert.match(html,/<span>Uninstall, asking first<\/span>/);assert.doesNotMatch(html,/Always uninstall|at every sync/);
+});
+test('choosing the rule saves it and says Muro will ask before it uninstalls; choosing to leave alone says they are left alone',async()=>{
+ const s=snapshot(),notes:string[]=[],saved:{action:string;payload:Record<string,unknown>}[]=[];
+ const app={state:viewState(s),
+  request:async(action:string,payload:Record<string,unknown>)=>{saved.push({action,payload});return snapshot();},
+  run:async(_label:string,work:()=>Promise<Snapshot>,after:(s:Snapshot)=>void)=>after(await work()),
+  adopt:()=>{},notify:(text:string)=>{notes.push(text);}} as unknown as App;
+ assert.equal(syncChange(app,{name:'excl',value:'remove'} as unknown as TextBox),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(notes,['Saved. Muro will ask before it uninstalls plugins outside your list.']);
+ assert.deepEqual(saved.map(c=>c.action),['save_target','save_target']);
+ for(const t of app.state.snapshot!.registry.targets)t.exclusive=true;
+ assert.equal(syncChange(app,{name:'excl',value:'keep'} as unknown as TextBox),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(notes.at(-1),'Saved. Plugins outside your list are left alone.');
 });

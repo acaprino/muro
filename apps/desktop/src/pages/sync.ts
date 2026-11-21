@@ -1,7 +1,7 @@
 import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFieldRow, removeRepeatedFieldRow, replaceHtmlRegion, type MenuItem } from '@acaprino/imago/ui';
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
-import { cellState, harnessState, syncHeadline, sameOperations, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
+import { cellState, harnessState, syncHeadline, mustReview, applyPayload, appliedNotice, filesMissing, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
 import { esc, icon, plural, mark, sym, tag, spin, button, head, empty, seg } from '../ui.ts';
 import { reviewSheet, pluginDialog, harnessSheet, adaptDialog, installedHere, instructionDetails } from '../sheets.ts';
 import { distributionRow, readPlugin, readTarget, pluginErrors, targetErrors, showErrors, clearError, exclusiveSeg, signature, lastPart } from '../forms.ts';
@@ -78,7 +78,7 @@ function addHarnessMenu(state:ViewState):string {
 /** What is installed on a harness that Muro reads completely and that the list does not hold, and the one rule for all of it. What the rule does shows on each line before anything is applied. */
 function unlistedSection(state:ViewState):string {
  const items=unlisted(state.snapshot!);if(!items.length)return '';
- return `<div class="im-section-heading"><h2>Installed, not in your list</h2><span class="im-count">${items.length}</span><span class="im-grow"></span>${exclusiveSeg(state.snapshot!.registry.targets)}</div><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${items.map(({target:t,plugin:p})=>`<li>${mark(t.harness)}<div class="im-grow"><strong>${esc(p.name)}</strong><small>${esc(p.version)} · on ${esc(t.name)}</small></div>${t.exclusive?'<span class="im-chip" data-im-tone="err">Removed at the next sync</span>':'<small>Left alone</small>'}${button('Add to my list','add-to-list',{id:t.id,attrs:{'data-native':p.id}})}</li>`).join('')}</ul>`;
+ return `<div class="im-section-heading"><h2>Installed, not in your list</h2><span class="im-count">${items.length}</span><span class="im-grow"></span>${exclusiveSeg(state.snapshot!.registry.targets)}</div><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${items.map(({target:t,plugin:p})=>`<li>${mark(t.harness)}<div class="im-grow"><strong>${esc(p.name)}</strong><small>${esc(p.version)} · on ${esc(t.name)}${filesMissing(p)}</small></div>${t.exclusive?'<span class="im-chip" data-im-tone="err">Removal waits for your confirmation</span>':'<small>Left alone</small>'}${button('Add to my list','add-to-list',{id:t.id,attrs:{'data-native':p.id}})}</li>`).join('')}</ul>`;
 }
 export function view(state:ViewState):string {
  return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus',primary:true})))+unlistedSection(state);
@@ -100,25 +100,26 @@ async function review(app:App,data:DOMStringMap){
  await app.run('Comparing with what is installed…',()=>app.request<Plan>('plan',target?{target_id:target.id}:{}),p=>{plan=p;if(!target)state.plan=p;});
  if(plan)openReview(app,plan,target??null);
 }
-/** Applies a plan: the operations that are ready, and with blockers (`allow_blocked`) the rest is left out. Then the plan the strip reads is calculated again. */
-async function applyPlan(app:App,plan:Plan,target:Target|null,sheet:boolean){
- const {state}=app;if(state.busy||!plan.operations.length)return;
- state.applying={index:0,total:plan.operations.length,name:[...new Set(plan.operations.map(o=>o.name))].join(', ')};state.review={plan,target_id:target?.id??null};
+/** Applies a plan: the operations that are ready, and with blockers (`allow_blocked`) the rest is left out. A plan with removals is applied with the person's choice (`applyPayload`): `confirm` uninstalls and clears them, `skip` leaves them out and applies the rest. Then the plan the strip reads is calculated again. */
+async function applyPlan(app:App,plan:Plan,target:Target|null,sheet:boolean,choice:'confirm'|'skip'='confirm'){
+ const {state}=app,executed=plan.operations.filter(o=>choice==='confirm'||o.kind!=='remove');if(state.busy||!executed.length)return;
+ state.applying={index:0,total:executed.length,name:[...new Set(executed.map(o=>o.name))].join(', ')};state.review={plan,target_id:target?.id??null};
  if(sheet)showReview(app);
  let applied=false;
- try{await app.run('Syncing…',()=>app.request<Snapshot>('apply',{plan_id:plan.id,...(plan.blockers.length?{allow_blocked:true}:{})}),async v=>{
+ try{await app.run('Syncing…',()=>app.request<Snapshot>('apply',applyPayload(plan,choice)),async v=>{
+  const skipped=v.skipped_removals??0;
   applied=true;app.adopt(v);state.plan=null;state.review=null;if(sheet)app.closeDialog();await app.replan();
-  app.notify(`${plural(plan.operations.length,'change')} applied.${v.left_out?.length?` ${v.left_out.length} left out.`:''}`,'good');});}
+  app.notify(`${appliedNotice(plan.operations.length-skipped,skipped)}${v.left_out?.length?` ${v.left_out.length} left out.`:''}`,'good');});}
  finally{state.applying=null;}
  if(!applied&&sheet)showReview(app);
  app.render();
 }
-/** Apply all: a fresh plan first. It is applied at once only when it is what the strip showed and has no blocker; otherwise the review sheet opens, so nothing the person has not seen is applied. */
+/** Apply all: a fresh plan first. It is applied at once only when it is what the strip showed, has no blocker and no removal; otherwise the review sheet opens, so nothing the person has not seen is applied and no removal is applied without the person's confirmation. */
 async function applyAll(app:App){
  const {state}=app;if(state.busy)return;const shown=state.plan;let fresh:Plan|undefined;
  await app.run('Comparing with what is installed…',()=>app.request<Plan>('plan'),p=>{fresh=p;state.plan=p;});
  if(!fresh)return;
- if(fresh.blockers.length||!fresh.operations.length||!sameOperations(shown,fresh))openReview(app,fresh,null);else await applyPlan(app,fresh,null,false);
+ if(mustReview(shown,fresh))openReview(app,fresh,null);else await applyPlan(app,fresh,null,false);
 }
 
 const closeMenu=(_refocus=false)=>closeLayers(['menu']);
@@ -224,11 +225,13 @@ async function setExclusive(app:App,mode:'keep'|'remove'):Promise<void> {
    catch(e){if(last)app.adopt(last);throw new Error(`${saved?`${plural(saved,'harness','harnesses')} saved. `:''}${t.name} was not saved: ${message(e)}`);}
   }
   return last!;
- },v=>{app.adopt(v);app.notify(wanted?'Saved. Plugins outside your list are uninstalled at the next sync.':'Saved. Plugins outside your list are left alone.','good');});
+ },v=>{app.adopt(v);app.notify(wanted?'Saved. Muro will ask before it uninstalls plugins outside your list.':'Saved. Plugins outside your list are left alone.','good');});
 }
 
+/** The sheet's own buttons: the plan it shows is applied, with its removals confirmed (`apply`) or left out (`apply-keep`). */
+const applyReview=(choice:'confirm'|'skip'):Actions[string]=>app=>{const r=app.state.review;return r?applyPlan(app,r.plan,targetOf(app.state,r.target_id??undefined)??null,true,choice):undefined;};
 export const actions:Actions={
- check,review,apply:app=>{const r=app.state.review;return r?applyPlan(app,r.plan,targetOf(app.state,r.target_id??undefined)??null,true):undefined;},'apply-all':applyAll,
+ check,review,apply:applyReview('confirm'),'apply-keep':applyReview('skip'),'apply-all':applyAll,
  'clear-filter':app=>{app.state.query='';app.state.filter='all';app.render();},
  menu:(app,_d,el)=>harnessMenu(app,el),
  'open-plugin':(app,d)=>{const p=pluginOf(app.state,d.id);if(p)editPlugin(app,p);},
