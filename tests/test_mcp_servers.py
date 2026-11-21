@@ -201,3 +201,117 @@ def test_a_server_and_a_hook_of_one_source_are_both_registered(portable_project,
     root = build(portable_project, tmp_path) / "adapters" / "claude-code"
     assert "UserPromptSubmit" in json.loads((root / "hooks/hooks.json").read_text(encoding="utf-8"))["hooks"]
     assert list(json.loads((root / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]) == ["stub"]
+
+
+# --- Hosts whose plugin registers a server in code (Pi, OpenCode) -----------------------------------------------
+
+import shutil
+from pathlib import Path
+
+from muro.native_policy import write_opencode_adapter, write_pi_adapter
+
+PLUGIN = {"slug": "paper-crane", "command": "crane", "name": "Paper Crane", "version": "1.2.3"}
+RAW = r"a$b%c\d ${HOME} `x` 'q'"
+LAUNCH = [{"name": "stub", "command": "python", "args": ["<package_root>/scripts/demo/server.py", "two words"],
+           "env": {"STUB_HOME": "<package_root>/scripts/demo", "RAW": RAW}}]
+
+
+def package(tmp_path, policy=False):
+    root = tmp_path / "release with spaces è"
+    skill = root / "skills" / "crane"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text('---\nname: crane\ndescription: "Use when: creating a document."\n---\n\n# Crane\n',
+                                    encoding="utf-8")
+    if policy:
+        (root / "policy.md").write_text("Keep the complete scope.", encoding="utf-8", newline="")
+    return root
+
+
+def node(tmp_path, root, source):
+    executable = shutil.which("node")
+    if not executable:
+        pytest.skip("Node is needed to execute native Pi/OpenCode package entrypoints")
+    script = tmp_path / "host-boundary.mjs"
+    script.write_text(source, encoding="utf-8")
+    done = subprocess.run([executable, str(script), str(root)], cwd=tmp_path, capture_output=True, text=True,
+                          encoding="utf-8")
+    assert done.returncode == 0, done.stderr or done.stdout
+    return json.loads(done.stdout)
+
+
+def expected_paths(root):
+    home = Path(root) / "skills" / "crane" / "scripts" / "demo"
+    return home, home / "server.py"
+
+
+def test_pi_registers_the_server_with_the_paths_of_its_own_install(tmp_path):
+    root = package(tmp_path)
+    write_pi_adapter(root, PLUGIN, False, LAUNCH)
+    manifest = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    assert manifest["pi"]["extensions"] == ["./extensions/mcp.js"]
+    calls = node(tmp_path, root, r"""
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const root = process.argv[2];
+const extension = (await import(pathToFileURL(path.join(root, 'extensions', 'mcp.js')).href)).default;
+const calls = [];
+extension({on() {}, registerMcpServer: (name, config) => calls.push({name, config})});
+console.log(JSON.stringify(calls));
+""")
+    home, server = expected_paths(root)
+    [call] = calls
+    assert call["name"] == "stub" and call["config"]["command"] == "python"
+    assert [Path(call["config"]["args"][0]), call["config"]["args"][1]] == [server, "two words"]
+    assert Path(call["config"]["env"]["STUB_HOME"]) == home and call["config"]["env"]["RAW"] == RAW
+
+
+def test_pi_keeps_its_policy_extension_beside_the_server(tmp_path):
+    root = package(tmp_path, policy=True)
+    write_pi_adapter(root, PLUGIN, True, LAUNCH)
+    manifest = json.loads((root / "package.json").read_text(encoding="utf-8"))
+    assert manifest["pi"]["extensions"] == ["./extensions/policy.js", "./extensions/mcp.js"]
+
+
+def test_opencode_registers_the_server_through_its_mcp_editor(tmp_path):
+    root = package(tmp_path)
+    write_opencode_adapter(root, PLUGIN, False, LAUNCH)
+    calls = node(tmp_path, root, r"""
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+const root = process.argv[2];
+const plugin = (await import(pathToFileURL(path.join(root, 'index.js')).href)).default;
+const calls = [];
+await plugin.setup({
+  skill: {transform: async (fn) => fn({add() {}})},
+  session: {hook: async () => {}},
+  mcp: {transform: async (fn) => fn({set: (name, config) => calls.push({name, config})})},
+});
+console.log(JSON.stringify(calls));
+""")
+    home, server = expected_paths(root)
+    [call] = calls
+    assert call["name"] == "stub" and call["config"]["type"] == "local"
+    assert call["config"]["command"][0] == "python" and Path(call["config"]["command"][1]) == server
+    assert call["config"]["command"][2] == "two words"
+    assert Path(call["config"]["environment"]["STUB_HOME"]) == home and call["config"]["environment"]["RAW"] == RAW
+
+
+def test_without_servers_the_pi_and_opencode_packages_are_what_they_were(tmp_path):
+    before, after = package(tmp_path / "a", policy=True), package(tmp_path / "b", policy=True)
+    write_pi_adapter(before, PLUGIN, True)
+    write_pi_adapter(after, PLUGIN, True, [])
+    write_opencode_adapter(before, PLUGIN, True)
+    write_opencode_adapter(after, PLUGIN, True, [])
+    for name in ("package.json", "index.js", "extensions/policy.js"):
+        assert (before / name).read_bytes() == (after / name).read_bytes()
+    assert not (after / "extensions" / "mcp.js").exists()
+    assert "mcp" not in (after / "index.js").read_text(encoding="utf-8")
+
+
+def test_a_release_registers_the_declared_server_on_pi_and_opencode(portable_project, tmp_path):
+    declare(portable_project)
+    release = build(portable_project, tmp_path)
+    assert '"stub"' in (release / "adapters/pi/extensions/mcp.js").read_text(encoding="utf-8")
+    assert '"stub"' in (release / "adapters/opencode/index.js").read_text(encoding="utf-8")
+    for host in ("pi", "opencode"):
+        assert "MCP server `stub`" in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")

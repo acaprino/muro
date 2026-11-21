@@ -65,6 +65,11 @@ def server_launch(server: dict[str, Any], package_root: str) -> dict[str, Any]:
             "env": {name: place(value) for name, value in server.get("env", {}).items()}}
 
 
+def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The declared servers for a host whose plugin resolves its own location in code (Pi, OpenCode)."""
+    return [{"name": server["name"], **server_launch(server, _PACKAGE_ROOT)} for server in mcp_servers(document)]
+
+
 def claude_code_mcp(document: dict[str, Any] | None, command: str) -> dict[str, Any] | None:
     """The `.mcp.json` a Claude Code plugin registers when enabled, or None when no server is declared."""
     root = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{command}"
@@ -342,6 +347,8 @@ def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[s
 _SERVER_CHANNELS = {
     "claude-code": "the plugin's `.mcp.json`, when the plugin is enabled",
     "codex": "the plugin's `mcp.json`",
+    "pi": "`pi.registerMcpServer` in the package's `extensions/mcp.js`, at every load",
+    "opencode": "the package plugin's `mcp.transform`",
 }
 
 

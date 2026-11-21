@@ -6,7 +6,7 @@ from pathlib import Path, PurePosixPath
 import shutil
 
 from .delivery import (DELIVERY_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp, codex_hooks,
-                       install_note, session_text)
+                       install_note, placeholder_launches, session_text)
 from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
@@ -388,9 +388,9 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             if servers:
                 (root / "mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
         elif host == "pi":
-            write_pi_adapter(root, plugin, bool(policy))
+            write_pi_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "opencode":
-            write_opencode_adapter(root, plugin, bool(policy))
+            write_opencode_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "hermes":
             write_hermes_adapter(root, plugin, bool(policy))
 
