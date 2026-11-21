@@ -57,7 +57,11 @@ abilitata", and "non riconosce ancora codex bene".
 - Rust: new unit tests `a_codex_entry_has_the_folder_codex_installed_it_in_and_its_enabled_state`,
   `the_plugin_name_of_an_entry_is_the_name_the_harness_installed_it_under` (`native.rs`) and
   `a_copy_of_the_same_name_is_taken_over_from_the_person_or_from_another_plugin_once` (`service.rs`).
-  Not compiled or run here (owner rule): they wait for the `Tests` workflow.
+  Not compiled or run here (owner rule). `Tests` workflow on `claude/beautiful-albattani-3vtozp`: run 105
+  (commit 4fbd616) failed one assertion of the Codex test only, whose expected path joined
+  `plugins/cache/...` with `/` on Windows; run 107 (commit 6d25971, the expected path built with `join`)
+  passed both jobs: Python tests, validate, check sources and build on Ubuntu; Rust tests, frontend unit
+  tests, type check, frontend build, shell tests and browser tests on Windows.
 
 ## Not executed
 
