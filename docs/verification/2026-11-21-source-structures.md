@@ -78,7 +78,13 @@ GitHub Actions, branch `fix/source-structures`:
   side-by-side, package repository, bare name and `./` with plugin root cases;
   passed: entries outside or from elsewhere, several plugins, Muro layout
   before a root manifest.
-- The run with the implementation: see the commit that adds this record.
+- Run 44897805647, the implementation (commit dbf6000): desktop job green (Rust
+  tests with the cases above, frontend unit tests, type check, build, shell and
+  browser tests). The tests job failed one test,
+  `test_marionette_release_workflow.py::test_replaying_the_publication_step_preserves_the_open_pr_head`,
+  which replays the publication step on Linux (skipped on Windows, so not run
+  here): its staged release had no adapters for `muro marketplace`. The test now
+  stages them and checks the root marketplaces the step commits.
 
 ## Not executed
 
