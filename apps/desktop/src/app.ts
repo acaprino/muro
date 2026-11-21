@@ -33,7 +33,9 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  let mountedGraph:ReturnType<typeof graphView>|null=null,graphProject='';
  const stopGraph=()=>{if(mountedGraph){viewports.set(graphProject,mountedGraph.viewport());mountedGraph.dispose();mountedGraph=null;}};
  const message=(e:unknown)=>String(e instanceof Error?e.message:e);
- const fail=(e:unknown)=>{state.error=message(e);render();};
+ // A failed operation is a notice with Reload; the review dialog says it in its own line (state.error), and the panel of a registry that could not be read in its own state.
+ const report=(e:unknown)=>{state.error=message(e);if(!(state.review&&dialog.open))notify(`That did not complete: ${state.error}`,'err',{label:'Reload',run:()=>void reload()});};
+ const fail=(e:unknown)=>{report(e);render();};
  const stopTheme=watchTheme();
 
  /** The key caps of the app come from the registry: the title bar's command button, and every element that names a command. */
@@ -84,7 +86,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  }
  async function run<T>(label:string,work:()=>Promise<T>,after?:(value:T)=>void|Promise<void>):Promise<void>{
   if(state.busy)return;state.busy=label;state.error=null;render();
-  try{const value=await loading('busy',work);await after?.(value);}catch(e){state.error=message(e);}finally{state.busy=null;state.slow.busy=false;render();}
+  try{const value=await loading('busy',work);await after?.(value);}catch(e){report(e);}finally{state.busy=null;state.slow.busy=false;render();}
  }
  // The shell sends the jobs and the data folder only with `snapshot`: a snapshot a mutation returns keeps the ones already held.
  function adopt(s:Snapshot,options?:{replan?:boolean}){
@@ -94,14 +96,14 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  const reload=()=>run('Reading your registry…',()=>request<Snapshot>('snapshot'),adopt);
  function replan():Promise<void>{
   if(planning){again=true;return planning;}
-  planning=(async()=>{try{do{again=false;state.plan=await request<Plan>('plan');}while(again);}catch(e){state.error=message(e);}finally{planning=null;render();}})();
+  planning=(async()=>{try{do{again=false;state.plan=await request<Plan>('plan');}while(again);}catch(e){report(e);}finally{planning=null;render();}})();
   return planning;
  }
  async function discover(){
   if(state.discovering)return;state.discovering=true;state.discoveryError=null;render();
   try{state.discovered=await request<Discovered[]>('discover');}catch(e){state.discoveryError=message(e);}finally{state.discovering=false;render();}
  }
- const notify=(text:string,tone?:'err')=>{if(!disposed)notice(root,text,{tone});};
+ const notify=(text:string,tone?:'err',action?:{label:string;run:()=>void})=>{if(!disposed)notice(root,text,{tone,action});};
  function openDialog(html:string):HTMLDialogElement{
   return dialogView.show(html);
  }

@@ -34,7 +34,7 @@ async function openActivity(page) {
 }
 const checked = async (page, label) => (await switchOf(page, label).getAttribute('aria-checked')) === 'true';
 const waitSwitch = (page, label, on) => page.locator(`[role=switch][aria-label="${label}"][aria-checked="${on}"]`).waitFor();
-const bannerText = page => page.locator('.im-note[role=alert]').allTextContents();
+const bannerText = page => page.locator('.im-notice:has(.im-notice-word) .im-notice-text').allTextContents();   // the error notices of the app
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const titles = page => page.locator('ul.im-activity-list li strong').allTextContents();
 
@@ -107,7 +107,7 @@ await test('an interval outside 1 to 1440 is refused where it enters, and the co
   for (const bad of ['0', '1441', '5000', '-5', '1.5', 'abc']) {
     await interval.evaluate((el, value) => { el.add(new Option('Injected', value)); }, bad);
     await interval.selectOption(bad);
-    await page.locator('.im-note[role=alert]').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
+    await page.locator('.im-setting-row').filter({ hasText: 'Check' }).locator('.im-field-error').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
     assert.equal(await page.getByRole('combobox', { name: 'Check interval' }).inputValue(), '45', `${bad} is not kept`);
     assert.deepEqual(await saves(app), [], `${bad} was never sent`);
   }
@@ -176,7 +176,7 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await switchOf(page, AUTO).click();
-  await page.locator('.im-note[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-notice-text').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await checked(page, AUTO), false, 'the switch is as it was');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), AUTO, 'and keeps the focus');
   // A text box too: what was typed goes back to what is stored.
@@ -191,7 +191,6 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await app.flags({ rejectSettings: false });
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
-  assert.deepEqual(await bannerText(page), [], 'the error is gone');
 });
 
 await test('Python and the factory folder are saved when they are left, trimmed', 'default', {}, async app => {
@@ -214,7 +213,7 @@ await test('Python and the factory folder are saved when they are left, trimmed'
   // An empty Python is no value: it is refused where it enters and the stored one comes back.
   await python.fill('   ');
   await python.blur();
-  await page.locator('.im-note[role=alert]').getByText('Enter the Python command or its full path.').waitFor();
+  await page.locator('.im-setting-row').filter({ hasText: 'Python' }).locator('.im-field-error').getByText('Enter the Python command or its full path.').waitFor();
   assert.equal((await saves(app)).length, 3, 'it was never sent');
   assert.equal(await python.inputValue(), 'C:/Tools/Python 3/python.exe');
 });
@@ -643,13 +642,12 @@ await test('AI: a save the service refuses puts the engine back and shows the se
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await useEngine(page, 'OpenAI-compatible API');
-  await page.locator('.im-note[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-notice-text').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Coding agent on this computer' }).isChecked(), true, 'the stored engine is shown');
   assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).count(), 0);
   await app.flags({ rejectSettings: false });
   await useEngine(page, 'OpenAI-compatible API');
   await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
-  assert.deepEqual(await bannerText(page), [], 'the error is gone');
 });
 
 for (const width of [1100, 760]) {

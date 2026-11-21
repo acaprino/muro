@@ -193,7 +193,7 @@ await test('a harness that cannot be removed stays, and the message says so', 't
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
   await page.getByRole('button', { name: 'Stop managing' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Stop managing', exact: true }).click();
-  await page.locator('#main > .im-panel-body > .im-note[role=alert]').getByText('OpenCode isolated test was not removed: Version conflict', { exact: false }).waitFor();
+  await page.locator('.im-notice-text').getByText('OpenCode isolated test was not removed: Version conflict', { exact: false }).waitFor();
   assert.equal(await page.locator('th').getByText('OpenCode isolated test').count(), 1, 'the harness is still a column');
   assert.equal((await actions(app)).includes('remove_target'), false, 'the harness was never asked to go while a plugin lists it');
 });
