@@ -270,3 +270,10 @@ test('every action the markup of this task names has an owner among the page mod
  for(const html of pieces)for(const action of tags(html,'data-action'))assert.ok(owned.has(action),`${action} has no owner`);
  for(const wanted of ['set-exclusive','add-to-list','resolve-plugin','adapt-plugin','reinstall-plugin','open-custom-instructions','reload-instructions','remove-plugin','remove-target','remove-distribution','menu'])assert.ok(owned.has(wanted),`${wanted} is declared`);
 });
+
+// Owner, 2026-11-21: a plugin in a folder of its repository is reached with #folder, which the field did not say.
+test('the source field of a new plugin says how to reach a plugin in a folder of its repository',()=>{
+ const hint=pluginForm(snapshot()).replace(/<[^>]+>/g,' ');
+ assert.match(hint,/add #folder to the address/);
+ assert.doesNotMatch(hint,/marketplace entry/,'Muro takes no marketplace entry as a source: it reads a repository marketplace to find the plugin');
+});

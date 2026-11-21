@@ -245,14 +245,39 @@ fn local_path(s: &str, root: &Path) -> Option<PathBuf> {
         }
     }
 }
-pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
-    let manifest = match h {
+/// The manifest of a harness's plugin, from the plugin's folder.
+pub fn manifest(h: &str) -> Result<&'static str> {
+    Ok(match h {
         "claude-code" => ".claude-plugin/plugin.json",
         "codex" => ".codex-plugin/plugin.json",
         "pi" | "opencode" => "package.json",
         "hermes" => "plugin.yaml",
         _ => bail!("Adapter not available for {h}"),
-    };
+    })
+}
+/// The marketplace file of a harness that has one, from the folder that is the marketplace: how the
+/// harness finds the plugins of a repository, and where Muro writes the one it installs from.
+pub fn marketplace(h: &str) -> Option<&'static str> {
+    match h {
+        "claude-code" => Some(".claude-plugin/marketplace.json"),
+        "codex" => Some(".agents/plugins/marketplace.json"),
+        _ => None,
+    }
+}
+/// The name a person reads for a harness.
+pub fn harness_name(h: &str) -> &str {
+    match h {
+        "claude-code" => "Claude Code",
+        "codex" => "Codex",
+        "opencode" => "OpenCode",
+        "pi" => "Pi",
+        "hermes" => "Hermes",
+        "deepseek" => "DeepSeek",
+        other => other,
+    }
+}
+pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
+    let manifest = manifest(h)?;
     let v: Value = if h == "hermes" {
         serde_yaml::from_slice(&fs::read(artifact.join(manifest))?)?
     } else {
@@ -421,11 +446,7 @@ pub fn install(
             "Native marketplace copy is corrupt"
         );
         let relative = format!("./releases/{digest}");
-        let meta = if h == "claude-code" {
-            ".claude-plugin"
-        } else {
-            ".agents/plugins"
-        };
+        let file = marketplace(h).with_context(|| format!("{h} has no marketplace"))?;
         let source = if h == "claude-code" {
             json!(relative)
         } else {
@@ -437,7 +458,7 @@ pub fn install(
             json!({"name":name,"source":source,"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"})
         };
         write(
-            &market.join(meta).join("marketplace.json"),
+            &market.join(file),
             &json!({"name":format!("muro-{plugin_id}"),"owner":{"name":"Muro"},"interface":{"displayName":"Muro registry"},"plugins":[entry]}),
         )?;
         let marketplaces: Value = serde_json::from_str(&run(

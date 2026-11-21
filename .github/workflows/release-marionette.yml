@@ -97,13 +97,16 @@ jobs:
           git switch -c "$branch"
           rm -rf marionette
           cp -a "$RUNNER_TEMP/release/marionette" marionette
+          # The root marketplaces point Claude Code, Codex and Muro's desktop app at marionette/adapters/<harness>,
+          # so the repository's address is enough to install it.
+          PYTHONPATH="$GITHUB_WORKSPACE" python -m muro marketplace . marionette
           mkdir -p releases
           notes="$GITHUB_WORKSPACE/docs/releases/$PKG_TAG.md"
           {
             if [ -f "$notes" ]; then cat "$notes"; echo; else printf '# Marionette %s\n\n' "$PKG_VERSION"; fi
             echo "Built by Muro from $GITHUB_REPOSITORY@$GITHUB_SHA ($MANIFEST)."
           } > "releases/$PKG_TAG.md"
-          git add -A marionette releases
+          git add -A marionette releases .claude-plugin .agents
           if git diff --cached --quiet; then
             echo "$PKG_TAG is already on the package main." >> "$GITHUB_STEP_SUMMARY"
             exit 0

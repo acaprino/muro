@@ -81,7 +81,7 @@ Every plugin follows an update policy: latest stable release, a pinned version o
 
 ### AI adaptation
 
-A plugin with no build for one of its harnesses shows **No version** in that cell. **Adapt with AI**, under **More** in the plugin's dialog, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+A plugin with no build for one of its harnesses shows **Needs a build** in that cell. **Adapt with AI**, under **More** in the plugin's dialog, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
 
 <img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
 
@@ -116,7 +116,7 @@ The first time Muro opens, and until it manages a harness, three steps take the 
 
    <img src="docs/assets/screenshots/first-run-3.png" alt="First run, step 3 of 3: Keep them in sync by itself? Automatic sync and Start Muro when Windows starts, both on, with Back and Finish buttons." width="880">
 
-Then, on **Sync**, **Add plugin**: give its source (a repository, a marketplace entry or a folder) and tick the harnesses it goes on. Press **Check now**, read the strip, and press **Apply all**.
+Then, on **Sync**, **Add plugin**: give its source (a repository, or a folder on this computer) and tick the harnesses it goes on. Muro finds each harness's plugin where that harness looks for it (its manifest or its marketplace at the root, or `adapters/<harness>` in a Muro build); for a plugin in a folder of its repository, add `#folder` to the address, as in `https://github.com/acaprino/marionette#marionette`. Press **Check now**, read the strip, and press **Apply all**.
 
 ## Usage examples
 
@@ -133,7 +133,7 @@ Then, on **Sync**, **Add plugin**: give its source (a repository, a marketplace 
 
 ### A plugin on a harness it was not made for
 
-In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, its OpenCode cell shows **No version**.
+In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, its OpenCode cell shows **Needs a build**.
 
 1. Open the plugin, then **More → Adapt with AI**. The harness without a build is preselected; set the maximum budget.
 2. Follow the job in **Activity**. When it succeeds, the cell shows the new version.

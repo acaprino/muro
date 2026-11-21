@@ -187,6 +187,17 @@ def _run_install(adapter_dir: Path, harness: str, home: Path) -> int:
         return 1
 
 
+def _run_marketplace(repository: Path, folder: str) -> int:
+    from .adapters import write_repository_marketplaces
+    try:
+        for path in write_repository_marketplaces(repository, folder):
+            print(f"Wrote {path}")
+        return 0
+    except (OSError, ValueError) as e:
+        print(f"marketplace failed: {e}", file=sys.stderr)
+        return 1
+
+
 def _run_project(args: argparse.Namespace) -> int:
     """`muro project pack|unpack|info|verify`: the `.mp` file (muro/project.py)."""
     from . import project
@@ -475,6 +486,10 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--harness", required=True, choices=("claude-code", "codex", "opencode", "pi"))
     p.add_argument("--home", required=True, type=Path,
                    help="The harness home to install into (e.g. resolved through Mukade's scan)")
+    p = sub.add_parser("marketplace", help="Write the Claude Code and Codex marketplaces at the root of a repository "
+                                           "that publishes a built release in a subfolder")
+    p.add_argument("repository", type=Path, help="The repository's folder")
+    p.add_argument("folder", help="The release's folder inside it (holds adapters/<harness>), e.g. marionette")
     p = sub.add_parser("mcp", parents=[common],
                        help="Serve the factory as an MCP stdio server, for Claude Code, Codex or any MCP client")
     p.add_argument("--tools", metavar="NAME[,NAME...]",
@@ -579,6 +594,8 @@ def _modern_main(argv: list[str]) -> int:
                          release=args.release, head=args.head)
     if args.command == "install":
         return _run_install(args.adapter_dir, args.harness, args.home)
+    if args.command == "marketplace":
+        return _run_marketplace(args.repository, args.folder)
     if args.command == "absorb":
         return _run_absorb(args.directory, args.repo_url, slug=args.slug,
                            license_name=args.license_name, goal=args.goal, selected=args.select,

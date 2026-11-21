@@ -14,15 +14,16 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from .adapters import MARKETPLACE_FILES
+
 HARNESSES = ("claude-code", "codex", "opencode", "pi")
 
 _HOME_ENV = {"claude-code": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME", "pi": "PI_CODING_AGENT_DIR"}
-_MARKETPLACE = {"claude-code": ".claude-plugin/marketplace.json", "codex": ".agents/plugins/marketplace.json"}
 
 
 def _marketplace_names(adapter: Path, harness: str) -> tuple[str, str]:
     """(marketplace name, plugin name) from the adapter's own manifest."""
-    path = adapter / _MARKETPLACE[harness]
+    path = adapter / MARKETPLACE_FILES[harness]
     document = json.loads(path.read_text(encoding="utf-8"))
     plugins = document.get("plugins") or []
     plugin = plugins[0].get("name") if plugins and isinstance(plugins[0], dict) else None

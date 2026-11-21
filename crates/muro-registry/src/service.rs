@@ -553,12 +553,10 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
     let ds = plugin["distributions"]
         .as_array()
         .context("distributions")?;
-    let d = ds.iter().find(|d| d["harness"] == h).with_context(|| {
-        format!(
-            "{}: no native distribution for {h}; run AI adaptation",
-            plugin["name"]
-        )
-    })?;
+    let d = ds
+        .iter()
+        .find(|d| d["harness"] == h)
+        .with_context(|| sources::missing(plugin, h))?;
     let custom_digest = instructions::ensure_distribution(root, plugin, d)?;
     let source = Path::new(str_field(d, "path")?);
     ensure!(

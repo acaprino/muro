@@ -3,7 +3,7 @@ use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 fn git(args: &[&str], cwd: Option<&Path>) -> Result<String> {
@@ -220,6 +220,142 @@ fn checkout_in(
     };
     Ok((source, revision, reference))
 }
+const HARNESSES: [&str; 5] = ["claude-code", "codex", "opencode", "pi", "hermes"];
+/// What a source holds for one harness.
+enum Found {
+    /// The plugin's folder.
+    One(PathBuf),
+    /// The harness's marketplace lists these plugin folders, relative to the source.
+    Many(Vec<String>),
+    None,
+}
+/// The plugin of harness `h` in `source`, looked for as Muro and the harness look for it: the
+/// layout of a Muro build (`adapters/<harness>`), else the harness's manifest at the root, else the
+/// one folder the harness's marketplace at the root lists. The structures of different harnesses
+/// live side by side in one source. A marketplace that lists more than one plugin is not chosen
+/// from: the person points the source at one (`missing` says how).
+fn find(h: &str, source: &Path) -> Result<Found> {
+    let adapter = source.join("adapters").join(h);
+    if adapter.is_dir() {
+        return Ok(match native::identity(h, &adapter) {
+            Ok(_) => Found::One(adapter),
+            Err(_) => Found::None,
+        });
+    }
+    if native::identity(h, source).is_ok()
+        && (!matches!(h, "opencode" | "pi") || read(&source.join("package.json"))?.get(h).is_some())
+    {
+        return Ok(Found::One(source.to_path_buf()));
+    }
+    let Some(file) = native::marketplace(h).map(|m| source.join(m)) else {
+        return Ok(Found::None);
+    };
+    if !file.is_file() {
+        return Ok(Found::None);
+    }
+    let document =
+        read(&file).with_context(|| format!("Invalid marketplace {}", file.display()))?;
+    let base = source.canonicalize()?;
+    let plugin_root = document["metadata"]["pluginRoot"].as_str();
+    let mut folders: Vec<PathBuf> = vec![];
+    for entry in document["plugins"].as_array().into_iter().flatten() {
+        let Some(dir) =
+            local_source(h, &entry["source"], plugin_root).and_then(|r| inside(&base, &r))
+        else {
+            continue;
+        };
+        if native::identity(h, &dir).is_ok() && !folders.contains(&dir) {
+            folders.push(dir);
+        }
+    }
+    Ok(match folders.len() {
+        0 => Found::None,
+        1 => Found::One(folders.remove(0)),
+        _ => Found::Many(
+            folders
+                .iter()
+                .map(|f| {
+                    f.strip_prefix(&base)
+                        .unwrap_or(f)
+                        .to_string_lossy()
+                        .replace('\\', "/")
+                })
+                .collect(),
+        ),
+    })
+}
+/// The folder a marketplace entry's `source` names inside the marketplace, as the harness writes it:
+/// Claude Code `./path`, or a bare name under `metadata.pluginRoot`; Codex `{"source":"local",
+/// "path":...}`. Any other source (another repository, a package, an archive) is not in this one.
+fn local_source(h: &str, source: &Value, plugin_root: Option<&str>) -> Option<String> {
+    match (h, source) {
+        ("claude-code", Value::String(s)) if s == "." || s.starts_with("./") => Some(s.clone()),
+        ("claude-code", Value::String(s)) if !s.is_empty() && !s.contains(['/', '\\']) => {
+            plugin_root.map(|r| format!("{}/{s}", r.trim_end_matches('/')))
+        }
+        ("codex", Value::Object(o)) if o.get("source").and_then(Value::as_str) == Some("local") => {
+            o.get("path").and_then(Value::as_str).map(str::to_owned)
+        }
+        _ => None,
+    }
+}
+/// The folder `relative` names inside `base` (canonical), or nothing when it leaves it, is not
+/// there or is not a folder.
+fn inside(base: &Path, relative: &str) -> Option<PathBuf> {
+    let path = Path::new(relative);
+    if !path
+        .components()
+        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir))
+    {
+        return None;
+    }
+    let dir = base.join(path).canonicalize().ok()?;
+    (dir.starts_with(base) && dir.is_dir()).then_some(dir)
+}
+/// `source` narrowed to `folder`, a folder of what it resolves to.
+fn narrowed(source: &str, folder: &str) -> String {
+    if is_local_path(source) {
+        return Path::new(source)
+            .join(folder)
+            .to_string_lossy()
+            .into_owned();
+    }
+    match source.split_once('#') {
+        Some((base, sub)) => format!("{base}#{}/{folder}", sub.trim_end_matches('/')),
+        None => format!("{source}#{folder}"),
+    }
+}
+/// Why `plugin` has no build for harness `h`, in words a person can act on.
+pub fn missing(plugin: &Value, h: &str) -> String {
+    let name = native::harness_name(h);
+    let Some(resolved) = plugin["resolved_source"].as_str() else {
+        return format!(
+            "no {name} build yet: check for updates to look for one in the source, or adapt the plugin with AI"
+        );
+    };
+    if let Ok(Found::Many(folders)) = find(h, Path::new(resolved)) {
+        let source = plugin["source"].as_str().unwrap_or_default();
+        let choices: Vec<_> = folders.iter().map(|f| narrowed(source, f)).collect();
+        return format!(
+            "the source's {name} marketplace lists {} plugins and Muro does not choose one: set the source to {}",
+            folders.len(),
+            choices.join(" or ")
+        );
+    }
+    let adapters = format!("adapters/{h}");
+    let looked: Vec<&str> = [
+        native::manifest(h).ok(),
+        native::marketplace(h),
+        Some(adapters.as_str()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    format!(
+        "no {name} build: the source has none of {}. Point the source at the plugin's folder (for a repository, add #<folder> to its address), or adapt the plugin with AI",
+        looked.join(", ")
+    )
+}
 pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
     let (source, revision, version) = checkout(root, plugin)?;
     let mut next = plugin.clone();
@@ -241,24 +377,12 @@ pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
             }
         }
     }
-    for h in ["claude-code", "codex", "opencode", "pi", "hermes"] {
+    for h in HARNESSES {
         if distributions.iter().any(|d| d["harness"] == h) {
             continue;
         }
-        let candidate = source.join("adapters").join(h);
-        let is_adapter = candidate.is_dir();
-        let dir = if is_adapter {
-            candidate
-        } else {
-            source.clone()
-        };
-        if let Ok((_, native_version)) = native::identity(h, &dir) {
-            if matches!(h, "opencode" | "pi") && !is_adapter {
-                let m = read(&dir.join("package.json"))?;
-                if m.get(h).is_none() {
-                    continue;
-                }
-            }
+        if let Found::One(dir) = find(h, &source)? {
+            let (_, native_version) = native::identity(h, &dir)?;
             distributions.push(json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"version":native_version,"origin":"native","source_revision":revision}));
         }
     }
@@ -631,6 +755,36 @@ mod tests {
             );
         }
         assert!(found(s).is_empty());
+        // What the plan says in its place names the sources that choose one.
+        for (source, choices) in [
+            (
+                "https://github.com/o/r",
+                "https://github.com/o/r#plugins/a or https://github.com/o/r#plugins/b",
+            ),
+            ("o/r#sub", "o/r#sub/plugins/a or o/r#sub/plugins/b"),
+        ] {
+            let plugin = json!({"source":source,"resolved_source":s});
+            assert_eq!(
+                missing(&plugin, "claude-code"),
+                format!(
+                    "the source's Claude Code marketplace lists 2 plugins and Muro does not choose one: set the source to {choices}"
+                )
+            );
+        }
+    }
+    #[test]
+    fn a_source_without_a_build_says_where_muro_looked() {
+        let t = tempfile::tempdir().unwrap();
+        let plugin = json!({"source":"o/r","resolved_source":t.path()});
+        assert_eq!(
+            missing(&plugin, "claude-code"),
+            "no Claude Code build: the source has none of .claude-plugin/plugin.json, .claude-plugin/marketplace.json, adapters/claude-code. Point the source at the plugin's folder (for a repository, add #<folder> to its address), or adapt the plugin with AI"
+        );
+        assert!(missing(&plugin, "pi").contains("none of package.json, adapters/pi."));
+        assert!(
+            missing(&json!({"source":"o/r"}), "codex")
+                .starts_with("no Codex build yet: check for updates")
+        );
     }
     #[test]
     fn the_layout_of_a_muro_build_comes_before_a_manifest_at_the_root() {
