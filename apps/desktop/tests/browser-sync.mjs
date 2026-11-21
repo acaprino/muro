@@ -265,11 +265,40 @@ await test('a failed apply keeps the sheet open, with the error, to try again', 
 
 await test('themes: the system theme decides until one is chosen', 'changes', { colorScheme: 'light' }, async ({ page }) => {
   await page.locator('nav').waitFor();
+  const paintedSurface = () => page.locator('.im-shell').evaluate(shell => {
+    const style = getComputedStyle(shell), canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const context = canvas.getContext('2d');
+    const rgba = color => {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = color;
+      context.fillRect(0, 0, 1, 1);
+      return [...context.getImageData(0, 0, 1, 1).data];
+    };
+    const luminance = channels => channels.slice(0, 3).map(value => {
+      const s = value / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    const background = rgba(style.backgroundColor), ground = rgba(style.getPropertyValue('--im-ground').trim());
+    const text = rgba(getComputedStyle(shell.querySelector('main')).color);
+    const backgroundLight = luminance(background), textLight = luminance(text);
+    return { background, ground, luminance: backgroundLight, contrast: (Math.max(backgroundLight, textLight) + 0.05) / (Math.min(backgroundLight, textLight) + 0.05) };
+  });
   assert.equal(await page.evaluate(() => document.documentElement.dataset.imTheme), 'light');
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(246, 247, 249)');
+  const light = await paintedSurface();
+  assert.deepEqual(light.background, light.ground, 'the Imago shell paints its ground token');
+  assert.equal(light.background[3], 255, 'the browser shell has an opaque surface');
+  assert.ok(light.luminance > 0.8, 'the light theme paints a light surface');
+  assert.ok(light.contrast >= 4.5, 'light-theme text remains readable on the actual surface');
   await page.screenshot({ path: shots + '/sync-light.png' });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.waitForFunction(() => document.documentElement.dataset.imTheme === 'dark');
+  const dark = await paintedSurface();
+  assert.deepEqual(dark.background, dark.ground, 'system changes update the painted Imago ground');
+  assert.equal(dark.background[3], 255);
+  assert.ok(dark.luminance < 0.2, 'the dark theme paints a dark surface');
+  assert.ok(dark.contrast >= 4.5, 'dark-theme text remains readable on the actual surface');
+  assert.notDeepEqual(dark.background, light.background, 'the visible surface changes with the system theme');
 });
 
 for (const width of [1100, 760]) {

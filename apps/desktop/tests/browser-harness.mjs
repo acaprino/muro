@@ -116,10 +116,21 @@ await test('Add harness lists the harness found, opens its sheet with the folder
   await page.screenshot({ path: shots + '/harness-menu.png' });
   await page.keyboard.press('ArrowDown');
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Add by hand…');
-  await page.keyboard.press('End');
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Rescan this computer');
   await page.keyboard.press('ArrowDown');
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Manage Claude Code', 'it wraps');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Rescan this computer', 'Down visits the last enabled item');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Rescan this computer', 'Imago clamps at the last item');
+  for (const index of [1, 0]) {
+    await page.keyboard.press('ArrowUp');
+    assert.equal(await menu.getByRole('menuitem').nth(index).evaluate(el => el === document.activeElement), true, 'Up visits each enabled item in reverse order');
+  }
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Manage Claude Code', 'Imago clamps at the first item');
+  await page.keyboard.press('End');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Rescan this computer', 'End reaches the last item');
+  await page.keyboard.press('Home');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Manage Claude Code', 'Home returns to the first item');
+  assert.equal(await menu.locator('[role=menuitem][tabindex="0"]').count(), 1, 'the menu has one tab stop');
   await page.keyboard.press('Escape');
   assert.equal(await menu.isHidden(), true, 'Escape closes it');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-action')), 'menu', 'and the keyboard goes back to its button');

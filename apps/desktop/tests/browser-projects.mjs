@@ -604,7 +604,7 @@ await test('Documented examples: one lights its branch in order with no call, ag
   const card = page.locator('.im-numbered-result');
   assert.equal(await card.getAttribute('role'), 'status', 'the result is announced');
   const text = await squash(card);
-  for (const part of [/2 steps/, /Documented example/, /With stack:react/, /“Design a landing page”/, /1 design-taste design-taste-intent It designs a page\./, /2 design-review design-review-intent A finished design is checked\./, /Design first, then review\./]) assert.match(text, part);
+  for (const part of [/2 steps/, /Documented example/, /With stack:react/, /"Design a landing page"/, /1 design-taste design-taste-intent It designs a page\./, /2 design-review design-review-intent A finished design is checked\./, /Design first, then review\./]) assert.match(text, part);
   assert.doesNotMatch(text, /Asked /, 'no engine answered a documented example');
   assert.equal(await litNodes(page).count(), 2);
   assert.deepEqual(await page.locator('[data-im-node^="cap:"] .im-count').allTextContents(), ['1', '2']);
@@ -652,7 +652,7 @@ await test('Simulate: an empty request is refused in place, the note names the e
   const card = page.locator('.im-numbered-result');
   await card.waitFor();
   const text = await squash(card);
-  for (const part of [/2 steps/, /“Write a letter as a Word file”/, /1 office-pdf Prerequisite/, /2 office-docs office-docs-intent The request asks for a Word file\./, /Classified "Write a letter as a Word file" as a document\./, /Asked Claude Code · \$0\.12 · 4\.2 s/]) assert.match(text, part);
+  for (const part of [/2 steps/, /"Write a letter as a Word file"/, /1 office-pdf Prerequisite/, /2 office-docs office-docs-intent The request asks for a Word file\./, /Classified "Write a letter as a Word file" as a document\./, /Asked Claude Code · \$0\.12 · 4\.2 s/]) assert.match(text, part);
   assert.doesNotMatch(text, /Documented example/);
   assert.equal(await card.getAttribute('role'), 'status');
   assert.deepEqual(await page.locator('[data-im-node^="cap:"] .im-count').allTextContents(), ['2', '1'], 'in the order of the decision (the graph lists office-docs first)');
