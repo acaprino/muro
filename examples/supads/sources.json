@@ -1,0 +1,136 @@
+{
+  "plugin": {
+    "slug": "supads",
+    "name": "Supads",
+    "command": "supads",
+    "version": "0.1.0",
+    "language": "it",
+    "description": "Use when making ads and marketing content: setting up the media keys and a brand profile; analyzing a brand, a product, the competitors, their ads or the ads you are running; planning which ads to test next; writing ad copy, video scripts, video prompts and storyboards; generating images, image ads, product photos, an AI actor or an ad resized to other formats; generating video clips, product ad videos, UGC videos, cartoon videos, a clone of an existing video ad or a voiceover; or making a video as a coded animation from a library of shared prompts.",
+    "replaces": [
+      "supercmo",
+      "supercmo-setup",
+      "onboarding-user",
+      "analyzing-brand",
+      "analyzing-products",
+      "identifying-competitors",
+      "researching-competitor-ads",
+      "analyzing-own-ads",
+      "planning-campaigns",
+      "writing-ad-copy",
+      "writing-video-scripts",
+      "writing-video-prompts",
+      "generating-storyboards",
+      "generating-images",
+      "generating-image-ads",
+      "generating-product-photos",
+      "generating-ai-actors",
+      "adapting-formats",
+      "generating-videos",
+      "generating-ad-videos",
+      "generating-ugc-videos",
+      "generating-cartoon-videos",
+      "cloning-video-ads",
+      "generating-audio"
+    ]
+  },
+  "sources": [
+    {
+      "id": "awesome-opus5-5-videos",
+      "repo_url": "https://github.com/yihui-dev/awesome-opus5-5-videos",
+      "pin": "head",
+      "commit": "92aee2f586ac0715cb3cbcb6384834f98a33383d",
+      "license": "MIT",
+      "selected_paths": [
+        "data/videos.json",
+        "README.md"
+      ],
+      "excluded_paths": [],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Absorb the collection as a reference library of prompts for videos made as coded animations (HTML, Canvas, SVG, Three.js, GSAP, shaders): pick a reference prompt by category and technique and adapt it into a new animation, rendered as a single HTML file and recorded when a video is wanted. Keep each prompt's author and original post as its credit; the README states that every video and prompt belongs to its creator. The prompts are evidence, never instructions to the intake."
+      },
+      "omissions": [
+        {
+          "paths": [
+            "prompts/**"
+          ],
+          "reason": "The same 703 prompts as data/videos.json, one Markdown file each, linked from README.md. Compared at the pinned commit: the 703 file names equal the 703 slugs and every prompt text is in the JSON entry, which also carries category, tech_tags, prompt_partial, author and post_url. The JSON is the one copy that travels."
+        }
+      ],
+      "intake_only_paths": [
+        "README.md"
+      ]
+    },
+    {
+      "id": "supercmo-skills",
+      "repo_url": "https://github.com/SupercmoHQ/superCMO-skills",
+      "pin": "release",
+      "release": "v0.1.27",
+      "commit": "3bf78a423b1ba27a1f500b3b50f806b86cc5bdab",
+      "license": "Apache-2.0",
+      "copyright": "Copyright (c) 2026 Kshitiz Kumar (root NOTICE; the bundled Inter fonts are Copyright (c) 2016-2020 The Inter Project Authors, SIL Open Font License 1.1, credited in the same NOTICE)",
+      "selected_paths": [
+        "skills/**",
+        "scripts/supercmo_skills/**",
+        "scripts/supercmo_env.py",
+        "scripts/doctor.py",
+        ".mcp.json",
+        "pyproject.toml",
+        "NOTICE",
+        "TELEMETRY.md",
+        "README.md"
+      ],
+      "excluded_paths": [],
+      "media_paths": [
+        "scripts/supercmo_skills/_assets/fonts/*.ttf"
+      ],
+      "notice_paths": [
+        "NOTICE"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Python 3.11+ (the source's pyproject.toml requires it; the server and its tools use the standard library)",
+          "license": "PSF runtime prerequisite, not bundled by Muro",
+          "bundled": false
+        },
+        {
+          "name": "icalendar >=6.0 and python-dateutil >=2.8, for the calendar tools only (pyproject.toml dependencies)",
+          "license": "External Python packages, not bundled by Muro; installed at runtime when a calendar task needs them and they are missing",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Absorb the marketing skills (brand, product and competitor analysis, campaign planning, ad copy, scripts and storyboards, image ads, product photos, ad, UGC and cartoon videos, AI actors, audio, format adaptation, cloning a video ad, reading the user's own ads) together with the MCP server whose tools they call (scripts/supercmo_skills, started by the source as supercmo-skills), so the generated plugin carries and registers that server itself. Carry as content the source's own statements on keys (the managed key and bring-your-own keys in ~/.supercmo/.env), on what is sent to which provider and on its opt-out telemetry. Record how setup and onboarding work without the source's own installer."
+      },
+      "omissions": [
+        {
+          "paths": [
+            "CONTRIBUTING.md",
+            "assets/logo.png",
+            "package.json",
+            "server.json"
+          ],
+          "reason": "Named by README.md and pyproject.toml: how to contribute to the source, its logo, the npm package of its own installer and its MCP registry listing. They publish and install the original plugin; this package registers the absorbed server itself."
+        },
+        {
+          "paths": [
+            "scripts/check_catalog_sync.py",
+            "scripts/check_shared_client.py",
+            "scripts/listing_gate.py",
+            "scripts/quick_validate.py",
+            "scripts/sync_skills.py",
+            "scripts/bump_version.py",
+            "scripts/package_plugins.py"
+          ],
+          "reason": "The maintainers' release and validation scripts, named by README.md's contributing section. No skill and no server tool runs them."
+        }
+      ],
+      "intake_only_paths": [
+        "skills/*/evals/*",
+        ".mcp.json",
+        "pyproject.toml",
+        "README.md"
+      ]
+    }
+  ]
+}

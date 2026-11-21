@@ -1,0 +1,146 @@
+{
+  "examples": [
+    {
+      "title": "Prima configurazione e profilo del brand",
+      "task": "Configura le chiavi per generare immagini e video, poi imposta il mio brand partendo dal sito.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "media-setup", "intent": "ads.media-setup", "reason": "Servono le chiavi e la verifica di quali capacità di generazione sono pronte."},
+        {"capability": "brand-onboarding", "intent": "ads.brand-onboarding", "reason": "Il brand va impostato la prima volta dal sito e salvato nel profilo che le sessioni successive leggono."}
+      ],
+      "reason": "Prima le chiavi, poi il profilo: media-setup offre il brand setup e brand-onboarding lo esegue come passo successivo, perché possiede il profilo aziendale.",
+      "questions": []
+    },
+    {
+      "title": "Video UGC per un prodotto",
+      "task": "Fammi un video UGC di 20 secondi per questa crema, con una creator che la prova davanti alla camera.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "ugc-video", "intent": "ads.ugc-video", "reason": "Una creator in prima persona che prova il prodotto è un video UGC, non uno spot prodotto."}
+      ],
+      "reason": "Un solo passo: analisi del prodotto, script, attrice, storyboard e prompt sono fasi interne del video UGC, come nel metodo della fonte.",
+      "questions": []
+    },
+    {
+      "title": "Spot prodotto senza persone",
+      "task": "Voglio uno spot di 15 secondi che mostri solo il nostro orologio, stile commerciale, con voce fuori campo.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "ad-video", "intent": "ads.product-ad-video", "reason": "Uno spot prodotto senza creator in camera, con voce fuori campo, è il video pubblicitario prodotto."}
+      ],
+      "reason": "Lo spot prodotto è un passo solo; la voce fuori campo fa parte della sua pipeline.",
+      "questions": []
+    },
+    {
+      "title": "Ricerca sulle ads dei concorrenti e piano",
+      "task": "Guarda cosa stanno pubblicando i nostri concorrenti e dimmi quali annunci dovremmo testare adesso.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "competitor-ads-research", "intent": "ads.competitor-ads-research", "reason": "Serve leggere le ads attive e quelle fermate dei concorrenti."},
+        {"capability": "campaign-plan", "intent": "ads.campaign-plan", "reason": "Dalla ricerca vanno ricavati i concetti da testare, scritti in modo che un produttore li possa realizzare."}
+      ],
+      "reason": "La ricerca viene prima perché il piano legge il suo rapporto. Nessun asset viene generato: costruire i concetti approvati è una richiesta successiva.",
+      "questions": []
+    },
+    {
+      "title": "Testi per un annuncio",
+      "task": "Scrivimi headline, testo principale e call to action per un annuncio Meta e uno Google Search dello stesso prodotto.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "ad-copy", "intent": "ads.ad-copy", "reason": "Sono i testi che vanno nei campi della piattaforma, per due canali."}
+      ],
+      "reason": "Solo testo: non viene generata nessuna immagine.",
+      "questions": []
+    },
+    {
+      "title": "Annuncio statico e formati",
+      "task": "Crea un annuncio immagine quadrato per le nostre scarpe e poi adattalo ai formati storia e orizzontale.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "image-ad", "intent": "ads.image-ad", "reason": "Serve un annuncio immagine completo, con prodotto e testo nell'immagine."},
+        {"capability": "format-adaptation", "intent": "ads.format-adaptation", "reason": "L'annuncio esistente va ricomposto negli altri rapporti, non ritagliato."}
+      ],
+      "reason": "Prima l'annuncio, poi i formati: l'adattamento legge l'annuncio registrato dal primo passo.",
+      "questions": []
+    },
+    {
+      "title": "Foto prodotto",
+      "task": "Da questa foto del flacone fammi un packshot su fondo bianco e due scatti lifestyle.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "product-photos", "intent": "ads.product-photography", "reason": "Packshot e scatti lifestyle da una foto del prodotto sono fotografia di prodotto, non un annuncio."}
+      ],
+      "reason": "Un solo passo; l'analisi del prodotto è una sua fase interna.",
+      "questions": []
+    },
+    {
+      "title": "Clonare un video di un concorrente",
+      "task": "Rifai questo video pubblicitario di un concorrente con il nostro prodotto al posto del loro, stessa struttura e stesso ritmo.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "video-ad-clone", "intent": "ads.video-ad-clone", "reason": "C'è un video di riferimento da ricostruire mantenendo struttura, ritmo e inquadrature."}
+      ],
+      "reason": "Il clone parte dal video fornito; non è una ricerca sulle ads dei concorrenti e non è uno spot nuovo.",
+      "questions": []
+    },
+    {
+      "title": "Video come animazione in codice",
+      "task": "Voglio un video esplicativo di 30 secondi fatto come animazione in codice, tipo motion graphics, per spiegare come funziona la nostra app.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "coded-animation", "intent": "video.coded-animation", "reason": "L'utente chiede un'animazione scritta in codice, non un video generato da un modello video."}
+      ],
+      "reason": "La libreria di prompt dà un riferimento da adattare; il risultato è un file HTML unico, registrato se serve il file video.",
+      "questions": []
+    },
+    {
+      "title": "Solo prompt di riferimento",
+      "task": "Mostrami alcuni prompt usati per fare scene 3D in Three.js, con chi li ha scritti.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "coded-animation", "intent": "video.reference-prompts", "reason": "Si chiedono prompt di riferimento con i loro autori, senza costruire nulla."}
+      ],
+      "reason": "Stessa capability, altra operazione: la ricerca nella libreria si ferma ai prompt con i crediti.",
+      "questions": []
+    },
+    {
+      "title": "Voce fuori campo",
+      "task": "Trasforma questo script in una voce fuori campo femminile, tono caldo.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {"capability": "audio-generation", "intent": "ads.speech-generation", "reason": "Lo script esiste già e va letto ad alta voce da una voce scelta."}
+      ],
+      "reason": "Lo script c'è: non serve il passo di scrittura.",
+      "questions": []
+    },
+    {
+      "title": "Richiesta troppo vaga",
+      "task": "Fammi un video.",
+      "stack_tokens": [],
+      "status": "needs_clarification",
+      "selections": [],
+      "reason": "Il pacchetto fa sei tipi diversi di video (spot prodotto, UGC, cartone, clone di un annuncio, clip singola, animazione in codice) e la richiesta non dice quale né di che prodotto.",
+      "questions": ["Che tipo di video ti serve: uno spot del prodotto, un video UGC con una persona, un cartone, il clone di un annuncio esistente, una clip singola o un'animazione in codice?", "Per quale prodotto o soggetto?"]
+    },
+    {
+      "title": "Fuori dal pacchetto",
+      "task": "Pubblica questo annuncio sul mio account Meta Ads e imposta un budget di 50 euro al giorno.",
+      "stack_tokens": [],
+      "status": "no_match",
+      "selections": [],
+      "reason": "Il pacchetto analizza, pianifica, scrive e genera contenuti pubblicitari. Nessuna capability pubblica annunci o gestisce budget su una piattaforma.",
+      "questions": []
+    }
+  ]
+}
