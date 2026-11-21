@@ -95,6 +95,9 @@ await test('a refused save keeps the sheet and its values, with the reason; Stop
   assert.equal(await page.evaluate(() => document.activeElement?.matches('[role=alertdialog] .im-btn') && document.activeElement.textContent === 'Cancel'), true, 'Cancel has the focus');
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
+  // The form still holds the typed name: close it (Close, then Discard) so that opening it again asks nothing.
+  await page.locator('.im-inspector:not([hidden])').getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click({ timeout: 700 }).catch(() => {});
   await column(page, 'OpenCode isolated test').click();
   await dlg.getByRole('button', { name: 'Stop managing' }).click();
   await dlg.getByRole('button', { name: /^Stop managing .+/ }).click();
@@ -499,7 +502,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.locator('[name=budget]').fill('3');
   await dlg.locator('[name=harness]').selectOption('opencode');
   await dlg.getByRole('button', { name: 'Start' }).click();
-  await dlg.waitFor({ state: 'detached' });
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
   assert.deepEqual((await callsOf(app, 'adapt')).map(c => c.payload), [{ id: 'p1', harness: 'opencode', agent: 'claude-code', budget_usd: 3 }]);
   assert.equal(await toast(page).last().textContent(), 'Started. Follow it in Activity.');
   await page.getByRole('tab', { name: 'Activity, 1 run in progress' }).waitFor();
@@ -628,7 +631,7 @@ await test('the harness sheet and the plugin dialog in the light theme', 'unlist
   await page.screenshot({ path: shots + '/harness-plugin-light.png' });
 });
 
-// ---------- the inspector (not run locally: the owner's rule) ----------
+// ---------- the inspector ----------
 await test('a harness opens in the docked inspector at 1512 and the table stays usable; Escape closes it, and a change asks once', 'changes', {}, async app => {
   const { page } = app, panel = page.locator('.im-inspector:not([hidden])');
   await column(page, 'Codex isolated test').click();
@@ -665,6 +668,33 @@ await test('buttons of the inspector are enabled after a run from the action bar
   assert.equal((await callsOf(app, 'save_target')).length, 1, 'exactly one save_target');
   await toast(page).getByText('Saved once saved.').waitFor();
   await column(page, 'Saved once').waitFor();
+});
+
+await test('the guard follows the form: nothing is asked after a discard, and another object over a form with changes asks first', 'two-harnesses', {}, async app => {
+  const { page } = app, panel = page.locator('.im-inspector:not([hidden])');
+  const asks = () => page.getByRole('button', { name: 'Discard changes' });
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').fill('Edited');
+  await page.keyboard.press('Escape');
+  await asks().click();
+  await panel.waitFor({ state: 'detached' });
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
+  assert.equal(await asks().count(), 0, 'a form that was discarded asks nothing when the page changes');
+  await page.getByRole('tab', { name: 'Sync' }).click();
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').fill('Edited again');
+  await column(page, 'OpenCode isolated test').click();
+  await asks().waitFor();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  assert.equal(await panel.locator('[name=name]').inputValue(), 'Edited again', 'Keep editing keeps the first form');
+  await column(page, 'OpenCode isolated test').click();
+  await asks().click();
+  await panel.getByRole('heading', { name: 'OpenCode isolated test', level: 2 }).waitFor();
+  await panel.locator('[name=name]').fill('Typed');
+  await page.keyboard.press('Escape');
+  await asks().waitFor();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
 });
 
 console.log('PASS: ' + done.join('; '));

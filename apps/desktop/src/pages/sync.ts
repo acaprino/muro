@@ -140,14 +140,14 @@ async function applyAll(app:App){
 
 const closeMenu=(_refocus=false)=>closeLayers(['menu']);
 async function rescan(app:App):Promise<void>{closeMenu(true);await app.run('Reading installed plugins…',()=>app.request<Snapshot>('scan'),v=>app.adopt(v));await app.replan();await app.discover();}
-export function harnessMenuItems(app:App):MenuItem[] {
- const items:MenuItem[]=foundHarnesses(app.state).map(found=>({label:found.supported?'Manage '+found.name:found.name+' · no plugin support yet',disabled:found.supported?undefined:'Plugin installation is not supported by this harness',run:()=>editTarget(app,undefined,found)}));
+export function harnessMenuItems(app:App,anchor?:HTMLElement):MenuItem[] {
+ const items:MenuItem[]=foundHarnesses(app.state).map(found=>({label:found.supported?'Manage '+found.name:found.name+' · no plugin support yet',disabled:found.supported?undefined:'Plugin installation is not supported by this harness',run:()=>editTarget(app,undefined,found,anchor)}));
  if(!items.length)items.push({label:app.state.discovering?'Looking for harnesses…':'No other harness found on this computer',disabled:'No unmanaged harness available',run:()=>{}});
- items.push('separator',{label:'Add by hand…',run:()=>editTarget(app)},{label:'Rescan this computer',run:()=>{void rescan(app).catch(error=>{app.notify(message(error),'err');});}});
+ items.push('separator',{label:'Add by hand…',run:()=>editTarget(app,undefined,undefined,anchor)},{label:'Rescan this computer',run:()=>{void rescan(app).catch(error=>{app.notify(message(error),'err');});}});
  return items;
 }
 
-function harnessMenu(app:App,anchor:HTMLElement):void { imagoMenu(anchor,harnessMenuItems(app)); }
+function harnessMenu(app:App,anchor:HTMLElement):void { imagoMenu(anchor,harnessMenuItems(app,anchor)); }
 
 // ---------- the plugin dialog, the harness sheet and what they do ----------
 /** Runs a request that a control of the open dialog started. A failure shows in the dialog's own error line (the page behind a modal cannot be seen), and a second click while it runs is ignored. From the page it is an ordinary `app.run`. */
@@ -203,7 +203,7 @@ function adapt(app:App,d:DOMStringMap,el:HTMLElement):void {
   e.preventDefault();const data=new FormData(form),budget=Number(data.get('budget')),harness=String(data.get('harness'));
   if(engineOf(app.state.snapshot!.registry.settings).harness==='codex')return;   // the dialog says why and its Start is disabled: an Enter in a field starts nothing either
   if(!showErrors(form,Number.isFinite(budget)&&budget>0?{}:{budget:'Enter a budget above zero.'}))return;
-  app.closeDialog();
+  app.closeDialog();app.closeInspector(true);   // the plugin is under adaptation now: its form does not stay open beside the page
   void app.run('Starting the AI adaptation…',async()=>{await app.request<Job>('adapt',{id:p.id,harness,agent:engineOf(app.state.snapshot!.registry.settings).harness,budget_usd:budget});return app.request<Snapshot>('snapshot');},v=>{app.adopt(v);app.notify('Started. Follow it in Activity.');});
  };
 }
