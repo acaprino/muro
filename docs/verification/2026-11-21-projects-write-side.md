@@ -17,7 +17,7 @@ pages).
 | `python muro_build.py --manifest examples/marionette/sources.json --validate` | this container | OK |
 | `npx tsc --noEmit`, `npm test`, `npm run build` | this container | clean; 371 passed; built |
 | `node apps/desktop/tests/browser.mjs` with `MURO_BROWSER_PATH` set to Playwright's Chromium (no Edge here) | this container | 8 browser files passed, among them the new `browser-project-write.mjs` (10 tests) |
-| `cargo test -p muro-registry -p muro-desktop-runtime`, the shell tests, the full Python suite, validate, check-sources, build and the pack of Marionette | GitHub Actions, `Tests` on `claude/busy-pascal-a74l79` | first push: everything passed but one new Rust test, whose fixture put the listed project's file in the folder the new one was asked for (the earlier "already exists" refusal answered first); the test was fixed. The result of the push that carries the fix is to be read in that run |
+| `cargo test -p muro-registry -p muro-desktop-runtime`, the shell tests, the full Python suite, validate, check-sources, build and the pack of Marionette | GitHub Actions, `Tests` on `claude/busy-pascal-a74l79` | run 106 (first push): everything passed but one new Rust test, whose fixture put the listed project's file in the folder the new one was asked for (the earlier "already exists" refusal answered first); the test was fixed. Run 108 (commit 8f70786): every step passed: Python suite, validate, check-sources, build, pack of Marionette, Rust tests, frontend unit tests, type check, frontend build, shell tests and the 8 browser files on Edge |
 
 `cargo` was not run in this container (AGENTS.md: Rust is built and tested on
 GitHub only); `rustfmt --check` was used only to parse the new files.
