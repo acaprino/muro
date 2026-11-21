@@ -36,7 +36,7 @@ await test('a check the window did not make shows on open: its count, Review and
   assert.deepEqual((await app.calls()).map(c => c.action).filter(a => a === 'plan' || a === 'check'), [], 'opening checks nothing');
   // Review plans again before it shows anything.
   await strip(page).getByRole('button', { name: 'Review' }).click();
-  await page.locator('dialog.im-content-dialog--drawer[open]').waitFor();
+  await page.locator('dialog[open]').waitFor();
   assert.equal(await count(app, 'plan'), 1);
 });
 
@@ -67,12 +67,12 @@ await test('a source the last check could not resolve is not in sync, and a clea
   assert.match(await strip(page).getByRole('button', { name: 'Check now' }).getAttribute('class'), /primary/, 'Check now leads');
   await app.flags({ checkErrors: true });
   await strip(page).getByRole('button', { name: 'Check now' }).click();
-  await page.locator('.im-banner[role=alert]').getByText('1 source could not be checked').waitFor();
+  await page.locator('.im-note[role=alert]').getByText('1 source could not be checked').waitFor();
   assert.equal(await title(page), '1 source could not be checked', 'the check found it again');
   await app.flags({ checkErrors: false });
   await strip(page).getByRole('button', { name: 'Check now' }).click();
   await strip(page).locator('strong', { hasText: 'Everything is in sync' }).waitFor();
-  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-note[role=alert]').count(), 0);
 });
 
 // ---------- F4: the window follows the registry ----------
@@ -93,7 +93,7 @@ await test('the window reads the registry again when it gets the focus, and asks
   const save = (await app.calls()).filter(c => c.action === 'settings').at(-1).payload;
   assert.equal(save.revision, 2);
   assert.deepEqual([save.settings.auto_sync, save.settings.close_to_tray], [true, false], 'what the worker saved is kept');
-  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-note[role=alert]').count(), 0);
 });
 
 await test('the shell telling the window it was shown again reads the registry again, and asks for no plan', 'changes', {}, async app => {
@@ -158,19 +158,19 @@ await test('a settings save refused because the registry moved reads it again an
   await page.getByRole('switch', { name: 'Keep running when the window is closed' }).click();
   await page.locator('[data-im-notices]').getByText('Saved.').waitFor();
   assert.deepEqual(await tail(3), ['settings', 'snapshot', 'settings'], 'refused, read again, sent again');
-  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
+  assert.equal(await page.locator('.im-note[role=alert]').count(), 0);
   // Refused twice: the person sees it, after exactly one more try.
   await app.flags({ staleSettings: 2 });
   await page.getByRole('switch', { name: 'Automatic sync' }).click();
-  await page.locator('.im-banner[role=alert]').getByText('Registry revision changed').waitFor();
+  await page.locator('.im-note[role=alert]').getByText('Registry revision changed').waitFor();
   assert.deepEqual(await tail(3), ['settings', 'snapshot', 'settings']);
   // And the next try, with the registry as it is, goes through.
   await page.getByRole('button', { name: 'Reload' }).click();
   const sent = await count(app, 'settings');
   await page.getByRole('switch', { name: 'Automatic sync' }).click();
   await page.waitForFunction(n => window.calls.filter(c => c.action === 'settings').length > n, sent);
-  await page.locator('.im-busy').waitFor({ state: 'detached' });
-  assert.equal(await page.locator('.im-banner[role=alert]').count(), 0);
+  await page.locator('.im-loader').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('.im-note[role=alert]').count(), 0);
 });
 
 // ---------- F7: a plugin added from what is installed ----------

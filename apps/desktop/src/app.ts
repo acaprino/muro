@@ -1,4 +1,4 @@
-import { attachLayers, closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openPalette, openMenu, regions, roving } from '@acaprino/imago/ui';
+import { attachLayers, closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openPalette, openMenu, regions, roving, loader } from '@acaprino/imago/ui';
 import { graphView, type GraphViewport } from '@acaprino/imago/graph';
 import { guardDesktop, mountZoom, mountWindowControls, type WindowApi } from '@acaprino/imago/shell';
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
@@ -18,13 +18,13 @@ export const REFRESH_MS=30_000;
 export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,ALONE);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
- root.classList.add('im-shell','im-native-controls','im-app-layout');root.dataset.imSidebar='off';renderShellFrame(root,frame(state));
+ root.classList.add('im-shell');root.dataset.imSidebar='off';renderShellFrame(root,frame(state));
  const titlebar=root.querySelector<HTMLElement>('.im-titlebar')!,body=root.querySelector<HTMLElement>('.im-body')!;
  const dialogView=createContentDialog(root,{canDismiss:()=>!state.applying,onClose:()=>render(),fallbackFocus:()=>root.querySelector<HTMLElement>('#main')});
  const dialog=dialogView.element;
  const stopLayers=attachLayers(root),stopRegions=regions(root),registry=createRegistry();
  let nativeApi:WindowApi|undefined,stopWindow=()=>{},stopZoom=()=>{},stopGuard=()=>{},stopTabs=()=>{};
- const wireWindow=()=>{stopWindow();if(nativeApi)stopWindow=mountWindowControls(titlebar,nativeApi,{onError:(what,error)=>notify(what+': '+message(error),'bad')});};
+ const wireWindow=()=>{stopWindow();if(nativeApi)stopWindow=mountWindowControls(titlebar,nativeApi,{onError:(what,error)=>notify(what+': '+message(error),'err')});};
  let disposed=false,polling=false,planning:Promise<void>|null=null,again=false;
  let wantedFocus:FocusSnapshot|null=null;
  const viewports=new Map<string,GraphViewport>();
@@ -36,7 +36,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
 
  function render(){
   if(disposed)return;
-  const dom=captureDomState(root,{scroll:['#main','.im-table-scroll']});
+  const dom=captureDomState(root,{scroll:['#main > .im-panel-body','.im-table-scroll']});
   if(!hasModal()){
    if(document.activeElement?.id!=='main')wantedFocus=dom.focus;
   }
@@ -45,6 +45,8 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   stopTabs();renderShellFrame(root,frame(state));
   const tabs=titlebar.querySelector<HTMLElement>('.im-tabs');if(tabs)stopTabs=roving(tabs,{item:'.im-tab',orientation:'horizontal',onSelect:el=>el.click()});
   wireWindow();remember(state.project);
+  // The running operation shows at the top of the content: the frame is strings, the loader an element of the package.
+  if(state.busy&&!state.checking&&!state.applying)root.querySelector<HTMLElement>('#main > .im-panel-body')?.prepend(loader(document,state.busy));
   const host=body.querySelector<HTMLElement>('[data-project-graph]');
   if(host&&state.project&&state.projects.info&&state.projects.infoId===state.project.id){
    graphProject=state.project.id;
@@ -78,9 +80,9 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   if(state.discovering)return;state.discovering=true;state.discoveryError=null;render();
   try{state.discovered=await request<Discovered[]>('discover');}catch(e){state.discoveryError=message(e);}finally{state.discovering=false;render();}
  }
- const notify=(text:string,tone?:'good'|'bad')=>{if(!disposed)notice(root,text,{tone:tone==='bad'?'err':undefined});};
- function openDialog(html:string,kind:'dialog'|'sheet'='dialog'):HTMLDialogElement{
-  return dialogView.show(html,kind==='sheet'?'drawer':'dialog');
+ const notify=(text:string,tone?:'err')=>{if(!disposed)notice(root,text,{tone});};
+ function openDialog(html:string):HTMLDialogElement{
+  return dialogView.show(html);
  }
  const closeDialog=()=>dialogView.close();
  function confirm(title:string,text:string,ok:string,then:()=>void,danger=false){
@@ -114,10 +116,10 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
  for(const page of ['projects','sync','activity','settings'] as const)registry.register({id:page,title:'Open '+page,when:canNavigate,run:()=>go(page)});
  const stopCommands=registry.attach(document);
  if('__TAURI_INTERNALS__' in window){
-  if(!import.meta.env.DEV)stopGuard=guardDesktop(document,{keyPhase:'bubble'});
+  if(!import.meta.env.DEV)stopGuard=guardDesktop(document);
   void Promise.all([import('@acaprino/imago/tauri'),import('@tauri-apps/api/webview')]).then(([adapter,webview])=>{
    if(disposed)return;
-   nativeApi=adapter.tauriWindowApi((what,error)=>notify(what+': '+message(error),'bad'));wireWindow();
+   nativeApi=adapter.tauriWindowApi((what,error)=>notify(what+': '+message(error),'err'));wireWindow();
    let storage:Storage|undefined;try{storage=localStorage;}catch{}
    stopZoom=mountZoom(document,{apply:level=>webview.getCurrentWebview().setZoom(level),storage,storageKey:'muro.zoom'});
   }).catch(fail);

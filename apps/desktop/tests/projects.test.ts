@@ -152,7 +152,7 @@ test('Open project file is offered while the shell can open a file dialog, and i
 });
 test('the list while it is read, after it failed, and when it is empty', () => {
   const s = snapshot();
-  assert.match(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /Reading your projects…/);
+  assert.match(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   const failed = projects.view(blank({ snapshot: s, projects: { ...blankProjects(), error: 'The factory did not answer' } }));
   assert.match(failed, /Projects could not be read/);
   assert.match(failed, /The factory did not answer/);
@@ -193,7 +193,7 @@ test('a project with no repository says so, and one from the user is not marked 
 test('the four steps are a tablist: selected, labelled, with one tab in the tab order', () => {
   for (const [at, [id]] of STEPS.entries()) {
     const html = projects.view(opened({}, id));
-    const list = html.match(/<div class="im-step-nav" role="tablist" aria-label="Project steps">([\s\S]*?)<\/div><div role="tabpanel"/)?.[1] ?? '';
+    const list = html.match(/<ol class="im-steps" role="tablist" aria-label="Project steps">([\s\S]*?)<\/ol><div role="tabpanel"/)?.[1] ?? '';
     const tabs = [...list.matchAll(/<button type="button" role="tab"([^>]*)>([\s\S]*?)<\/button>/g)];
     assert.equal(tabs.length, 4);
     assert.deepEqual(tabs.map(t => /aria-selected="true"/.test(t[1])), STEPS.map(([s]) => s === id), `${id} is the one selected`);
@@ -221,7 +221,7 @@ test('arrow keys move through the steps and wrap; Home and End go to the ends; o
 });
 test('while the project is read, and when it cannot be, the page says so and offers to try again', () => {
   const loading = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
-  assert.match(loading, /Reading the project…/);
+  assert.match(loading, /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   assert.match(loading, /data-action="close-project"/, 'the way back is there');
   assert.doesNotMatch(loading, /role="tablist"/);
   const failed = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoError: 'The project file is not a Muro project file' } }));
@@ -232,7 +232,7 @@ test('while the project is read, and when it cannot be, the page says so and off
 test('the information of another project is never shown for this one', () => {
   const state = opened({}, 'inputs', info());
   state.projects.infoId = 'other';
-  assert.match(projects.view(state), /Reading the project…/);
+  assert.match(projects.view(state), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
 });
 test('the project page escapes everything it shows', () => {
   const evil = '<script>alert(1)</script>';
@@ -296,7 +296,7 @@ test('Install: a harness the plan changes shows the change, and one with no buil
 test('Install: a harness that is paused has no switch', () => {
   const html = install.view(live({ targets: [claude, { ...codex, enabled: false }] }), info());
   assert.equal(html.match(/role="switch"/g)?.length, 1);
-  assert.match(html, /<span class="im-chip" data-im-tone="">Paused<\/span>/);
+  assert.match(html, /<span class="im-chip">Paused<\/span>/);
 });
 test('Install: without a harness it sends to Sync', () => {
   const html = install.view(live({ targets: [] }), info());

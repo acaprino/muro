@@ -158,7 +158,7 @@ const differs = (stored: Settings, patch: Patch) => (Object.keys(patch) as (keyo
 async function save(app: App, patch: Patch): Promise<void> {
   const stored = app.state.snapshot!.registry.settings;
   if (differs(stored, patch))
-    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.', 'good'); if (patch.ai && ('engine' in patch.ai || 'api_key_env' in patch.ai)) void readKey(app); });
+    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.'); if (patch.ai && ('engine' in patch.ai || 'api_key_env' in patch.ai)) void readKey(app); });
   app.render();
 }
 /** Refused where it enters: the message, and the control goes back to what is stored. */
@@ -195,7 +195,7 @@ async function startWithWindows(app: App): Promise<void> {
   await app.run('Saving settings…', async () => {
     state.autostart = await app.request<Autostart>('set_autostart', { enabled: on });
     return alsoSync ? await saveRequest(app, { auto_sync: true }) : null;
-  }, saved => { if (saved) accept(app, saved); app.notify('Saved.', 'good'); });
+  }, saved => { if (saved) accept(app, saved); app.notify('Saved.'); });
 }
 
 async function maintain(app: App, kind: 'verify' | 'cleanup', label: string): Promise<void> {

@@ -31,7 +31,6 @@ await test('a column header opens the harness sheet; each wrong field says what 
   const { page } = app, dlg = dialog(page).first();
   await column(page, 'Codex isolated test').click();
   await dlg.locator('h2').getByText('Codex isolated test', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet on the right');
   assert.equal(await focused(page, 'inside'), true, 'the sheet takes the focus');
   assert.equal(await dlg.getAttribute('aria-labelledby'), 'dlg-title');
   for (const label of ['Name', 'Harness', 'Configuration folder', 'Executable', 'Keep this harness in sync', 'Uninstall plugins that are not in my list']) await dlg.getByLabel(label).first().waitFor();
@@ -207,7 +206,7 @@ await test('Uninstall, asking first lists the removal before Apply', 'unlisted',
   assert.match(await page.locator('section.im-summary small').first().textContent(), /1 removal/);
   await page.screenshot({ path: shots + '/harness-unlisted-removal.png' });
   await page.getByRole('button', { name: 'Review', exact: true }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByText('Remove', { exact: true }).waitFor();
   await sheet.getByText('old-snippets').waitFor();
   await sheet.getByText('1 plugin will be uninstalled.').waitFor();
@@ -286,7 +285,7 @@ await test('Apply all on a plan with removals opens the review sheet and applies
   const { page } = app;
   await check(page);
   await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).waitFor();
   assert.equal((await actions(app)).includes('apply'), false, 'Apply all asked for a fresh plan and applied nothing');
   await sheet.getByText('Install', { exact: true }).waitFor();
@@ -305,7 +304,7 @@ await test('the primary button of a review with removals confirms their number a
   const { page } = app;
   await check(page);
   await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).click();
   await sheet.waitFor({ state: 'detached' });
   const sent = (await callsOf(app, 'apply')).at(-1).payload;
@@ -352,7 +351,6 @@ await test('a new plugin: wrong fields say so, the name follows the source, a re
   const { page } = app, dlg = dialog(page).first();
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
   await dlg.locator('h2').getByText('Add a plugin', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), false, 'a dialog, not a sheet');
   assert.equal(await focused(page, 'name'), 'source', 'it starts in the source');
   assert.equal(await dlg.getByRole('checkbox', { name: 'Codex isolated test' }).isChecked(), true, 'every enabled harness is checked');
   assert.equal(await dlg.getByText('More', { exact: true }).count(), 0, 'a plugin that is not in the list has no More');
@@ -507,7 +505,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Plan a reinstall' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.locator('h2').getByText('Review changes', { exact: true }).waitFor();
   assert.deepEqual((await callsOf(app, 'plan')).at(-1).payload, { reinstall: 'p1' });
   await sheet.getByText('Reinstall', { exact: true }).waitFor();

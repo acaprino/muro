@@ -9,7 +9,7 @@ export interface App {
   render(): void;
   /** One request at a time: sets `state.busy` to `label`, runs `work`, hands its value to `after`, shows a failure in `state.error`. Does nothing while another run is busy. */
   run<T>(label: string, work: () => Promise<T>, after?: (value: T) => void | Promise<void>): Promise<void>;
-  notify(text: string, tone?: 'good' | 'bad'): void;
+  notify(text: string, tone?: 'err'): void;
   /** Reads the snapshot again. */
   reload(): Promise<void>;
   /** Asks the service for a full plan and keeps it as `state.plan`. Calls that arrive meanwhile share one more plan, never one each. */
@@ -18,8 +18,8 @@ export interface App {
   adopt(snapshot: Snapshot, options?: { replan?: boolean }): void;
   /** Looks for the harnesses installed on this computer: `state.discovered`. */
   discover(): Promise<void>;
-  /** Opens `html` in the one dialog (a centred dialog or a sheet on the right); open already, it replaces the content and keeps the focus. The first heading becomes its name. Returns the element: wire a form's `onsubmit` on it. */
-  openDialog(html: string, kind?: 'dialog' | 'sheet'): HTMLDialogElement;
+  /** Opens `html` in the one dialog (centred; a panel for one object is the inspector); open already, it replaces the content and keeps the focus. The first heading becomes its name. Returns the element: wire a form's `onsubmit` on it. */
+  openDialog(html: string): HTMLDialogElement;
   closeDialog(): void;
   confirm(title: string, text: string, ok: string, then: () => void, danger?: boolean): void;
 }

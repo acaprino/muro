@@ -1,3 +1,4 @@
+import type { ChipTone } from '@acaprino/imago/ui';
 import type { ProjectView, ProjectsState } from '../../types.ts';
 import { newSim, restoreSim } from './graph.ts';
 
@@ -8,7 +9,7 @@ export const VIEWS = ['records', 'choices', 'history', 'prompts'] as const;
 const KEY = 'muro.project';
 
 /** The state of a project's harmonization, in the words of the list, the page's head, the tab and the strip of step 2: said once, here. Every project is "Harmonized" until plan 3 (the write side) computes the others. */
-export const STATE = { label: 'Harmonized', tone: 'good' };
+export const STATE: { label: string; tone: ChipTone } = { label: 'Harmonized', tone: 'ok' };
 
 /** What the Projects page holds while nothing was read: no list, nothing open. */
 export const blankProjects = (): ProjectsState => ({ list: null, loading: false, error: null, info: null, infoId: null, infoLoading: false, infoError: null, noPicker: false, noFolder: false });

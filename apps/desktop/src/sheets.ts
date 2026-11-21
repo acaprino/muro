@@ -7,12 +7,12 @@ export { formHeaderHtml as dlHead } from '@acaprino/imago/ui';
 
 
 const KINDS:Record<string,string>={install:'Install',update:'Update',reinstall:'Reinstall',activate:'Activate',remove:'Remove'};
-const tone=(kind:string)=>kind==='remove'?'bad':kind==='update'?'warn':'accent';
+const tone=(kind:string)=>kind==='remove'?'err':kind==='update'?'warn':'accent';
 /** The review sheet: what a plan would change, harness by harness, and what it leaves out. `scope` is the harness a one-harness plan was made for; `running` is an apply in progress (`index` operations done), which locks the sheet. */
 export function reviewSheet(state:ViewState,plan:Plan,running:{index:number}|null,scope:Target|null=null):string {
  const s=state.snapshot!,ops=plan.operations,removing=removals(plan).total;
  const sections=s.registry.targets.map(t=>({t,own:ops.filter(o=>o.target_id===t.id)})).filter(x=>x.own.length);
- const line=(o:Plan['operations'][number])=>{const i=ops.indexOf(o),st=running?(i<running.index?`<span class="im-text-ok">${icon('check')}</span>`:spin):'';return `<li><span class="im-chip" data-im-tone="${tone(o.kind)==='bad'?'err':tone(o.kind)}">${esc(KINDS[o.kind]||o.kind)}</span><div><strong>${esc(o.name)}</strong><small>${o.kind==='remove'?`${esc(o.from_version)}${o.reason?` · ${esc(o.reason)}`:''}`:o.kind==='update'?`${esc(o.from_version)} → ${esc(o.to_version)}`:esc(o.to_version)}</small></div><span class="im-operation-status">${st}</span></li>`;};
+ const line=(o:Plan['operations'][number])=>{const i=ops.indexOf(o),st=running?(i<running.index?`<span class="im-text-ok">${icon('check')}</span>`:spin):'';return `<li><span class="im-chip" data-im-tone="${tone(o.kind)}">${esc(KINDS[o.kind]||o.kind)}</span><div><strong>${esc(o.name)}</strong><small>${o.kind==='remove'?`${esc(o.from_version)}${o.reason?` · ${esc(o.reason)}`:''}`:o.kind==='update'?`${esc(o.from_version)} → ${esc(o.to_version)}`:esc(o.to_version)}</small></div><span class="im-operation-status">${st}</span></li>`;};
  return `<div class="im-form">${dlHead(scope?`Sync ${scope.name}`:'Review changes',(scope?'Only the changes of this harness. ':'')+'Nothing changes until you apply.',!!running)}
  ${sections.map(({t,own})=>`<section class="im-operation-list"><h3>${mark(t.harness)}${esc(t.name)}</h3><ul>${own.map(line).join('')}</ul></section>`).join('')}
  ${!ops.length?'<p class="im-muted">No change is ready to apply.</p>':''}

@@ -98,7 +98,7 @@ test('step 2 writes nothing: no Edit, no Add a record, no Harmonize button, in a
 // ---------- the four views ----------
 test('the views are a labelled radio group named hview, with their counts, and the current one is checked', () => {
   const html = panel(opened('choices'));
-  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Harmonization views">[\s\S]*?<\/div>/)![0];
+  const group = html.match(/<div class="im-seg" role="radiogroup" aria-label="Harmonization views">[\s\S]*?<\/div>/)![0];
   assert.deepEqual([...group.matchAll(/<input type="radio" name="hview" value="(\w+)"( checked)?[^>]*><span>([^<]+)<\/span>/g)].map(m => [m[1], !!m[2], m[3]]), [
     ['records', false, 'Decision records · 3'], ['choices', true, 'Choices by part · 7'], ['history', false, 'History · 3'], ['prompts', false, 'Prompts'],
   ]);
@@ -126,7 +126,7 @@ test('Decision records: who wrote each, its date, its subjects and its text, in 
     'By Muro · binding 2026-11-19 · office-docs Never <b>bold</b> & "quoted"',
   ]);
   assert.match(html, /<span class="im-chip" data-im-tone="accent">Yours · binding<\/span>/);
-  assert.match(html, /<span class="im-chip" data-im-tone="">By Muro<\/span>/, 'a record of Muro that does not bind is not highlighted');
+  assert.match(html, /<span class="im-chip">By Muro<\/span>/, 'a record of Muro that does not bind is not highlighted');
 });
 test('Decision records: every value is escaped', () => {
   const html = panel(opened('records'));
@@ -153,7 +153,7 @@ test('Choices by part: each decision with its form, its source, the part, the re
     'Always on custom-instructions/house-style.md house-style.md The owner\'s own words.',
   ]);
   assert.match(words(html), /What each part of each input became, and why\. 7 of 7/);
-  assert.deepEqual([...list.matchAll(/<span class="im-chip" data-im-tone="(\w*)">(Capability|Always on|Hook|Dropped)<\/span>/g)].map(m => [m[2], m[1]]).slice(0, 4), [['Capability', 'accent'], ['Capability', 'accent'], ['Dropped', ''], ['Capability', 'accent']]);
+  assert.deepEqual([...list.matchAll(/<span class="im-chip"(?: data-im-tone="(\w+)")?>(Capability|Always on|Hook|Dropped)<\/span>/g)].map(m => [m[2], m[1] ?? '']).slice(0, 4), [['Capability', 'accent'], ['Capability', 'accent'], ['Dropped', ''], ['Capability', 'accent']]);
   assert.match(list, /<span class="im-chip" data-im-tone="warn">Always on<\/span>/);
   assert.match(list, /<span class="im-chip" data-im-tone="ok">Hook<\/span>/);
 });
@@ -164,11 +164,11 @@ test('Choices by part: a capability is opened through the action of the graph, a
 });
 test('Choices by part: the input filter is a labelled select with every input, and the form filter a labelled radio group', () => {
   const html = panel(opened('choices'));
-  const select = html.match(/<select name="dsrc" aria-label="Filter by input">([\s\S]*?)<\/select>/)![1];
+  const select = html.match(/<select class="im-select" name="dsrc" aria-label="Filter by input">([\s\S]*?)<\/select>/)![1];
   assert.deepEqual([...select.matchAll(/<option value="([^"]*)"([^>]*)>([^<]*)<\/option>/g)].map(m=>[m[1],/\bselected\b/.test(m[2]),m[3]]), [
     ['',true,'All inputs'],['taste-skill',false,'taste-skill'],['genoffice',false,'genoffice'],['superpowers',false,'superpowers'],
   ]);
-  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Filter by form">[\s\S]*?<\/div>/)![0];
+  const group = html.match(/<div class="im-seg" role="radiogroup" aria-label="Filter by form">[\s\S]*?<\/div>/)![0];
   assert.deepEqual([...group.matchAll(/name="dform" value="([\w-]+)"( checked)?[^>]*><span>([^<]+)</g)].map(m => [m[1], !!m[2], m[3]]), [
     ['all', true, 'All'], ['capability', false, 'Capability'], ['always-on', false, 'Always on'], ['hook', false, 'Hook'], ['dropped', false, 'Dropped'],
   ]);
@@ -192,7 +192,7 @@ test('Choices by part: a filter that leaves nothing says so and keeps the filter
   assert.match(words(html), /No choice matches this filter\./);
   assert.match(words(html), /0 of 7/);
   assert.doesNotMatch(html, /<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">/);
-  assert.match(html, /<select name="dsrc"/, 'the person can change the filter');
+  assert.match(html, /<select class="im-select" name="dsrc"/, 'the person can change the filter');
 });
 test('Choices by part: a filter for an input the project does not have means all inputs, and so does an unknown form', () => {
   const html = panel(opened('choices', { dsrc: 'vanished', dform: 'nonsense' }));
@@ -231,7 +231,7 @@ test('History: the changelog keeps its lines, and the results have their own ton
   const html = panel(opened('history', {}, info({ history: [...RUNS, run('run-4', '2026-11-20T08:00:00Z', '0.5.1', { status: 'failed' })] })));
   assert.match(html, /<td class="im-log-note">Moved taste-skill to v1\.2\.0\.\nThe Figma step works in any tool\.<\/td>/);
   assert.match(html, /<span class="im-chip" data-im-tone="ok">Built and validated<\/span>/);
-  assert.match(html, /<span class="im-chip" data-im-tone="">Cancelled<\/span>/);
+  assert.match(html, /<span class="im-chip">Cancelled<\/span>/);
   assert.match(html, /<span class="im-chip" data-im-tone="err">Failed<\/span>/);
   const rows = [...html.matchAll(/<tr>([\s\S]*?)<\/tr>/g)].slice(1).map(m => words(m[1]));
   assert.equal(rows[0], '20 Nov 2026, 08:00 0.5.1 marionette-v0.5.1 Changes of 0.5.1. Failed — —', 'a newer run that failed is not the current one');
@@ -280,7 +280,6 @@ test('Open shows the prompt, whole, in a sheet named for its file; the text is e
   const { app, dialogs } = fakeApp(opened('prompts'));
   await harmonize.actions['harmonize-prompt'](app, { id: 'intake.md' } as unknown as DOMStringMap, {} as HTMLElement);
   assert.equal(dialogs.length, 1);
-  assert.equal(dialogs[0].kind, 'sheet');
   const html = dialogs[0].html;
   assert.match(html, /<h2 id="dlg-title">intake\.md<\/h2>/, 'the heading names the dialog');
   assert.match(html, /Reads the inputs, classifies what they do/);
@@ -335,7 +334,7 @@ test('the page paints what the events kept: choose a view, then filter it', () =
 test('the page puts the step in its tab panel, and the tab still says Harmonized', () => {
   const html = projects.view(opened('records'));
   assert.match(html, /<div role="tabpanel" id="step-panel" aria-labelledby="step-tab-harmonize"><section class="im-summary" data-im-tone="ok"/);
-  assert.match(html, /id="step-tab-harmonize" aria-selected="true"[^>]*>[\s\S]*?<small>Harmonized<\/small>/);
+  assert.match(html, /id="step-tab-harmonize" aria-selected="true"[^>]*>[\s\S]*?<small class="im-step-sub">Harmonized<\/small>/);
   assert.doesNotMatch(html, /Coming in this version/);
 });
 test('the state of the harmonization is one value: the page\'s head, its tab and the strip of the step all read it', () => {
@@ -344,7 +343,7 @@ test('the state of the harmonization is one value: the page\'s head, its tab and
   try {
     const html = projects.view(opened('records'));
     assert.match(html, /<span class="im-chip" data-im-tone="warn">Waiting<\/span>/, 'the head');
-    assert.match(html, /id="step-tab-harmonize"[^>]*>[\s\S]*?<small>Waiting<\/small>/, 'the tab');
+    assert.match(html, /id="step-tab-harmonize"[^>]*>[\s\S]*?<small class="im-step-sub">Waiting<\/small>/, 'the tab');
     assert.match(html, /<section class="im-summary" data-im-tone="warn" aria-label="Harmonization state"><span class="im-summary-icon">[\s\S]*?<strong>Waiting<\/strong>/, 'the strip');
     assert.doesNotMatch(html, /Harmonized/, 'no second copy of the word');
   } finally { Object.assign(STATE, before); }

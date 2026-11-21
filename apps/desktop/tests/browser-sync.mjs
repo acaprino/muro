@@ -56,9 +56,9 @@ await test('a harness column offers its own changes and never replaces the strip
   const own = page.locator('th .im-cell-meta').getByRole('button', { name: 'Sync 1 change' });
   assert.equal(await own.count(), 2);
   await own.first().click();
-  await page.locator('dialog.im-content-dialog--drawer[open] h2').getByText('Sync Codex isolated test', { exact: true }).waitFor();
+  await page.locator('dialog[open] h2').getByText('Sync Codex isolated test', { exact: true }).waitFor();
   assert.deepEqual((await app.calls()).at(-1), { action: 'plan', payload: { target_id: 't1' } });
-  assert.equal(await page.locator('dialog.im-content-dialog--drawer li').count(), 1, 'the sheet lists only this harness');
+  assert.equal(await page.locator('dialog[open] li').count(), 1, 'the sheet lists only this harness');
   await page.keyboard.press('Escape');
   await page.locator('dialog[open]').waitFor({ state: 'detached' });
   assert.equal(await title(page), '2 changes ready to apply', 'a one-harness plan is not the plan of the strip');
@@ -88,7 +88,7 @@ await test('with blockers Apply all opens the review sheet; its Apply sends allo
   await check(page);
   assert.match(await strip(page).locator('small').first().textContent(), /1 item not ready yet/);
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('heading', { name: 'Review changes' }).waitFor();
   await sheet.getByRole('heading', { name: 'Not ready yet' }).waitFor();
   await sheet.getByText('Inventory incomplete').waitFor();
@@ -124,7 +124,7 @@ await test('a plan without anything ready has no Apply button', 'default', {}, a
   assert.deepEqual(after[1].payload, {});
   assert.equal(await strip(page).getByRole('button', { name: 'Check now' }).count(), 1);
   await strip(page).getByRole('button', { name: 'Review' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('heading', { name: 'Not ready yet' }).waitFor();
   assert.equal(await sheet.getByRole('button', { name: /^Apply/ }).count(), 0, 'nothing ready: no Apply');
   assert.match(await sheet.textContent(), /No change is ready to apply\./);
@@ -189,7 +189,7 @@ await test('a harness that cannot be removed stays, and the message says so', 't
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
   await page.getByRole('button', { name: 'Stop managing' }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Stop managing', exact: true }).click();
-  await page.locator('.im-banner[role=alert]').getByText('OpenCode isolated test was not removed: Version conflict', { exact: false }).waitFor();
+  await page.locator('.im-note[role=alert]').getByText('OpenCode isolated test was not removed: Version conflict', { exact: false }).waitFor();
   assert.equal(await page.locator('th').getByText('OpenCode isolated test').count(), 1, 'the harness is still a column');
   assert.equal((await actions(app)).includes('remove_target'), false, 'the harness was never asked to go while a plugin lists it');
 });
@@ -237,7 +237,7 @@ await test('applying shows its progress and cannot be dismissed', 'changes', {},
   await app.flags({ blockPlan: true, applyDelay: 700 });
   await check(page);
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply 1 change' }).click();
   await sheet.getByRole('button', { name: 'Applying 1 change…' }).waitFor();
   assert.equal(await sheet.getByRole('button', { name: 'Applying 1 change…' }).isDisabled(), true);
@@ -252,7 +252,7 @@ await test('a failed apply keeps the sheet open, with the error, to try again', 
   await app.flags({ blockPlan: true, rejectApply: true });
   await check(page);
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply 1 change' }).click();
   await sheet.getByRole('alert').getByText('The harness refused the change').waitFor();
   assert.equal(await sheet.getByRole('button', { name: 'Apply 1 change' }).isEnabled(), true, 'the sheet can try again after an error');
