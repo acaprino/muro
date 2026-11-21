@@ -590,8 +590,8 @@ await test('the dialogs and the menu fit a phone-width window, in the light them
   const views = page.getByRole('button', { name: 'Views', exact: true });
   await views.click();
   const navigation = page.getByRole('menu');
-  assert.deepEqual(await navigation.getByRole('menuitem').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings'], 'the compact Views menu keeps every page reachable');
-  await navigation.getByRole('menuitem', { name: 'Sync', exact: true }).click();
+  assert.deepEqual(await navigation.getByRole('menuitemradio').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings'], 'the compact Views menu keeps every page reachable');
+  await navigation.getByRole('menuitemradio', { name: 'Sync', exact: true }).click();
   await page.getByRole('heading', { name: 'Sync', level: 1 }).waitFor();
   assert.equal(await page.getByRole('menu').count(), 0, 'selecting a view closes compact navigation');
   await page.screenshot({ path: shots + '/harness-narrow-page.png' });

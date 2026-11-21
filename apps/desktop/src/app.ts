@@ -1,29 +1,31 @@
-import { attachLayers, closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openPalette, openMenu, regions, roving, loader } from '@acaprino/imago/ui';
+import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, keyCaps, mountApp, PALETTE_COMMAND } from '@acaprino/imago/ui';
 import { graphView, type GraphViewport } from '@acaprino/imago/graph';
 import { guardDesktop, mountZoom, mountWindowControls, type WindowApi } from '@acaprino/imago/shell';
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
 import type { App, Actions } from './context.ts';
 import { textBoxOf } from './context.ts';
 import { frame, modules } from './views.ts';
-import { watchTheme } from './look.ts';
+import { watchTheme, currentLook, currentTheme, saveAppearance } from './look.ts';
 import { serial, ALONE } from './queue.ts';
 import { needed as setupNeeded } from './pages/setup.ts';
 import { blankProjects, recall, remember } from './pages/project/state.ts';
 import { sceneFor, decisionGraphOptions } from './pages/project/graph.ts';
 
+const PAGES=['projects','sync','activity','settings'] as const;
+const tabLabel=(page:Page)=>page[0].toUpperCase()+page.slice(1);
 /** How often the open window reads the registry again while it has the focus: the background worker and the tray change it behind the window's back. */
 export const REFRESH_MS=30_000;
 
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
-export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
+export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,ALONE);
  const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
  root.classList.add('im-shell');root.dataset.imSidebar='off';renderShellFrame(root,frame(state));
  const titlebar=root.querySelector<HTMLElement>('.im-titlebar')!,body=root.querySelector<HTMLElement>('.im-body')!;
  const dialogView=createContentDialog(root,{canDismiss:()=>!state.applying,onClose:()=>render(),fallbackFocus:()=>root.querySelector<HTMLElement>('#main')});
  const dialog=dialogView.element;
- const stopLayers=attachLayers(root),stopRegions=regions(root),registry=createRegistry();
- let nativeApi:WindowApi|undefined,stopWindow=()=>{},stopZoom=()=>{},stopGuard=()=>{},stopTabs=()=>{};
+ const registry=createRegistry();
+ let nativeApi:WindowApi|undefined,stopWindow=()=>{},stopZoom=()=>{},stopGuard=()=>{},stopTabs=()=>{},stopSteps=()=>{};
  const wireWindow=()=>{stopWindow();if(nativeApi)stopWindow=mountWindowControls(titlebar,nativeApi,{onError:(what,error)=>notify(what+': '+message(error),'err')});};
  let disposed=false,polling=false,planning:Promise<void>|null=null,again=false;
  let wantedFocus:FocusSnapshot|null=null;
@@ -34,6 +36,13 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
  const fail=(e:unknown)=>{state.error=message(e);render();};
  const stopTheme=watchTheme();
 
+ /** The key caps of the app come from the registry: the title bar's command button, and every element that names a command. */
+ function fillKeys(){
+  const keys=registry.get(PALETTE_COMMAND)?.keys,button=root.querySelector<HTMLElement>('.im-titlebar-command');
+  if(keys&&button&&!button.querySelector('.im-keys'))button.append(keyCaps(document,keys));
+  root.querySelectorAll<HTMLElement>('[data-muro-keys]').forEach(el=>{const bound=registry.get(el.dataset.muroKeys!)?.keys;if(bound)el.replaceChildren(keyCaps(document,bound));});
+ }
+
  function render(){
   if(disposed)return;
   const dom=captureDomState(root,{scroll:['#main > .im-panel-body','.im-table-scroll']});
@@ -42,9 +51,12 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   }
   stopGraph();
   closeLayers(['menu','sheet']);
-  stopTabs();renderShellFrame(root,frame(state));
+  stopTabs();stopSteps();renderShellFrame(root,frame(state));
   const tabs=titlebar.querySelector<HTMLElement>('.im-tabs');if(tabs)stopTabs=roving(tabs,{item:'.im-tab',orientation:'horizontal',onSelect:el=>el.click()});
   wireWindow();remember(state.project);
+  fillKeys();
+  // The steps of a project are a tablist of one tab stop: the arrows, Home and End move the focus along them, and the tab the focus reaches is the one shown.
+  const steps=root.querySelector<HTMLElement>('.im-steps');if(steps){stopSteps=roving(steps,{item:'[role=tab]',orientation:'horizontal',onSelect:el=>el.click()});steps.addEventListener('focusin',e=>{const tab=(e.target as HTMLElement).closest<HTMLElement>('[role=tab]');if(tab&&tab.getAttribute('aria-selected')!=='true'&&tab.matches(':focus-visible'))tab.click();});}
   // The running operation shows at the top of the content: the frame is strings, the loader an element of the package.
   if(state.busy&&!state.checking&&!state.applying)root.querySelector<HTMLElement>('#main > .im-panel-body')?.prepend(loader(document,state.busy));
   const host=body.querySelector<HTMLElement>('[data-project-graph]');
@@ -95,7 +107,7 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
  const go=(page:Page)=>{if(!canNavigate())return;state.page=page;render();void modules[page].opened?.(app);};
  // The Projects tab, clicked while a project is open, goes back to the list.
  // A page button inside a dialog (the Adapt with AI dialog links to Settings) takes the person there: the dialog closes first, unless an apply is running in it.
- const actions:Actions={page:(_app,d)=>{if(!state.applying)closeDialog();if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload(),views:(_app,_d,el)=>{openMenu(el,(['projects','sync','activity','settings'] as const).map(page=>({label:page[0].toUpperCase()+page.slice(1),run:()=>go(page)})));},commands:()=>{openPalette(root,registry,{placeholder:'Search commands…',empty:'No matching command'});}};
+ const actions:Actions={page:(_app,d)=>{if(!state.applying)closeDialog();if(d.id==='projects'&&state.page==='projects')state.project=null;if(d.id==='projects'||d.id==='sync'||d.id==='activity'||d.id==='settings')go(d.id);},refresh:()=>reload(),views:(_app,_d,el)=>{openMenu(el,PAGES.map(page=>({label:tabLabel(page),checked:()=>state.page===page,run:()=>go(page)})));},commands:()=>{registry.get(PALETTE_COMMAND)?.run();}};
  for(const [name,m] of Object.entries(modules))for(const [action,fn] of Object.entries(m.actions)){if(action in actions)throw new Error(`The action "${action}" of the ${name} page is already declared`);actions[action]=fn;}
 
  const click=(e:Event)=>{
@@ -106,15 +118,14 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   e.preventDefault();void Promise.resolve().then(()=>fn(app,el.dataset,el)).catch(fail);
  };
  const route=(hook:'input'|'change')=>(e:Event)=>{const el=textBoxOf(e.target);if(!el)return;for(const m of Object.values(modules))if(m[hook]?.(app,el))return;};
- const keys=(e:KeyboardEvent)=>{for(const m of Object.values(modules))if(m.keydown?.(app,e))return;};
  const onInput=route('input'),onChange=route('change');
- root.addEventListener('click',click);root.addEventListener('input',onInput);root.addEventListener('change',onChange);root.addEventListener('keydown',keys);
- const search=()=>{if(state.page!=='sync')go('sync');root.querySelector<HTMLInputElement>('#search')?.focus();};
- registry.register({id:'commands',title:'Commands',keys:'Ctrl+K',run:()=>{openPalette(root,registry,{placeholder:'Search commands…',empty:'No matching command'});}});
- registry.register({id:'search',title:'Search plugins',keys:'Ctrl+F',when:canNavigate,run:search});
- registry.register({id:'quick-search',title:'Search plugins',keys:'/',when:canNavigate,run:search});
- for(const page of ['projects','sync','activity','settings'] as const)registry.register({id:page,title:'Open '+page,when:canNavigate,run:()=>go(page)});
- const stopCommands=registry.attach(document);
+ root.addEventListener('click',click);root.addEventListener('input',onInput);root.addEventListener('change',onChange);
+ // Ctrl+F searches the current view: only Sync has a search box, so on the other pages it does nothing. `/` does the same.
+ const search=()=>{if(canNavigate())root.querySelector<HTMLInputElement>('#main #search')?.focus();};
+ // The layers, the keys, the regions, Ctrl+K and Ctrl+F, and the look and theme commands: one call of the package.
+ const stopImago=mountApp(root,registry,{search,labels:{palette:'Commands',search:'Search in this view',palettePlaceholder:'Search commands…',paletteEmpty:'No matching command'},appearance:{get:()=>({look:currentLook(),theme:currentTheme()}),set:next=>{saveAppearance(next);render();}}});
+ registry.register({id:'quick-search',title:'Search in this view',keys:'/',when:canNavigate,run:search});
+ for(const page of PAGES)registry.register({id:page,title:'Open '+tabLabel(page),when:canNavigate,run:()=>go(page)});
  if('__TAURI_INTERNALS__' in window){
   if(!import.meta.env.DEV)stopGuard=guardDesktop(document);
   void Promise.all([import('@acaprino/imago/tauri'),import('@tauri-apps/api/webview')]).then(([adapter,webview])=>{
@@ -149,5 +160,5 @@ export function mountApp(root:HTMLElement,transport:Transport,shown?:(wake:()=>v
   catch(e){fail(e);}finally{polling=false;}
  },3000);
  void reload().then(()=>{if(!disposed&&state.snapshot){void discover();void modules[state.page].opened?.(app);}});
- return ()=>{disposed=true;stopGraph();dialogView.dispose();root.removeEventListener('click',click);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);root.removeEventListener('keydown',keys);stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();stopCommands();stopTabs();stopWindow();stopZoom();stopGuard();stopRegions();stopLayers();clearNotices(root);root.replaceChildren();};
+ return ()=>{disposed=true;stopGraph();dialogView.dispose();root.removeEventListener('click',click);root.removeEventListener('input',onInput);root.removeEventListener('change',onChange);stopTheme();clearInterval(jobTimer);clearInterval(refreshTimer);window.removeEventListener('focus',focused);stopShown?.();stopImago();stopTabs();stopSteps();stopWindow();stopZoom();stopGuard();clearNotices(root);root.replaceChildren();};
 }

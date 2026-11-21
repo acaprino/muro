@@ -37,8 +37,6 @@ export interface PageModule {
   input?(app: App, el: TextBox): boolean;
   /** A control of the page or of a dialog changed (the `change` event); true when handled. */
   change?(app: App, el: TextBox): boolean;
-  /** A key was pressed in the page or in a dialog; true when handled (the module then calls `preventDefault` itself). */
-  keydown?(app: App, e: KeyboardEvent): boolean;
   /** The page was opened (a tab, the first paint). */
   opened?(app: App): void | Promise<void>;
 }

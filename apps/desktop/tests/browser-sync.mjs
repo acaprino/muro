@@ -301,6 +301,26 @@ await test('themes: the system theme decides until one is chosen', 'changes', { 
   assert.notDeepEqual(dark.background, light.background, 'the visible surface changes with the system theme');
 });
 
+await test('Ctrl+F and / search the current view: Sync focuses its search box, the other pages leave focus and page as they are; the command button holds the caps of the registry', 'changes', {}, async ({ page }) => {
+  await page.locator('#search').waitFor();
+  assert.deepEqual(await page.locator('.im-titlebar-command .im-key').allTextContents(), ['Ctrl', 'K'], 'two caps, from the registry');
+  assert.deepEqual(await page.locator('#search').evaluate(el => el.closest('label').querySelector('.im-key').textContent), '/', 'the search box shows the cap of its command');
+  await page.keyboard.press('Control+f');
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'search', 'Ctrl+F focuses the search box');
+  await page.locator('#rows').click({ position: { x: 2, y: 2 } }).catch(() => {});
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press('/');
+  assert.equal(await page.evaluate(() => document.activeElement?.id), 'search', '/ does the same');
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
+  await page.evaluate(() => document.activeElement?.blur());
+  const before = await page.evaluate(() => document.activeElement?.tagName);
+  await page.keyboard.press('Control+f');
+  assert.equal(await page.evaluate(() => document.activeElement?.tagName), before, 'focus stays where it was');
+  await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
+  assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Activity', 'the page does not change');
+});
+
 for (const width of [1100, 760]) {
   await test(`no sideways scroll at ${width}px`, 'demo', { viewport: { width, height: 900 } }, async app => {
     const { page } = app;
