@@ -467,20 +467,17 @@ repository (Marionette from `acaprino/marionette`; owner request of 2026-11-19, 
   carries `Muro-<version>-windows-x64.zip`, the portable folder `build-release.bat` makes. Do not bump
   `__version__` or create `muro-v*` tags by hand.
 - A package, `<slug>-v<version>` (version in its `sources.json`, `plugin.version`; Marionette is
-  `marionette-v<version>`), on the owner's request only:
+  `marionette-v<version>`). Merging a package version change into Muro's `main` requests its release.
   1. Bump the package version on `develop`. A package changes version whenever its catalog, policy or
      packaged files changed: hosts cache an installed plugin by version.
   2. Write `docs/releases/<tag>.md`: what changed for a user, the verification results, and what was not
      executed. Without that file the notes carry only the version and the Muro commit it was built from.
   3. On the commit to release run `python -m pytest -q`, `--validate` and `--check-sources`, and stage a
      fresh build with `--build --out <scratch>`.
-  4. Run the `Release Marionette` workflow (GitHub, Actions, "Run workflow", or
-     `gh workflow run release-marionette.yml --ref develop`). It refuses a tag that already exists here or in
-     `acaprino/marionette` (a published release is never replaced, bump the version instead), repeats the
-     tests, validation, source checks and the build, and pushes the build as `marionette/`, with the notes in
-     `releases/<tag>.md`, to the branch `release/<tag>` of `acaprino/marionette`, which opens the pull request
-     into its `main`. Run again before the merge, it refreshes that pull request. The push uses the secret
-     `MARIONETTE_DEPLOY_KEY`, a write deploy key of that repository only.
+  4. Merge the `plugin.version` change into Muro's `main`. `Release Marionette` starts automatically,
+     runs the tests, validates the manifest and its sources, and builds the package. It pushes `marionette/`
+     and `releases/<tag>.md` to `release/<tag>` in `acaprino/marionette`, where a workflow opens the PR.
+     The existing `workflow_dispatch` remains available for recovery from Actions on `main`. A published tag is preserved. The push uses `MARIONETTE_DEPLOY_KEY`.
   5. The owner merges the pull request: `acaprino/marionette` then publishes the tag and the GitHub release
      with `<slug>-<version>.zip` and its SHA-256. `marionette-v0.2.0` to `marionette-v0.4.0` stay among this
      repository's releases.
