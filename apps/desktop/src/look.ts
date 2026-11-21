@@ -13,8 +13,11 @@ export function applyTheme():void {
   setWindowTheme: (word,{look,resolved}) => import('@tauri-apps/api/core').then(m=>m.invoke('set_window_theme',{theme:word,look,resolved}))
  } : {});
 }
-export function saveTheme(theme:Theme):void { try { localStorage.setItem(THEME_KEY,theme); } catch {} applyTheme(); }
-export function saveLook(look:Look):void { try { localStorage.setItem(LOOK_KEY,look); } catch {} applyTheme(); }
+const store = (key:string,value:string) => { try { localStorage.setItem(key,value); } catch {} };
+/** The look and the theme the person chose, from Settings or from the palette: kept, then put on the window. */
+export function saveAppearance(next:{look:Look;theme:Theme}):void { store(LOOK_KEY,next.look); store(THEME_KEY,next.theme); applyTheme(); }
+export function saveTheme(theme:Theme):void { store(THEME_KEY,theme); applyTheme(); }
+export function saveLook(look:Look):void { store(LOOK_KEY,look); applyTheme(); }
 export function watchTheme():()=>void {
  applyTheme();const media=window.matchMedia('(prefers-color-scheme: dark)');media.addEventListener('change',applyTheme);
  return ()=>media.removeEventListener('change',applyTheme);

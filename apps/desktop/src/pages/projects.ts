@@ -1,4 +1,4 @@
-import { nextStepId, stepNavigationHtml, stepNavigationKey, stepPanelHtml } from '@acaprino/imago/ui';
+import { stepNavigationHtml, stepPanelHtml } from '@acaprino/imago/ui';
 import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, versionOf } from '../model.ts';
@@ -167,14 +167,6 @@ const own: Actions = {
 };
 export const actions: Actions = merge(own, ...Object.values(steps).map(s => s.actions));
 
-/** The step a key moves to from the one it is pressed on: arrows wrap around, Home and End go to the ends; any other key moves nowhere. */
-export const nextStep = (step: ProjectStep, key: string): ProjectStep | null => nextStepId(STEPS.map(([id])=>id),step,key);
-/** Imago owns keyboard navigation; this page owns the selected project step. */
-export function keydown(app: App, event: KeyboardEvent): boolean {
-  const pv = app.state.project;
-  if (app.state.page !== 'projects' || !pv) return false;
-  return stepNavigationKey(event,{ids:STEPS.map(([id])=>id),action:'step',onSelect:id=>{pv.step=id;app.render();}});
-}
 export function input(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));
 }

@@ -684,7 +684,7 @@ it('text pasted into the request box reaches the step, survives a change of step
 });
 it('the step hears no key of its own: the text is always what the input events brought', () => {
   assert.equal('keydown' in graph, false);
-  assert.equal('keydown' in projects && typeof projects.keydown === 'function', true, 'the page keeps the tablist\'s keys');
+  assert.equal('keydown' in projects, false, 'the keys of the steps are the package (roving), not a hook of the page');
 });
 
 // ---------- the capability sheet ----------

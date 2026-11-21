@@ -89,7 +89,7 @@ await test('Inputs: what goes in, pinned how, under which license, and what it b
   assert.deepEqual({ step: record.step, view: record.view, dsrc: record.dsrc, dform: record.dform }, { step: 'harmonize', view: 'choices', dsrc: 'taste-skill', dform: 'all' }, 'its choices, filtered to that input, are kept for step 2');
 });
 
-await test('the steps are a tablist with arrow keys: the keyboard goes with the selection, the arrows wrap, Home and End go to the ends', 'projects', {}, async app => {
+await test('the steps are a tablist (roving): the arrows move along it and the tab reached is shown, the arrows stop at the ends, Home and End go to the ends', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   const current = () => page.evaluate(() => ({ focus: document.activeElement?.id, selected: [...document.querySelectorAll('.im-steps [role=tab]')].filter(t => t.getAttribute('aria-selected') === 'true').map(t => t.id), tabbable: [...document.querySelectorAll('.im-steps [role=tab]')].filter(t => t.tabIndex === 0).map(t => t.id) }));
@@ -100,9 +100,10 @@ await test('the steps are a tablist with arrow keys: the keyboard goes with the 
   await page.keyboard.press('ArrowRight');
   assert.deepEqual(await current(), { focus: 'step-tab-install', selected: ['step-tab-install'], tabbable: ['step-tab-install'] });
   await page.keyboard.press('ArrowRight');
-  assert.equal((await current()).focus, 'step-tab-inputs', 'wraps to the first');
+  assert.equal((await current()).focus, 'step-tab-install', 'the arrows stop at the last');
   await page.keyboard.press('ArrowLeft');
-  assert.equal((await current()).focus, 'step-tab-install', 'wraps to the last');
+  assert.equal((await current()).focus, 'step-tab-graph');
+  await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Home');
   assert.equal((await current()).focus, 'step-tab-inputs');
   await page.keyboard.press('End');

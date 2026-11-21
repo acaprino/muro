@@ -210,15 +210,6 @@ test('the tabs read: number, name and a line of what the step holds', () => {
   const tabs = [...html.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map(m => words(m[1]));
   assert.deepEqual(tabs, ['1 Inputs 3 inputs', '2 Harmonize Harmonized', '3 Graph & simulator 3 capabilities · 2 examples', '4 Install On 1 harness · in sync']);
 });
-test('arrow keys move through the steps and wrap; Home and End go to the ends; other keys do nothing', () => {
-  assert.equal(projects.nextStep('inputs', 'ArrowRight'), 'harmonize');
-  assert.equal(projects.nextStep('install', 'ArrowRight'), 'inputs', 'wraps');
-  assert.equal(projects.nextStep('inputs', 'ArrowLeft'), 'install', 'wraps');
-  assert.equal(projects.nextStep('graph', 'ArrowLeft'), 'harmonize');
-  assert.equal(projects.nextStep('graph', 'Home'), 'inputs');
-  assert.equal(projects.nextStep('graph', 'End'), 'install');
-  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', ' ', 'a']) assert.equal(projects.nextStep('graph', key), null, key);
-});
 test('while the project is read, and when it cannot be, the page says so and offers to try again', () => {
   const loading = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
   assert.match(loading, /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
