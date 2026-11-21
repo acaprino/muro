@@ -1,5 +1,5 @@
 # muro/__init__.py
-__version__ = "0.5.2"  # the factory's own version; a package's version is in its sources.json
+__version__ = "0.5.3"  # the factory's own version; a package's version is in its sources.json
 
 from .core import (
     validate_plugin_identity,
