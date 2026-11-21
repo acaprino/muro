@@ -1,63 +1,53 @@
-# Desktop migration to Imago
+# Desktop on Imago
 
-The desktop uses `@acaprino/imago` for tokens, Smooth/ONI appearance, native form
-controls, buttons, segmented radios, switches, chips, tables, lists, workflow
-steps, settings groups, status surfaces and progress. Menu, dialog/drawer,
-notification, keyboard command, focus and shell behaviour comes from Imago's
-TypeScript modules. The Windows frame uses `imago-shell`: glass and persisted
-native theme, caption controls/Snap Layouts, navigation guard, browser shortcut
-guard and WebView2 failure handling. Registry operations, the tray, the background
-worker and project decisions remain Muro's.
+Muro's desktop is the canon of Imago (`docs/design-file.md` of the package): one window
+frame, `im-shell`, painted from strings by `renderShellFrame` and routed by `data-action`
+(`app.ts`). This file records what Muro takes from Imago and where its tests are; the
+rules are the package's, and `npx imago-check` (a step of the desktop CI job, "Design
+rules") is how they are enforced.
 
-`styles.css` contains only the Imago import. All components, typography, layout
-primitives and visual behaviours belong to Imago. Muro retains domain schemas,
-labels, operations and screen composition. Its `ui.ts` is only a compatibility
-re-export of shared components plus domain formatting; it implements no UI.
+## What Muro takes from Imago
+
+- **Tokens and look**: `styles.css` is the Imago import and nothing else. The look and the
+  theme go through `applyLook`; `mountApp` registers the five commands that pick them, and
+  Settings calls the same `saveAppearance`.
+- **The frame**: title bar (mark and name, four view tabs, Commands with its caps from the
+  registry, window buttons), status row (the sync state, last and next check, harness count),
+  content, inspector, action bar (`PageModule.bar`: at most one primary), footer (automatic
+  sync, last sync, size of the list, the keys of the page from `footerKeys`). No sidebar
+  (`data-im-sidebar="off"`). The inspector is wide (360).
+- **Surfaces**: the plugin, the harness, a capability and a prompt are shown in the
+  inspector (not modal); the review of a plan and Adapt with AI are centred dialogs;
+  destructive actions ask with `confirm`; a failed operation is a notice with Reload, and the
+  notes of a page (sources not checked, harness detection) stay in the page; loading is
+  shown only after `LOADING_DELAY_MS` (`App.loading`, `state.slow`).
+- **Keys**: one registry through the package's `mountApp` (Ctrl+K, Ctrl+F, F6, Escape);
+  Ctrl+F and `/` search the current view (only Sync has a search box). The steps of a
+  project are a `roving` tablist.
+- **The graph**: `graphView` and `graph-layout`; `graph-scene.ts` only maps capabilities,
+  entries, prerequisites, conflicts and simulation results to the scene.
+- **The window**: the crate `imago-shell` (glass and native theme, caption controls and Snap
+  Layouts, navigation guard, WebView2 recovery). `set_window_theme` takes the look and the
+  theme the page draws. Registry operations, the tray, the background worker and project
+  decisions remain Muro's.
+- **Icons**: the files of `node_modules/@acaprino/imago/icons/muro/`, listed under
+  `"icons"` of the `"imago"` block of `package.json` and compared byte for byte.
+
 Extend Imago whenever a component is missing; do not add local components or CSS.
-See Imago's `docs/native-forms.md` and `docs/content-composition.md`.
 
-The decision graph uses Imago's `graphView` component. Imago owns grouped layout, nodes,
-edge routing, pan/zoom/fit, keyboard navigation, legend, focus and camera APIs.
-Muro's `graph-scene.ts` only maps capabilities, entries, prerequisites, conflicts
-and simulation results to the shared scene model. The old SVG renderer is deleted.
-Viewport state (camera plus automatic-fit mode) is retained per project across paints and tab changes; graph controls
-respect application transactions and modal state.
+## The pin
 
-The app retains a stable shell body while repainting its children, so a render
-cannot remove the inert boundary of an open dialog. Native forms retain their
-submission and FormData behaviour. Dismissal is refused during saves/applies;
-successful completion may close the form programmatically. Imago's operation guard
-locks the complete form, restores each button's original disabled state and rejects
-late UI callbacks when the form was replaced or detached. Error retries keep
-the form values. Native title-bar controls stay available under dialogs; page
-navigation does not bypass modality. Unmount disposes listeners, layers, notices
-and timers. Ctrl+K opens commands, Ctrl+F or `/` finds plugins. Navigation commands
-wait for registry initialization and completion of the first-run wizard.
+The npm package and the Rust crate are pinned to the same Imago tag (or, while Muro waits for a
+release, the same commit of Imago's `develop`); `package-lock.json` and `Cargo.lock` record
+the commit. `Cargo.lock` is edited by hand when the pin moves and proved by CI's `--locked`.
+The desktop CI uses `npm ci` and Cargo `--locked`. A standalone Muro checkout never depends on
+a sibling directory.
 
-## Shared dependency
+## Tests
 
-The npm package and Rust crate are pinned to the same released Imago tag.
-`package-lock.json` and `Cargo.lock` record its immutable commit. The package's
-Git `prepare` script builds the public JavaScript modules during installation.
-The npm lock includes the complete resolved D3 runtime dependency tree.
-
-When extending Imago, integrate and verify it first, release it through its
-develop-to-main pull request, then update both Muro dependencies and lockfiles
-together. A standalone Muro checkout must never depend on a sibling directory.
-The desktop CI uses `npm ci` and Cargo `--locked` to verify those pins.
-
-## Verification status
-
-- Targeted frontend tests cover forms, sync, setup, settings/activity, projects,
-  harmonization and graph/simulation. Browser tests use the new component selectors.
-- `browser-imago.mjs` adds a native-browser contract for menu/focus, validation,
-  rejected saves and retries, modality, appearance, commands and teardown.
-- Imago adds `tests/gallery/content-dialog.mjs` for both looks and themes,
-  native FormData, locked dismissal, native close, reuse and wrapped inputs.
-  `dialog-repaint.mjs` covers focus restoration and component CSS specificity;
-  the graph gallery covers automatic-fit and manual-camera state across remounts.
-- CI verifies Rust compilation, the production Vite build and browser execution.
-  Source review and compatibility checks alone do not prove native-window behaviour.
-
-The [verification report](imago-verification.md) records preparation evidence and
-the CI gates required before merging the migration into main.
+`apps/desktop/tests`: unit tests (`npm test`: forms, sync, setup, settings and activity,
+projects, harmonization, graph) and browser tests (`browser-*.mjs`, headless Edge on a
+fake transport, `node apps/desktop/tests/browser.mjs`). `browser-imago.mjs` is the
+native-browser contract (menu and focus, validation, rejected saves, the inspector, notices,
+commands, teardown). The real window (`native.mjs`, `native-shell.mjs`, both looks and both
+themes over a dark and a bright desktop) is checked by hand; see `docs/verification/` for what was seen.

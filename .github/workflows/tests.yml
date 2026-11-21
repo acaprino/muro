@@ -70,6 +70,9 @@ jobs:
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm test
+      - name: Design rules
+        if: always()
+        run: npx imago-check
       - name: Type check
         if: always()
         run: npx tsc --noEmit
