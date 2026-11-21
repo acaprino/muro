@@ -965,7 +965,7 @@ mod tests {
     #[test]
     fn a_codex_entry_has_the_folder_codex_installed_it_in_and_its_enabled_state() {
         let tmp = tempfile::tempdir().unwrap();
-        let there = tmp.path().join("plugins/cache/muro-demo/demo/1.2.3");
+        let there = tmp.path().join("plugins").join("cache").join("muro-demo").join("demo").join("1.2.3");
         fs::create_dir_all(&there).unwrap();
         // The rows as codex-cli 0.171.0 writes them under `installed`.
         let row = |id: &str, market: &str, name: &str, version: &str, enabled: bool| {
