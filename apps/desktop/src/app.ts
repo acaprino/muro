@@ -40,10 +40,12 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
 
  /** The key caps of the app come from the registry: the title bar's command button, and every element that names a command. */
  function fillKeys(){
+  // The caps are direct children of what they sit in (a button, a field's box), as the canon writes them: the package's rules for a cap in a button apply to `.im-btn > .im-key`.
+  const caps=(binding:string,hidden:boolean)=>Array.from(keyCaps(document,binding).children).map(cap=>{if(hidden)cap.setAttribute('aria-hidden','true');return cap;});
   const keys=registry.get(PALETTE_COMMAND)?.keys,button=root.querySelector<HTMLElement>('.im-titlebar-command');
-  if(keys&&button&&!button.querySelector('.im-keys'))button.append(keyCaps(document,keys));
-  root.querySelectorAll<HTMLElement>('[data-muro-keys]').forEach(el=>{const bound=registry.get(el.dataset.muroKeys!)?.keys;if(bound)el.replaceChildren(keyCaps(document,bound));});
-  root.querySelectorAll<HTMLElement>('[data-muro-cap]').forEach(el=>el.replaceChildren(keyCaps(document,el.dataset.muroCap!)));
+  if(keys&&button&&!button.querySelector('.im-key'))button.append(...caps(keys,false));
+  root.querySelectorAll<HTMLElement>('[data-muro-keys]').forEach(el=>{const bound=registry.get(el.dataset.muroKeys!)?.keys;if(bound)el.replaceWith(...caps(bound,el.closest('button')!==null));else el.remove();});
+  root.querySelectorAll<HTMLElement>('[data-muro-cap]').forEach(el=>el.replaceWith(...caps(el.dataset.muroCap!,true)));
   // The footer lists the keys that work on the page: search only where there is something to search.
   root.querySelectorAll<HTMLElement>('[data-muro-footer]').forEach(el=>el.replaceWith(footerKeys(document,registry,[PALETTE_COMMAND,...(el.dataset.muroFooter==='sync'?[SEARCH_COMMAND]:[]),'muro.check'])));
  }

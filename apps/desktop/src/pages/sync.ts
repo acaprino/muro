@@ -35,8 +35,8 @@ function stripOf(state:ViewState):Strip {
  else{tone='ok';ico='check';title='Everything is in sync';text='What is installed on your harnesses matches your list.';}
  return {tone,icon:ico,title,text,lead,actions};
 }
-/** A key cap on a button: `attr` is an attribute of an empty span that the app fills from the registry after each paint (`fillKeys` in app.ts). */
-const withCap=(html:string,attr:string)=>html.replace(/<\/button>$/,`<span ${attr} aria-hidden="true"></span></button>`);
+/** A key cap on a button: `attr` is an attribute of an empty span that the app replaces by the caps (direct children of the button, hidden from the accessible name) after each paint (`fillKeys` in app.ts). */
+const withCap=(html:string,attr:string)=>html.replace(/<\/button>$/,`<span ${attr}></span></button>`);
 const strip=(state:ViewState):string=>{const st=stripOf(state);return `<div id="sync-state">${noteHtml({icon:st.icon,title:st.title,message:st.text,tone:st.tone})}</div>`;};
 /** The action bar of Sync: Check now always, then what the note says to do. At most one primary action. */
 export function bar(state:ViewState):string {
