@@ -54,7 +54,7 @@ const plan = (operations: Plan['operations'], revision = 1): Plan => ({ id: 'p',
 const op = (plugin_id: string, kind: string, target_id = 't1', to = '0.5.0', from = ''): Plan['operations'][number] => ({ target_id, plugin_id, name: plugin_id, kind, from_version: from, to_version: to, reason: '' });
 /** The visible words of a piece of markup, one space between them. */
 const words = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
-const rowOf = (html: string, id: string) => html.match(new RegExp(`<li class="go"><button[^>]*data-id="${id}"[\\s\\S]*?</li>`))?.[0] ?? '';
+const rowOf = (html: string, id: string) => html.match(new RegExp(`<li class="im-list-link"><button[^>]*data-id="${id}"[\\s\\S]*?</li>`))?.[0] ?? '';
 
 // ---------- the tabs ----------
 test('Projects is the first of four tabs, and the app bar still has one state button', () => {
@@ -67,7 +67,8 @@ test('Projects is the first of four tabs, and the app bar still has one state bu
 test('the Projects tab is current on its page, which is wide like Sync', () => {
   const html = frame(opened());
   assert.match(html, /data-id="projects" aria-current="page"/);
-  assert.match(html, /<div class="page ">/, 'not the narrow column of Activity and Settings');
+  assert.match(html, /<div class="im-page-content">/, 'the wide page container');
+  assert.doesNotMatch(html, /class="im-page-content im-page-content--narrow"/);
 });
 test('every action has one owner, with the project steps merged in', () => {
   const names = Object.values(modules).flatMap(m => Object.keys(m.actions));
@@ -82,7 +83,7 @@ test('the list says for each project its name, version, file, counts, state and 
   assert.match(html, /<h1>Projects<\/h1>/);
   assert.match(html, /A project turns plugins and skills into one plugin, harmonized by the AI, for every harness\./);
   assert.equal(words(row), 'MA Marionette 0.5.0 Included with Muro D:/Muro/data/projects/marionette.mp 3 inputs · 37 capabilities Harmonized Not installed anywhere');
-  assert.match(row, /<span class="tag good">Harmonized<\/span>/);
+  assert.match(row, /<span class="im-chip" data-im-tone="ok">Harmonized<\/span>/);
 });
 test('a project that is not Muro\'s own has no Included with Muro tag', () => {
   const html = projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary({ id: 'notes', included: false, project: meta({ name: 'Notes', builtin: false }) })] } }));
@@ -129,7 +130,7 @@ test('the plugins Muro installs as published are listed apart, with the harnesse
   const project = registryPlugin('marionette', 'Marionette', ['t1'], [build('claude-code', '0.5.0')], { project: 'marionette' });
   const html = projects.view(blank({ snapshot: snapshot({ plugins: [published, project] }), projects: { ...blankProjects(), list: [summary()] } }));
   const section = html.slice(html.indexOf('Installed as published'));
-  assert.match(html, /<h2>Installed as published<\/h2><span class="count">1<\/span>/, 'the project plugin is not among them');
+  assert.match(html, /<h2>Installed as published<\/h2><span class="im-count">1<\/span>/, 'the project plugin is not among them');
   assert.match(words(section), /commit-helper v2\.1\.0 github\.com\/example\/commit-helper No version for Codex/);
   assert.doesNotMatch(section, /Marionette/);
   assert.doesNotMatch(words(html.slice(0, html.indexOf('Installed as published'))), /No version for/);
@@ -170,17 +171,17 @@ test('every value of the list goes through esc', () => {
 test('the project page: header, the file with its folder, repository, author, creation, and what the file holds', () => {
   const html = projects.view(opened());
   assert.match(html, /<button[^>]*data-action="close-project"[^>]*>.*<span>Projects<\/span>/, 'back to the list');
-  const head = html.match(/<div class="projhead">[\s\S]*?<\/div>/)![0];
+  const head = html.match(/<div class="im-record-heading">[\s\S]*?<\/div>/)![0];
   assert.equal(words(head), 'MA Marionette 0.5.0 Harmonized Included with Muro');
   assert.match(head, /<h1>Marionette<\/h1>/);
-  const file = html.match(/<div class="projfile">[\s\S]*?<\/details><\/div>/)![0];
+  const file = html.match(/<div class="im-record-meta">[\s\S]*?<\/details><\/div>/)![0];
   assert.match(file, /<code>D:\/Muro\/data\/projects\/marionette\.mp<\/code>/);
   assert.match(file, /<button[^>]*data-action="open-folder"[^>]*data-id="D:\/Muro\/data\/projects\/marionette\.mp"[^>]*>.*<span>Open folder<\/span>/);
   assert.match(words(file), /Repository github\.com\/acaprino\/marionette · main · by acaprino · created 2026-11-10/);
   assert.match(file, /<summary>What this project file holds<\/summary>/);
   const rows = [...file.matchAll(/<li><strong[^>]*>([^<]*)<\/strong><span[^>]*>([^<]*)<\/span>/g)].map(m => [m[1], m[2]]);
   assert.deepEqual(rows, [['Identity', 'The final plugin: Marionette, installed as marionette, version 0.5.0'], ['Your instructions', 'house-style.md, tone.md'], ['Built plugin', 'Ready to install on every harness, with its guide'], ['Offline', 'The file carries everything: the project rebuilds and installs without the network.']]);
-  assert.match(file, /<code class="muted">release\/<\/code>/);
+  assert.match(file, /<code class="im-muted">release\/<\/code>/);
 });
 test('a project with no repository says so, and one from the user is not marked as Muro\'s', () => {
   const held = info({ included: false, project: meta({ repository: null, builtin: false, author: 'you' }) });
@@ -191,7 +192,7 @@ test('a project with no repository says so, and one from the user is not marked 
 test('the four steps are a tablist: selected, labelled, with one tab in the tab order', () => {
   for (const [at, [id]] of STEPS.entries()) {
     const html = projects.view(opened({}, id));
-    const list = html.match(/<div class="steps4" role="tablist" aria-label="Project steps">([\s\S]*?)<\/div><div role="tabpanel"/)?.[1] ?? '';
+    const list = html.match(/<div class="im-step-nav" role="tablist" aria-label="Project steps">([\s\S]*?)<\/div><div role="tabpanel"/)?.[1] ?? '';
     const tabs = [...list.matchAll(/<button type="button" role="tab"([^>]*)>([\s\S]*?)<\/button>/g)];
     assert.equal(tabs.length, 4);
     assert.deepEqual(tabs.map(t => /aria-selected="true"/.test(t[1])), STEPS.map(([s]) => s === id), `${id} is the one selected`);
@@ -252,7 +253,7 @@ test('Inputs: a table of what goes in, pinned how, under which license, and what
 });
 test('Inputs: what an input became is a link to its choices, and counts of one read in the singular', () => {
   const html = inputs.view(opened(), info({ inputs: [{ id: 'one', url: 'https://x/y', pin: 'release', release: 'v1', commit: null, license: 'MIT', paths: [], became: became(1, 0, 1, 0) }] }));
-  assert.match(html, /<button type="button" class="link" data-action="decisions-of" data-id="one">1 capability · 1 hook<\/button>/);
+  assert.match(html, /<button type="button" class="im-btn im-btn--sm im-btn--ghost" data-action="decisions-of" data-id="one"><span>1 capability · 1 hook<\/span><\/button>/);
 });
 test('Inputs: the write actions of plan 3 are not offered', () => {
   const html = inputs.view(opened(), info({ inputs: [{ ...info().inputs[0], release: 'v0.0.1' }] }));
@@ -294,7 +295,7 @@ test('Install: a harness the plan changes shows the change, and one with no vers
 test('Install: a harness that is paused has no switch', () => {
   const html = install.view(live({ targets: [claude, { ...codex, enabled: false }] }), info());
   assert.equal(html.match(/role="switch"/g)?.length, 1);
-  assert.match(html, /<span class="tag ?">Paused<\/span>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="">Paused<\/span>/);
 });
 test('Install: without a harness it sends to Sync', () => {
   const html = install.view(live({ targets: [] }), info());
@@ -306,7 +307,7 @@ test('Install: without a harness it sends to Sync', () => {
 test('Install: the changes waiting for this project are reviewed in Sync\'s own sheet, which lists the whole plan', () => {
   const held = plan([op('marionette', 'install', 't2'), op('marionette', 'update', 't1', '0.6.0', '0.5.0'), op('other', 'install', 't1')]);
   const html = install.view(live({ targetsOn: ['t1', 't2'], plan: held }), info());
-  assert.match(html, /<button[^>]*class="btn primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'only this project\'s changes count');
+  assert.match(html, /<button[^>]*class="im-btn im-btn--primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'only this project\'s changes count');
   assert.doesNotMatch(html.match(/<button[^>]*data-action="review"[^>]*>/)![0], /data-id/, 'the review of the whole plan, not of one harness');
   assert.match(html, /data-action="page" data-id="sync"[^>]*>.*<span>Open Sync<\/span>/);
   assert.doesNotMatch(install.view(live(), info()), /data-action="review"/, 'nothing waiting: no review');
@@ -350,7 +351,7 @@ it('a new project opens on its first step, with no filter', () => {
 
 // ---------- the steps Tasks 7 and 8 build: until then each says so ----------
 test('Graph & simulator is built (tests/project-graph.test.ts): the page shows the module of the step, and no step is a placeholder any more', () => {
-  assert.match(projects.view(opened({}, 'graph')), /<div class="two"><div class="sim">/, 'the page shows the module of the step');
+  assert.match(projects.view(opened({}, 'graph')), /<div class="im-aside-layout"><div class="im-stack-3">/, 'the page shows the module of the step');
   assert.doesNotMatch(projects.view(opened({}, 'graph')), /Coming in this version/);
   assert.doesNotMatch(projects.view(opened({}, 'harmonize')), /Coming in this version/, 'Harmonize is no placeholder any more');
 });
@@ -583,8 +584,8 @@ test('Install: a harness whose build is older than the project file says so and 
   const html = install.view(both, info());
   const rows = html.split('<li>').slice(1);
   assert.match(words(rows[0]), /^CC Claude Code Checked never · last sync never Changed since it was installed: install again Install again$/);
-  assert.match(rows[0], /<button[^>]*class="btn sm"[^>]*data-action="install-again"[^>]*data-id="t1"[^>]*aria-label="Install Marionette again on Claude Code"/);
-  assert.doesNotMatch(rows[0], /class="cell ok"/, 'not shown as up to date');
+  assert.match(rows[0], /<button[^>]*class="im-btn im-btn--sm"[^>]*data-action="install-again"[^>]*data-id="t1"[^>]*aria-label="Install Marionette again on Claude Code"/);
+  assert.doesNotMatch(rows[0], /class="im-inline-cell im-tone-ok"/, 'not shown as up to date');
   assert.match(words(rows[1]), /^CX Codex Checked never · last sync never 0\.5\.0$/, 'Codex is blocked by nothing');
   assert.doesNotMatch(rows[1], /install-again/);
   assert.equal(install.installLine(both, 'marionette'), 'On 2 harnesses · 1 harness to install again', 'the line of the tab and of the list says it too: not "in sync"');

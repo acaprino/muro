@@ -61,7 +61,7 @@ try {
   const page = await until('the WebView page', () => browser.contexts().flatMap(c => c.pages()).find(p => !p.url().startsWith('devtools:')));
   page.setDefaultTimeout(60000);
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  const strip = page.locator('section.strip');
+  const strip = page.locator('section.im-summary');
   const headline = () => strip.locator('strong').first().textContent();
   const status = () => json(join(data, 'sync-status.json'));
 
@@ -71,7 +71,7 @@ try {
   const opencode = page.getByRole('checkbox', { name: /OpenCode/ });
   await opencode.waitFor({ timeout: 180000 });
   assert.equal(await opencode.isChecked(), false, 'nothing is ticked for the person');
-  assert.ok((await page.locator('.pick').textContent()).toLowerCase().includes(profile.toLowerCase()), 'OpenCode is offered with the profile of the temporary folder');
+  assert.ok((await page.locator('.im-choice-rows').textContent()).toLowerCase().includes(profile.toLowerCase()), 'OpenCode is offered with the profile of the temporary folder');
   await opencode.check();
   await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await page.locator('#setup-title').filter({ hasText: 'Start from what is installed' }).waitFor();
@@ -127,14 +127,14 @@ try {
 
   // 4. Apply all installs it into the profile, and the profile's own settings stay.
   await strip.getByRole('button', { name: 'Apply all 1 change' }).click();
-  await page.locator('#toasts').getByText('1 change applied.').waitFor();
+  await page.locator('[data-im-notices]').getByText('1 change applied.').waitFor();
   await strip.locator('strong', { hasText: 'Everything is in sync' }).waitFor();
   const config = await json(join(profile, 'opencode.json'));
   assert.equal(config.theme, 'retained-test-setting');
   assert.equal(config.plugins.length, 1);
   assert.ok(config.plugins[0].startsWith('file:'));
   assert.match(await page.locator('#rows td').nth(2).textContent(), /1\.0\.0/, 'the table shows the installed version');
-  assert.equal(await page.locator('th .hstate').last().textContent().then(t => t.includes('In sync')), true, 'the harness column says In sync');
+  assert.equal(await page.locator('th .im-cell-meta').last().textContent().then(t => t.includes('In sync')), true, 'the harness column says In sync');
   const synced = await status();
   assert.ok(synced.last_sync, 'the sync was recorded');
   assert.deepEqual([synced.pending, synced.blockers], [0, 0]);
@@ -167,7 +167,7 @@ try {
   await page.reload();
   await page.getByText('Installed, not in your list').waitFor();
   await page.getByRole('button', { name: 'Add to my list' }).click();
-  await page.locator('#toasts').getByText('added to your list.').waitFor();
+  await page.locator('[data-im-notices]').getByText('added to your list.').waitFor();
   const adopted = Object.values(await json(join(data, 'receipts.json'))).filter(r => r.native_id === own);
   assert.equal(adopted.length, 1, 'the service wrote one receipt for the installation that was there');
   assert.deepEqual([adopted[0].version, adopted[0].path, adopted[0].adopted], ['2.0.0', own, true]);
@@ -179,12 +179,12 @@ try {
   checks.push('a plugin installed by hand is added with Add to my list: the service binds it, and the next check finds it in sync, not as an install');
 
   // 6. Settings, through the real service: saved on change; the interface and the registry agree.
-  await page.locator('nav').getByRole('button', { name: /^Settings/ }).click();
+  await page.locator('nav').getByRole('tab', { name: /^Settings/ }).click();
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
   const TRAY = 'Keep running when the window is closed';
   const tray = page.getByRole('switch', { name: TRAY });
   // The page paints a setting only after the service answered, so once it shows it the save is done on disk too.
-  const shows = async on => { await page.locator(`[role=switch][aria-label="${TRAY}"][aria-checked="${on}"]`).waitFor(); await page.locator('.busy').waitFor({ state: 'detached' }); };
+  const shows = async on => { await page.locator(`[role=switch][aria-label="${TRAY}"][aria-checked="${on}"]`).waitFor(); await page.locator('.im-busy').waitFor({ state: 'detached' }); };
   assert.equal(await tray.getAttribute('aria-checked'), 'true');
   await tray.click();
   await shows(false);
@@ -197,12 +197,12 @@ try {
   checks.push('Settings saves on change through the real service and keeps the recorded sync state current');
 
   // 7. Stop managing: the service refuses a harness that a plugin still lists, so the page takes it off the plugin first.
-  await page.locator('nav').getByRole('button', { name: /^Sync/ }).click();
-  await page.locator('th .hbtn').click();
+  await page.locator('nav').getByRole('tab', { name: /^Sync/ }).click();
+  await page.locator('th button[data-action="edit-target"]').click();
   const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Stop managing' }).click();
-  await sheet.getByRole('button', { name: 'Stop managing', exact: true }).click();
-  await page.locator('#toasts').getByText(/Muro no longer manages/).waitFor();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await page.locator('[data-im-notices]').getByText(/Muro no longer manages/).waitFor();
   registry = await json(join(data, 'registry.json'));
   assert.deepEqual([registry.targets.length, registry.plugins.length, registry.plugins.flatMap(p => p.targets).length], [0, 2, 0], 'the harness is gone and the plugins kept their place in the list');
   assert.equal((await json(join(profile, 'opencode.json'))).plugins.length, 2, 'the plugins stay installed in the profile');

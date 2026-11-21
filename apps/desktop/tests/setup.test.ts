@@ -171,8 +171,8 @@ it('every step ends with one footer that is the last box of its card, whatever t
   ] as const;
   for (const [step, state, buttons] of states) {
     const html = setup.view(state);
-    assert.equal(html.match(/class="setupfoot"/g)?.length, 1, `step ${step}: one footer`);
-    const footer = html.slice(html.indexOf('<div class="setupfoot">'));
+    assert.equal(html.match(/class="im-wizard-actions"/g)?.length, 1, `step ${step}: one footer`);
+    const footer = html.slice(html.indexOf('<div class="im-wizard-actions">'));
     assert.ok(footer.endsWith('</div></section></div>'), `step ${step}: nothing of the card comes after the footer, so it can stay at the bottom while the rest scrolls`);
     assert.match(footer, buttons, `step ${step}: its buttons are in it`);
   }
@@ -191,7 +191,7 @@ const topLevelRules = (css: string): [string, string][] => {
 };
 /** What the stylesheet declares for a selector: every rule with exactly that selector, a later one over an earlier one. */
 const style = (selector: string): Record<string, string> => {
-  const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const css = readFileSync(new URL(import.meta.resolve('@acaprino/imago/css/content.css')), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const declared: Record<string, string> = {};
   for (const [head, body] of topLevelRules(css)) {
     if (head !== selector) continue;
@@ -202,15 +202,15 @@ const style = (selector: string): Record<string, string> => {
 
 it('the first run\'s footer sticks to the bottom of the window: the page scrolls, not the wrap, and the card is a column, not a grid', () => {
   // What a sticky box needs, each of which was missing: it moves inside the nearest scrolling ancestor and inside its parent.
-  assert.equal(style('.main')['overflow'], 'auto', 'the page is what scrolls');
-  assert.equal(style('.setupwrap')['overflow'], 'visible', 'an overflow:auto wrap is the scroller the footer would look at, and it never overflows');
-  assert.equal(style('.setupcard')['display'], 'flex', 'in a grid row as tall as the footer a sticky box has nowhere to move');
-  assert.equal(style('.setupcard')['flex-direction'], 'column');
-  assert.equal(style('.setupfoot')['position'], 'sticky');
-  assert.equal(style('.setupfoot')['bottom'], '0');
-  assert.match(style('.setupfoot')['background'], /^var\(--/, 'what scrolls under it does not show through');
-  assert.equal(style('.setupfoot')['display'], 'flex', 'Back and Continue stay at the two ends');
-  assert.match(style('.main:has(.setupcard)')['scroll-padding-bottom'], /^\d+px$/, 'a box focused with the keyboard is not left under the footer');
+  assert.equal(style('.im-main')['overflow'], 'auto', 'the page is what scrolls');
+  assert.equal(style('.im-wizard-wrap')['overflow'], 'visible', 'an overflow:auto wrap is the scroller the footer would look at, and it never overflows');
+  assert.equal(style('.im-wizard')['display'], 'flex', 'in a grid row as tall as the footer a sticky box has nowhere to move');
+  assert.equal(style('.im-wizard')['flex-direction'], 'column');
+  assert.equal(style('.im-wizard-actions')['position'], 'sticky');
+  assert.equal(style('.im-wizard-actions')['bottom'], '0');
+  assert.match(style('.im-wizard-actions')['background'], /^var\(--/, 'what scrolls under it does not show through');
+  assert.equal(style('.im-wizard-actions')['display'], 'flex', 'Back and Continue stay at the two ends');
+  assert.match(style('.im-main:has(.im-wizard)')['scroll-padding-bottom'], /^\d+px$/, 'a box focused with the keyboard is not left under the footer');
 });
 
 it('step 3 offers two switches, on by default, and disables the one the shell cannot honour', () => {
@@ -218,7 +218,7 @@ it('step 3 offers two switches, on by default, and disables the one the shell ca
   assert.match(html, /Keep them in sync by itself\?/);
   assert.match(html, /<small id="setup-step">Step 3 of 3<\/small>/);
   assert.match(html, /role="switch" aria-checked="true" aria-label="Automatic sync" data-action="setup-auto"/);
-  assert.match(html, /role="switch" aria-checked="true" aria-label="Start Muro when Windows starts" data-action="setup-autostart" data-id="" >/);
+  assert.match(html, /role="switch" aria-checked="true" aria-label="Start Muro when Windows starts" data-action="setup-autostart" data-id=""\s*>/);
   assert.match(html, /Checks every hour and applies what changed\./);
   assert.match(html, /Starts in the notification area, without opening a window\./);
   assert.match(html, /data-action="setup-finish"/);
@@ -236,7 +236,7 @@ it('step 3 reads the interval the registry has, never a fixed hour', () => {
 
 it('a failure is announced in its step and tied to the heading', () => {
   const html = setup.view(blank({ snapshot: snapshot(), setup: { ...stepped(3), err: 'Version conflict: <x>' } as any }));
-  assert.match(html, /<p class="err" id="setup-error" role="alert">Version conflict: &lt;x&gt;<\/p>/);
+  assert.match(html, /<p class="im-field-error" id="setup-error" role="alert">Version conflict: &lt;x&gt;<\/p>/);
   assert.match(html, /aria-describedby="setup-step setup-error"/);
   assert.doesNotMatch(setup.view(blank({ snapshot: snapshot(), setup: stepped(3) })), /setup-error"[^>]*>[^<]/, 'no message, no text');
 });

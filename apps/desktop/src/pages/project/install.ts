@@ -1,8 +1,9 @@
 import type { ViewState, ProjectInfo, Snapshot, Plugin, Target } from '../../types.ts';
 import type { App, Actions } from '../../context.ts';
 import { cellState, currentPlan, CHANGES, stamp } from '../../model.ts';
-import { esc, plural, mark, tag, sw, button, empty } from '../../ui.ts';
+import { plural, mark, tag, sw, button, empty } from '../../ui.ts';
 import { cell } from '../sync.ts';
+import { stackListHtml, stackRowHtml, toolbarHtml } from '@acaprino/imago/ui';
 
 /** The registry plugin that is the build of this project: the one that names it. It exists once the project was installed on a harness. */
 const pluginOf = (state: ViewState, id: string): Plugin | undefined => state.snapshot?.registry.plugins.find(p => p.project === id);
@@ -34,13 +35,15 @@ export function view(state: ViewState, info: ProjectInfo): string {
   const waiting = plugin ? managed(state).filter(t => CHANGES.has(cellState(plugin, t, s, state.plan).kind)).length : 0;
   const row = (t: typeof targets[number]) => {
     const times = s.sync.targets[t.id], on = !!plugin?.targets.includes(t.id), stale = on && !!plugin && changed(state, plugin, t);
-    const status = !t.enabled ? '' : !plugin ? '<span class="muted" aria-label="Not installed here">—</span>'
-      : stale ? `<span class="warn">Changed since it was installed: install again</span>${button('Install again', 'install-again', { sm: true, id: t.id, attrs: { 'aria-label': `Install ${info.plugin.name} again on ${t.name}` } })}`
+    const status = !t.enabled ? '' : !plugin ? '<span class="im-muted" aria-label="Not installed here">—</span>'
+      : stale ? `<span class="im-text-warn">Changed since it was installed: install again</span>${button('Install again', 'install-again', { sm: true, id: t.id, attrs: { 'aria-label': `Install ${info.plugin.name} again on ${t.name}` } })}`
       : cell(state, plugin, t);
-    return `<li>${t.enabled ? sw(on, `Install ${info.plugin.name} on ${t.name}`, 'toggle-harness', t.id) : tag('Paused')}${mark(t.harness)}<div class="grow"><strong>${esc(t.name)}</strong><small>Checked ${esc(stamp(times?.checked ?? null))} · last sync ${esc(stamp(times?.synced ?? null))}</small></div>${status}</li>`;
+    return stackRowHtml({title:t.name,detail:`Checked ${stamp(times?.checked??null)} · last sync ${stamp(times?.synced??null)}`,
+      leadingHtml:(t.enabled?sw(on,`Install ${info.plugin.name} on ${t.name}`,'toggle-harness',t.id):tag('Paused'))+mark(t.harness),trailingHtml:status});
   };
-  return `<div class="tools"><div><h2>Where it is installed</h2><small>Switch a harness on to install this project there. Nothing changes until you apply.</small></div><div class="acts">${waiting ? button(`Review ${plural(waiting, 'change')}`, 'review', { primary: true }) : ''}${button('Open Sync', 'page', { id: 'sync' })}</div></div>`
-    + (targets.length ? `<ul class="card list">${targets.map(row).join('')}</ul>` : empty('No harness managed yet', 'Add one in Sync.', button('Open Sync', 'page', { id: 'sync', primary: true })));
+  return toolbarHtml('<div><h2>Where it is installed</h2><small>Switch a harness on to install this project there. Nothing changes until you apply.</small></div>',
+    (waiting?button(`Review ${plural(waiting,'change')}`,'review',{primary:true}):'')+button('Open Sync','page',{id:'sync'}))
+    + (targets.length ? stackListHtml(targets.map(row).join('')) : empty('No harness managed yet', 'Add one in Sync.', button('Open Sync', 'page', { id: 'sync', primary: true })));
 }
 
 /** The project's build put on the targets named (`install_project {id, targets}`): the runtime makes exactly those ids the plugin's targets and a build for each kind of them, from the file as it is now. The page saves nothing itself. The runtime's answer is not relied on: the snapshot is read again, and says so when the plugin is not there or lacks a target it was asked for. Nothing reaches a harness until the review sheet applies it. */

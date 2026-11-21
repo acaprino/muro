@@ -1,0 +1,56 @@
+// Browser-native integration contract, shared by the Playwright runner and an offline fixture.
+import { attachLayers, openContentDialog, hasModal, notify, clearNotices, topLayer } from '@acaprino/imago/ui';
+export async function verify(){
+ const passed=[];
+ const assert=(value,message)=>{if(!value)throw Error(message);};
+ const wait=async(fn)=>{for(let n=0;n<100;n++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Timed out: '+fn.toString());};
+ const click=async(selector)=>{const el=document.querySelector(selector);assert(el,'Missing '+selector);el.focus();el.click();await new Promise(r=>setTimeout(r,0));};
+ const escape=()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+ await wait(()=>document.querySelector('#rows')&&!document.querySelector('.im-busy'));
+ assert(document.documentElement.dataset.imApp==='muro','Muro look is applied');
+ await click('[data-action="menu"]');
+ assert(topLayer()?.kind==='menu','Add harness uses Imago menu');
+ assert(document.querySelector('.im-menu').textContent.includes('Add by hand'),'Manual addition is available');
+ escape();assert(!document.querySelector('.im-menu'),'Escape closes menu');
+ assert(document.activeElement.dataset.action==='menu','Menu restores opener');passed.push('menu and focus');
+ await click('[data-action="add-plugin"]');
+ assert(hasModal()&&document.querySelector('.im-body').inert,'Dialog makes stable body inert');
+ await click('dialog button[type="submit"]');
+ assert(document.querySelector('dialog [aria-invalid="true"]'),'Native form validation remains wired');
+ const source=document.querySelector('dialog [name="source"]');source.value='owner/imago-test';source.dispatchEvent(new Event('input',{bubbles:true}));
+ const name=document.querySelector('dialog [name="name"]');name.value='Imago regression';name.dispatchEvent(new Event('input',{bubbles:true}));
+ window.flags.rejectSave=true;await click('dialog button[type="submit"]');
+ await wait(()=>document.querySelector('#form-error')?.textContent.includes('Version conflict'));
+ assert(source.value==='owner/imago-test'&&name.value==='Imago regression','Rejected save preserves values');
+ assert(document.querySelector('.im-body').inert,'Rejected save keeps modality');
+ await click('.im-titlebar [data-action="page"][data-id="settings"]');
+ assert(document.querySelector('dialog[open]'),'Titlebar navigation cannot bypass pending dialog');
+ window.flags.rejectSave=false;await click('dialog button[type="submit"]');
+ await wait(()=>!hasModal());
+ assert(!document.querySelector('.im-body').inert,'Successful save releases page');
+ assert(document.querySelector('.im-notice-text')?.textContent==='Saved.','Notification belongs to Imago');passed.push('validation, rejected save, retry, notices');
+ await click('[data-action="page"][data-id="settings"]');
+ await wait(()=>document.querySelector('[data-setting="look"][value="oni"]'));
+ await click('[data-setting="look"][value="oni"]');
+ assert(document.documentElement.dataset.imLook==='oni','Look changes through Imago');
+ await click('[data-setting="theme"][value="light"]');
+ assert(document.documentElement.dataset.imTheme==='light','Theme changes through Imago');
+ document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true,cancelable:true}));
+ assert(topLayer()?.kind==='palette','Registry opens command palette');escape();assert(!hasModal(),'Palette releases modality');passed.push('look, theme, commands');
+ // A separate shell tests disposal, locked Escape/backdrop, reused native dialogs and native close events.
+ const shell=document.createElement('section');shell.className='im-shell im-native-controls';shell.innerHTML='<header class="im-titlebar"><button>Window</button></header><main class="im-body"><button id="fixture-opener">Open</button></main>';
+ document.body.append(shell);const stop=attachLayers(shell);const body=shell.querySelector('main');const opener=shell.querySelector('#fixture-opener');opener.focus();
+ const dialog=document.createElement('dialog');dialog.innerHTML='<form method="dialog"><input name="value" value="preserved" autofocus><button>Save</button></form>';
+ let locked=true,closes=0;
+ const content=openContentDialog(shell,dialog,{canDismiss:()=>!locked,onClose:()=>closes++});
+ escape();assert(dialog.open&&body.inert,'Locked Escape preserves modal');
+ dialog.parentElement.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));assert(dialog.open,'Locked backdrop preserves modal');
+ body.replaceChildren(document.createElement('button'));assert(body.inert,'Body replacement does not bypass modality');
+ assert(new FormData(dialog.querySelector('form')).get('value')==='preserved','Native FormData works');
+ content.close();content.close();assert(closes===1&&!body.inert&&!hasModal(),'Programmatic completion is idempotent and bypasses dismissal lock');
+ const again=openContentDialog(shell,dialog,{onClose:()=>closes++});dialog.close();await wait(()=>closes===2);assert(!hasModal(),'Native close releases layer');
+ openContentDialog(shell,dialog,{canDismiss:()=>false});notify(shell,'Pending');stop();clearNotices(shell);
+ assert(!hasModal()&&!body.inert&&!dialog.open&&!shell.querySelector('[data-im-notices]'),'Disposal releases locked layers and notices');
+ again.dispose();shell.remove();passed.push('locked dialog, FormData, reuse and disposal');
+ return passed;
+}

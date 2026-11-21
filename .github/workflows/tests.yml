@@ -63,11 +63,12 @@ jobs:
             target
           key: desktop-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
       - name: Rust tests
-        run: cargo test -p muro-registry -p muro-desktop-runtime
+        run: cargo test --locked -p muro-registry -p muro-desktop-runtime
       - name: Frontend unit tests
         if: always()
         run: |
           npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm test
       - name: Type check
         if: always()
@@ -79,11 +80,11 @@ jobs:
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
       # one stands in.
-      - name: Shell check
+      - name: Shell tests
         if: always()
         run: |
           New-Item -ItemType Directory -Force apps/desktop/src-tauri/resources | Out-Null
-          cargo check -p muro-desktop
+          cargo test --locked -p muro-desktop
       # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
       - name: Browser tests
         if: always()

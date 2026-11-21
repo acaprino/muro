@@ -1,5 +1,9 @@
 # Muro desktop: harness manager, plugin sync and updater
 
+The desktop interface and Windows frame use Imago. Appearance offers Smooth and
+ONI, with System/Light/Dark themes. See [Imago migration](imago-migration.md) for
+component ownership, the paired development dependency and the integration gate.
+
 The desktop app is one window with four tabs, **Projects**, **Sync**, **Activity** and **Settings**. Projects is where a plugin is made and read; Sync is where plugins reach the harnesses ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md)). The window opens on Sync. Until Muro manages a harness, three steps take the place of the tabs (the first run). The README shows the pages with demo data.
 
 ## The pages

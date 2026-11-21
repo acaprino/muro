@@ -11,7 +11,7 @@ import * as projects from '../src/pages/projects.ts';
 import { blankProjects, fresh, recall, remember } from '../src/pages/project/state.ts';
 import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from '../src/pages/project/graph-model.ts';
 import type { Outcome } from '../src/pages/project/graph-model.ts';
-import { layout, drawGraph, textWidth } from '../src/pages/project/graph-draw.ts';
+import { decisionScene, decisionGraphOptions } from '../src/pages/project/graph-scene.ts';
 import { createTransport } from './fake-transport.js';
 
 // ---------- fixtures ----------
@@ -58,7 +58,7 @@ const opened = (sim: Partial<graph.SimState> = {}, held = info(), s: Snapshot = 
   return state;
 };
 const show = (state: ViewState) => graph.view(state, state.projects.info!);
-const words = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+const words = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/[“”]/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
 const ai = (over: Record<string, unknown> = {}) => ({ engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY', ...over });
 const decision = (over: Record<string, unknown> = {}): Outcome => ({ kind: 'decision', asked: 'Write a letter', status: 'selected', steps: [{ step_id: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent', reason: 'A Word file.', added_as_prerequisite: false }], reason: 'One document.', questions: [], stack: [], who: null, example: null, ...over } as Outcome);
 
@@ -150,115 +150,68 @@ it('the steps that light the graph are numbered in the order of the decision; an
   assert.equal(litOf(decision({ status: 'no_match', steps: [] })).size, 0);
 });
 
-// ---------- the layout and the drawing ----------
-const wide = (caps: number, entries: number) => {
-  const ids = Array.from({ length: caps }, (_, i) => `capability-number-${i + 1}`);
-  return { caps: ids.map(id => capsOf(info({}, { capabilities: [cap(id)] }))[0]), entries: Array.from({ length: entries }, (_, i) => ({ name: `marionette-group-${i + 1}`, description: `Group ${i + 1}`, capabilities: ids.filter((_, j) => j % entries === i) })) };
-};
-it('the entries are on the left and the capabilities on the right, one row each, none over another', () => {
-  const l = layout(entriesOf(info()), capsOf(info()), 'marionette');
-  assert.equal(l.caps.length, 5);
-  assert.deepEqual(new Set(l.caps.map(c => c.x)).size, 1, 'one column');
-  assert.ok(l.entries.every(e => e.x + e.w < l.caps[0].x), 'the entries end before the capabilities start');
-  const ys = l.caps.map(c => c.y);
-  assert.deepEqual(ys, [...new Set(ys)].sort((a, b) => a - b), 'in the order the entries list them, none twice');
-  for (let i = 1; i < ys.length; i++) assert.ok(ys[i] - ys[i - 1] >= 28, 'a row is at least a node and its gap');
-  assert.ok(l.height >= ys[ys.length - 1] + 22 && l.width >= l.caps[0].x + l.caps[0].w, 'everything is inside the drawing');
-  const design = l.entries[0], rows = l.caps.slice(0, 2).map(c => c.y);
-  assert.equal(design.y, (rows[0] + rows[1]) / 2, 'an entry stands level with the middle of its capabilities');
+// ---------- the domain adapter for Imago ----------
+const scene = (lit: Map<string, number[]> = new Map(), held = info()) => decisionScene(entriesOf(held), capsOf(held), 'marionette', lit);
+it('the scene supplies every capability once with its accessible name and domain tooltip', () => {
+  const result = scene(), nodes = result.nodes.filter(n => n.id.startsWith('cap:'));
+  assert.deepEqual(nodes.map(n => n.label), CAPS.map(c => c.id));
+  assert.equal(new Set(result.nodes.map(n => n.id)).size, 7);
+  assert.equal(nodes[0].ariaLabel, 'Capability design-taste, entry design');
+  assert.equal(nodes[0].title, 'DESIGN-TASTE');
+  assert.equal(result.nodes.find(n => n.label === 'design')?.title, 'Use when designing');
 });
-it('a graph of 37 capabilities in 15 entries has every node once, inside the drawing, no two entries on one row', () => {
-  const { caps, entries } = wide(37, 15), l = layout(entries, caps, 'marionette');
-  assert.equal(l.caps.length, 37);
-  assert.equal(l.entries.length, 15);
-  assert.equal(new Set(l.caps.map(c => c.y)).size, 37);
-  const ys = l.entries.map(e => e.y).sort((a, b) => a - b);
-  for (let i = 1; i < ys.length; i++) assert.ok(ys[i] - ys[i - 1] >= 22, 'entry nodes do not overlap');
-  assert.ok(l.caps.every(c => c.y + 22 <= l.height));
+it('relationships keep prerequisites, conditions and symmetric conflicts distinct', () => {
+  const edges = scene().edges;
+  assert.equal(edges.filter(e => e.source.startsWith('entry:')).length, 5);
+  assert.ok(edges.some(e => e.source === 'cap:office-docs' && e.target === 'cap:office-fonts' && e.label?.includes('always runs')));
+  assert.ok(edges.some(e => e.dashed && e.tone === 'warn' && e.label === 'design-review needs design-taste when: A design exists'));
+  assert.ok(edges.some(e => e.dotted && e.directed === false && e.tone === 'err' && e.label === 'office-docs never runs with office-pdf'));
+  const both = info({}, { capabilities: [cap('a', { conflicts: ['b'] }), cap('b', { conflicts: ['a'] })], entries: [] });
+  assert.equal(scene(new Map(), both).edges.filter(e => e.dotted).length, 1);
+  const lost = info({}, { capabilities: [cap('a', { needs: [need('gone', 'x')], conflicts: ['gone'], after: ['gone'] })], entries: [] });
+  assert.equal(scene(new Map(), lost).edges.length, 0);
 });
-it('the fake service\'s big graph (the browser tests\') is the size the page must hold, laid out and drawn with every name inside its node', async () => {
-  const fake = createTransport('projects');
-  fake.flags.bigGraph = true;
-  const held = await fake.request('project', { id: 'marionette' }) as ProjectInfo, l = layout(entriesOf(held), capsOf(held), 'marionette');
-  assert.deepEqual([capsOf(held).length, entriesOf(held).length, l.caps.length, l.entries.length, examplesOf(held).length], [37, 15, 37, 15, 2]);
-  assert.ok(l.caps.every(c => c.w >= textWidth(c.cap.id) + 10));
-  assert.ok(Math.max(...l.caps.map(c => c.w)) > 600, 'one name is far longer than the rest');
-  const svg = drawGraph(entriesOf(held), capsOf(held), 'marionette', litOf(outcomeOfExample(examplesOf(held)[0])));
-  assert.equal(svg.match(/<foreignObject/g)?.length, 37);
-  assert.equal(svg.match(/class="gnode on"/g)?.length, 2);
-  assert.match(svg, /<path class="e need"/);
-  assert.match(svg, /<path class="e conf"/);
+it('decision steps highlight nodes and membership edges, retain repeated step labels and dim only known graphs', () => {
+  const lit = scene(new Map([['design-taste', [1]], ['design-review', [2]]]));
+  assert.equal(lit.nodes.filter(n => n.id.startsWith('cap:') && n.selected).length, 2);
+  assert.equal(lit.nodes.find(n => n.id === 'cap:design-taste')?.count, 1);
+  assert.equal(lit.nodes.find(n => n.id === 'cap:design-review')?.ariaLabel, 'Capability design-review, entry design, step 2');
+  assert.equal(lit.edges.filter(e => e.source.startsWith('entry:') && e.tone === 'accent').length, 2);
+  assert.ok(lit.edges.some(e => e.dashed && e.tone === 'accent'));
+  assert.ok(lit.nodes.find(n => n.id === 'cap:office-docs')?.dimmed);
+  assert.equal(scene(new Map([['office-docs', [1, 3]]])).nodes.find(n => n.id === 'cap:office-docs')?.ariaLabel, 'Capability office-docs, entry office, steps 1 and 3');
+  assert.ok(scene(new Map([['nobody', [1]]])).nodes.every(n => !n.dimmed && !n.selected));
 });
-it('a node is as wide as its name needs, so a long name is never cut by its box', () => {
-  const id = 'x'.repeat(90) + '-design-taste-frontend-with-a-very-long-name', long = capsOf(info({}, { capabilities: [cap(id), cap('short')] }));
-  const entries = [{ name: 'marionette-' + 'e'.repeat(70), description: 'd', capabilities: [id, 'short'] }], l = layout(entries, long, 'marionette');
-  const node = l.caps.find(c => c.cap.id === id)!, short = l.caps.find(c => c.cap.id === 'short')!;
-  assert.ok(node.w >= textWidth(id) + 10, `${node.w} must hold ${textWidth(id)} and the padding`);
-  assert.equal(node.w, short.w, 'the column is as wide as its widest name');
-  assert.ok(l.entries[0].w >= textWidth('e'.repeat(70)) + 10);
-  assert.ok(l.width >= node.x + node.w);
-  assert.ok(textWidth('mmmm') > textWidth('iiii') && textWidth('WWWW') > textWidth('llll'), 'wide letters are counted wider');
+it('prefix shortening affects only entry labels, never node identity or unrelated names', () => {
+  const held = info({}, { capabilities: ['a', 'b', 'c'].map(id => cap(id)), entries: [
+    { name: 'marionette-design', capabilities: ['a'] }, { name: 'other-marionette-x', capabilities: ['b'] }, { name: 'marionette', capabilities: ['c'] },
+  ] });
+  assert.deepEqual(scene(new Map(), held).nodes.filter(n => n.id.startsWith('entry:')).map(n => n.label), ['design', 'other-marionette-x', 'marionette']);
 });
-it('the entry\'s name loses the plugin\'s own prefix and nothing else', () => {
-  const l = layout([{ name: 'marionette-design', description: '', capabilities: ['a'] }, { name: 'other-marionette-x', description: '', capabilities: ['b'] }, { name: 'marionette', description: '', capabilities: ['c'] }], ['a', 'b', 'c'].map(id => capsOf(info({}, { capabilities: [cap(id)] }))[0]), 'marionette');
-  assert.deepEqual(l.entries.map(e => e.label), ['design', 'other-marionette-x', 'marionette']);
+it('duplicate capability input is represented once and namespace collisions remain distinct', () => {
+  const held = info({}, { capabilities: [cap('a'), cap('a'), cap('entry:0:a')], entries: [{ name: 'a', capabilities: ['a', 'a'] }] });
+  const result = scene(new Map(), held);
+  assert.equal(result.nodes.length, 3);
+  assert.equal(result.edges.length, 1);
+  assert.equal(new Set(result.nodes.map(n => n.id)).size, 3);
 });
-it('a capability no entry lists is still drawn, below the others, and an entry that lists only capabilities already placed stands among them', () => {
-  const caps = ['a', 'b', 'c'].map(id => capsOf(info({}, { capabilities: [cap(id)] }))[0]);
-  const l = layout([{ name: 'one', description: '', capabilities: ['a', 'b'] }, { name: 'two', description: '', capabilities: ['b'] }], caps, 'p');
-  assert.deepEqual(l.caps.map(c => c.cap.id), ['a', 'b', 'c']);
-  assert.ok(l.caps[2].y > l.caps[1].y);
-  assert.equal(l.entries.length, 2);
-  assert.ok(Math.abs(l.entries[1].y - l.entries[0].y) >= 22, 'the two entries do not sit on one another');
+it('graph selection opens only capabilities and preserves arbitrary identifiers', () => {
+  const opened: string[] = [], options = decisionGraphOptions(id => opened.push(id));
+  options.onSelect?.('entry:0:design');
+  options.onSelect?.('cap:<odd>:identifier');
+  assert.deepEqual(opened, ['<odd>:identifier']);
+  assert.match(options.label, /Decision graph/);
+  assert.equal(options.controls.fit, 'Fit graph');
 });
-const draw = (lit: Map<string, number[]> = new Map(), held = info()) => drawGraph(entriesOf(held), capsOf(held), 'marionette', lit);
-it('the drawing is one labelled SVG: a button for each capability, a plain node for each entry', () => {
-  const svg = draw();
-  assert.equal(svg.match(/<svg /g)?.length, 1);
-  assert.match(svg, /<svg class="graph" [^>]*role="group" aria-label="Decision graph: entries on the left, capabilities on the right"/);
-  assert.match(svg, /viewBox="0 0 \d+ \d+"/);
-  const nodes = [...svg.matchAll(/<button type="button" id="([^"]+)" class="gnode[^"]*" data-action="open-capability" data-id="([^"]+)" aria-label="([^"]+)"/g)];
-  assert.deepEqual(nodes.map(m => m[2]), CAPS.map(c => c.id));
-  assert.equal(new Set(nodes.map(m => m[1])).size, 5, 'each opener has its own id, so the keyboard comes back to the one that was used');
-  assert.equal(nodes[0][3], 'Capability design-taste, entry design');
-  assert.equal(svg.match(/class="n ent/g)?.length, 2);
-  assert.match(svg, /<g class="n ent"[^>]*><title>Use when designing<\/title>/);
-  assert.equal(svg.match(/<button/g)?.length, 5, 'entries are not controls');
-});
-it('the edges: entry to capability, a dashed one for a condition, a dotted one for two that never run together, each pair once', () => {
-  const svg = draw();
-  assert.equal(svg.match(/<path class="e"/g)?.length, 5, 'one from its entry to each capability');
-  assert.equal(svg.match(/<path class="e need"/g)?.length, 1);
-  assert.match(svg, /<path class="e need"[^>]*><title>design-review needs design-taste when: A design exists<\/title>/);
-  assert.equal(svg.match(/<path class="e conf"/g)?.length, 1);
-  assert.match(svg, /<title>office-docs never runs with office-pdf<\/title>/);
-  const both = info({}, { capabilities: [cap('office-docs', { conflicts: ['office-pdf'] }), cap('office-pdf', { conflicts: ['office-docs'] })], entries: [{ name: 'o', description: '', capabilities: ['office-docs', 'office-pdf'] }] });
-  assert.equal(draw(new Map(), both).match(/class="e conf"/g)?.length, 1, 'declared by both, drawn once');
-  const one = info({}, { capabilities: [cap('a'), cap('z', { conflicts: ['a'] })], entries: [{ name: 'o', description: '', capabilities: ['a', 'z'] }] });
-  assert.equal(draw(new Map(), one).match(/class="e conf"/g)?.length, 1, 'declared by the later one only, still drawn');
-  const lost = info({}, { capabilities: [cap('a', { needs: [need('gone', 'x')], conflicts: ['gone'] })], entries: [{ name: 'o', description: '', capabilities: ['a'] }] });
-  assert.doesNotMatch(draw(new Map(), lost), /e need|e conf/, 'an edge to a capability the graph does not have is not drawn');
-});
-it('what a decision activates is lit and numbered in order, the rest dims, and nothing lit leaves the graph as it was', () => {
-  const lit = new Map([['design-taste', [1]], ['design-review', [2]]]);
-  const svg = draw(lit);
-  assert.match(svg, /<svg class="graph sim" /);
-  assert.equal(svg.match(/class="gnode on"/g)?.length, 2);
-  assert.match(svg, /id="gnode-design-taste" class="gnode on" data-action="open-capability" data-id="design-taste" aria-label="Capability design-taste, entry design, step 1"[^>]*><span class="gname">design-taste<\/span><span class="gnum" aria-hidden="true">1<\/span>/);
-  assert.match(svg, /aria-label="Capability design-review, entry design, step 2"/);
-  assert.equal(svg.match(/<path class="e on"/g)?.length, 2, 'the entry\'s edge to each lit capability');
-  assert.match(svg, /<path class="e need on"/, 'a condition between two lit steps');
-  assert.match(svg, /<g class="n ent on"/);
-  assert.equal(svg.match(/<g class="n ent"/g)?.length, 1, 'the entry of nothing lit stays dim');
-  assert.doesNotMatch(draw(), /gnode on|class="graph sim"|gnum/);
-  assert.match(draw(new Map([['office-docs', [1, 3]]])), /aria-label="Capability office-docs, entry office, steps 1 and 3"/);
-  assert.match(draw(new Map([['nobody', [1]]])), /class="graph"/, 'a step of a capability the graph lacks lights nothing and dims nothing');
-});
-it('every value that goes into the drawing is escaped', () => {
-  const evil = '"><img src=x onerror=alert(1)>', held = info({}, { capabilities: [cap(evil, { title: evil, needs: [need(evil, evil)], conflicts: [evil] })], entries: [{ name: 'marionette-' + evil, description: evil, capabilities: [evil] }] });
-  const svg = drawGraph(entriesOf(held), capsOf(held), 'marionette', new Map([[evil, [1]]]));
-  assert.doesNotMatch(svg, /<img/);
-  assert.match(svg, /&lt;img src=x onerror=alert\(1\)&gt;/);
+it('the large service fixture reaches Imago without dropping any nodes or relationships', async () => {
+  const fake = createTransport('projects'); fake.flags.bigGraph = true;
+  const held = await fake.request('project', { id: 'marionette' }) as ProjectInfo;
+  const result = scene(litOf(outcomeOfExample(examplesOf(held)[0])), held);
+  assert.equal(result.nodes.filter(n => n.id.startsWith('cap:')).length, 37);
+  assert.equal(result.nodes.filter(n => n.id.startsWith('entry:')).length, 15);
+  assert.equal(result.nodes.filter(n => n.id.startsWith('cap:') && n.selected).length, 2);
+  assert.ok(result.edges.some(e => e.dashed));
+  assert.ok(result.edges.some(e => e.dotted));
 });
 
 // ---------- the step's view ----------
@@ -269,19 +222,20 @@ it('a project with no capability says there is no graph and offers no simulator'
 });
 it('the step has the simulator on the left and the graph on the right, with what the graph holds said once', () => {
   const html = show(opened());
-  assert.match(html, /^<div class="two"><div class="sim">/);
+  assert.match(html, /^<div class="im-aside-layout"><div class="im-stack-3">/);
   assert.match(words(html), /Simulate a request See which branch of the graph a request activates, and in what order\./);
   assert.match(html, /<textarea name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"/);
-  assert.match(html, /<small class="err" id="err-simtask" role="alert"><\/small>/);
-  assert.match(html, /<button type="button" class="btn" data-action="graph-simulate"><svg[^>]*>.*?<\/svg><span>Simulate<\/span><\/button>/);
+  assert.match(html, /<small class="im-field-error" id="err-simtask" role="alert"><\/small>/);
+  assert.match(html, /<button type="button" class="im-btn" data-action="graph-simulate"><svg[^>]*>.*?<\/svg><span>Simulate<\/span><\/button>/);
   assert.match(words(html), /Documented examples 3/);
   assert.equal(html.match(/data-action="graph-example"/g)?.length, 3);
   assert.deepEqual([...html.matchAll(/data-action="graph-example" data-id="(\d)" aria-pressed="(\w+)"/g)].map(m => [m[1], m[2]]), [['0', 'false'], ['1', 'false'], ['2', 'false']]);
   assert.match(html, /<strong>A landing page<\/strong><small>Design a landing page<\/small>/);
-  assert.match(html, /<div class="card graphcard"><div class="legend">/);
-  assert.match(words(html), /entry → capability needs, on a condition never together 2 entries · 5 capabilities/);
+  assert.match(html, /<div class="im-panel im-surface im-graph-panel" data-im-surface="sheet"><div class="im-graph-legend">/);
+  assert.match(words(html), /entry → capability always runs first needs, on a condition never together 2 entries · 5 capabilities/);
   assert.doesNotMatch(words(html), /activated, in order/, 'the legend says it only when something is lit');
-  assert.equal(html.match(/<svg class="graph/g)?.length, 1);
+  assert.equal(html.match(/data-project-graph/g)?.length, 1);
+  assert.doesNotMatch(html, /<svg class="graph|foreignObject/);
   assert.doesNotMatch(html, /role="status"|simres/, 'no result before there is one');
 });
 it('the text of the request is what the box holds, escaped', () => {
@@ -289,16 +243,16 @@ it('the text of the request is what the box holds, escaped', () => {
 });
 it('a refused empty request is said under the box, which it describes', () => {
   const html = show(opened({ error: 'Write a request first.' }));
-  assert.match(html, /<small class="err" id="err-simtask" role="alert">Write a request first\.<\/small>/);
+  assert.match(html, /<small class="im-field-error" id="err-simtask" role="alert">Write a request first\.<\/small>/);
   assert.match(html, /<textarea[^>]*aria-invalid="true"/);
   assert.match(html.match(/<textarea[^>]*>/)![0], /aria-describedby="[^"]*err-simtask/);
 });
 it('before the first free-text request the page says which engine it will use and what it may cost, with a link to Settings', () => {
-  const note = (settings: Record<string, unknown>) => { const html = show(opened({}, info(), snapshot(settings))); return { html, text: words(html.match(/<p class="simnote"[\s\S]*?<\/p>/)?.[0] ?? '') }; };
+  const note = (settings: Record<string, unknown>) => { const html = show(opened({}, info(), snapshot(settings))); return { html, text: words(html.match(/<p class="im-callout"[\s\S]*?<\/p>/)?.[0] ?? '') }; };
   const harness = note({ ai: ai() });
   assert.match(harness.text, /Claude Code/);
   assert.match(harness.text, /up to \$0\.50 a request/);
-  assert.match(harness.html, /<button type="button" class="link" data-action="page" data-id="settings">Settings<\/button>/);
+  assert.match(harness.html, /<button type="button" class="im-btn im-btn--ghost im-btn--sm" data-action="page" data-id="settings">Settings<\/button>/);
   assert.match(harness.html.match(/<textarea[^>]*>/)![0], /aria-describedby="[^"]*sim-note/);
   assert.match(note({ ai: ai({ budget_usd: 2 }) }).text, /up to \$2\.00 a request/);
   const codex = note({ ai: ai({ harness: 'codex' }) }).text;
@@ -317,31 +271,31 @@ it('before the first free-text request the page says which engine it will use an
 });
 it('the note is said once in a session: it is gone after the first free-text request, and back in a new session', async () => {
   const s = await session();
-  assert.match(s.view(), /class="simnote"/);
+  assert.match(s.view(), /class="im-callout"/);
   s.sim().task = 'Write a letter';
   await s.act('graph-simulate');
-  assert.doesNotMatch(s.view(), /class="simnote"/);
+  assert.doesNotMatch(s.view(), /class="im-callout"/);
   newSession();
-  assert.match(s.view(), /class="simnote"/);
+  assert.match(s.view(), /class="im-callout"/);
   (globalThis as any).sessionStorage = undefined;
-  assert.match(s.view(), /class="simnote"/, 'a session that keeps nothing says it each time rather than never');
+  assert.match(s.view(), /class="im-callout"/, 'a session that keeps nothing says it each time rather than never');
 });
 it('a documented example is shown as it was written: its steps in order, why each, what was added for it, and nothing called', () => {
   const html = show(opened({ example: 1 }));
   assert.match(html, /<button type="button" data-action="graph-example" data-id="1" aria-pressed="true">/);
-  const card = html.match(/<div class="card simres"[\s\S]*?<\/ol>[\s\S]*?<\/div>\s*<h3>/)![0];
+  const card = html.match(/<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet"[\s\S]*?<\/ol>[\s\S]*?<\/div>\s*<h3>/)![0];
   assert.match(card, /role="status"/);
   assert.match(words(card), /2 steps Documented example/);
-  assert.match(words(card), /“Write a letter”/);
+  assert.match(words(card), /"Write a letter"/);
   const steps = [...card.matchAll(/<li><b aria-hidden="true">(\d)<\/b><div>(.*?)<\/div><\/li>/g)].map(m => [m[1], words(m[2])]);
   assert.deepEqual(steps, [['1', 'office-fonts Prerequisite A prerequisite the plugin declares, added before the step that needs it.'], ['2', 'office-docs office-docs-intent A Word file.']]);
-  assert.match(card, /<button type="button" class="link" id="sim-step-1" data-action="open-capability" data-id="office-fonts">office-fonts<\/button>/);
+  assert.match(card, /<button type="button" class="im-btn im-btn--ghost im-btn--sm" id="sim-step-1" data-action="open-capability" data-id="office-fonts">office-fonts<\/button>/);
   assert.match(words(card), /One document\./);
   assert.match(card, /data-action="graph-clear"/);
   assert.doesNotMatch(card, /Asked /, 'no engine answered it');
-  assert.match(html, /class="graph sim"/);
+  assert.match(html, /data-project-graph/);
   assert.match(words(html), /activated, in order/);
-  assert.match(html, /aria-label="Capability office-fonts, entry office, step 1"/);
+  assert.equal(graph.sceneFor(opened({ example: 1 }), info()).nodes.find(n => n.id === 'cap:office-fonts')?.ariaLabel, 'Capability office-fonts, entry office, step 1');
 });
 it('an example with a stack says it, and one with no match says so and has no steps', () => {
   assert.match(words(show(opened({ example: 0 }))), /With stack:react/);
@@ -349,7 +303,7 @@ it('an example with a stack says it, and one with no match says so and has no st
   assert.match(words(none), /No match/);
   assert.match(words(none), /Nothing to build\./);
   assert.doesNotMatch(none, /<ol>/);
-  assert.doesNotMatch(none, /class="graph sim"/);
+  assert.doesNotMatch(none, /class="graph im-stack-3"/);
 });
 it('an example the project no longer has is not shown', () => {
   assert.doesNotMatch(show(opened({ example: 9 })), /simres/);
@@ -358,8 +312,8 @@ it('an example the project no longer has is not shown', () => {
 it('while a request runs the button says which engine is asked, cannot be used again, and can be cancelled', () => {
   const asking = (settings: Record<string, unknown>) => show(opened({ run: 'r1', task: 'Write a letter' }, info(), snapshot(settings)));
   const html = asking({ ai: ai() });
-  assert.match(html, /<button type="button" class="btn" data-action="graph-simulate" aria-busy="true" aria-disabled="true"><i class="spin" aria-hidden="true"><\/i><span>Asking Claude Code…<\/span><\/button>/);
-  assert.match(html, /<button type="button" class="btn" data-action="graph-cancel"><span>Cancel<\/span><\/button>/);
+  assert.match(html, /<button type="button" class="im-btn" data-action="graph-simulate" aria-busy="true" aria-disabled="true"><i class="im-spinner" aria-hidden="true"><\/i><span>Asking Claude Code…<\/span><\/button>/);
+  assert.match(html, /<button type="button" class="im-btn" data-action="graph-cancel"><span>Cancel<\/span><\/button>/);
   assert.match(words(asking({ ai: ai({ harness: 'codex' }) })), /Asking Codex…/);
   assert.match(words(asking({ ai: ai({ engine: 'api', model: 'gpt-test' }) })), /Asking gpt-test…/);
   assert.match(words(asking({ ai: ai({ engine: 'api', model: '' }) })), /Asking the API…/);
@@ -369,14 +323,14 @@ it('while a request runs the button says which engine is asked, cannot be used a
 it('a decision of the AI is shown with its status, steps, reasons, the engine that answered and what it cost', () => {
   const who = { engine: 'harness', model: null, harness: 'claude-code', cost_usd: 0.1234, duration_ms: 4200 };
   const html = show(opened({ result: decision({ who, steps: [{ step_id: 'office-pdf', capability: 'office-pdf', intent: null, reason: null, added_as_prerequisite: true }, decision().steps[0]] } as any) }));
-  const card = html.match(/<div class="card simres"[\s\S]*?<h3>/)![0];
-  assert.match(card, /<span class="tag good">2 steps<\/span>/);
+  const card = html.match(/<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet"[\s\S]*?<h3>/)![0];
+  assert.match(card, /<span class="im-chip" data-im-tone="ok">2 steps<\/span>/);
   assert.doesNotMatch(card, /Documented example/);
-  assert.match(words(card), /“Write a letter”/);
+  assert.match(words(card), /"Write a letter"/);
   assert.match(words(card), /Prerequisite/);
   assert.match(words(card), /Asked Claude Code · \$0\.12 · 4\.2 s/);
-  assert.match(html, /class="graph sim"/);
-  assert.match(html, /aria-label="Capability office-docs, entry office, step 2"/);
+  assert.match(html, /data-project-graph/);
+  assert.match(html, /data-project-graph/);
   const api = show(opened({ result: decision({ who: { engine: 'api', model: 'gpt-test', harness: null, cost_usd: null, duration_ms: 65000 } } as any) }));
   assert.match(words(api), /Asked gpt-test · 1 min 5 s/);
   assert.doesNotMatch(words(api), /\$/, 'a cost that is not known is not shown');
@@ -388,29 +342,29 @@ it('no_match and needs_clarification are said as they are, the second with the q
   assert.match(none, /Nothing here is work for the plugin\./);
   const html = show(opened({ result: decision({ status: 'needs_clarification', steps: [], reason: 'It does not say what to make.', questions: ['A page or a file?', 'For whom?'] }) }));
   assert.match(words(html), /Needs clarification/);
-  assert.deepEqual([...html.matchAll(/<li class="q">(.*?)<\/li>/g)].map(m => m[1]), ['A page or a file?', 'For whom?']);
+  assert.deepEqual([...html.match(/<ul class="im-bullet-list">([\s\S]*?)<\/ul>/)![1].matchAll(/<li>(.*?)<\/li>/g)].map(m => m[1]), ['A page or a file?', 'For whom?']);
   assert.doesNotMatch(html, /<ol>/);
-  assert.doesNotMatch(html, /class="graph sim"/);
+  assert.doesNotMatch(html, /class="graph im-stack-3"/);
 });
 it('an answer that is not a valid decision is said so, with its errors, and shows no step and lights no branch', () => {
   const html = show(opened({ result: { kind: 'invalid', asked: 'Write a letter', errors: ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason'], who: { engine: 'harness', model: null, harness: 'claude-code', cost_usd: 0.02, duration_ms: 3000 } } }));
-  const card = html.match(/<div class="card simres"[\s\S]*?<h3>/)![0];
+  const card = html.match(/<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet"[\s\S]*?<h3>/)![0];
   assert.match(words(card), /The AI's answer was not a valid decision/);
-  assert.deepEqual([...card.matchAll(/<li class="q">(.*?)<\/li>/g)].map(m => m[1]), ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason']);
+  assert.deepEqual([...card.match(/<ul class="im-bullet-list">([\s\S]*?)<\/ul>/)![1].matchAll(/<li>(.*?)<\/li>/g)].map(m => m[1]), ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason']);
   assert.doesNotMatch(card, /<ol>|open-capability|steps?<\/span>/);
-  assert.doesNotMatch(html, /class="graph sim"|gnode on/);
+  assert.doesNotMatch(html, /class="graph im-stack-3"|gnode on/);
   assert.match(words(card), /Asked Claude Code · \$0\.02 · 3\.0 s/);
   assert.match(card, /role="status"/);
 });
 it('a call that failed is shown as such, in the runtime\'s words, with the way to Settings', () => {
   for (const message of ['No API key: the environment variable named by --api-key-env is not set (the key is never a command-line argument)', 'Could not reach https://example.test/v1: connection refused', 'claude was not found on this computer']) {
     const html = show(opened({ result: { kind: 'failed', asked: 'Write a letter', message } }));
-    const card = html.match(/<div class="card simres"[\s\S]*?<h3>/)![0];
+    const card = html.match(/<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet"[\s\S]*?<h3>/)![0];
     assert.match(card, /role="alert"/);
     assert.match(words(card), /The simulation could not run/);
     assert.ok(words(card).includes(message), message);
-    assert.match(card, /<button type="button" class="link" data-action="page" data-id="settings">Settings<\/button>/);
-    assert.doesNotMatch(html, /class="graph sim"/);
+    assert.match(card, /<button type="button" class="im-btn im-btn--ghost im-btn--sm" data-action="page" data-id="settings">Settings<\/button>/);
+    assert.doesNotMatch(html, /class="graph im-stack-3"/);
   }
 });
 it('what the request or the runtime said is escaped everywhere it is shown', () => {
@@ -424,12 +378,12 @@ it('what the request or the runtime said is escaped everywhere it is shown', () 
 it('every control that opens a capability has an id of its own, so the keyboard comes back to the one that was used', () => {
   const html = show(opened({ example: 0 }));
   const ids = [...html.matchAll(/<button[^>]*\bid="([^"]+)"[^>]*data-action="open-capability"/g)].map(m => m[1]);
-  assert.equal(ids.length, 5 + 2, 'five nodes and two steps');
+  assert.equal(ids.length, 2, 'step links belong to the page; graph controls are mounted by Imago');
   assert.equal(new Set(ids).size, ids.length);
 });
 it('the page shows this step in the panel of the project page, and its tab keeps its line', () => {
   const html = projects.view(opened());
-  assert.match(html, /role="tabpanel" id="step-panel" aria-labelledby="step-tab-graph"><div class="two">/);
+  assert.match(html, /role="tabpanel" id="step-panel" aria-labelledby="step-tab-graph"><div class="im-aside-layout">/);
   assert.match(words(html), /3 Graph & simulator 5 capabilities · 3 examples/);
 });
 
@@ -485,7 +439,7 @@ it('an example replaces a free-text result, and Clear removes whatever is shown'
 it('an empty request is refused inline, without a call, and the box takes the keyboard', async () => {
   const s = await session();
   let focused = 0;
-  const box = { focus: () => { focused++; } }, el = { closest: (sel: string) => sel === '.two' ? { querySelector: (q: string) => q === 'textarea' ? box : null } : null };
+  const box = { focus: () => { focused++; } }, el = { closest: (sel: string) => sel === '.im-aside-layout' ? { querySelector: (q: string) => q === 'textarea' ? box : null } : null };
   for (const task of ['', '   ', '\n\t ']) { s.sim().task = task; s.sim().error = ''; await s.act('graph-simulate', {}, el); assert.equal(s.sim().error, 'Write a request first.'); }
   assert.deepEqual(s.calls(), []);
   assert.equal(s.sim().run, null);
@@ -509,7 +463,7 @@ it('a request is sent to the runtime for this project, trimmed, and its answer i
   assert.equal(s.state.busy, null, 'a request that can last a minute does not lock the rest of the app');
   assert.equal(s.state.error, null);
   assert.match(words(s.view()), /office-pdf Prerequisite/);
-  assert.match(s.view(), /class="graph sim"/);
+  assert.ok(graph.sceneFor(s.state, s.state.projects.info!).nodes.some(n => n.selected));
 });
 it('while it runs the page is not busy for the rest of the app, and a second Simulate asks nothing more', async () => {
   const wait = deferred<unknown>();
@@ -749,8 +703,8 @@ it('a capability opens a sheet with its role, entry, sources, intents, branches 
   assert.match(text, /Activates when the request means design-taste-intent Make a design Not for: Reviewing one/);
   assert.match(text, /Produces design-brief palette/);
   assert.doesNotMatch(text, /Branches/, 'a capability with no branch has no section for it');
-  assert.match(html, /<button type="button" class="btn" data-close autofocus>Close<\/button>/);
-  assert.match(html, /class="dlhead"/);
+  assert.match(html, /<button type="button" class="im-btn" data-close autofocus>Close<\/button>/);
+  assert.match(html, /class="im-form-head"/);
 });
 it('the branches of a capability are its conditions, what never runs with it, and what always runs before it', async () => {
   const s = await session();

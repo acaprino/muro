@@ -2,9 +2,10 @@ import type { ViewState, Snapshot, Settings, AiSettings, AiEngine, AiHarness, Au
 import type { App, Actions, TextBox } from '../context.ts';
 import type { Theme } from '../look.ts';
 import { intervalOptions } from '../model.ts';
-import { esc, head, icon, sw, seg, button } from '../ui.ts';
+import { head, sw, seg, button } from '../ui.ts';
 import { exclusiveSeg } from '../forms.ts';
-import { currentTheme, saveTheme } from '../look.ts';
+import { currentTheme, saveTheme, currentLook, saveLook } from '../look.ts';
+import { settingsRowHtml, settingsGroupHtml, settingsMessageHtml, statusTextHtml, settingInputHtml, inputHtml, selectHtml, type FormAttributes } from '@acaprino/imago/ui';
 
 /** Settings are saved as they change: there is no Save button. A switch or a choice sends the whole settings object with the
  * one field changed, at the revision of the snapshot held; a text box sends when it is left. A save the service refuses puts
@@ -61,16 +62,15 @@ export const modelError = (model: string): string => bytes(model) <= 200 && !/\p
 
 // ---------- the page ----------
 /** Plain text of a hint, or the same as a warning; always escaped, the row takes markup. */
-const note = (text: string, warn = false) => warn ? `<span class="warn">${esc(text)}</span>` : esc(text);
+const note = (text: string, warn = false) => statusTextHtml(text, warn ? 'warn' : '');
 /** A row: its title, a hint (markup the caller escaped) and the control. A row with a `field` is a field of the AI section: its hint and its error slot carry the ids its control is described by, and the slot holds the field's refusal. */
-const row = (title: string, hint: string, control: string, field = '') => `<div class="row"><div><strong>${esc(title)}</strong>${hint ? `<small${field ? ` id="hint-${field}"` : ''}>${hint}</small>` : ''}${field ? `<small class="err" id="err-${field}" role="alert">${esc(refusal(field))}</small>` : ''}</div>${control}</div>`;
-const option = (value: string | number, label: string, current: string | number) => `<option value="${esc(value)}" ${String(value) === String(current) ? 'selected' : ''}>${esc(label)}</option>`;
+const row = (title: string, hint: string, control: string, field = '') => settingsRowHtml({ title, hintHtml: hint, controlHtml: control, field, error: refusal(field) });
 /** A segmented choice of a setting: its radios say which setting they change, as every other control of the page does. */
-const segSetting = (name: string, value: string, options: [string, string][], label: string) => seg(name, value, options, label).replace(new RegExp(`name="${name}"`, 'g'), `name="${name}" data-setting="${name}"`);
+const segSetting = (name: string, value: string, options: [string, string][], label: string) => seg(name, value, options, label, { attrs: { 'data-setting': name } });
 /** The coding agents the select offers: a stored one that is none of them stays an option, so the select never shows another. */
 const harnessOptions = (current: string): [string, string][] => HARNESSES.some(([id]) => id === current) ? HARNESSES : [...HARNESSES, [current, current]];
 /** A text box of a field of the AI section: described by its hint and its error slot, and marked invalid while the field holds a refusal. `attrs` are the code's own attributes. */
-const textBox = (field: string, label: string, value: string, attrs = '') => `<input ${attrs ? attrs + ' ' : ''}name="${field}" data-setting="${field}" aria-label="${esc(label)}" aria-describedby="hint-${field} err-${field}"${refusal(field) ? ' aria-invalid="true"' : ''} value="${esc(value)}" autocomplete="off" spellcheck="false">`;
+const textBox = (field: string, label: string, value: string, attrs: FormAttributes = {}) => settingInputHtml({ name: field, label, value, attrs, invalid: !!refusal(field) });
 
 function startHint(autostart: Autostart | null, settings: Settings): string {
   if (autostart && !autostart.supported) return note('Available on Windows');
@@ -83,7 +83,7 @@ function keyState(name: string): string {
   const known = learned.key?.name === name ? learned.key : null;
   if (!known) return note('Checking…');
   if (known.set === null) return note(`Could not check whether ${name} is set.`);
-  return known.set ? `<span class="good">${esc(`${name} is set for Muro.`)}</span>` : note(`${name} is not set for Muro.`, true);
+  return known.set ? statusTextHtml(`${name} is set for Muro.`, 'ok') : note(`${name} is not set for Muro.`, true);
 }
 
 /** What the AI section says it is for. Adapting a plugin runs Claude Code (the only agent Muro can hold to a budget) whatever engine answers simulations, so with Codex chosen as the coding agent the line says so, as the Adapt with AI dialog does. */
@@ -98,37 +98,34 @@ export function aiLead(ai: AiSettings): string {
 function aiSection(s: Settings): string {
   const ai = s.ai, api = ai.engine === 'api', codex = ai.harness === 'codex';
   const engine = api ? [
-    row('Endpoint', note('Use https. Plain http is accepted only on localhost.'), textBox('ai_api_base', 'Endpoint', ai.api_base, 'class="mono" placeholder="https://api.openai.com/v1"'), 'ai_api_base'),
-    row('Model', ai.model ? note('The model name as the API knows it.') : note('Required: a request cannot run without a model.', true), textBox('ai_model', 'Model', ai.model, 'class="mono"'), 'ai_model'),
-    row(KEY_TITLE, `<span class="line" role="status">${keyState(ai.api_key_env)}</span><span class="line">${note("Muro never stores the key. Set it in Windows' environment variables, then restart Muro.")}</span>`, textBox('ai_api_key_env', KEY_TITLE, ai.api_key_env, 'class="mono" placeholder="MURO_API_KEY"'), 'ai_api_key_env'),
+    row('Endpoint', note('Use https. Plain http is accepted only on localhost.'), textBox('ai_api_base', 'Endpoint', ai.api_base, { class: 'im-mono', placeholder: 'https://api.openai.com/v1' }), 'ai_api_base'),
+    row('Model', ai.model ? note('The model name as the API knows it.') : note('Required: a request cannot run without a model.', true), textBox('ai_model', 'Model', ai.model, { class: 'im-mono' }), 'ai_model'),
+    row(KEY_TITLE, `<span class="im-block" role="status">${keyState(ai.api_key_env)}</span><span class="im-block">${note("Muro never stores the key. Set it in Windows' environment variables, then restart Muro.")}</span>`, textBox('ai_api_key_env', KEY_TITLE, ai.api_key_env, { class: 'im-mono', placeholder: 'MURO_API_KEY' }), 'ai_api_key_env'),
   ] : [
-    row('Coding agent', note('It signs in as it does when you use it yourself.'), `<select name="ai_harness" data-setting="ai_harness" aria-label="Coding agent">${harnessOptions(ai.harness).map(([id, label]) => option(id, label, ai.harness)).join('')}</select>`),
-    row('Budget per request', note(codex ? 'Codex has no budget limit.' : 'In US dollars, checked between turns: a request can end slightly above it.'), textBox('ai_budget_usd', 'Budget per request in USD', String(ai.budget_usd), `inputmode="decimal"${codex ? ' disabled' : ''}`), 'ai_budget_usd'),
+    row('Coding agent', note('It signs in as it does when you use it yourself.'), selectHtml({ name: 'ai_harness', value: ai.harness, options: harnessOptions(ai.harness), label: 'Coding agent', attrs: { 'data-setting': 'ai_harness' } })),
+    row('Budget per request', note(codex ? 'Codex has no budget limit.' : 'In US dollars, checked between turns: a request can end slightly above it.'), textBox('ai_budget_usd', 'Budget per request in USD', String(ai.budget_usd), { inputmode: 'decimal', disabled: codex }), 'ai_budget_usd'),
   ];
-  return `<section class="card set"><h2>AI</h2><p>${esc(aiLead(ai))}</p>`
-    + row('Use', note(api ? 'Muro calls the service itself, with a key it reads from the environment.' : "Claude Code or Codex, as installed on this computer. It reaches Muro's factory over MCP."), segSetting('ai_engine', ai.engine, ENGINES, 'Use'))
+  return settingsGroupHtml(row('Use', note(api ? 'Muro calls the service itself, with a key it reads from the environment.' : "Claude Code or Codex, as installed on this computer. It reaches Muro's factory over MCP."), segSetting('ai_engine', ai.engine, ENGINES, 'Use'))
     + engine.join('')
-    + row('Python', note('The command or full path of the interpreter.'), `<input class="mono" name="python" data-setting="python" aria-label="Python" value="${esc(s.python)}" autocomplete="off" spellcheck="false">`)
-    + row('Muro factory folder', note('Leave empty to use the one that ships with Muro.'), `<input class="mono" name="factory_path" data-setting="factory_path" aria-label="Muro factory folder" placeholder="Built in" value="${esc(s.factory_path)}" autocomplete="off" spellcheck="false">`)
-    + '</section>';
+    + row('Python', note('The command or full path of the interpreter.'), inputHtml({ name: 'python', label: 'Python', value: s.python, attrs: { class: 'im-mono', 'data-setting': 'python', autocomplete: 'off', spellcheck: 'false' } }))
+    + row('Muro factory folder', note('Leave empty to use the one that ships with Muro.'), inputHtml({ name: 'factory_path', label: 'Muro factory folder', value: s.factory_path, attrs: { class: 'im-mono', 'data-setting': 'factory_path', placeholder: 'Built in', autocomplete: 'off', spellcheck: 'false' } }))
+    , { title: 'AI', description: aiLead(ai) });
 }
 
 export function view(state: ViewState): string {
   const registry = state.snapshot!.registry, s = registry.settings, a = state.autostart, m = state.maintenance, verifying = state.busy === VERIFYING;
   return head('Settings', 'Saved as you change them.')
-    + `<section class="card set"><h2>Sync</h2>${row('Plugins that are not in my list', note('Always uninstall: at every sync Muro removes from each harness what is installed there but is not in your list. One harness can differ, in its own settings.'), exclusiveSeg(registry.targets))}</section>`
-    + `<section class="card set"><h2>Background</h2><p>How Muro keeps your harnesses in sync without you opening it.</p>`
-    + row(AUTO, note('Checks for changes and applies them by itself.'), sw(s.auto_sync, AUTO, 'toggle-setting', 'auto_sync'))
-    + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), `<select name="interval_minutes" data-setting="interval_minutes" aria-label="Check interval" ${s.auto_sync ? '' : 'disabled'}>${intervalOptions(s.interval_minutes).map(([minutes, label]) => option(minutes, label, s.interval_minutes)).join('')}</select>`)
+    + settingsGroupHtml(row('Plugins that are not in my list', note('Always uninstall: at every sync Muro removes from each harness what is installed there but is not in your list. One harness can differ, in its own settings.'), exclusiveSeg(registry.targets)), { title: 'Sync' })
+    + settingsGroupHtml(row(AUTO, note('Checks for changes and applies them by itself.'), sw(s.auto_sync, AUTO, 'toggle-setting', 'auto_sync'))
+    + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), selectHtml({ name: 'interval_minutes', value: s.interval_minutes, options: intervalOptions(s.interval_minutes), label: 'Check interval', attrs: { 'data-setting': 'interval_minutes', disabled: !s.auto_sync } }))
     + row(START, startHint(a, s), sw(!!a?.enabled, START, 'toggle-setting', 'autostart', !a?.supported))
     + row(TRAY, s.close_to_tray ? note('Closing the window leaves Muro in the notification area. Quit from its icon there.') : note('Closing the window quits Muro: nothing syncs until you open it again.', true), sw(s.close_to_tray, TRAY, 'toggle-setting', 'close_to_tray'))
-    + `</section><section class="card set"><h2>Appearance</h2>${row('Theme', note('System follows Windows.'), segSetting('theme', currentTheme(), THEMES, 'Theme'))}</section>`
+    , { title: 'Background', description: 'How Muro keeps your harnesses in sync without you opening it.' })
+    + settingsGroupHtml(row('Theme', note('System follows Windows.'), segSetting('theme', currentTheme(), THEMES, 'Theme')) + row('Look', note('Smooth or angular window styling.'), segSetting('look', currentLook(), [['smooth','Smooth'],['oni','ONI']], 'Look')), { title: 'Appearance' })
     + aiSection(s)
-    + `<section class="card set"><h2>Maintenance</h2>`
-    + row('Verify', note('Check stored builds and installations against what Muro recorded.'), button(verifying ? VERIFYING : 'Verify', 'maintenance-verify', { busy: verifying, disabled: verifying }))
+    + settingsGroupHtml(row('Verify', note('Check stored builds and installations against what Muro recorded.'), button(verifying ? VERIFYING : 'Verify', 'maintenance-verify', { busy: verifying, disabled: verifying }))
     + row('Clean up', note('Delete stored builds that nothing uses any more.'), button('Clean up…', 'maintenance-cleanup'))
-    + (m ? `<div class="row" role="status"><div><span><span class="good">${icon('check')}</span> ${esc(m.message)}</span>${m.details.map(d => `<small class="break">${esc(d)}</small>`).join('')}</div></div>` : '')
-    + '</section>';
+    + (m ? settingsMessageHtml(m.message, m.details, { icon: 'check', tone: 'ok' }) : ''), { title: 'Maintenance' });
 }
 
 // ---------- saving ----------
@@ -222,6 +219,8 @@ export function change(app: App, el: TextBox): boolean {
   const value = el.value;
   if (setting.startsWith('ai_')) learned.refused = null;
   switch (setting) {
+    case 'look':
+      saveLook(el.value === 'oni' ? 'oni' : 'smooth'); app.render(); return true;
     case 'theme':
       if (THEMES.some(([id]) => id === value)) saveTheme(value as Theme);
       app.render();
@@ -281,7 +280,7 @@ export function input(_app: App, el: TextBox): boolean {
   if (!field || learned.refused?.field !== field) return false;
   learned.refused = null;
   el.removeAttribute('aria-invalid');
-  const slot = el.closest('.row')?.querySelector('.err');
+  const slot = el.closest('.im-setting-row')?.querySelector('.im-field-error');
   if (slot) slot.textContent = '';
   return true;
 }

@@ -252,13 +252,13 @@ test('sameOperations compares the operations of two plans in any order, and neve
  assert.equal(sameOperations(null,null),false);assert.equal(sameOperations(a,null),false);assert.equal(sameOperations(plan([]),plan([])),true);
 });
 
-const stripOf=(html:string)=>html.match(/<section class="strip[\s\S]*?<\/section>/)?.[0]||'';
+const stripOf=(html:string)=>html.match(/<section class="im-summary[\s\S]*?<\/section>/)?.[0]||'';
 const actionsOf=(html:string)=>html.match(/data-action="[a-z-]+"/g)?.map(a=>a.slice(13,-1));
 test('the frame is an app bar with four tabs and a state button, no sidebar; Sync is current',()=>{
  const html=frame(viewState(snapshot()));
  assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,5,'four tabs and the state button');
  assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
- assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="appbar">/);assert.match(html,/<main id="main"/);
+ assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="im-titlebar" data-tauri-drag-region>/);assert.match(html,/<main id="main"/);
 });
 test('the strip says Not checked yet and offers only Check now when nothing was recorded for this revision, and for a plan of another revision',()=>{
  for(const held of [null,plan([op('update','1','2')],3)]){const strip=stripOf(frame(viewState(snapshot(),{plan:held})));assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(strip),['check']);}
@@ -280,7 +280,7 @@ test('a recorded check with blockers or sources not checked or nothing to do rea
  s.sync=recordedSync({pending:0,blockers:2});
  const blocked=stripOf(frame(viewState(s)));assert.match(blocked,/Some plugins are not ready/);assert.match(blocked,/2 items are not ready yet/);assert.doesNotMatch(blocked,/<small>\./);assert.deepEqual(actionsOf(blocked),['check','review']);
  s.sync=recordedSync({pending:0,errors:2});
- const sources=stripOf(frame(viewState(s)));assert.match(sources,/<strong>2 sources could not be checked<\/strong>/);assert.doesNotMatch(sources,/Everything is in sync/);assert.deepEqual(actionsOf(sources),['check']);assert.match(sources,/class="btn primary" data-action="check"/,'Check now leads');
+ const sources=stripOf(frame(viewState(s)));assert.match(sources,/<strong>2 sources could not be checked<\/strong>/);assert.doesNotMatch(sources,/Everything is in sync/);assert.deepEqual(actionsOf(sources),['check']);assert.match(sources,/class="im-btn im-btn--primary" data-action="check"/,'Check now leads');
  assert.match(frame(viewState(s)),/Sources not checked/,'the app bar button says it too');
  s.sync=recordedSync({pending:2,errors:1});
  assert.match(stripOf(frame(viewState(s))),/1 source could not be checked\. Nothing changes until you apply\./,'changes still lead and the count follows');
@@ -333,7 +333,7 @@ test('a paused harness reads Paused in its column and in each of its cells',()=>
  const html=frame(viewState(s,{plan:plan([])}));assert.equal(html.match(/>Paused</g)?.length,2);assert.match(stripOf(html),/No harness is managed/);
 });
 test('without a snapshot the frame is an empty state that offers Try again',()=>{
- const html=frame(viewState(null,{error:'Service not answering'}));assert.match(html,/Registry not available/);assert.match(html,/Service not answering/);assert.match(html,/data-action="refresh"/);assert.doesNotMatch(html,/class="strip/);
+ const html=frame(viewState(null,{error:'Service not answering'}));assert.match(html,/Registry not available/);assert.match(html,/Service not answering/);assert.match(html,/data-action="refresh"/);assert.doesNotMatch(html,/class="im-summary/);
 });
 
 test('reviewSheet lists the operations by harness, the blockers as left out, and the removals it will make',()=>{
@@ -346,7 +346,7 @@ test('reviewSheet with nothing ready has no Apply, and an apply in progress lock
  const s=viewState(snapshot()),none=reviewSheet(s,plan([],4,['Codex: broken']),null);
  assert.match(none,/No change is ready to apply\./);assert.match(none,/Not ready yet/);assert.doesNotMatch(none,/data-action="apply"/);assert.match(none,/>Close</);
  const running=reviewSheet(s,plan([op('update','1','2','a'),op('install','','2','b')],4,['x']),{index:1});
- assert.match(running,/Applying 2 changes…/);assert.match(running,/data-action="apply"[^>]*disabled/);assert.match(running,/data-close[^>]*disabled/);assert.doesNotMatch(running,/Not ready yet/);assert.equal(running.match(/class="spin"/g)?.length,1,'the first is done, the second runs');
+ assert.match(running,/Applying 2 changes…/);assert.match(running,/data-action="apply"[^>]*disabled/);assert.match(running,/data-close[^>]*disabled/);assert.doesNotMatch(running,/Not ready yet/);assert.equal(running.match(/class="im-spinner"/g)?.length,1,'the first is done, the second runs');
  assert.match(reviewSheet(viewState(snapshot(),{error:'Plan has blockers'}),plan([op('update','1','2')]),null),/role="alert">Plan has blockers/);
 });
 
@@ -355,7 +355,7 @@ test('sw and seg carry what their change or click runs, and escape their text',(
  assert.match(on,/role="switch" aria-checked="true" aria-label="Automatic &lt;sync&gt;" data-action="toggle" data-id="auto"/);assert.match(sw(false,'x','toggle'),/aria-checked="false"/);
  const group=seg('filter','action',[['all','All'],['action','Needs <action>']],'Filter plugins');
  assert.match(group,/role="radiogroup" aria-label="Filter plugins"/);assert.match(group,/value="action" checked/);assert.doesNotMatch(group,/value="all" checked/);assert.match(group,/Needs &lt;action&gt;/);
- assert.match(button('Go','run',{id:'a"b',sm:true,accent:true}),/class="btn accent sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="spin"/);
+ assert.match(button('Go','run',{id:'a"b',sm:true,accent:true}),/class="im-btn im-btn--accent im-btn--sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="im-spinner"/);
 });
 
 test('every action has one owner: no two page modules, and none of them the app, declare the same name',()=>{

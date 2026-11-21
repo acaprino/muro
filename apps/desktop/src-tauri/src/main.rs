@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+mod shell;
 use anyhow::Context;
 #[cfg(windows)]
 use muro_desktop_runtime::single_instance;
@@ -139,9 +140,9 @@ fn pick_file(app: &tauri::AppHandle, payload: &Value) -> anyhow::Result<Value> {
     let Some(picked) = dialog.blocking_pick_file() else {
         return Ok(json!({"path":Value::Null}));
     };
-    let path = picked
-        .into_path()
-        .map_err(|error| anyhow::anyhow!("The chosen file is not a path on this computer: {error}"))?;
+    let path = picked.into_path().map_err(|error| {
+        anyhow::anyhow!("The chosen file is not a path on this computer: {error}")
+    })?;
     Ok(json!({"path":path.to_string_lossy()}))
 }
 
@@ -287,12 +288,14 @@ impl Background {
 const SHOWN: &str = "muro-shown";
 
 fn show_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
-        let _ = window.emit(SHOWN, ());
-    }
+    shell::show(app);
+}
+
+fn reveal_window(window: &tauri::WebviewWindow) {
+    let _ = window.show();
+    let _ = window.unminimize();
+    let _ = window.set_focus();
+    let _ = window.emit(SHOWN, ());
 }
 
 fn autostart_name() -> String {
@@ -378,6 +381,7 @@ fn main() {
         }
     }
     tauri::Builder::default()
+        .manage(shell::Shell::new(data.clone()))
         .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             std::fs::create_dir_all(&data)?;
@@ -408,6 +412,7 @@ fn main() {
                 });
             }
             app.manage(backend.clone());
+            shell::build(app.handle())?;
             let state = MenuItem::with_id(app, "state", "Not checked yet", false, None::<&str>)?;
             let show = MenuItem::with_id(app, "show", "Open Muro", true, None::<&str>)?;
             let sync = MenuItem::with_id(app, "sync", "Sync now", true, None::<&str>)?;
@@ -470,6 +475,9 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if shell::recovering(window.app_handle()) {
+                return;
+            }
             if let WindowEvent::CloseRequested { api, .. } = event {
                 // Before the backend is up there is nothing to keep running.
                 let (Some(backend), Some(work)) = (
@@ -486,7 +494,21 @@ fn main() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![request])
-        .run(tauri::generate_context!())
-        .expect("Muro desktop startup failed");
+        .invoke_handler(tauri::generate_handler![
+            request,
+            shell::set_window_theme,
+            shell::window_caption_maximize
+        ])
+        .build(tauri::generate_context!())
+        .expect("Muro desktop startup failed")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested {
+                code: None, api, ..
+            } = event
+            {
+                if shell::recovering(app) {
+                    api.prevent_exit();
+                }
+            }
+        });
 }

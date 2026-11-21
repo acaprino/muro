@@ -23,7 +23,7 @@ const switchOf = (html: string, label: string) => html.match(new RegExp(`<button
 
 test('Settings has the five sections of the mockup, every setting saved on change, and no Save button', () => {
   const html = settings(viewState(snapshot(), { autostart: { supported: true, enabled: false, current: false } }));
-  assert.deepEqual([...html.matchAll(/<section class="card set"><h2>([^<]+)<\/h2>/g)].map(m => m[1]), ['Sync', 'Background', 'Appearance', 'AI', 'Maintenance']);
+  assert.deepEqual([...html.matchAll(/<section class="im-panel im-surface im-settings" data-im-surface="sheet"><h2>([^<]+)<\/h2>/g)].map(m => m[1]), ['Sync', 'Background', 'Appearance', 'AI', 'Maintenance']);
   assert.doesNotMatch(html, /<button[^>]*>(<[^>]*>)*\s*<span>Save/, 'no button reads Save');
   assert.doesNotMatch(html, /Save settings/);
   assert.match(html, /Saved as you change them\./);
@@ -42,9 +42,9 @@ test('the hints of Start with Windows and of Keep running follow the settings', 
   const on = { supported: true, enabled: true, current: true };
   assert.match(settings(viewState(snapshot({}, { auto_sync: true }), { autostart: on })), /Starts in the notification area and keeps your harnesses in line with your list\./);
   const warned = settings(viewState(snapshot(), { autostart: on }));
-  assert.match(warned, /<span class="warn">Automatic sync is off: Muro starts and watches, but applies changes only when you ask\.<\/span>/);
+  assert.match(warned, /<span class="im-text-warn">Automatic sync is off: Muro starts and watches, but applies changes only when you ask\.<\/span>/);
   assert.doesNotMatch(settings(viewState(snapshot(), { autostart: { ...on, enabled: false } })), /Automatic sync is off/, 'only when it starts');
-  assert.match(settings(viewState(snapshot({}, { close_to_tray: false }))), /<span class="warn">Closing the window quits Muro: nothing syncs until you open it again\.<\/span>/);
+  assert.match(settings(viewState(snapshot({}, { close_to_tray: false }))), /<span class="im-text-warn">Closing the window quits Muro: nothing syncs until you open it again\.<\/span>/);
   assert.doesNotMatch(settings(viewState(snapshot())), /quits Muro/);
 });
 
@@ -69,11 +69,11 @@ test('a stored coding agent that is not listed stays an option, so the select ne
 });
 
 test('the rule for plugins outside the list is the Sync page\'s own control, none chosen when harnesses differ', () => {
-  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="seg" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
+  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
   assert.ok(settings(viewState(snapshot())).includes(exclusiveSeg(snapshot().registry.targets)), 'one builder draws it on both pages');
   const keep = group(snapshot());
   assert.match(keep, /name="excl" value="keep" checked/);
-  assert.match(keep, /name="excl" value="remove" >/);
+  assert.match(keep, /name="excl" value="remove"\s*>/);
   const all = snapshot(); all.registry.targets = [target('a', true), target('b', true)];
   assert.match(group(all), /value="remove"[^>]*checked/);
   const mixed = snapshot(); mixed.registry.targets = [target('a', true), target('b', false)];
@@ -95,7 +95,7 @@ test('what the person typed and what the service returned is escaped on the Sett
 /** Plain text of some HTML: the tags gone and the entities the page writes decoded. */
 const plain = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 /** The rows of the AI section by their titles. */
-const aiRows = (html: string): Record<string, string> => Object.fromEntries(html.match(/<section class="card set"><h2>AI<\/h2>.*?<\/section>/)![0].split('<div class="row">').slice(1).map(r => [r.match(/<strong>([^<]*)<\/strong>/)![1], r]));
+const aiRows = (html: string): Record<string, string> => Object.fromEntries(html.match(/<section class="im-panel im-surface im-settings" data-im-surface="sheet"><h2>AI<\/h2>.*?<\/section>/)![0].split('<div class="im-setting-row">').slice(1).map(r => [r.match(/<strong>([^<]*)<\/strong>/)![1], r]));
 /** The tag of the input or select named `name`, or ''. */
 const control = (html: string, name: string) => html.match(new RegExp(`<(?:input|select)[^>]*name="${name}"[^>]*>`))?.[0] ?? '';
 const KEY_ROW = 'Key from the environment variable';
@@ -119,8 +119,11 @@ async function session(aiOver: Partial<AiSettings> = {}) {
 test('AI: the engine is a radio group; a coding agent shows its harness and its budget, and none of the API\'s fields', () => {
   forgetLearned();
   const html = settings(viewState(snapshot()));
-  const group = html.match(/<div class="seg" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
-  assert.deepEqual([...group.matchAll(/<input type="radio" name="ai_engine" data-setting="ai_engine" value="(\w+)" (checked)?[^>]*><span>([^<]+)<\/span>/g)].map(m => [m[1], !!m[2], m[3]]), [['harness', true, 'Coding agent on this computer'], ['api', false, 'OpenAI-compatible API']]);
+  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
+  assert.deepEqual([...group.matchAll(/<input type="radio" name="ai_engine" value="(\w+)"([^>]*)><span>([^<]+)<\/span>/g)].map(m => {
+    assert.match(m[2], /data-setting="ai_engine"/);
+    return [m[1], /\bchecked\b/.test(m[2]), m[3]];
+  }), [['harness', true, 'Coding agent on this computer'], ['api', false, 'OpenAI-compatible API']]);
   const select = html.match(/<select name="ai_harness"[^>]*>.*?<\/select>/)![0];
   assert.match(select, /aria-label="Coding agent"/);
   assert.deepEqual([...select.matchAll(/<option value="([^"]+)" (selected)?>([^<]+)<\/option>/g)].map(m => [m[1], !!m[2], m[3]]), [['claude-code', true, 'Claude Code · dollar budget'], ['codex', false, 'Codex · no budget limit']]);
@@ -155,7 +158,7 @@ test('AI: with the API the page asks for an endpoint, a model and the name of th
   const html = settings(viewState(snapshot({}, {}, { engine: 'api', api_base: 'https://api.example.com/v1', model: 'big-model', api_key_env: 'MY_API_KEY' })));
   const rows = aiRows(html);
   assert.deepEqual(Object.keys(rows), ['Use', 'Endpoint', 'Model', KEY_ROW, 'Python', 'Muro factory folder']);
-  assert.match(html, /<input type="radio" name="ai_engine" data-setting="ai_engine" value="api" checked>/);
+  assert.match(html, /<input type="radio" name="ai_engine" value="api" checked data-setting="ai_engine">/);
   assert.match(control(html, 'ai_api_base'), /aria-label="Endpoint"[^>]*value="https:\/\/api\.example\.com\/v1"/);
   assert.match(control(html, 'ai_model'), /aria-label="Model"[^>]*value="big-model"/);
   assert.match(control(html, 'ai_api_key_env'), /aria-label="Key from the environment variable"[^>]*value="MY_API_KEY"/);
@@ -164,14 +167,14 @@ test('AI: with the API the page asks for an endpoint, a model and the name of th
   assert.doesNotMatch(html, /type="(password|search)"|autocomplete="(current|new)-password"/, 'there is no box for a key');
   for (const name of ['ai_api_base', 'ai_model', 'ai_api_key_env']) {
     assert.match(control(html, name), new RegExp(`aria-describedby="hint-${name} err-${name}"`), `${name} is described by its hint and its error`);
-    assert.ok(html.includes(`<small class="err" id="err-${name}" role="alert"></small>`), `${name} has its error slot, empty`);
+    assert.ok(html.includes(`<small class="im-field-error" id="err-${name}" role="alert"></small>`), `${name} has its error slot, empty`);
   }
 });
 
 test('AI: an empty model is said to be required, a model that is set is not', () => {
   const empty = aiRows(settings(viewState(snapshot({}, {}, { engine: 'api' }))))['Model'];
   assert.match(plain(empty), /Required: a request cannot run without a model\./);
-  assert.ok(empty.includes('<span class="warn">'), 'a warning');
+  assert.ok(empty.includes('<span class="im-text-warn">'), 'a warning');
   const named = aiRows(settings(viewState(snapshot({}, {}, { engine: 'api', model: 'big-model' }))))['Model'];
   assert.doesNotMatch(plain(named), /Required/);
 });
@@ -182,11 +185,11 @@ test('AI: whether the variable is set for Muro comes from the runtime, which is 
   await opened(s.app);
   assert.deepEqual(s.asked(), [{ name: 'MY_API_KEY' }]);
   assert.match(plain(aiRows(s.html())[KEY_ROW]), /MY_API_KEY is not set for Muro\./);
-  assert.ok(aiRows(s.html())[KEY_ROW].includes('<span class="warn">MY_API_KEY is not set for Muro.</span>'));
+  assert.ok(aiRows(s.html())[KEY_ROW].includes('<span class="im-text-warn">MY_API_KEY is not set for Muro.</span>'));
   s.fake.flags.envSet = ['MY_API_KEY'];
   await opened(s.app);
   assert.match(plain(aiRows(s.html())[KEY_ROW]), /MY_API_KEY is set for Muro\./);
-  assert.ok(aiRows(s.html())[KEY_ROW].includes('<span class="good">MY_API_KEY is set for Muro.</span>'));
+  assert.ok(aiRows(s.html())[KEY_ROW].includes('<span class="im-text-ok">MY_API_KEY is set for Muro.</span>'));
   s.fake.flags.noEnvCheck = true;
   await opened(s.app);
   assert.match(plain(aiRows(s.html())[KEY_ROW]), /Could not check whether MY_API_KEY is set\./, 'a runtime that cannot say is no error banner');
@@ -243,7 +246,7 @@ test('AI: an endpoint that is not https or localhost is refused where it is type
   await settle();
   assert.deepEqual(s.saves(), [], 'nothing was sent');
   const html = s.html();
-  assert.ok(html.includes('<small class="err" id="err-ai_api_base" role="alert">Plain http is allowed only on localhost; use https.</small>'));
+  assert.ok(html.includes('<small class="im-field-error" id="err-ai_api_base" role="alert">Plain http is allowed only on localhost; use https.</small>'));
   assert.match(control(html, 'ai_api_base'), /aria-invalid="true"/);
   assert.match(control(html, 'ai_api_base'), /aria-describedby="hint-ai_api_base err-ai_api_base"/);
   assert.match(control(html, 'ai_api_base'), /value="https:\/\/api\.openai\.com\/v1"/, 'the stored address, not the typed one');
@@ -275,7 +278,7 @@ test('AI: a key typed where the name of the variable goes is refused without bei
   await settle();
   assert.deepEqual(s.saves(), []);
   const html = s.html();
-  assert.ok(html.includes('<small class="err" id="err-ai_api_key_env" role="alert">The key setting must name an environment variable, not hold a key</small>'));
+  assert.ok(html.includes('<small class="im-field-error" id="err-ai_api_key_env" role="alert">The key setting must name an environment variable, not hold a key</small>'));
   assert.match(control(html, 'ai_api_key_env'), /aria-invalid="true"/);
   assert.match(control(html, 'ai_api_key_env'), /value="MURO_API_KEY"/, 'the stored name is back');
   for (const where of [html, JSON.stringify(s.state), JSON.stringify(s.fake.calls), JSON.stringify(s.toasts)]) assert.equal(where.includes('SECRET'), false, 'the key is in none of the page, the state, the requests');
@@ -300,7 +303,7 @@ test('AI: a budget is dollars above 0 up to 100: refused in its own field otherw
   for (const bad of ['0', '-1', '101', 'abc', '0,5', '']) {
     assert.equal(edit(s.app, 'ai_budget_usd', bad), true);
     await settle();
-    assert.ok(s.html().includes('<small class="err" id="err-ai_budget_usd" role="alert">The budget is a number of US dollars above 0 and at most 100, such as 0.5.</small>'), JSON.stringify(bad));
+    assert.ok(s.html().includes('<small class="im-field-error" id="err-ai_budget_usd" role="alert">The budget is a number of US dollars above 0 and at most 100, such as 0.5.</small>'), JSON.stringify(bad));
     assert.match(control(s.html(), 'ai_budget_usd'), /aria-invalid="true"/);
     assert.match(control(s.html(), 'ai_budget_usd'), /value="0\.5"/, 'the stored budget is back');
   }
@@ -371,7 +374,7 @@ test('AI: typing in a field that holds a refusal takes the refusal away, without
 
 test('a maintenance result is a status with what it removed', () => {
   const html = settings(viewState(snapshot(), { maintenance: { message: 'Removed 1 unused artifacts', details: ['old-build'] } }));
-  assert.match(html, /<div class="row" role="status">.*Removed 1 unused artifacts.*<small class="break">old-build<\/small>/);
+  assert.match(html, /<div class="im-setting-row" role="status">.*Removed 1 unused artifacts.*<small class="im-wrap-text">old-build<\/small>/);
   assert.doesNotMatch(settings(viewState(snapshot())), /role="status"/);
 });
 
@@ -419,26 +422,26 @@ test('Activity: the filters', () => {
 
 test('Activity: a running adaptation has its card with phase, budget, log and Cancel; the list and its filter come after', () => {
   const html = activity(viewState(snapshot({ jobs: [job()], activity: [event('1', '10', 'check', 'failed', 'Sources not resolved')] })));
-  assert.match(html, /<article class="card job"[^>]*><div class="top"><i class="spin"[^>]*><\/i><h2 class="grow" id="job-0">Adapting Docs &lt;b&gt;writer&lt;\/b&gt; for OpenCode<\/h2><button[^>]*data-action="cancel-job"[^>]*data-id="job-1"/);
+  assert.match(html, /<article class="im-panel im-surface im-task-card" data-im-surface="sheet"[^>]*><div class="im-leading"><i class="im-spinner"[^>]*><\/i><h2 class="im-grow" id="job-0">Adapting Docs &lt;b&gt;writer&lt;\/b&gt; for OpenCode<\/h2><button[^>]*data-action="cancel-job"[^>]*data-id="job-1"/);
   assert.match(html, /<strong>harmonization<\/strong>/, 'its phase');
   assert.match(html, /<small>Working · budget up to \$2\.00<\/small>/);
   assert.match(html, /Log: C:\/data\/jobs\/job-1\/log\.txt/);
-  assert.ok(html.indexOf('class="card job"') < html.indexOf('role="radiogroup"') && html.indexOf('role="radiogroup"') < html.indexOf('class="card list act"'));
+  assert.ok(html.indexOf('class="im-panel im-surface im-task-card" data-im-surface="sheet"') < html.indexOf('role="radiogroup"') && html.indexOf('role="radiogroup"') < html.indexOf('class="im-panel im-surface im-stack-list im-activity-list" data-im-surface="sheet"'));
   assert.match(html, /aria-label="Filter activity"/);
-  assert.match(html, /<span class="tag bad">Failed<\/span>/);
+  assert.match(html, /<span class="im-chip" data-im-tone="err">Failed<\/span>/);
   assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI adaptation|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI adaptation', 'Problems']);
 });
 
 const START = 1700000500;
 test('Activity: a running adaptation shows its phase as text, a progress bar with no value and the time it has run', () => {
   const html = activity(viewState(snapshot({ jobs: [job({ time: String(START) })] })), (START + 125) * 1000);
-  const bar = html.match(/<div class="bar indeterminate"[^>]*>/)?.[0] ?? '';
+  const bar = html.match(/<div class="im-progress"[^>]*>/)?.[0] ?? '';
   assert.match(bar, /role="progressbar"/);
   assert.match(bar, /aria-label="Adaptation in progress"/);
   assert.doesNotMatch(bar, /aria-value(now|min|max)=/, 'a bar without a value is indeterminate, whatever the page says about time');
   assert.match(bar, /aria-valuetext="harmonization, running for 2 min 5 s"/, 'what a screen reader reads when it reaches the bar');
   assert.match(html, /<strong>harmonization<\/strong>/);
-  assert.match(html, /<span class="elapsed">Running for 2 min 5 s<\/span>/);
+  assert.match(html, /<span class="im-task-elapsed">Running for 2 min 5 s<\/span>/);
   assert.equal(html.match(/role="progressbar"/g)?.length, 1);
 });
 
@@ -461,8 +464,8 @@ test('elapsed: seconds, minutes with seconds, hours with minutes; no time that i
 
 test('Activity: a running adaptation whose start is not a time still shows its bar, and says no time', () => {
   const html = activity(viewState(snapshot({ jobs: [job({ time: 'earlier' })] })), START * 1000);
-  assert.match(html, /<div class="bar indeterminate" role="progressbar"[^>]*aria-valuetext="harmonization"/);
-  assert.doesNotMatch(html, /Running for|class="elapsed"/);
+  assert.match(html, /<div class="im-progress" role="progressbar"[^>]*aria-valuetext="harmonization"/);
+  assert.doesNotMatch(html, /Running for|class="im-task-elapsed"/);
   const noPhase = activity(viewState(snapshot({ jobs: [job({ time: String(START), phase: '' })] })), (START + 9) * 1000);
   assert.match(noPhase, /aria-valuetext="running for 9 s"/);
   assert.doesNotMatch(noPhase, /<strong><\/strong>/);
@@ -471,7 +474,7 @@ test('Activity: a running adaptation whose start is not a time still shows its b
 test('Activity: empty states', () => {
   assert.match(activity(viewState(snapshot())), /Nothing yet/);
   assert.match(activity(viewState(snapshot(), { afilter: 'problems' })), /Nothing here/);
-  assert.doesNotMatch(activity(viewState(snapshot())), /class="card job"/);
+  assert.doesNotMatch(activity(viewState(snapshot())), /class="im-panel im-surface im-task-card" data-im-surface="sheet"/);
 });
 
 test('Activity: everything the service, a plugin or an agent wrote is escaped', () => {

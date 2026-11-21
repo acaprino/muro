@@ -14,11 +14,11 @@ async function test(name, scenario, options, body) {
 }
 const actions = async app => (await app.calls()).map(c => c.action);
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
-const dialog = page => page.locator('dialog[open]');
-const toast = page => page.locator('#toasts .toast');
+const dialog = page => page.locator('dialog[open], [role=alertdialog]');
+const toast = page => page.locator('.im-notice-text');
 const focused = (page, what) => page.evaluate(w => { const e = document.activeElement; return w === 'name' ? e?.getAttribute('name') : w === 'text' ? e?.textContent : w === 'inside' ? !!e?.closest('dialog') : e?.id; }, what);
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('section.strip .meta').getByText('today').first().waitFor(); };
+const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('section.im-summary .im-summary-meta').getByText('today').first().waitFor(); };
 const column = (page, name) => page.getByRole('button', { name, exact: true });
 const rowOf = (page, name) => page.locator('#rows').getByRole('button', { name: new RegExp('^' + name) });
 const errorOf = (dlg, field) => dlg.locator('#err-' + field);
@@ -31,7 +31,7 @@ await test('a column header opens the harness sheet; each wrong field says what 
   const { page } = app, dlg = dialog(page).first();
   await column(page, 'Codex isolated test').click();
   await dlg.locator('h2').getByText('Codex isolated test', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('sheet')), true, 'a sheet on the right');
+  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet on the right');
   assert.equal(await focused(page, 'inside'), true, 'the sheet takes the focus');
   assert.equal(await dlg.getAttribute('aria-labelledby'), 'dlg-title');
   for (const label of ['Name', 'Harness', 'Configuration folder', 'Executable', 'Keep this harness in sync', 'Always uninstall plugins that are not in my list']) await dlg.getByLabel(label).first().waitFor();
@@ -71,7 +71,7 @@ await test('pausing a harness in its sheet saves it and the column says Paused',
   await dlg.getByLabel('Keep this harness in sync').uncheck();
   await dlg.getByRole('button', { name: 'Save', exact: true }).click();
   await dlg.waitFor({ state: 'detached' });
-  await page.locator('th .hstate').getByText('Paused').waitFor();
+  await page.locator('th .im-cell-meta').getByText('Paused').waitFor();
   const saved = (await callsOf(app, 'save_target')).at(-1).payload;
   assert.equal(saved.target.enabled, false);assert.equal(saved.target.id, 't1');assert.equal(saved.target.root, 'D:/isolated/codex');assert.equal(saved.revision, 1);
   assert.equal(await toast(page).first().textContent(), 'Codex isolated test saved.');
@@ -91,7 +91,7 @@ await test('a refused save keeps the sheet and its values, with the reason; Stop
   await dlg.getByRole('button', { name: 'Stop managing' }).click();
   await dlg.locator('h2').getByText('Stop managing OpenCode isolated test?', { exact: true }).waitFor();
   await dlg.getByText('Its plugins stay installed. Muro only stops syncing it.').waitFor();
-  assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-confirm')), true, 'the confirming button has the focus');
+  assert.equal(await page.evaluate(() => document.activeElement?.matches('[role=alertdialog] .im-btn') && document.activeElement.textContent === 'Cancel'), true, 'Cancel has the focus');
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
   await column(page, 'OpenCode isolated test').click();
@@ -104,22 +104,22 @@ await test('a refused save keeps the sheet and its values, with the reason; Stop
 
 // ---------- the Add harness menu ----------
 await test('Add harness lists the harness found, opens its sheet with the folder filled in, and keeps the keyboard in order', 'changes', {}, async app => {
-  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.menu');
+  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.im-menu');
   await ready(page);
   assert.equal(await menu.isHidden(), true, 'closed at first');
   assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
   await toggle.click();
   assert.equal(await menu.isVisible(), true);
   assert.equal(await toggle.getAttribute('aria-expanded'), 'true');
-  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['CCManage Claude Code', 'Add by hand…', 'Rescan this computer']);
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'CCManage Claude Code', 'the first choice has the focus');
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['Manage Claude Code', 'Add by hand…', 'Rescan this computer']);
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Manage Claude Code', 'the first choice has the focus');
   await page.screenshot({ path: shots + '/harness-menu.png' });
   await page.keyboard.press('ArrowDown');
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Add by hand…');
   await page.keyboard.press('End');
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Rescan this computer');
   await page.keyboard.press('ArrowDown');
-  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'CCManage Claude Code', 'it wraps');
+  assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Manage Claude Code', 'it wraps');
   await page.keyboard.press('Escape');
   assert.equal(await menu.isHidden(), true, 'Escape closes it');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-action')), 'menu', 'and the keyboard goes back to its button');
@@ -150,11 +150,11 @@ await test('Add harness lists the harness found, opens its sheet with the folder
   assert.deepEqual((await actions(app)).slice(-2), ['save_target', 'plan']);
   await toggle.click();
   await menu.getByText('No other harness found on this computer').waitFor();
-  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['Add by hand…', 'Rescan this computer'], 'a harness that is managed is not offered again');
+  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(), ['No other harness found on this computer', 'Add by hand…', 'Rescan this computer'], 'a harness that is managed is not offered again');
 });
 
 await test('Add by hand opens an empty sheet and Rescan reads the computer again', 'changes', {}, async app => {
-  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.menu'), dlg = dialog(page).first();
+  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.im-menu'), dlg = dialog(page).first();
   await ready(page);
   await toggle.click();
   await menu.getByRole('menuitem', { name: 'Add by hand…' }).click();
@@ -180,7 +180,7 @@ await test('Add by hand opens an empty sheet and Rescan reads the computer again
 await test('Always uninstall lists the removal before Apply', 'unlisted', {}, async app => {
   const { page } = app;
   await page.getByRole('heading', { name: 'Installed, not in your list' }).waitFor();
-  const line = page.locator('ul.list li').filter({ hasText: 'old-snippets' });
+  const line = page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' });
   assert.match(await line.textContent(), /0\.2\.0 · on Codex isolated test/);
   await line.getByText('Left alone', { exact: true }).waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Leave alone' }).isChecked(), true);
@@ -192,11 +192,11 @@ await test('Always uninstall lists the removal before Apply', 'unlisted', {}, as
   assert.equal(await toast(page).first().textContent(), 'Saved. Plugins outside your list are uninstalled at the next sync.');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'remove', 'the radio keeps the focus');
   assert.deepEqual((await actions(app)).slice(-2), ['save_target', 'plan'], 'the plan is asked for after the save, and nothing is applied');
-  await page.locator('section.strip strong').getByText('1 change ready to apply').waitFor();
-  assert.match(await page.locator('section.strip small').first().textContent(), /1 removal/);
+  await page.locator('section.im-summary strong').getByText('1 change ready to apply').waitFor();
+  assert.match(await page.locator('section.im-summary small').first().textContent(), /1 removal/);
   await page.screenshot({ path: shots + '/harness-unlisted-removal.png' });
   await page.getByRole('button', { name: 'Review', exact: true }).click();
-  const sheet = page.locator('dialog.sheet[open]');
+  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
   await sheet.getByText('Remove', { exact: true }).waitFor();
   await sheet.getByText('old-snippets').waitFor();
   await sheet.getByText('1 plugin will be uninstalled.').waitFor();
@@ -234,7 +234,7 @@ await test('the rule is saved harness by harness; it stops at the first one that
   assert.match(await page.getByRole('alert').filter({ hasText: 'was not saved' }).textContent(), /1 harness saved\. Second was not saved: Version conflict/);
   await page.getByText('Differs per harness').waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Always uninstall' }).isChecked(), false, 'neither choice claims what is half done');
-  await page.locator('ul.list li').filter({ hasText: 'old-snippets' }).getByText('Removed at the next sync').waitFor();
+  await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).getByText('Removed at the next sync').waitFor();
   await page.evaluate(() => { delete window.flags.rejectSave; window.flags.rejectSave = false; });
   await page.getByRole('button', { name: 'Reload' }).click();
   await page.getByRole('radio', { name: 'Always uninstall' }).click({ force: true });
@@ -247,7 +247,7 @@ await test('the rule is saved harness by harness; it stops at the first one that
 
 await test('Add to my list calls save_plugin and the plugin becomes a row; the line is gone', 'unlisted', {}, async app => {
   const { page } = app;
-  await page.locator('ul.list li').filter({ hasText: 'old-snippets' }).getByRole('button', { name: 'Add to my list' }).click();
+  await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).getByRole('button', { name: 'Add to my list' }).click();
   await page.locator('#rows').getByRole('button', { name: /^old-snippets/ }).waitFor();
   const saved = (await callsOf(app, 'save_plugin')).at(-1).payload;
   assert.deepEqual({ ...saved.plugin, id: 'x' }, { id: 'x', name: 'old-snippets', source: 'D:/plugins/old-snippets', policy: 'pinned', pinned_version: '0.2.0', targets: ['t1'], distributions: [{ harness: 'codex', path: 'D:/plugins/old-snippets', version: '0.2.0' }] });
@@ -259,7 +259,7 @@ await test('Add to my list calls save_plugin and the plugin becomes a row; the l
 });
 
 await test('a plugin added to the list while Always uninstall is on is not shown as removed', 'unlisted', {}, async app => {
-  const { page } = app, line = page.locator('ul.list li').filter({ hasText: 'old-snippets' });
+  const { page } = app, line = page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' });
   await page.getByRole('radio', { name: 'Always uninstall' }).click({ force: true });
   await line.getByText('Removed at the next sync', { exact: true }).waitFor();
   await line.getByRole('button', { name: 'Add to my list' }).click();
@@ -305,7 +305,7 @@ await test('a new plugin: wrong fields say so, the name follows the source, a re
   const { page } = app, dlg = dialog(page).first();
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
   await dlg.locator('h2').getByText('Add a plugin', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('sheet')), false, 'a dialog, not a sheet');
+  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), false, 'a dialog, not a sheet');
   assert.equal(await focused(page, 'name'), 'source', 'it starts in the source');
   assert.equal(await dlg.getByRole('checkbox', { name: 'Codex isolated test' }).isChecked(), true, 'every enabled harness is checked');
   assert.equal(await dlg.getByText('More', { exact: true }).count(), 0, 'a plugin that is not in the list has no More');
@@ -386,7 +386,7 @@ await test('a plugin row opens its dialog: edits keep what the form does not sho
   assert.equal(saved.upstream_version, undefined);assert.equal(saved.upstream_revision, undefined);
   assert.equal(saved.custom_instructions_dir, 'D:/custom notes', 'the instructions folder stays');
   await rowOf(page, 'Pkg renamed').click();
-  assert.equal(await dlg.locator('.distribution-row').count(), 0, 'the old builds do not come back');
+  assert.equal(await dlg.locator('.im-repeat-row').count(), 0, 'the old builds do not come back');
   await dlg.getByText('Advanced', { exact: true }).click();
   await dlg.getByLabel('Custom instructions folder').fill('');
   await dlg.getByRole('button', { name: 'Save', exact: true }).click();
@@ -455,20 +455,20 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.waitFor({ state: 'detached' });
   assert.deepEqual((await callsOf(app, 'adapt')).map(c => c.payload), [{ id: 'p1', harness: 'opencode', agent: 'claude-code', budget_usd: 3 }]);
   assert.equal(await toast(page).last().textContent(), 'Started. Follow it in Activity.');
-  await page.getByRole('button', { name: 'Activity, 1 run in progress' }).waitFor();
+  await page.getByRole('tab', { name: 'Activity, 1 run in progress' }).waitFor();
   // Plan a reinstall: the plan is for the sheet; the strip does not take it
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Plan a reinstall' }).click();
-  const sheet = page.locator('dialog.sheet[open]');
+  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
   await sheet.locator('h2').getByText('Review changes', { exact: true }).waitFor();
   assert.deepEqual((await callsOf(app, 'plan')).at(-1).payload, { reinstall: 'p1' });
   await sheet.getByText('Reinstall', { exact: true }).waitFor();
   await page.screenshot({ path: shots + '/harness-reinstall.png' });
   await page.keyboard.press('Escape');
   await sheet.waitFor({ state: 'detached' });
-  assert.equal(await page.locator('section.strip strong').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
-  assert.doesNotMatch(await page.locator('section.strip small').first().textContent(), /reinstall/, 'and the reinstall is not in it');
+  assert.equal(await page.locator('section.im-summary strong').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
+  assert.doesNotMatch(await page.locator('section.im-summary small').first().textContent(), /reinstall/, 'and the reinstall is not in it');
   assert.equal((await actions(app)).includes('apply'), false);
   // Remove from my list asks first
   await rowOf(page, 'Package').click();
@@ -477,7 +477,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.locator('h2').getByText('Remove Package from your list?', { exact: true }).waitFor();
   await dlg.getByText('It stays installed where it is, unless plugins outside your list are always uninstalled.').waitFor();
   assert.equal((await actions(app)).includes('remove_plugin'), false, 'nothing is removed before the person agrees');
-  assert.equal(await page.evaluate(() => document.activeElement?.hasAttribute('data-confirm')), true);
+  assert.equal(await page.evaluate(() => document.activeElement?.matches('[role=alertdialog] .im-btn') && document.activeElement.textContent === 'Cancel'), true);
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   assert.equal((await actions(app)).includes('remove_plugin'), false);
   await rowOf(page, 'Package').click();
@@ -546,7 +546,7 @@ await test('the dialogs and the menu fit a phone-width window, in the light them
   await ready(page);
   await page.getByRole('button', { name: 'Add harness', exact: true }).click();
   await page.screenshot({ path: shots + '/harness-narrow-menu.png' });
-  assert.ok(await page.locator('.menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), 'the menu stays on screen');
+  assert.ok(await page.locator('.im-menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), 'the menu stays on screen');
   await page.keyboard.press('Escape');
   await column(page, 'Codex isolated test').click();
   assert.ok(await dlg.evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'nothing inside the sheet scrolls sideways');

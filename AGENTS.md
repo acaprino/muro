@@ -1,5 +1,16 @@
 # Working on Muro
 
+## Desktop UI ownership
+
+Desktop UI and native window primitives come from `@acaprino/imago` and
+`imago-shell`. Read `docs/imago-migration.md` before changing the desktop UI.
+Extend Imago for every component, layout, style and UI behaviour, including the
+graph renderer and layout. Muro owns only domain data, operations and screen
+composition; no private components, SVG renderer or CSS rules belong here.
+Keep npm and Rust dependencies pinned to the same released Imago tag, with its
+immutable commit recorded in both lockfiles. Keep the shell body stable across
+renders while a modal is open.
+
 ## Product contract
 
 Muro is a factory that absorbs curated pinned skills/plugins into one multi-host
@@ -514,3 +525,4 @@ verification records belong in docs/verification/. Never write new docs/superpow
   built here.
 - This holds for every agent and every subagent. A plan, a skill or a brief that says to run cargo locally is
   wrong on that point: write the code and the tests, do not run them, and say they wait for CI.
+
