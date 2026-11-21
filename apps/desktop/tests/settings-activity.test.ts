@@ -110,6 +110,7 @@ async function session(aiOver: Partial<AiSettings> = {}) {
   const app = {
     state, request: fake.request, render: () => { renders++; },
     async run(label: string, work: () => Promise<unknown>, after?: (v: any) => unknown) { if (state.busy) return; state.busy = label; state.error = null; try { const value = await work(); await after?.(value); } catch (e) { state.error = e instanceof Error ? e.message : String(e); } finally { state.busy = null; } },
+    loading: <T>(_key: string, work: () => Promise<T>) => work(),
     notify: (text: string) => void toasts.push(text), adopt: (s: Snapshot) => { state.snapshot = s; },
   } as unknown as App;
   forgetLearned();
