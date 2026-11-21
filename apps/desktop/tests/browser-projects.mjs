@@ -345,7 +345,7 @@ await test('with no project listed the page says what to do, and offers no way t
   assert.equal(await page.locator('h2', { hasText: 'Installed as published' }).count(), 0);
 });
 
-await test('no sideways scroll at 760px, on the list and on a project; every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
+await test('no sideways scroll at 500px, on the list and on a project; every control has a name', 'projects', { viewport: { width: 500, height: 900 } }, async app => {
   const { page } = app;
   await goProjects(page);
   await page.locator('li.im-list-link').waitFor();
@@ -357,7 +357,7 @@ await test('no sideways scroll at 760px, on the list and on a project; every con
   for (const name of ['Install', 'Inputs']) { await tab(page, name).click(); assert.ok(await sideways(page) <= 0, name); }
   const unnamed = await page.evaluate(() => [...document.querySelectorAll('button, [role=switch], [role=tab]')].filter(b => !(b.getAttribute('aria-label') || b.textContent.trim())).length);
   assert.equal(unnamed, 0);
-  await page.screenshot({ path: shots + '/project-760.png' });
+  await page.screenshot({ path: shots + '/project-500.png' });
 });
 
 await test('the light theme keeps the project page readable', 'projects', { colorScheme: 'light' }, async app => {
@@ -512,7 +512,7 @@ await test('Harmonize: the view and its filters survive a reload, and a stored f
   assert.equal(await page.getByLabel('Filter by input').inputValue(), '');
 });
 
-await test('Harmonize at 760px: no sideways scroll in any view, every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
+await test('Harmonize at 500px: no sideways scroll in any view, every control has a name', 'projects', { viewport: { width: 500, height: 900 } }, async app => {
   const { page } = app;
   await harmonizeTab(page);
   for (const name of ['Decision records', 'Choices by part', 'History', 'Prompts']) {
@@ -522,7 +522,7 @@ await test('Harmonize at 760px: no sideways scroll in any view, every control ha
     assert.equal(unnamed, 0, `${name}: every control is named`);
   }
   await choose(page, 'Choices by part');
-  await page.screenshot({ path: shots + '/project-harmonize-760.png' });
+  await page.screenshot({ path: shots + '/project-harmonize-500.png' });
 });
 
 await test('Harmonize in the light theme stays readable', 'projects', { colorScheme: 'light' }, async app => {
@@ -859,7 +859,7 @@ await test('A paste into the request box is kept like typing: it survives a chan
   assert.equal((await simulations(app))[0].payload.task, 'Write a letter as a Word file');
 });
 
-await test('The simulator at 760px: one column, the graph uses its own viewport, no sideways scroll, every control has a name', 'projects', { viewport: { width: 760, height: 900 } }, async app => {
+await test('The simulator at 500px: one column, the graph uses its own viewport, no sideways scroll, every control has a name', 'projects', { viewport: { width: 500, height: 900 } }, async app => {
   const { page } = app;
   await app.flags({ bigGraph: true });
   await graphTab(page);
@@ -873,7 +873,7 @@ await test('The simulator at 760px: one column, the graph uses its own viewport,
   assert.ok(await sideways(page) <= 0, 'a result');
   assert.equal(await unnamedIn(page, '#step-panel'), 0);
   assert.equal(await nameFits(page), true);
-  await page.screenshot({ path: shots + '/project-graph-760.png' });
+  await page.screenshot({ path: shots + '/project-graph-500.png' });
 });
 
 await test('The graph and the simulator in the light theme stay readable', 'projects', { colorScheme: 'light' }, async app => {
