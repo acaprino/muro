@@ -116,7 +116,7 @@ it('step 1 lists what is found, with the ones Muro cannot manage disabled and wh
 });
 
 it('step 1 says it is looking, and when nothing can be picked offers to look again or to set up later', () => {
-  assert.match(setup.view(blank({ snapshot: noTargets(), discovering: true })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
+  assert.match(setup.view(blank({ snapshot: noTargets(), discovering: true, slow: { discovery: true } })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   for (const discovered of [[], [found('deepseek', 'DeepSeek', { supported: false })]]) {
     const html = setup.view(blank({ snapshot: noTargets(), discovered }));
     assert.match(html, /data-action="setup-later"/);

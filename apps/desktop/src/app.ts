@@ -101,7 +101,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  }
  async function discover(){
   if(state.discovering)return;state.discovering=true;state.discoveryError=null;render();
-  try{state.discovered=await request<Discovered[]>('discover');}catch(e){state.discoveryError=message(e);}finally{state.discovering=false;render();}
+  try{state.discovered=await loading('discovery',()=>request<Discovered[]>('discover'));}catch(e){state.discoveryError=message(e);}finally{state.discovering=false;render();}
  }
  const notify=(text:string,tone?:'err',action?:{label:string;run:()=>void})=>{if(!disposed)notice(root,text,{tone,action});};
  function openDialog(html:string):HTMLDialogElement{

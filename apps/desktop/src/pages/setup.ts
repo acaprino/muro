@@ -77,7 +77,7 @@ const headingDescription = (s: Held) => ['setup-step', ...(s.err ? ['setup-error
 function stepOne(state: ViewState, s: Held): string {
   const list = rows(state), nothing = !list.some(r => !r.why);
   const body = list.length ? choiceRowsHtml(list.map(r => ({name:'pick',value:r.harness,checked:picked(s,r),disabled:!!r.why||!!state.busy,leadingHtml:mark(r.harness),label:r.name,hintHtml:r.why?esc(r.why):`<code>${esc(r.root)}</code>`})))
-    : state.discovering ? loadingPanel(3)
+    : state.discovering ? loadingPanel(!!state.slow?.discovery)
     : empty('No harness found', 'Muro looks for the coding agents installed on this computer. Add one by hand from Sync, with its configuration folder.', button('Look again', 'setup-discover'));
   const failed = state.discoveryError ? noteHtml({title:'Harness detection failed',message:state.discoveryError,tone:'err'}) : '';
   const later = nothing && !state.discovering ? button('Set up later', 'setup-later') : '';
