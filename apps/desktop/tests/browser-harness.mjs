@@ -24,7 +24,7 @@ const rowOf = (page, name) => page.locator('#rows').getByRole('button', { name: 
 const errorOf = (dlg, field) => dlg.locator('#err-' + field);
 const on = page => page.evaluate(() => { const e = document.activeElement; return (e?.getAttribute('data-action') || '') + ':' + (e?.getAttribute('data-id') || ''); });
 /** The app is up and the computer was searched for harnesses: a render that follows the search would close an open menu. */
-const ready = async page => { await page.locator('nav').waitFor(); await page.waitForFunction(() => window.calls.some(c => c.action === 'discover')); await page.waitForTimeout(150); };
+const ready = async page => { await page.locator('.im-titlebar').waitFor(); await page.waitForFunction(() => window.calls.some(c => c.action === 'discover')); await page.waitForTimeout(150); };
 
 // ---------- the harness sheet ----------
 await test('a column header opens the harness sheet; each wrong field says what is wrong, tied to the field, and takes the focus', 'changes', {}, async app => {
@@ -552,9 +552,15 @@ await test('More acts on the saved plugin: with unsaved changes it says so and d
 
 await test('the dialogs and the menu fit a phone-width window, in the light theme', 'unlisted', { viewport: { width: 390, height: 844 }, colorScheme: 'light' }, async app => {
   const { page } = app, dlg = dialog(page).first();
-  await page.locator('nav').waitFor();
-  await page.screenshot({ path: shots + '/harness-narrow-page.png' });
   await ready(page);
+  const views = page.getByRole('button', { name: 'Views', exact: true });
+  await views.click();
+  const navigation = page.getByRole('menu');
+  assert.deepEqual(await navigation.getByRole('menuitem').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings'], 'the compact Views menu keeps every page reachable');
+  await navigation.getByRole('menuitem', { name: 'Sync', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sync', level: 1 }).waitFor();
+  assert.equal(await page.getByRole('menu').count(), 0, 'selecting a view closes compact navigation');
+  await page.screenshot({ path: shots + '/harness-narrow-page.png' });
   await page.getByRole('button', { name: 'Add harness', exact: true }).click();
   await page.screenshot({ path: shots + '/harness-narrow-menu.png' });
   assert.ok(await page.locator('.im-menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), 'the menu stays on screen');
