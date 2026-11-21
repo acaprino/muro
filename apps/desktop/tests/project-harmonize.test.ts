@@ -62,7 +62,7 @@ const items = (html: string) => [...html.matchAll(/<li>([\s\S]*?)<\/li>/g)].map(
 function fakeApp(state: ViewState) {
   const dialogs: { html: string; kind?: string }[] = [];
   let renders = 0;
-  const app = { state, render: () => { renders++; }, openDialog: (html: string, kind?: string) => { dialogs.push({ html, kind }); return {} as HTMLDialogElement; }, closeDialog: () => {}, notify: () => {} } as unknown as App;
+  const app = { state, render: () => { renders++; }, openInspector: (html: string) => { dialogs.push({ html }); return {} as HTMLElement; }, closeInspector: () => {}, notify: () => {} } as unknown as App;
   return { app, dialogs, renders: () => renders };
 }
 const control = (name: string, value: string) => ({ name, value }) as unknown as HTMLInputElement;
@@ -281,9 +281,9 @@ test('Open shows the prompt, whole, in a sheet named for its file; the text is e
   await harmonize.actions['harmonize-prompt'](app, { id: 'intake.md' } as unknown as DOMStringMap, {} as HTMLElement);
   assert.equal(dialogs.length, 1);
   const html = dialogs[0].html;
-  assert.match(html, /<h2 id="dlg-title">intake\.md<\/h2>/, 'the heading names the dialog');
+  assert.match(html, /<h2 class="im-panel-title">intake\.md<\/h2>/, 'the heading names the panel');
   assert.match(html, /Reads the inputs, classifies what they do/);
-  assert.match(html, /data-close/, 'a way to close it');
+  assert.match(html, /data-action="close-inspector"/, 'a way to close it');
   assert.match(html, /<pre class="im-code-view" tabindex="0" aria-label="Text of intake\.md"># Intake\n\nRead &lt;everything&gt; first &amp; &quot;decide&quot;\.<\/pre>/);
   assert.equal(html.includes('<everything>'), false);
 });

@@ -18,6 +18,8 @@ const tab = (page, name) => page.getByRole('tab', { name: new RegExp('^' + name)
 const goProjects = async page => { await page.locator('nav button', { hasText: 'Projects' }).click(); await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor(); };
 const openMarionette = async page => { await goProjects(page); await page.getByRole('button', { name: /Marionette/ }).click(); await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor(); };
 const kept = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('muro.project') ?? 'null'));
+/** The inspector that shows the object named `name` (its heading). */
+const panelOf = (page, name) => page.locator('.im-inspector:not([hidden])').filter({ has: page.getByRole('heading', { name, level: 2, exact: true }) });
 const switchOf = (page, harness) => page.locator(`[role=switch][aria-label="Install Marionette on ${harness}"]`);
 
 await test('Projects is the first tab, the app still opens on Sync, and the list says what each project is', 'projects', {}, async app => {
@@ -472,20 +474,20 @@ await test('Harmonize, Prompts: each prompt with an Open that shows its text in 
   assert.match(items[0], /^intake\.md Reads the inputs, classifies what they do and extracts capabilities with their provenance\. Open$/);
   assert.deepEqual(await page.locator('#step-panel li button').evaluateAll(b => b.map(x => x.getAttribute('aria-label'))), ['Open intake.md', 'Open harmonizer.md', 'Open delivery.md', 'Open classify.md']);
   await page.getByRole('button', { name: 'Open intake.md' }).click();
-  const sheet = page.getByRole('dialog', { name: 'intake.md' });
+  const sheet = panelOf(page, 'intake.md');
   await sheet.waitFor();
   assert.equal(await sheet.locator('pre.im-code-view').textContent(), '# intake.md\n\nThe prompt.');
-  assert.equal(await page.evaluate(() => !!document.activeElement?.closest('dialog')), true, 'the focus is in the sheet');
+  assert.equal(await page.evaluate(() => !!document.activeElement?.closest('.im-inspector')), true, 'the focus is in the inspector');
   let reached = false;
   for (let i = 0; i < 3 && !reached; i++) { await page.keyboard.press('Tab'); reached = await page.evaluate(() => !!document.activeElement?.classList.contains('im-code-view')); }
   assert.equal(reached, true, 'the text can be reached with the keyboard, to scroll it');
   await page.screenshot({ path: shots + '/project-harmonize-prompt.png' });
   await page.keyboard.press('Escape');
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await focused(page, 'aria-label'), 'Open intake.md', 'the focus returns to the button that opened the sheet');
   await page.getByRole('button', { name: 'Open classify.md' }).click();
-  await page.getByRole('dialog', { name: 'classify.md' }).getByRole('button', { name: 'Close' }).click();
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await panelOf(page, 'classify.md').getByRole('button', { name: 'Close' }).click();
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await focused(page, 'aria-label'), 'Open classify.md');
 });
 
@@ -574,7 +576,22 @@ await test('Graph & simulator: the nodes are reached with the keyboard, in order
   await page.keyboard.press('ArrowUp');
   assert.equal(await activeGraphNode(page), 'cap:design-taste');
   await page.keyboard.press('Space');
-  await page.getByRole('dialog', { name: 'design-taste' }).waitFor();
+  await panelOf(page, 'design-taste').waitFor();
+});
+
+await test('A capability in the inspector: docked beside the graph at 1512, a drawer over it at 900, and the graph stays usable (not run locally: the owner's rule)', 'projects', {}, async app => {
+  const { page } = app;
+  await graphTab(page);
+  await gnode(page, 'design-review').click();
+  await panelOf(page, 'design-review').waitFor();
+  assert.equal(await page.evaluate(() => document.querySelector('.im-body').inert), false, 'not modal');
+  const docked = () => page.evaluate(() => { const c = document.querySelector('#main').getBoundingClientRect(), i = document.querySelector('.im-inspector').getBoundingClientRect(); return c.right <= i.left + 1; });
+  assert.equal(await docked(), true, 'docked at 1512');
+  assert.equal(await page.locator('[data-project-graph]').evaluate(h => !h.inert), true, 'the graph is not inert beside it');
+  await page.setViewportSize({ width: 900, height: 900 });
+  assert.equal(await docked(), false, 'a drawer over the content under 1000');
+  await page.keyboard.press('Escape');
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
 });
 
 await test('Imago graph camera survives a result repaint and leaving the project step', 'projects', {}, async app => {
@@ -749,38 +766,38 @@ await test('A capability opens a sheet from the graph, from a step of the result
   const { page } = app;
   await graphTab(page);
   await gnode(page, 'design-review').click();
-  const sheet = page.getByRole('dialog', { name: 'design-review' });
+  const sheet = panelOf(page, 'design-review');
   await sheet.waitFor();
   const text = await squash(sheet);
   for (const part of [/Role worker/, /Entry marionette-design Use when designing an interface\./, /Comes from —/, /Activates when the request means design-review-intent Review a finished design Not for: Building one/, /Branches Runs design-taste first, on a condition A design exists/]) assert.match(text, part);
   assert.doesNotMatch(text, /Produces/);
-  assert.equal(await page.evaluate(() => document.activeElement?.closest('dialog')?.querySelector('footer .im-btn') === document.activeElement), true, 'the keyboard is on Close, in the sheet');
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.im-inspector')?.querySelector('[data-action=close-inspector]') === document.activeElement), true, 'the keyboard is on Close, in the inspector');
   await page.screenshot({ path: shots + '/project-graph-sheet.png' });
   await page.keyboard.press('Escape');
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await activeGraphNode(page), 'cap:design-review', 'the keyboard is back on the node');
   await gnode(page, 'design-taste').click();
-  const taste = await squash(page.getByRole('dialog', { name: 'design-taste' }));
+  const taste = await squash(panelOf(page, 'design-taste'));
   assert.match(taste, /Comes from taste-skill/);
   assert.match(taste, /Produces design-brief/);
   assert.doesNotMatch(taste, /Branches/);
-  await page.getByRole('dialog', { name: 'design-taste' }).locator('footer .im-btn').click();
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await panelOf(page, 'design-taste').getByRole('button', { name: 'Close' }).click();
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await activeGraphNode(page), 'cap:design-taste');
   await page.locator('.im-choice-list button', { hasText: 'A landing page' }).click();
   await page.locator('#sim-step-2').click();
-  await page.getByRole('dialog', { name: 'design-review' }).waitFor();
+  await panelOf(page, 'design-review').waitFor();
   await page.keyboard.press('Escape');
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await activeAttr(page, 'id'), 'sim-step-2', 'back on the step that was used, not on the node of the same capability');
   await tab(page, 'Inputs').click();
   await page.locator('button[data-action="decisions-of"]').first().click();
   const link = page.locator('button[data-action="open-capability"]').first();
   const id = await link.getAttribute('data-id');
   await link.click();
-  await page.getByRole('dialog', { name: id }).waitFor();
+  await panelOf(page, id).waitFor();
   await page.keyboard.press('Escape');
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   assert.equal(await activeAttr(page, 'data-action'), 'open-capability', 'Harmonize\'s link gets the keyboard back too');
 });
 

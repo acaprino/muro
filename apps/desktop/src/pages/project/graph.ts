@@ -1,7 +1,7 @@
 import type { ViewState, ProjectInfo } from '../../types.ts';
 import type { App, Actions, TextBox } from '../../context.ts';
 import { esc, plural, tag, button, empty } from '../../ui.ts';
-import { dlHead } from '../../sheets.ts';
+import { infoPanel } from '../../sheets.ts';
 import { harnessNames, obj, text, engineOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
 import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from './graph-model.ts';
@@ -117,12 +117,12 @@ function sheet(info: ProjectInfo, c: Cap): string {
     ...c.needs.map(n => `<li><div><span>Runs <strong>${esc(n.capability)}</strong> first, on a condition</span>${n.label ? `<small>${esc(n.label)}</small>` : ''}</div></li>`),
     ...c.conflicts.map(id => `<li><div><span>Never together with <strong>${esc(id)}</strong></span></div></li>`),
   ];
-  return `<div class="im-form">${dlHead(c.id, c.title)}`
-    + `<dl class="im-definition-list"><dt>Role</dt><dd>${esc(c.role || '—')}</dd><dt>Entry</dt><dd class="im-stack">${entry ? `<span>${esc(entry.name)}</span>${entry.description ? `<small>${esc(entry.description)}</small>` : ''}` : '—'}</dd><dt>Comes from</dt><dd class="im-tag-row">${from.map(s => tag(s)).join('') || '—'}</dd></dl>`
+  return infoPanel(c.id, c.title,
+    `<dl class="im-definition-list"><dt>Role</dt><dd>${esc(c.role || '—')}</dd><dt>Entry</dt><dd class="im-stack">${entry ? `<span>${esc(entry.name)}</span>${entry.description ? `<small>${esc(entry.description)}</small>` : ''}` : '—'}</dd><dt>Comes from</dt><dd class="im-tag-row">${from.map(s => tag(s)).join('') || '—'}</dd></dl>`
     + (c.intents.length ? `<section class="im-operation-list"><h3>Activates when the request means</h3><ul>${c.intents.map(i => `<li><div><code>${esc(i.id)}</code>${i.description ? `<small>${esc(i.description)}</small>` : ''}${i.excludes ? `<small>Not for: ${esc(i.excludes)}</small>` : ''}</div></li>`).join('')}</ul></section>` : '')
     + (branches.length ? `<section class="im-operation-list"><h3>Branches</h3><ul>${branches.join('')}</ul></section>` : '')
     + (c.outputs.length ? `<section><h3>Produces</h3><div class="im-tag-row">${c.outputs.map(o => tag(o)).join('')}</div></section>` : '')
-    + `<footer><button type="button" class="im-btn" data-close autofocus>Close</button></footer></div>`;
+  );
 }
 
 // ---------- the actions ----------
@@ -190,11 +190,11 @@ export const actions: Actions = {
     boxOf(el)?.focus();
     app.render();
   },
-  'open-capability': (app, d) => {
+  'open-capability': (app, d, el) => {
     if (!d.id) return;
     const info = held(app), c = info && capsOf(info).find(x => x.id === d.id);
     if (!info || !c) { app.notify('That capability is not in this project\'s graph.','err'); return; }
-    app.openDialog(sheet(info, c));
+    app.openInspector(sheet(info, c), { opener: el });
   },
 };
 
