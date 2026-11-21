@@ -156,7 +156,7 @@ await test('a failure stays in its step, announced, and loses nothing the person
   await step(page, 1, ONE);
   assert.equal(await box(page, /Claude Code/).isChecked(), true);
   assert.equal(await box(page, /Codex/).isChecked(), true);
-  assert.equal(await page.locator('.im-banner').count(), 0, 'not a banner of the app');
+  assert.equal(await page.locator('.im-note').count(), 0, 'not a banner of the app');
   await page.screenshot({ path: shots + '/setup-error.png' });
   await app.flags({ rejectSave: false });
   await button(page, 'Continue').click();
@@ -298,10 +298,10 @@ await test('on a long list the footer of the step stays in the window and Contin
   // The fake has one plugin installed: forty more rows of its kind make the step taller than the window.
   await page.evaluate(() => { const list = document.querySelector('.im-choice-rows'), row = list.querySelector('li'); for (let i = 0; i < 40; i++) list.append(row.cloneNode(true)); });
   const geometry = () => page.evaluate(() => {
-    const main = document.getElementById('main'), foot = document.querySelector('.im-wizard-actions').getBoundingClientRect(), last = document.querySelector('.im-choice-rows li:last-child').getBoundingClientRect();
+    const main = document.querySelector('#main > .im-panel-body'), foot = document.querySelector('.im-wizard-actions').getBoundingClientRect(), last = document.querySelector('.im-choice-rows li:last-child').getBoundingClientRect();
     return { scrollable: main.scrollHeight > main.clientHeight + 200, footTop: foot.top, footBottom: foot.bottom, lastBottom: last.bottom, height: window.innerHeight };
   });
-  const scrollTo = top => page.evaluate(y => document.getElementById('main').scrollTo(0, y), top);
+  const scrollTo = top => page.evaluate(y => document.querySelector('#main > .im-panel-body').scrollTo(0, y), top);
   for (const [where, top] of [['at the start', 0], ['in the middle', 600], ['at the end', 1e6]]) {
     await scrollTo(top);
     const g = await geometry();

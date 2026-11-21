@@ -1,7 +1,7 @@
 //! App wiring for the shared Imago native shell. Registry/tray behaviour remains in main.rs.
 use imago_shell::{
     ProcessFailure, Recovery, RecoveryAction, SnapLayouts, apply_theme,
-    disable_browser_accelerators, glass_window_config, guard_navigation_with_scheme,
+    disable_browser_accelerators, drawn_by_page, glass_window_config, guard_navigation_with_scheme,
     install_reload_menu, install_snap_layouts, parse_theme, recovery_action, save_theme,
     saved_theme, watch_process_failures,
 };
@@ -153,9 +153,13 @@ pub fn set_window_theme(
     window: WebviewWindow,
     shell: State<'_, Shell>,
     theme: String,
+    look: Option<String>,
+    resolved: Option<String>,
 ) -> Result<(), String> {
     let theme = parse_theme(&theme).ok_or_else(|| "Unknown window theme".to_string())?;
-    apply_theme(&window, theme).map_err(|e| e.to_string())?;
+    // The page says the look and the theme it draws; the tint of the acrylic follows them.
+    let (look, resolved) = drawn_by_page(theme, look.as_deref(), resolved.as_deref());
+    apply_theme(&window, theme, look, resolved).map_err(|e| e.to_string())?;
     save_theme(&shell.data, theme).map_err(|e| e.to_string())
 }
 

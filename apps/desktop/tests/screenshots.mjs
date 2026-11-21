@@ -28,12 +28,12 @@ for (const scheme of ['dark', 'light']) {
     await shot(page, `sync-changes-${scheme}`);
     if (scheme !== 'dark') return;
     await page.getByRole('button', { name: 'Review', exact: true }).click();
-    await page.locator('dialog.im-content-dialog--drawer[open]').getByText('Not ready yet').waitFor();
+    await page.locator('dialog[open]').getByText('Not ready yet').waitFor();
     await shot(page, 'review');
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });
     await page.locator('th button[data-action="edit-target"]', { hasText: 'Claude Code' }).click();
-    await page.locator('dialog.im-content-dialog--drawer[open] h2').getByText('Claude Code', { exact: true }).waitFor();
+    await page.locator('dialog[open] h2').getByText('Claude Code', { exact: true }).waitFor();
     await shot(page, 'harness');
     await page.keyboard.press('Escape');
     await page.locator('dialog[open]').waitFor({ state: 'detached' });

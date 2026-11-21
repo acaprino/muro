@@ -10,7 +10,7 @@ export const currentLook = () => parseLook(read(LOOK_KEY));
 export function applyTheme():void {
  const native = '__TAURI_INTERNALS__' in window;
  applyLook(document.documentElement,{app:'muro',look:currentLook(),theme:currentTheme(),glass:native}, native ? {
-  setWindowTheme: word => import('@tauri-apps/api/core').then(m=>m.invoke('set_window_theme',{theme:word}))
+  setWindowTheme: (word,{look,resolved}) => import('@tauri-apps/api/core').then(m=>m.invoke('set_window_theme',{theme:word,look,resolved}))
  } : {});
 }
 export function saveTheme(theme:Theme):void { try { localStorage.setItem(THEME_KEY,theme); } catch {} applyTheme(); }

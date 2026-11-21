@@ -6,7 +6,7 @@ export async function verify(){
  const wait=async(fn)=>{for(let n=0;n<100;n++){if(fn())return;await new Promise(r=>setTimeout(r,20));}throw Error('Timed out: '+fn.toString());};
  const click=async(selector)=>{const el=document.querySelector(selector);assert(el,'Missing '+selector);el.focus();el.click();await new Promise(r=>setTimeout(r,0));};
  const escape=()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
- await wait(()=>document.querySelector('#rows')&&!document.querySelector('.im-busy'));
+ await wait(()=>document.querySelector('#rows')&&!document.querySelector('.im-loader'));
  assert(document.documentElement.dataset.imApp==='muro','Muro look is applied');
  await click('[data-action="menu"]');
  assert(topLayer()?.kind==='menu','Add harness uses Imago menu');
@@ -38,7 +38,7 @@ export async function verify(){
  document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'k',ctrlKey:true,bubbles:true,cancelable:true}));
  assert(topLayer()?.kind==='palette','Registry opens command palette');escape();assert(!hasModal(),'Palette releases modality');passed.push('look, theme, commands');
  // A separate shell tests disposal, locked Escape/backdrop, reused native dialogs and native close events.
- const shell=document.createElement('section');shell.className='im-shell im-native-controls';shell.innerHTML='<header class="im-titlebar"><button>Window</button></header><main class="im-body"><button id="fixture-opener">Open</button></main>';
+ const shell=document.createElement('section');shell.className='im-shell';shell.innerHTML='<header class="im-titlebar"><button>Window</button></header><main class="im-body"><button id="fixture-opener">Open</button></main>';
  document.body.append(shell);const stop=attachLayers(shell);const body=shell.querySelector('main');const opener=shell.querySelector('#fixture-opener');opener.focus();
  const dialog=document.createElement('dialog');dialog.innerHTML='<form method="dialog"><input name="value" value="preserved" autofocus><button>Save</button></form>';
  let locked=true,closes=0;

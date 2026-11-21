@@ -92,7 +92,7 @@ await test('Inputs: what goes in, pinned how, under which license, and what it b
 await test('the steps are a tablist with arrow keys: the keyboard goes with the selection, the arrows wrap, Home and End go to the ends', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
-  const current = () => page.evaluate(() => ({ focus: document.activeElement?.id, selected: [...document.querySelectorAll('.im-step-nav [role=tab]')].filter(t => t.getAttribute('aria-selected') === 'true').map(t => t.id), tabbable: [...document.querySelectorAll('.im-step-nav [role=tab]')].filter(t => t.tabIndex === 0).map(t => t.id) }));
+  const current = () => page.evaluate(() => ({ focus: document.activeElement?.id, selected: [...document.querySelectorAll('.im-steps [role=tab]')].filter(t => t.getAttribute('aria-selected') === 'true').map(t => t.id), tabbable: [...document.querySelectorAll('.im-steps [role=tab]')].filter(t => t.tabIndex === 0).map(t => t.id) }));
   await tab(page, 'Inputs').focus();
   await page.keyboard.press('ArrowRight');
   assert.deepEqual(await current(), { focus: 'step-tab-harmonize', selected: ['step-tab-harmonize'], tabbable: ['step-tab-harmonize'] });
@@ -146,9 +146,9 @@ await test('Install: a switch per harness calls install_project with the id of t
   assert.match(await tab(page, 'Install').textContent(), /On 1 harness · 1 change waiting/);
   assert.equal(await page.locator('nav button', { hasText: 'Sync' }).locator('.im-count').textContent(), '1', 'the tab of Sync counts the change this switch made');
   await page.getByRole('button', { name: 'Review 1 change' }).click();
-  await page.locator('dialog.im-content-dialog--drawer[open] h2', { hasText: 'Review changes' }).waitFor();
+  await page.locator('dialog[open] h2', { hasText: 'Review changes' }).waitFor();
   assert.deepEqual((await app.calls()).at(-1), { action: 'plan', payload: {} }, 'a fresh plan of everything, as Sync asks for it');
-  assert.match(await page.locator('dialog.im-content-dialog--drawer').textContent(), /Install\s*Marionette/);
+  assert.match(await page.locator('dialog[open]').textContent(), /Install\s*Marionette/);
   await page.screenshot({ path: shots + '/project-install-review.png' });
   await page.getByRole('button', { name: /^Apply 1 change/ }).click();
   await page.locator('dialog[open]').waitFor({ state: 'detached' });
@@ -243,7 +243,7 @@ await test('a runtime that leaves the harness out of the plugin\'s targets is an
   await tab(page, 'Install').click();
   const before = (await app.calls()).length;
   await switchOf(page, 'Codex').click();
-  await page.locator('.im-banner[data-im-tone="err"]', { hasText: 'marionette was not set up for Codex' }).waitFor();
+  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'marionette was not set up for Codex' }).waitFor();
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false');
   assert.equal((await app.calls()).slice(before).some(c => c.action === 'save_plugin'), false, 'the page does not save the targets itself');
 });
@@ -254,7 +254,7 @@ await test('an install that fails says why and changes nothing', 'projects', {},
   await openMarionette(page);
   await tab(page, 'Install').click();
   await switchOf(page, 'Codex').click();
-  await page.locator('.im-banner[data-im-tone="err"]', { hasText: 'no build for codex' }).waitFor();
+  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'no build for codex' }).waitFor();
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false');
 });
 
@@ -310,10 +310,10 @@ await test('a cancelled file dialog changes nothing; a file that is not a projec
   await page.getByRole('button', { name: 'Open project file…' }).click();
   await page.waitForFunction(() => window.calls.some(c => c.action === 'pick_file'));
   assert.equal((await actions(app)).includes('open_project'), false);
-  assert.equal(await page.locator('.im-banner').count(), 0);
+  assert.equal(await page.locator('.im-note').count(), 0);
   await app.flags({ pickPath: 'D:/Notes/Notes.txt' });
   await page.getByRole('button', { name: 'Open project file…' }).click();
-  await page.locator('.im-banner[data-im-tone="err"]', { hasText: 'Not a Muro project file' }).waitFor();
+  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'Not a Muro project file' }).waitFor();
   assert.equal(await page.locator('li.im-list-link').count(), 1, 'nothing was added');
 });
 
@@ -324,7 +324,7 @@ await test('a shell that has no file dialog or folder opening yet loses those bu
   await page.getByRole('button', { name: 'Open project file…' }).click();
   await page.locator('.im-notice-text', { hasText: 'cannot open a file dialog' }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Open project file…' }).count(), 0);
-  assert.equal(await page.locator('.im-banner').count(), 0, 'not an error of the app');
+  assert.equal(await page.locator('.im-note').count(), 0, 'not an error of the app');
   await page.getByRole('button', { name: /Marionette/ }).click();
   await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
   await page.locator('.im-record-meta').getByRole('button', { name: 'Open folder' }).click();
@@ -473,7 +473,6 @@ await test('Harmonize, Prompts: each prompt with an Open that shows its text in 
   await page.getByRole('button', { name: 'Open intake.md' }).click();
   const sheet = page.getByRole('dialog', { name: 'intake.md' });
   await sheet.waitFor();
-  assert.equal(await sheet.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet, on the right');
   assert.equal(await sheet.locator('pre.im-code-view').textContent(), '# intake.md\n\nThe prompt.');
   assert.equal(await page.evaluate(() => !!document.activeElement?.closest('dialog')), true, 'the focus is in the sheet');
   let reached = false;
@@ -632,7 +631,7 @@ await test('Documented examples: one lights its branch in order with no call, ag
 await test('Simulate: an empty request is refused in place, the note names the engine and the cost once, asking shows the engine, and the answer lights the branch in order', 'projects', {}, async app => {
   const { page } = app;
   await graphTab(page);
-  assert.match(await squash(page.locator('#sim-note')), /^Free-text requests use Claude Code on this computer, with its own credentials\. Each costs up to \$0\.50 a request\. Documented examples run no AI\. Change this in Settings\.$/);
+  assert.match(await squash(page.locator('#sim-note')), /^Free-text requests use Claude Code on this computer, with its own credentials\. Each costs up to \$0\.50 a request\. Documented examples run no AI\. Settings$/);
   assert.equal(await page.locator('#sim-note').getByRole('button', { name: 'Settings' }).count(), 1);
   assert.match(await requestBox(page).getAttribute('aria-describedby'), /sim-note/);
   await simulateButton(page).click();
@@ -706,7 +705,7 @@ await test('Simulate: a call that fails, an answer that is not a valid decision,
   assert.equal(await failed.getAttribute('role'), 'alert');
   assert.match(await squash(failed), /No API key: the environment variable named by --api-key-env is not set Check the AI engine in Settings\./);
   assert.equal(await litNodes(page).count(), 0);
-  assert.equal(await page.locator('.im-banner').count(), 0, 'the failure is the simulator\'s, not the app\'s');
+  assert.equal(await page.locator('.im-note').count(), 0, 'the failure is the simulator\'s, not the app\'s');
   const invalid = await ask({ simulate: 'invalid' }, 'The AI\'s answer was not a valid decision');
   assert.deepEqual(await invalid.locator('.im-bullet-list > li').allTextContents(), ['Unknown capability in AI classification: made-up', 'AI classification requires a nonempty reason']);
   assert.equal(await invalid.locator('ol, button[data-action="open-capability"]').count(), 0, 'no step comes of an invalid answer');
@@ -734,7 +733,7 @@ await test('Simulate with an API engine names the model and the provider, and sh
   await page.evaluate(() => window.shown());
   const note = page.locator('#sim-note', { hasText: 'gpt-test' });
   await note.waitFor();
-  assert.match(await squash(note), /^Free-text requests are sent to gpt-test through https:\/\/example\.test\/v1 and billed by your API provider\. Documented examples run no AI\. Change this in Settings\.$/);
+  assert.match(await squash(note), /^Free-text requests are sent to gpt-test through https:\/\/example\.test\/v1 and billed by your API provider\. Documented examples run no AI\. Settings$/);
   await requestBox(page).fill('Write a letter');
   await app.flags({ simulateDelay: 500 });
   await simulateButton(page).click();
@@ -751,7 +750,6 @@ await test('A capability opens a sheet from the graph, from a step of the result
   await gnode(page, 'design-review').click();
   const sheet = page.getByRole('dialog', { name: 'design-review' });
   await sheet.waitFor();
-  assert.equal(await sheet.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet, on the right');
   const text = await squash(sheet);
   for (const part of [/Role worker/, /Entry marionette-design Use when designing an interface\./, /Comes from —/, /Activates when the request means design-review-intent Review a finished design Not for: Building one/, /Branches Runs design-taste first, on a condition A design exists/]) assert.match(text, part);
   assert.doesNotMatch(text, /Produces/);

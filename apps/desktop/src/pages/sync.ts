@@ -43,7 +43,7 @@ export function cell(state:ViewState,p:Plugin,t:Target):string {
   case 'install':return tag(`Install ${c.to}`,'accent');
   case 'reinstall':return tag(`Reinstall ${c.to}`,'accent');
   case 'activate':return tag(`Activate ${c.to}`,'accent');
-  case 'remove':return tag(`Remove ${c.from}`,'bad');
+  case 'remove':return tag(`Remove ${c.from}`,'err');
   case 'needs-build':return tag('Needs a build','warn');
   case 'unknown':return '<span class="im-muted">Unknown</span>';
   case 'paused':return '<span class="im-muted">Paused</span>';
@@ -55,7 +55,7 @@ function hstate(state:ViewState,t:Target):string {
  const h=harnessState(t,state.snapshot!,state.plan);
  switch(h.kind){
   case 'paused':return tag('Paused');
-  case 'changes':return button(`Sync ${plural(h.count,'change')}`,'review',{id:t.id,sm:true,accent:true,icon:'sync'});
+  case 'changes':return button(`Sync ${plural(h.count,'change')}`,'review',{id:t.id,sm:true,icon:'sync'});
   case 'needs-build':return tag(`${plural(h.count,'plugin')} need${h.count===1?'s':''} a build`,'warn');
   case 'unknown':return tag(h.count?`${plural(h.count,'plugin')} to check`:'Cannot be read','warn');
   case 'unseen':return tag('Check to see the changes','accent');
@@ -92,7 +92,7 @@ async function check(app:App){
  finally{state.checking=false;app.render();}
 }
 /** Paints the review sheet of `state.review` (running while `state.applying`). */
-function showReview(app:App){const {state}=app,r=state.review;if(r)app.openDialog(reviewSheet(state,r.plan,state.applying?{index:state.applying.index}:null,targetOf(state,r.target_id??undefined)??null),'sheet');}
+function showReview(app:App){const {state}=app,r=state.review;if(r)app.openDialog(reviewSheet(state,r.plan,state.applying?{index:state.applying.index}:null,targetOf(state,r.target_id??undefined)??null));}
 function openReview(app:App,plan:Plan,target:Target|null){app.state.review={plan,target_id:target?.id??null};showReview(app);}
 /** Review and Sync N changes: a fresh plan first. Only a whole plan becomes `state.plan`; the plan of one harness is for its sheet alone. */
 async function review(app:App,data:DOMStringMap){
@@ -109,7 +109,7 @@ async function applyPlan(app:App,plan:Plan,target:Target|null,sheet:boolean,choi
  try{await app.run('Syncing…',()=>app.request<Snapshot>('apply',applyPayload(plan,choice)),async v=>{
   const skipped=v.skipped_removals??0;
   applied=true;app.adopt(v);state.plan=null;state.review=null;if(sheet)app.closeDialog();await app.replan();
-  app.notify(`${appliedNotice(plan.operations.length-skipped,skipped)}${v.left_out?.length?` ${v.left_out.length} left out.`:''}`,'good');});}
+  app.notify(`${appliedNotice(plan.operations.length-skipped,skipped)}${v.left_out?.length?` ${v.left_out.length} left out.`:''}`);});}
  finally{state.applying=null;}
  if(!applied&&sheet)showReview(app);
  app.render();
@@ -146,7 +146,7 @@ async function attempt<T>(app:App,el:HTMLElement,label:string,work:()=>Promise<T
 async function submit(app:App,dialog:HTMLDialogElement,form:HTMLFormElement,action:string,payload:Record<string,unknown>,done:string):Promise<void> {
  await runFormOperation(form,()=>app.request<Snapshot>(action,{...payload,revision:app.state.snapshot!.registry.revision}),{
   error:dialog.querySelector<HTMLElement>('#form-error'),lockFields:true,current:()=>dialog.open&&dialog.contains(form),
-  after:saved=>{app.adopt(saved);app.closeDialog();app.notify(done,'good');}
+  after:saved=>{app.adopt(saved);app.closeDialog();app.notify(done);}
  });
 }
 function editPlugin(app:App,plugin?:Plugin):void {
@@ -155,7 +155,7 @@ function editPlugin(app:App,plugin?:Plugin):void {
  form.onsubmit=e=>{e.preventDefault();const next=readPlugin(form,plugin);if(showErrors(form,pluginErrors(next)))void submit(app,dialog,form,'save_plugin',{plugin:next},'Saved.');};
 }
 function editTarget(app:App,target?:Target,found?:Discovered):void {
- const dialog=app.openDialog(harnessSheet(app.state,target,found),'sheet'),form=dialog.querySelector<HTMLFormElement>('#target-form')!;
+ const dialog=app.openDialog(harnessSheet(app.state,target,found)),form=dialog.querySelector<HTMLFormElement>('#target-form')!;
  form.onsubmit=e=>{e.preventDefault();const next=readTarget(form,target);if(showErrors(form,targetErrors(next)))void submit(app,dialog,form,'save_target',{target:next},`${next.name} saved.`);};
 }
 /** The actions under More work on the saved plugin: with changes in the form that are not saved, they say so rather than drop them. */
@@ -168,7 +168,7 @@ async function resolvePlugin(app:App,d:DOMStringMap,el:HTMLElement):Promise<void
  const p=pluginOf(app.state,d.id);if(!p||unsaved(el))return;
  await attempt(app,el,'Checking the source…',()=>app.request<Snapshot>('resolve',{id:p.id}),v=>{
   const after=v.registry.plugins.find(x=>x.id===p.id),version=after?versionOf(after).version:'',found=!!after?.upstream_revision&&after.upstream_revision!==p.upstream_revision;
-  app.adopt(v);app.closeDialog();app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`,found?'good':undefined);
+  app.adopt(v);app.closeDialog();app.notify(found?`${p.name} ${version} found.`:`${p.name}: no new version.`);
  });
 }
 /** Plan a reinstall: the plan the service makes for it opens in the review sheet, and is applied from there. It is never the plan the strip and the columns read. */
@@ -203,7 +203,7 @@ function repaintInstalled(app:App,id:string):void {
 async function addToList(app:App,d:DOMStringMap,el:HTMLElement):Promise<void> {
  const t=targetOf(app.state,d.id),p=app.state.snapshot?.inventory.find(i=>i.target_id===d.id)?.plugins.find(x=>x.id===d.native);if(!t||!p)return;
  if(!p.path){editPlugin(app,{...listedPlugin(p,t),source:'',distributions:[]});return;}
- await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',listing(p,t,app.state.snapshot!.registry.revision)),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`,'good');repaintInstalled(app,t.id);});
+ await attempt(app,el,'Updating your list…',()=>app.request<Snapshot>('save_plugin',listing(p,t,app.state.snapshot!.registry.revision)),v=>{app.adopt(v);app.notify(`${p.name} added to your list.`);repaintInstalled(app,t.id);});
 }
 /** The service refuses to remove a harness that a plugin still lists, so the plugins that list it are saved without it first, one after the other, each with the revision the one before returned; then the harness goes. A failure says how many plugins were already taken off it, and those stay saved. */
 async function stopManaging(app:App,t:Target):Promise<Snapshot> {
@@ -225,7 +225,7 @@ async function setExclusive(app:App,mode:'keep'|'remove'):Promise<void> {
    catch(e){if(last)app.adopt(last);throw new Error(`${saved?`${plural(saved,'harness','harnesses')} saved. `:''}${t.name} was not saved: ${message(e)}`);}
   }
   return last!;
- },v=>{app.adopt(v);app.notify(wanted?'Saved. Muro will ask before it uninstalls plugins outside your list.':'Saved. Plugins outside your list are left alone.','good');});
+ },v=>{app.adopt(v);app.notify(wanted?'Saved. Muro will ask before it uninstalls plugins outside your list.':'Saved. Plugins outside your list are left alone.');});
 }
 
 /** The sheet's own buttons: the plan it shows is applied, with its removals confirmed (`apply`) or left out (`apply-keep`). */

@@ -57,10 +57,10 @@ test('Start with Windows is disabled until it is read and where it is not availa
 
 test('the interval is used only with automatic sync on, and a stored interval none of the options names stays selected', () => {
   const off = settings(viewState(snapshot()));
-  assert.match(off, /<select name="interval_minutes"[^>]* disabled>/);
+  assert.match(off, /<select class="im-select" name="interval_minutes"[^>]* disabled>/);
   assert.match(off, /Used when automatic sync is on\./);
   const on = settings(viewState(snapshot({}, { auto_sync: true, interval_minutes: 45 })));
-  assert.doesNotMatch(on, /<select name="interval_minutes"[^>]* disabled>/);
+  assert.doesNotMatch(on, /<select class="im-select" name="interval_minutes"[^>]* disabled>/);
   assert.match(on, /<option value="45" selected>Every 45 minutes<\/option>/);
 });
 
@@ -69,7 +69,7 @@ test('a stored coding agent that is not listed stays an option, so the select ne
 });
 
 test('the rule for plugins outside the list is the Sync page\'s own control, none chosen when harnesses differ', () => {
-  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
+  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="im-seg" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
   assert.ok(settings(viewState(snapshot())).includes(exclusiveSeg(snapshot().registry.targets)), 'one builder draws it on both pages');
   const keep = group(snapshot());
   assert.match(keep, /name="excl" value="keep" checked/);
@@ -119,12 +119,12 @@ async function session(aiOver: Partial<AiSettings> = {}) {
 test('AI: the engine is a radio group; a coding agent shows its harness and its budget, and none of the API\'s fields', () => {
   forgetLearned();
   const html = settings(viewState(snapshot()));
-  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
+  const group = html.match(/<div class="im-seg" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
   assert.deepEqual([...group.matchAll(/<input type="radio" name="ai_engine" value="(\w+)"([^>]*)><span>([^<]+)<\/span>/g)].map(m => {
     assert.match(m[2], /data-setting="ai_engine"/);
     return [m[1], /\bchecked\b/.test(m[2]), m[3]];
   }), [['harness', true, 'Coding agent on this computer'], ['api', false, 'OpenAI-compatible API']]);
-  const select = html.match(/<select name="ai_harness"[^>]*>.*?<\/select>/)![0];
+  const select = html.match(/<select class="im-select" name="ai_harness"[^>]*>.*?<\/select>/)![0];
   assert.match(select, /aria-label="Coding agent"/);
   assert.deepEqual([...select.matchAll(/<option value="([^"]+)" (selected)?>([^<]+)<\/option>/g)].map(m => [m[1], !!m[2], m[3]]), [['claude-code', true, 'Claude Code · dollar budget'], ['codex', false, 'Codex · no budget limit']]);
   const budget = control(html, 'ai_budget_usd');

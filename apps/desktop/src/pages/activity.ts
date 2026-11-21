@@ -43,7 +43,7 @@ export function entries(s: Snapshot): Entry[] {
 }
 export const matches = (entry: Entry, filter: ActivityFilter) => filter === 'all' || (filter === 'problems' ? !OK.has(entry.status) : entry.kind === filter);
 
-const outcome = (status: string) => OK.has(status) ? '' : status === 'failed' || status === 'error' ? tag('Failed', 'bad') : tag(humanize(status));
+const outcome = (status: string) => OK.has(status) ? '' : status === 'failed' || status === 'error' ? tag('Failed', 'err') : tag(humanize(status));
 const money = (usd: number) => Number.isFinite(Number(usd)) ? `$${Number(usd).toFixed(2)}` : '';
 const log = (path: string) => codeNoteHtml(path ? `Log: ${path}` : '');
 

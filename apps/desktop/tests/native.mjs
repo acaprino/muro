@@ -184,7 +184,7 @@ try {
   const TRAY = 'Keep running when the window is closed';
   const tray = page.getByRole('switch', { name: TRAY });
   // The page paints a setting only after the service answered, so once it shows it the save is done on disk too.
-  const shows = async on => { await page.locator(`[role=switch][aria-label="${TRAY}"][aria-checked="${on}"]`).waitFor(); await page.locator('.im-busy').waitFor({ state: 'detached' }); };
+  const shows = async on => { await page.locator(`[role=switch][aria-label="${TRAY}"][aria-checked="${on}"]`).waitFor(); await page.locator('.im-loader').waitFor({ state: 'detached' }); };
   assert.equal(await tray.getAttribute('aria-checked'), 'true');
   await tray.click();
   await shows(false);

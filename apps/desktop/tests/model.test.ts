@@ -5,9 +5,10 @@ import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.
 import { frame, modules } from '../src/views.ts';
 import { cell, rows, actions as syncActions } from '../src/pages/sync.ts';
 import type { App } from '../src/context.ts';
-import { reviewSheet } from '../src/sheets.ts';
+import { reviewSheet, pluginDialog, harnessSheet, adaptDialog } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
+import { blankProjects } from '../src/pages/project/state.ts';
 
 const plugin: Plugin = {id:'pkg',name:'Package',source:'owner/pkg',policy:'stable',pinned_version:'',targets:['target'],distributions:[{harness:'codex',path:'/artifact',version:'2'}]};
 function snapshot(): Snapshot {return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'target',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},inventory:[{target_id:'target',complete:true,supported:true,error:null,plugins:[{id:'pkg',name:'Package',version:'1',path:'/plugin',managed:true}]}],activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,errors:null,targets:{}}};}
@@ -358,7 +359,7 @@ test('sw and seg carry what their change or click runs, and escape their text',(
  assert.match(on,/role="switch" aria-checked="true" aria-label="Automatic &lt;sync&gt;" data-action="toggle" data-id="auto"/);assert.match(sw(false,'x','toggle'),/aria-checked="false"/);
  const group=seg('filter','action',[['all','All'],['action','Needs <action>']],'Filter plugins');
  assert.match(group,/role="radiogroup" aria-label="Filter plugins"/);assert.match(group,/value="action" checked/);assert.doesNotMatch(group,/value="all" checked/);assert.match(group,/Needs &lt;action&gt;/);
- assert.match(button('Go','run',{id:'a"b',sm:true,accent:true}),/class="im-btn im-btn--accent im-btn--sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="im-spinner"/);
+ assert.match(button('Go','run',{id:'a"b',sm:true}),/class="im-btn im-btn--sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="im-spinner"/);
 });
 
 test('every action has one owner: no two page modules, and none of them the app, declare the same name',()=>{
@@ -492,4 +493,35 @@ test('the one-harness review of a plan with removals confirms that plan\'s own n
 });
 test('every action the review sheet names has an owner: apply and apply-keep',()=>{
  for(const wanted of ['apply','apply-keep'])assert.ok(Object.values(modules).some(m=>wanted in m.actions),`${wanted} is declared`);
+});
+
+// The tones of the canon: a note and a message take ok, warn, err or info; the accent stays a tone of data (a chip, a dot, a summary), and good, bad and danger are gone.
+const TONES=['ok','warn','err','info'];
+const toneFindings=(html:string)=>[...html.matchAll(/<(\w+)\b([^>]*?)\bdata-im-tone="([^"]*)"[^>]*>/g)].filter(([,,attrs,value])=>{
+ if(value===''||TONES.includes(value))return false;
+ const data=value==='accent'&&/\bclass="[^"]*\bim-(chip|dot|summary)\b/.test(attrs+' ');
+ return !data;
+}).map(m=>m[0].slice(0,120));
+test('the tone check itself reads an accent note, a good chip and a danger tone as findings, and an accent chip as data',()=>{
+ assert.equal(toneFindings('<div class="im-note" data-im-tone="accent">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="good">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="danger">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="accent"><span class="im-dot" data-im-tone="accent"><section class="im-summary" data-im-tone="accent">').length,0);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="warn"><b data-im-tone="">').length,0);
+});
+test('every page, state and sheet writes data-im-tone only in the four tones, and the accent only on a chip, a dot or a summary',()=>{
+ const shells:string[]=[];
+ const all=(over:Partial<ViewState>)=>{
+  for(const page of ['sync','projects','activity','settings'] as const){const s=snapshot();s.sync=recordedSync({pending:2,errors:1});s.registry.settings.ai={engine:'harness',harness:'claude-code',budget_usd:1,api_base:'',model:'',api_key_env:''};shells.push(frame(viewState(s,{page,projects:blankProjects(),project:null,autostart:{supported:true,enabled:false,current:false},...over})));}
+ };
+ all({});all({plan:plan([op('install','','2'),op('update','1','2','b'),op('reinstall','2','2','c'),op('activate','1','1','d'),op('remove','1','')])});
+ all({applying:{index:0,total:1,name:'Package'},plan:plan([op('update','1','2')])});all({checking:true});all({busy:'Syncing…',error:'Failed'});
+ all({checkErrors:[{plugin_id:'pkg',message:'x'}],discoveryError:'x'});all({plan:plan([],4,['blocked'])});
+ const unread=snapshot();unread.inventory[0].complete=false;shells.push(frame(viewState(unread,{projects:blankProjects(),project:null})));
+ const none=snapshot();none.registry.targets=[];shells.push(frame(viewState(none,{projects:blankProjects(),project:null})));
+ const ok=snapshot();ok.sync=recordedSync({pending:0});shells.push(frame(viewState(ok,{projects:blankProjects(),project:null})));
+ const v=viewState(snapshot(),{projects:blankProjects(),project:null,plan:plan([op('install','','2'),op('update','1','2'),op('remove','1','','')],4,['blocked'])});
+ shells.push(reviewSheet(v,v.plan!,null),reviewSheet(v,v.plan!,{index:1}),pluginDialog(v),pluginDialog(v,plugin),harnessSheet(v),harnessSheet(v,v.snapshot!.registry.targets[0]),adaptDialog(v,plugin));
+ assert.ok(shells.length>=20);
+ assert.deepEqual(shells.flatMap(toneFindings),[]);
 });

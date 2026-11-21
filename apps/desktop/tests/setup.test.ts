@@ -116,7 +116,7 @@ it('step 1 lists what is found, with the ones Muro cannot manage disabled and wh
 });
 
 it('step 1 says it is looking, and when nothing can be picked offers to look again or to set up later', () => {
-  assert.match(setup.view(blank({ snapshot: noTargets(), discovering: true })), /Looking for harnesses on this computer…/);
+  assert.match(setup.view(blank({ snapshot: noTargets(), discovering: true })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   for (const discovered of [[], [found('deepseek', 'DeepSeek', { supported: false })]]) {
     const html = setup.view(blank({ snapshot: noTargets(), discovered }));
     assert.match(html, /data-action="setup-later"/);
@@ -190,8 +190,8 @@ const topLevelRules = (css: string): [string, string][] => {
   return rules;
 };
 /** What the stylesheet declares for a selector: every rule with exactly that selector, a later one over an earlier one. */
-const style = (selector: string): Record<string, string> => {
-  const css = readFileSync(new URL(import.meta.resolve('@acaprino/imago/css/content.css')), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+const style = (selector: string, sheet = 'content.css'): Record<string, string> => {
+  const css = readFileSync(new URL(import.meta.resolve('@acaprino/imago/css/' + sheet)), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   const declared: Record<string, string> = {};
   for (const [head, body] of topLevelRules(css)) {
     if (head !== selector) continue;
@@ -202,7 +202,7 @@ const style = (selector: string): Record<string, string> => {
 
 it('the first run\'s footer sticks to the bottom of the window: the page scrolls, not the wrap, and the card is a column, not a grid', () => {
   // What a sticky box needs, each of which was missing: it moves inside the nearest scrolling ancestor and inside its parent.
-  assert.equal(style('.im-main')['overflow'], 'auto', 'the page is what scrolls');
+  assert.equal(style('.im-panel-body', 'primitives.css')['overflow'], 'auto', 'the panel body of the content is what scrolls');
   assert.equal(style('.im-wizard-wrap')['overflow'], 'visible', 'an overflow:auto wrap is the scroller the footer would look at, and it never overflows');
   assert.equal(style('.im-wizard')['display'], 'flex', 'in a grid row as tall as the footer a sticky box has nowhere to move');
   assert.equal(style('.im-wizard')['flex-direction'], 'column');
@@ -210,7 +210,7 @@ it('the first run\'s footer sticks to the bottom of the window: the page scrolls
   assert.equal(style('.im-wizard-actions')['bottom'], '0');
   assert.match(style('.im-wizard-actions')['background'], /^var\(--/, 'what scrolls under it does not show through');
   assert.equal(style('.im-wizard-actions')['display'], 'flex', 'Back and Continue stay at the two ends');
-  assert.match(style('.im-main:has(.im-wizard)')['scroll-padding-bottom'], /^\d+px$/, 'a box focused with the keyboard is not left under the footer');
+  assert.match(style('.im-panel-body:has(.im-wizard)')['scroll-padding-bottom'], /^\d+px$/, 'a box focused with the keyboard is not left under the footer');
 });
 
 it('step 3 offers two switches, on by default, and disables the one the shell cannot honour', () => {

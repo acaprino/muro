@@ -3,7 +3,7 @@ import type { App, Actions, TextBox } from '../../context.ts';
 import { harnessNames } from '../../model.ts';
 import { dlHead } from '../../sheets.ts';
 import { esc, tag, seg, button, empty, when } from '../../ui.ts';
-import { actionChipHtml, codeViewHtml, stackRowHtml, stackListHtml, summaryHtml, tableHtml, tableRowHtml, toolbarHtml, selectHtml } from '@acaprino/imago/ui';
+import { type ChipTone, actionChipHtml, codeViewHtml, stackRowHtml, stackListHtml, summaryHtml, tableHtml, tableRowHtml, toolbarHtml, selectHtml } from '@acaprino/imago/ui';
 import { VIEWS, STATE } from './state.ts';
 
 /** Step 2, why the project is the way it is, read only: the state of the last harmonization, and four views of it (the decision records, the choices by part, the history, the
@@ -14,7 +14,7 @@ import { VIEWS, STATE } from './state.ts';
  * `change` keeps what they say in the state and paints again. A link to a capability is the action `open-capability`, which pages/project/graph.ts owns. */
 
 /** The forms a decision can take, in the words of the interface, and the tone of each. */
-const FORMS: [DecisionForm, string, string][] = [['capability', 'Capability', 'accent'], ['always-on', 'Always on', 'warn'], ['hook', 'Hook', 'good'], ['dropped', 'Dropped', '']];
+const FORMS: [DecisionForm, string, ChipTone][] = [['capability', 'Capability', 'accent'], ['always-on', 'Always on', 'warn'], ['hook', 'Hook', 'ok'], ['dropped', 'Dropped', '']];
 /** What the factory's own prompts are for: a prompt that is not one of them is listed with no description. */
 const ROLES: Record<string, string> = {
   'intake.md': 'Reads the inputs, classifies what they do and extracts capabilities with their provenance.',
@@ -23,7 +23,7 @@ const ROLES: Record<string, string> = {
   'classify.md': 'How a harness picks capabilities for a request, at run time.',
 };
 const roleOf = (file: string) => Object.hasOwn(ROLES, file) ? ROLES[file] : '';
-const RESULTS: Record<ProjectRun['status'], [string, string]> = { completed: ['Built and validated', 'good'], cancelled: ['Cancelled', ''], failed: ['Failed', 'bad'] };
+const RESULTS: Record<ProjectRun['status'], [string, ChipTone]> = { completed: ['Built and validated', 'ok'], cancelled: ['Cancelled', ''], failed: ['Failed', 'err'] };
 const none = '—';
 
 /** An ISO time in the words of the interface (the same as every other stamp); anything that is no time as it came. */
@@ -107,7 +107,7 @@ export function view(state: ViewState, info: ProjectInfo): string {
 function openPrompt(app: App, d: DOMStringMap): void {
   const { state } = app, info = state.projects.infoId === state.project?.id ? state.projects.info : null, found = info?.prompts.find(p => p.file === d.id);
   if (!found) return;
-  app.openDialog(`<div class="im-form">${dlHead(found.file, roleOf(found.file))}${codeViewHtml(found.text,`Text of ${found.file}`)}</div>`, 'sheet');
+  app.openDialog(`<div class="im-form">${dlHead(found.file, roleOf(found.file))}${codeViewHtml(found.text,`Text of ${found.file}`)}</div>`);
 }
 export const actions: Actions = { 'harmonize-prompt': openPrompt };
 

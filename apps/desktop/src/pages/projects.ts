@@ -2,7 +2,8 @@ import { nextStepId, stepNavigationHtml, stepNavigationKey, stepPanelHtml } from
 import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, versionOf } from '../model.ts';
-import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
+import { esc, plural, sym, tag, button, head, empty, icon } from '../ui.ts';
+import { loadingPanel } from '../panels.ts';
 import { STEPS, STATE, fresh } from './project/state.ts';
 import * as inputs from './project/inputs.ts';
 import * as install from './project/install.ts';
@@ -29,7 +30,7 @@ const nameOf = (p: ProjectSummary) => p.project?.name || p.plugin?.name || p.id;
 /** "Remove from list" on every project but the one Muro ships (`included`, which the runtime says: never a field of the project file, which anyone can write). The file is not touched. */
 const removal = (p: ProjectSummary) => p.included ? '' : button('Remove from list', 'remove-project', { sm: true, id: p.id, attrs: { 'aria-label': `Remove ${nameOf(p)} from the list` } });
 function item(state: ViewState, p: ProjectSummary): string {
-  if (p.error) return `<li>${sym(nameOf(p))}<div class="im-grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="im-wrap-text">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}${removal(p)}</li>`;
+  if (p.error) return `<li>${sym(nameOf(p))}<div class="im-grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="im-wrap-text">${esc(p.error)}</small></div>${tag('Cannot be read', 'err')}${removal(p)}</li>`;
   const counts = [count(p.inputs, 'input'), count(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
   return `<li class="im-list-link"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="im-grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="im-muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="im-chip">Included with Muro</span>' : ''}</strong><small class="im-ellipsis" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="im-nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="im-nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
 }
@@ -46,7 +47,7 @@ function published(state: ViewState): string {
 function listPage(state: ViewState): string {
   const pr = state.projects, open = pr.noPicker ? '' : button('Open project file…', 'open-project-file', { icon: 'folder' });
   const body = pr.list === null
-    ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading your projects…</strong></div>`)
+    ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : loadingPanel(3))
     : pr.list.length ? `<ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Open a project file to add it here.', open);
   return head('Projects', 'A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.', open) + body + (state.snapshot ? published(state) : '');
 }
@@ -74,7 +75,7 @@ function projectPage(state: ViewState): string {
   const pv = state.project!, pr = state.projects, crumb = `<div class="im-breadcrumb-space">${button('Projects', 'close-project', { sm: true, icon: 'back' })}</div>`;
   if (pr.infoError && pr.infoId === pv.id) return crumb + empty('This project could not be read', pr.infoError, button('Try again', 'retry-projects'));
   const info = pr.infoId === pv.id ? pr.info : null;
-  if (!info) return crumb + `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading the project…</strong></div>`;
+  if (!info) return crumb + loadingPanel(3);
   return crumb + projectHead(state, info) + tabs(state, info) + stepPanelHtml(steps[pv.step].view(state,info),'step-panel',`step-tab-${pv.step}`);
 }
 export function view(state: ViewState): string {
@@ -114,7 +115,7 @@ async function viaShell<T>(app: App, action: string, payload: Record<string, unk
   try { return await app.request<T>(action, payload); }
   catch (e) {
     if (!(/unknown/i.test(message(e)) && message(e).includes(action))) throw e;
-    app.state.projects[missing] = true; app.render(); app.notify(`This version of Muro cannot ${words} yet.`, 'bad');
+    app.state.projects[missing] = true; app.render(); app.notify(`This version of Muro cannot ${words} yet.`,'err');
     return undefined;
   }
 }
@@ -125,7 +126,7 @@ async function openFile(app: App): Promise<void> {
   await app.run('Opening the project file…', () => app.request('open_project', { path }), async () => {
     await loadList(app);
     const added = app.state.projects.list?.find(p => flat(p.path) === flat(path));
-    app.notify(`${added ? nameOf(added) : 'The project'} added to your list.`, 'good');
+    app.notify(`${added ? nameOf(added) : 'The project'} added to your list.`);
   });
 }
 
@@ -146,7 +147,7 @@ function askRemoval(app: App, d: DOMStringMap): void {
   if (!p || !s) return;
   const installed = s.registry.plugins.some(x => x.project === p.id);
   app.confirm(`Remove ${nameOf(p)} from your list?`, `Only the entry goes: the file stays where it is (${p.path}) and you can open it again.${installed ? ' Its installed plugin stays as it is; Sync shows it as changed until the project is in your list again.' : ''}`, 'Remove from list',
-    () => void app.run('Removing the project from your list…', () => removeRequest(app, p.id), async saved => { app.adopt(saved); await loadList(app); app.notify(`${nameOf(p)} removed from your list.`, 'good'); }), true);
+    () => void app.run('Removing the project from your list…', () => removeRequest(app, p.id), async saved => { app.adopt(saved); await loadList(app); app.notify(`${nameOf(p)} removed from your list.`); }), true);
 }
 
 // ---------- the page's actions and events ----------

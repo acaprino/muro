@@ -37,7 +37,7 @@ test('the plugin form keeps every field: source, name, harnesses, updates, pinne
 });
 test('a new plugin starts with every enabled harness checked, a saved one with its own',()=>{
  const s=snapshot();s.registry.targets[1].enabled=false;
- assert.deepEqual(tags(pluginForm(s).match(/<input type="checkbox" name="targets"[^>]*>/g)!.join(''),'value'),['t1','t2'],'both are listed');
+ assert.deepEqual(tags(pluginForm(s).match(/<input type="checkbox" class="im-check" name="targets"[^>]*>/g)!.join(''),'value'),['t1','t2'],'both are listed');
  assert.equal(pluginForm(s).match(/name="targets"[^>]*checked/g)?.length,1,'only the enabled one is checked');
  const saved=pluginForm(snapshot(),plugin);assert.equal(saved.match(/name="targets"[^>]*checked/g)?.length,1);assert.match(saved,/value="t1" checked/);
  assert.match(pluginForm({...snapshot(),registry:{...snapshot().registry,targets:[]}}),/No harness yet\. Add one in Sync\./);

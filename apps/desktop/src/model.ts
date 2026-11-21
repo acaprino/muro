@@ -22,7 +22,7 @@ export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   const installations=targets.map(t=>({target:t,installed:installedOn(plugin,t,snapshot)}));
   if(installations.some(i=>!i.installed)) return status('missing','Not installed yet','accent');
   if(installations.some(i=>i.installed?.version!==distributionFor(plugin,i.target)?.version)) return status('update','Update available','warn');
-  return status('ok','Up to date','good');
+  return status('ok','Up to date','ok');
 }
 export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'unknown'|'paused'|'none';
 export interface CellStatus { kind:CellKind; from?:string; to?:string }

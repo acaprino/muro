@@ -224,7 +224,7 @@ it('the step has the simulator on the left and the graph on the right, with what
   const html = show(opened());
   assert.match(html, /^<div class="im-aside-layout"><div class="im-stack-3">/);
   assert.match(words(html), /Simulate a request See which branch of the graph a request activates, and in what order\./);
-  assert.match(html, /<textarea name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"/);
+  assert.match(html, /<textarea class="im-textarea" name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"/);
   assert.match(html, /<small class="im-field-error" id="err-simtask" role="alert"><\/small>/);
   assert.match(html, /<button type="button" class="im-btn" data-action="graph-simulate"><svg[^>]*>.*?<\/svg><span>Simulate<\/span><\/button>/);
   assert.match(words(html), /Documented examples 3/);
@@ -236,7 +236,7 @@ it('the step has the simulator on the left and the graph on the right, with what
   assert.doesNotMatch(words(html), /activated, in order/, 'the legend says it only when something is lit');
   assert.equal(html.match(/data-project-graph/g)?.length, 1);
   assert.doesNotMatch(html, /<svg class="graph|foreignObject/);
-  assert.doesNotMatch(html, /role="status"|simres/, 'no result before there is one');
+  assert.doesNotMatch(html, /im-numbered-result|simres/, 'no result before there is one');
 });
 it('the text of the request is what the box holds, escaped', () => {
   assert.match(show(opened({ task: 'Make <b>"this"</b> & that' })), /<textarea[^>]*>Make &lt;b&gt;&quot;this&quot;&lt;\/b&gt; &amp; that<\/textarea>/);
@@ -248,7 +248,7 @@ it('a refused empty request is said under the box, which it describes', () => {
   assert.match(html.match(/<textarea[^>]*>/)![0], /aria-describedby="[^"]*err-simtask/);
 });
 it('before the first free-text request the page says which engine it will use and what it may cost, with a link to Settings', () => {
-  const note = (settings: Record<string, unknown>) => { const html = show(opened({}, info(), snapshot(settings))); return { html, text: words(html.match(/<p class="im-callout"[\s\S]*?<\/p>/)?.[0] ?? '') }; };
+  const note = (settings: Record<string, unknown>) => { const html = show(opened({}, info(), snapshot(settings))); return { html, text: words(html.match(/<div id="sim-note"><div class="im-note im-note--block" data-im-tone="info"[\s\S]*?<\/p>/)?.[0] ?? '') }; };
   const harness = note({ ai: ai() });
   assert.match(harness.text, /Claude Code/);
   assert.match(harness.text, /up to \$0\.50 a request/);
@@ -271,14 +271,14 @@ it('before the first free-text request the page says which engine it will use an
 });
 it('the note is said once in a session: it is gone after the first free-text request, and back in a new session', async () => {
   const s = await session();
-  assert.match(s.view(), /class="im-callout"/);
+  assert.match(s.view(), /id="sim-note"><div class="im-note im-note--block" data-im-tone="info"/);
   s.sim().task = 'Write a letter';
   await s.act('graph-simulate');
-  assert.doesNotMatch(s.view(), /class="im-callout"/);
+  assert.doesNotMatch(s.view(), /id="sim-note"><div class="im-note im-note--block" data-im-tone="info"/);
   newSession();
-  assert.match(s.view(), /class="im-callout"/);
+  assert.match(s.view(), /id="sim-note"><div class="im-note im-note--block" data-im-tone="info"/);
   (globalThis as any).sessionStorage = undefined;
-  assert.match(s.view(), /class="im-callout"/, 'a session that keeps nothing says it each time rather than never');
+  assert.match(s.view(), /id="sim-note"><div class="im-note im-note--block" data-im-tone="info"/, 'a session that keeps nothing says it each time rather than never');
 });
 it('a documented example is shown as it was written: its steps in order, why each, what was added for it, and nothing called', () => {
   const html = show(opened({ example: 1 }));
@@ -678,7 +678,7 @@ it('text pasted into the request box reaches the step, survives a change of step
   await projects.actions.step(s.app, { id: 'inputs' } as DOMStringMap, {} as HTMLElement);
   await projects.actions.step(s.app, { id: 'graph' } as DOMStringMap, {} as HTMLElement);
   assert.equal(s.state.project!.step, 'graph');
-  assert.match(s.view(), /<textarea name="simtask"[^>]*>Write a letter as a Word file<\/textarea>/);
+  assert.match(s.view(), /<textarea class="im-textarea" name="simtask"[^>]*>Write a letter as a Word file<\/textarea>/);
   await s.act('graph-simulate');
   assert.equal(s.fake.calls.find(c => c.action === 'simulate')?.payload.task, 'Write a letter as a Word file');
 });
@@ -693,7 +693,6 @@ it('a capability opens a sheet with its role, entry, sources, intents, branches 
   s.state.projects.info = info();
   await s.act('open-capability', { id: 'design-taste' });
   assert.equal(s.dialogs.length, 1);
-  assert.equal(s.dialogs[0].kind, 'sheet');
   const html = s.dialogs[0].html, text = words(html);
   assert.match(html, /<h2 id="dlg-title">design-taste<\/h2>/);
   assert.match(text, /DESIGN-TASTE/);
