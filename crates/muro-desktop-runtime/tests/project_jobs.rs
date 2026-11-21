@@ -119,7 +119,11 @@ fn a_new_project_refuses_what_it_cannot_be_before_any_run() {
 fn a_new_project_refuses_an_id_already_in_the_list() {
     let home = Home::new();
     home.listed("my-plugin", json!({"plugin":plugin("Mine","my-plugin")}));
-    assert!(error_of(new_project(&home, |_| {})).contains("already in your list"));
+    // another folder: in the listed project's own, the file that is already there is refused first
+    let elsewhere = home.temp.path().join("elsewhere");
+    fs::create_dir_all(&elsewhere).unwrap();
+    let error = error_of(new_project(&home, |p: &mut Value| p["folder"] = json!(elsewhere)));
+    assert!(error.contains("already in your list"), "{error}");
 }
 
 // --- a change of a project: what is refused before the run ------------------------------------------

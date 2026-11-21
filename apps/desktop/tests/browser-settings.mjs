@@ -400,7 +400,7 @@ await test('Activity: the filters, and Problems shows only what failed or was ca
   await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
   await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   const filter = page.getByRole('radiogroup', { name: 'Filter activity' });
-  assert.deepEqual(await filter.locator('label').allTextContents(), ['All', 'Sync', 'AI adaptation', 'Problems']);
+  assert.deepEqual(await filter.locator('label').allTextContents(), ['All', 'Sync', 'AI runs', 'Problems']);
   assert.equal(await filter.getByRole('radio', { name: 'All' }).isChecked(), true);
   assert.equal((await titles(page)).length, 4, 'all: two completed, a failed check, a cancelled adaptation');
   await filter.getByRole('radio', { name: 'Problems' }).check({ force: true });
@@ -411,7 +411,7 @@ await test('Activity: the filters, and Problems shows only what failed or was ca
   assert.ok(problems.some(t => /AI adaptation of docs-writer/.test(t) && /Cancelled/.test(t)), problems.join(' | '));
   assert.equal(problems.some(t => /Checked sources and harnesses|Apply/.test(t)), false, 'no completed event under Problems');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'problems', 'the radio keeps the focus');
-  await filter.getByRole('radio', { name: 'AI adaptation' }).check({ force: true });
+  await filter.getByRole('radio', { name: 'AI runs' }).check({ force: true });
   await page.waitForFunction(() => document.querySelectorAll('ul.im-activity-list li').length === 1);
   assert.match(await page.locator('ul.im-activity-list li').textContent(), /AI adaptation of docs-writer for OpenCode/);
   await filter.getByRole('radio', { name: 'Sync' }).check({ force: true });
@@ -427,7 +427,7 @@ await test('Activity: empty states', 'default', {}, async app => {
   const { page } = app;
   await openActivity(page);
   assert.equal(await page.locator('.im-empty strong').textContent(), 'Nothing yet');
-  assert.equal(await page.locator('.im-empty span').textContent(), 'Sync runs and AI adaptations show up here.');
+  assert.equal(await page.locator('.im-empty span').textContent(), 'Sync runs and AI runs show up here.');
   await page.getByRole('radio', { name: 'Problems' }).check({ force: true });
   await page.locator('.im-empty strong', { hasText: 'Nothing here' }).waitFor();
   assert.equal(await page.locator('article.im-task-card').count(), 0);

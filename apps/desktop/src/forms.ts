@@ -1,5 +1,5 @@
 import type { Plugin, Snapshot, Target, Discovered } from './types.ts';
-import { field, button, mark, seg } from './ui.ts';
+import { field, button, mark, seg, esc } from './ui.ts';
 import { harnessNames, exclusiveMode } from './model.ts';
 import { selectFieldHtml, checkboxOptionHtml, formGroupHtml, fieldErrorHtml, repeatableFieldRowHtml, showFieldErrors, iconButtonHtml } from '@acaprino/imago/ui';
 export { selectFieldHtml as choice, clearFieldError as clearError, formSignature as signature } from '@acaprino/imago/ui';
@@ -73,3 +73,34 @@ export function targetErrors(target:Target):Errors {
 }
 /** A prepared-build error belongs to the collection rather than one ordinary named field. */
 export const showErrors=(form:HTMLFormElement,errors:Errors)=>showFieldErrors(form,errors,{field:(form,name)=>name==='distributions'?form.querySelector<HTMLElement>('#distributions input, [data-action=add-distribution]'):undefined});
+
+// ---------- a multi-line field ----------
+/** A text area with the label, hint and error slot of Imago's text field (`textFieldHtml`), drawn with Imago's own `im-native-textarea`. Imago has
+ * no markup helper for it yet: this is the one place it is written, to be moved into Imago with the next release (docs/imago-migration.md). */
+export function textArea(label:string,name:string,value='',o:{hint?:string;rows?:number;autofocus?:boolean;optional?:boolean;mono?:boolean}={}):string {
+ const key=encodeURIComponent(name),hint=o.hint?`<small id="hint-${esc(key)}">${esc(o.hint)}</small>`:'';
+ return `<label class="im-field"><span>${esc(label)}${o.optional?'<em>optional</em>':''}</span><textarea class="im-native-textarea${o.mono?' im-mono':''}" name="${esc(name)}" rows="${o.rows??4}"${o.autofocus?' autofocus':''} aria-describedby="${o.hint?`hint-${esc(key)} `:''}err-${esc(key)}">${esc(value)}</textarea>${hint}<small class="im-field-error" id="err-${esc(key)}" role="alert"></small></label>`;
+}
+
+// ---------- projects ----------
+/** A plugin id as the factory takes it: lowercase letters and digits joined by single dashes. */
+export const SLUG=/^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** The plugin id a project gets from its name while nobody typed one: accents dropped, every other run of characters a dash. */
+export const slugOf=(name:string)=>name.normalize('NFKD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,64).replace(/-+$/,'');
+/** A full path of this computer: a drive letter, a share or a root. */
+export const FULL_PATH=/^([A-Za-z]:[\\/]|\\\\|\/)/;
+/** Where an input comes from: an https address of a repository, or the full path of a folder. */
+export const isInput=(value:string)=>/^https:\/\/\S+$/.test(value)||FULL_PATH.test(value);
+/** The project's repository from the fields of a form: none when the address is empty. */
+export function readRepository(data:FormData):{url:string;branch:string;tag_prefix:string}|null {
+ const url=String(data.get('repo_url')||'').trim();
+ return url?{url,branch:String(data.get('repo_branch')||'').trim()||'main',tag_prefix:String(data.get('repo_prefix')||'').trim()}:null;
+}
+export const repositoryErrors=(repo:{url:string}|null):Errors=>repo&&!/^https:\/\/\S+$/.test(repo.url)?{repo_url:'Enter the https:// address of the repository, or leave it empty.'}:{};
+/** The fields of a project's repository: its address, branch and the prefix of its release tags. Empty address: none. */
+export const repositoryFields=(repo?:{url:string;branch:string;tag_prefix:string}|null)=>field('Repository','repo_url',repo?.url||'',{mono:true,placeholder:'https://github.com/owner/repository',hint:'Optional. The Git repository the project is published from. Leave it empty for a project that lives on this computer only.'})
+ +field('Branch','repo_branch',repo?.branch||'main',{mono:true})+field('Release tag prefix','repo_prefix',repo?.tag_prefix||'',{mono:true,placeholder:'my-plugin-v',hint:'Releases are tagged with this prefix and the version.'});
+/** A budget for an AI run, in US dollars: above zero, at most 100 (the runtime's limit). */
+export function budgetError(value:number):Errors {
+ return Number.isFinite(value)&&value>0&&value<=100?{}:{budget:'Enter a budget above zero and at most 100.'};
+}

@@ -62,6 +62,7 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' } : null, builtin },
     plugin: { name, slug, version: '0.5.0', description: `${name}, one plugin` },
     inputs, decisions,
+    instructions: [{ path: 'house-style.md', text: 'Keep sentences short.\n' }],
     records: [{ id: 'r1', date: '2026-11-10', subjects: ['design-taste'], text: 'One owner per output.', author: 'muro', binding: false }, { id: 'r2', date: '2026-11-12', subjects: ['office-docs'], text: 'Documents keep the source\'s limits.', author: 'you', binding: true }],
     history: [{ id: 'run-2', time: '2026-11-18T12:00:00Z', version: '0.5.0', status: 'completed', budget_usd: 2, engine: 'claude-code', pins: { 'taste-skill': 'v1.2.0' }, changelog: 'Moved taste-skill to v1.2.0.' }, { id: 'run-1', time: '2026-11-10T09:00:00Z', version: '0.4.0', status: 'completed', budget_usd: null, engine: null, pins: { 'taste-skill': 'v1.1.0' }, changelog: 'First harmonization.' }],
     changelog: '## 0.5.0\n\nMoved taste-skill to v1.2.0.\n', prompts: ['intake.md', 'harmonizer.md', 'delivery.md', 'classify.md'].map(file => ({ file, text: `# ${file}\n\nThe prompt.` })),
@@ -136,7 +137,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', pickFolder: 'D:/Projects', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -225,6 +226,53 @@ export function createTransport(scenario = 'default') {
     return bump();
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
+  // The runtime's project writes (ADR-0030). A change of the package is an AI run: a job of kind "project", refused for an agent other than Claude Code and while
+  // another run is going. A change and an edit name the digest of the file the page read: another one is refused in the runtime's words. An edit by hand gives the
+  // file a new digest. The fake decides nothing about what a change means; `behind.finish` ends the runs as a test says.
+  const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
+  const NEEDS = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
+  let edits = 0;
+  const aiRun = fields => {
+    if ((reg.settings.ai?.harness ?? reg.settings.agent) !== 'claude-code') throw new Error(NEEDS);
+    if (jobs.some(j => j.status === 'running')) throw new Error('Another AI run is in progress: wait for it to finish, or cancel it in Activity');
+    const job = { id: 'run-' + (jobs.length + 1), kind: 'project', status: 'running', phase: 'AI intake and harmonization', log_path: 'D:/isolated/data/jobs/run/output.log', message: 'The AI changes the project', time: ago(0), ...fields };
+    jobs.push(job);
+    return structuredClone(job);
+  };
+  const guard = (id, digest) => { const p = projectOf(id); if (digest !== p.info.digest) throw new Error(CHANGED); return p; };
+  const TITLES = { harmonize: () => 'Harmonize again', add_input: p => `Add the input ${p.source}`, remove_input: p => `Remove the input ${p.input}`, move_pin: p => `Move ${p.input} to ${p.to || 'its newest release'}`, instructions: () => 'Harmonize the custom instructions' };
+  function createProject(p) {
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(String(p.slug))) throw new Error('The plugin id is lowercase letters and digits joined by dashes, such as my-plugin');
+    if (projects.some(x => x.id === p.slug)) throw new Error(`A project for ${p.slug} is already in your list`);
+    if (!Array.isArray(p.inputs) || !p.inputs.length) throw new Error('Add at least one input: a project is made from plugins and skills');
+    return aiRun({ project_id: p.slug, operation: 'create', title: `New project ${p.name}`, budget_usd: p.budget_usd, file: `${p.folder}/${p.slug}.mp` });
+  }
+  function projectJob(p) {
+    guard(p.id, p.digest);
+    if (!TITLES[p.operation]) throw new Error(`Unknown change ${p.operation}`);
+    return aiRun({ project_id: p.id, operation: p.operation, title: TITLES[p.operation](p), budget_usd: p.budget_usd });
+  }
+  function editProject(p) {
+    const project = guard(p.id, p.digest), meta = project.info.project;
+    if (p.name !== undefined) meta.name = p.name;
+    if (p.author !== undefined) meta.author = p.author;
+    if (p.repository !== undefined) meta.repository = p.repository;
+    if (p.records !== undefined) project.info.records = structuredClone(p.records);
+    if (p.changelog !== undefined) project.info.changelog = p.changelog;
+    project.info.digest = 'sha256:edit' + ++edits;
+    return { path: project.path, digest: project.info.digest };
+  }
+  function deleteProject(p) {
+    if (p.id === 'marionette') throw new Error('The project Muro ships cannot be deleted');
+    mutate(p);
+    projectOf(p.id);
+    projects.splice(projects.findIndex(x => x.id === p.id), 1);
+    return bump();
+  }
+  const projectUpdates = ({ id }) => {
+    const p = projectOf(id);
+    return { id, digest: p.info.digest, inputs: p.info.inputs.map((i, n) => ({ id: i.id, pin: i.pin, pinned: i.release || i.commit || '', upstream: n === 0 ? 'v9.9.9' : i.release || i.commit, status: n === 0 ? 'behind' : 'current', note: '' })) };
+  };
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
   // The page names each run (`run`, as the runtime lets it: letters, digits, - and _, 64 at most) so it can ask for it to be stopped: `cancel_simulation {run}`.
   const running = new Map();
@@ -296,6 +344,12 @@ export function createTransport(scenario = 'default') {
         return summaryOf(id, added.path, info);
       }
       case 'install_project': return installProject(payload);
+      case 'create_project': return createProject(payload);
+      case 'project_job': return projectJob(payload);
+      case 'edit_project': return editProject(payload);
+      case 'delete_project': return deleteProject(payload);
+      case 'project_updates': return projectUpdates(payload);
+      case 'pick_folder': { unknownShellAction(action); return { path: flags.pickFolder }; }
       case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);
       case 'cancel_simulation': {
@@ -360,6 +414,15 @@ export function createTransport(scenario = 'default') {
     settings(patch) { Object.assign(reg.settings, patch); reg.revision++; },
     check(message = 'Everything is in sync') { makePlan(); log('Background check', 'complete', message); },
     bump() { reg.revision++; },
+    /** The AI runs end, as the runtime ends them: a project made is listed, a change gives the file a new digest. */
+    finish(status = 'completed', message = 'Done') {
+      for (const job of jobs.filter(j => j.status === 'running')) {
+        Object.assign(job, { status, phase: 'Finished', message });
+        if (status !== 'completed' || job.kind !== 'project') continue;
+        if (job.operation === 'create') { const name = job.title.replace(/^New project /, ''); projects.push({ id: job.project_id, path: job.file, adapters: ['claude-code', 'codex'], info: projectInfo(name, job.project_id) }); }
+        else projectOf(job.project_id).info.digest = 'sha256:run' + job.id;
+      }
+    },
   };
   return { request, calls, flags, behind };
 }

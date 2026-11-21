@@ -21,23 +21,27 @@ const TITLES: Record<string, [string, string]> = {
 };
 /** The actions that make up a sync run: the filter Sync shows them, the background worker's included (a check that only looked, and one that applied). Every other action is only under All. */
 const SYNC_ACTIONS = new Set(['check', 'sync', 'resolve', 'Automatic sync', 'Background check']);
-const FILTERS: [ActivityFilter, string][] = [['all', 'All'], ['sync', 'Sync'], ['ai', 'AI adaptation'], ['problems', 'Problems']];
+const FILTERS: [ActivityFilter, string][] = [['all', 'All'], ['sync', 'Sync'], ['ai', 'AI runs'], ['problems', 'Problems']];
 /** A status that is not a problem; anything else (failed, cancelled, interrupted, a status not known) is one. */
 const OK = new Set(['complete', 'completed', 'ok']);
 const humanize = (action: string) => { const text = action.replace(/[_-]+/g, ' ').trim(); return text.charAt(0).toUpperCase() + text.slice(1); };
 
 export interface Entry { time: string; kind: 'sync' | 'ai' | 'other'; title: string; message: string; status: string; log?: string }
 
-const pluginName = (s: Snapshot, id: string) => s.registry.plugins.find(p => p.id === id)?.name || id;
-const harnessName = (id: string) => harnessNames[id] || id;
-/** The list: the events the service wrote and the adaptations that are over, newest first. A running adaptation is not an
- * entry, it has its card; an adaptation is dated by its start, which is all its record keeps. */
+const pluginName = (s: Snapshot, id = '') => s.registry.plugins.find(p => p.id === id)?.name || id;
+const harnessName = (id = '') => harnessNames[id] || id;
+/** What an AI run was: a project made or changed (its own title, and the project's id for a change), or the adaptation of a plugin for a harness. */
+const runTitle = (s: Snapshot, j: Job, running: boolean) => j.kind === 'project'
+  ? `${j.title || 'Project change'}${j.operation !== 'create' && j.project_id ? ` · ${j.project_id}` : ''}`
+  : running ? `Adapting ${pluginName(s, j.plugin_id)} for ${harnessName(j.harness)}` : `AI adaptation of ${pluginName(s, j.plugin_id)} for ${harnessName(j.harness)}`;
+/** The list: the events the service wrote and the AI runs that are over (adaptations, and projects made or changed), newest first. A running run is
+ * not an entry, it has its card; a run is dated by its start, which is all its record keeps. */
 export function entries(s: Snapshot): Entry[] {
   const events = [...s.activity].reverse().map((a): Entry => {
     const [done, failed] = TITLES[a.action] || [humanize(a.action), humanize(a.action)];
     return { time: a.time, kind: SYNC_ACTIONS.has(a.action) ? 'sync' : 'other', title: OK.has(a.status) ? done : failed, message: a.message, status: a.status };
   });
-  const jobs = (s.jobs || []).filter(j => j.status !== 'running').map((j): Entry => ({ time: j.time, kind: 'ai', title: `AI adaptation of ${pluginName(s, j.plugin_id)} for ${harnessName(j.harness)}`, message: j.message, status: j.status, log: j.log_path }));
+  const jobs = (s.jobs || []).filter(j => j.status !== 'running').map((j): Entry => ({ time: j.time, kind: 'ai', title: runTitle(s, j, false), message: j.message, status: j.status, log: j.log_path }));
   // Stable: events of one second keep their order, newest first.
   return [...events, ...jobs].sort((a, b) => (Number(b.time) || 0) - (Number(a.time) || 0));
 }
@@ -54,9 +58,9 @@ function jobCard(s: Snapshot, job: Job, index: number, now: number): string {
   const budget = money(job.budget_usd), ran = elapsed(job.time, now);
   const said = [job.phase, ran && `running for ${ran}`].filter(Boolean).join(', ');
   const rest = [job.message, budget && `budget up to ${budget}`].filter(Boolean).join(' · ');
-  return taskCardHtml({id:`job-${index}`,title:`Adapting ${pluginName(s, job.plugin_id)} for ${harnessName(job.harness)}`,leadingHtml:spin,
+  return taskCardHtml({id:`job-${index}`,title:runTitle(s, job, true),leadingHtml:spin,
     actionsHtml:button('Cancel','cancel-job',{id:job.id,danger:true}),phase:job.phase,elapsed:ran?`Running for ${ran}`:'',
-    progressLabel:'Adaptation in progress',progressText:said,description:rest,detailHtml:log(job.log_path)});
+    progressLabel:job.kind === 'project' ? 'AI run in progress' : 'Adaptation in progress',progressText:said,description:rest,detailHtml:log(job.log_path)});
 }
 const item = (e: Entry) => timelineItemHtml({time:when(e.time),title:e.title,detail:e.message,detailHtml:log(e.log||''),trailingHtml:outcome(e.status)});
 
@@ -66,7 +70,7 @@ export function view(state: ViewState, now: number = Date.now()): string {
   return head('Activity', 'What Muro did, and why.')
     + (s.jobs || []).filter(j => j.status === 'running').map((j, i) => jobCard(s, j, i, now)).join('')
     + toolbarHtml(seg('afilter', filter, FILTERS, 'Filter activity'))
-    + (list.length ? stackListHtml(list.map(item).join(''),'timeline') : empty(filter === 'all' ? 'Nothing yet' : 'Nothing here', 'Sync runs and AI adaptations show up here.'));
+    + (list.length ? stackListHtml(list.map(item).join(''),'timeline') : empty(filter === 'all' ? 'Nothing yet' : 'Nothing here', 'Sync runs and AI runs show up here.'));
 }
 
 export const actions: Actions = {

@@ -429,7 +429,7 @@ test('Activity: a running adaptation has its card with phase, budget, log and Ca
   assert.ok(html.indexOf('class="im-panel im-surface im-task-card" data-im-surface="sheet"') < html.indexOf('role="radiogroup"') && html.indexOf('role="radiogroup"') < html.indexOf('class="im-panel im-surface im-stack-list im-activity-list" data-im-surface="sheet"'));
   assert.match(html, /aria-label="Filter activity"/);
   assert.match(html, /<span class="im-chip" data-im-tone="err">Failed<\/span>/);
-  assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI adaptation|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI adaptation', 'Problems']);
+  assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI runs|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI runs', 'Problems']);
 });
 
 const START = 1700000500;

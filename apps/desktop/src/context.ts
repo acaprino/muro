@@ -1,4 +1,4 @@
-import type { Transport, ViewState, Snapshot } from './types.ts';
+import type { Transport, ViewState, Snapshot, Job } from './types.ts';
 
 /** What the app lends to a page module (pages/*.ts) and to a sheet: the state, the transport and the few operations
  * every page needs. The modules never reach into app.ts; app.ts merges their `actions` and routes the events. */
@@ -41,4 +41,6 @@ export interface PageModule {
   keydown?(app: App, e: KeyboardEvent): boolean;
   /** The page was opened (a tab, the first paint). */
   opened?(app: App): void | Promise<void>;
+  /** The AI runs were read again while one was running: `before` and `after` are the runs as they were and as they are. */
+  jobsChanged?(app: App, before: Job[], after: Job[]): void;
 }

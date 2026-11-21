@@ -41,7 +41,7 @@ await test('Projects is the first tab, the app still opens on Sync, and the list
   const published = page.locator('li', { hasText: 'commit-helper' });
   assert.match(await published.textContent(), /Needs a build for Codex/);
   assert.equal(await page.locator('h2', { hasText: 'Installed as published' }).count(), 1);
-  assert.equal(await page.getByText(/New project|Create a project/).count(), 0, 'the write side is plan 3');
+  assert.equal(await page.getByRole('button', { name: 'New project…' }).count(), 1, 'a project is made here');
   assert.deepEqual((await actions(app)).filter(a => a === 'projects' || a === 'project'), ['projects']);
   await page.screenshot({ path: shots + '/projects-list.png' });
 });
@@ -72,7 +72,7 @@ await test('the project page: its header, its file, what the file holds, and the
   assert.equal(await kept(page), null, 'closing the project forgets it');
 });
 
-await test('Inputs: what goes in, pinned how, under which license, and what it became; the write actions are not there', 'projects', {}, async app => {
+await test('Inputs: what goes in, pinned how, under which license, and what it became; and its changes', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   const rows = page.locator('.im-input-list tbody tr');
@@ -81,9 +81,11 @@ await test('Inputs: what goes in, pinned how, under which license, and what it b
   assert.match(first, /taste-skill https:\/\/github\.com\/example\/taste-skill v1\.2\.0 published release MIT 2 capabilities · 1 dropped/);
   assert.match((await rows.nth(1).innerText()).replace(/\s+/g, ' '), /genoffice .* Latest commit @0123456 Apache-2\.0 1 capability · 1 hook/);
   assert.match((await rows.nth(2).innerText()).replace(/\s+/g, ' '), /superpowers .* Frozen commit @fedcba9 MIT 1 always on/);
-  assert.equal(await page.getByRole('button', { name: /Move pin|Add input/ }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Add input…' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: /^Move the pin of / }).count(), 2, 'a frozen input has no pin to move');
+  assert.equal(await page.getByRole('button', { name: /^Remove / }).count(), 3);
   assert.match(await page.locator('.im-section-heading', { hasText: 'Custom instructions' }).locator('xpath=following-sibling::ul[1]').textContent(), /house-style\.md/);
-  await rows.nth(0).getByRole('button').click();
+  await rows.nth(0).getByRole('button', { name: /capabilities/ }).click();
   await tab(page, 'Harmonize').and(page.locator('[aria-selected=true]')).waitFor();
   const record = await kept(page);
   assert.deepEqual({ step: record.step, view: record.view, dsrc: record.dsrc, dform: record.dform }, { step: 'harmonize', view: 'choices', dsrc: 'taste-skill', dform: 'all' }, 'its choices, filtered to that input, are kept for step 2');
@@ -332,13 +334,13 @@ await test('a shell that has no file dialog or folder opening yet loses those bu
   assert.equal(await page.locator('.im-record-meta').getByRole('button', { name: 'Open folder' }).count(), 0);
 });
 
-await test('with no project listed the page says what to do, and offers no way to create one yet', 'default', {}, async app => {
+await test('with no project listed the page says what to do: make one, or open a project file', 'default', {}, async app => {
   const { page } = app;
   await goProjects(page);
   await page.getByText('No project yet').waitFor();
-  assert.match(await page.locator('.im-empty').textContent(), /Open a project file to add it here\./);
+  assert.match(await page.locator('.im-empty').textContent(), /Make one from the plugins and skills you want in it, or open a project file\./);
   assert.equal(await page.getByRole('button', { name: 'Open project file…' }).count() > 0, true);
-  assert.equal(await page.getByText(/New project|Create a project/).count(), 0);
+  assert.equal(await page.locator('.im-empty').getByRole('button', { name: 'New project…' }).count(), 1);
   assert.equal(await page.locator('h2', { hasText: 'Installed as published' }).count(), 0);
 });
 
@@ -379,9 +381,10 @@ await test('Harmonize: the state strip, the four views as a radio group, the dec
   assert.match(await flat(page.locator('section.im-summary')), /^Harmonized Last run 18 Nov 2026, \d\d:\d\d Version 0\.5\.0 Agent Claude Code$/);
   assert.deepEqual(await page.getByRole('radiogroup', { name: 'Harmonization views' }).locator('label').allTextContents(), ['Decision records · 2', 'Choices by part · 6', 'History · 2', 'Prompts']);
   assert.equal(await viewRadio(page, 'Decision records').isChecked(), true);
-  assert.deepEqual(await rowsOf(page.locator('.im-decision-list > li')), ['By Muro 2026-11-10 · design-taste One owner per output.', 'Yours · binding 2026-11-12 · office-docs Documents keep the source\'s limits.']);
-  assert.equal(await page.getByRole('button', { name: /^(Edit|Add a record|Add input|Harmonize|Harmonize again|Move pin)$/ }).count(), 0, 'the write side is plan 3');
-  assert.equal(await page.locator('#step-panel button').count(), 0, 'nothing to press in the records');
+  assert.deepEqual(await rowsOf(page.locator('.im-decision-list > li')), ['By Muro 2026-11-10 · design-taste One owner per output. Edit', 'Yours · binding 2026-11-12 · office-docs Documents keep the source\'s limits. Edit']);
+  assert.equal(await page.getByRole('button', { name: 'Harmonize again…' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Add record…' }).count(), 1);
+  assert.equal(await page.locator('.im-decision-list').getByRole('button', { name: /^Edit the record of / }).count(), 2, 'one Edit per record');
   await page.screenshot({ path: shots + '/project-harmonize-records.png' });
 });
 
@@ -444,7 +447,8 @@ await test('Harmonize, History: one row a run with its version and tag, changelo
   const region = page.getByRole('region', { name: 'Runs' });
   await region.focus();
   assert.equal(await focused(page, 'aria-label'), 'Runs', 'the table can be scrolled with the keyboard');
-  assert.equal(await page.getByRole('button', { name: /Edit|Harmonize|Cancel/ }).count(), 0);
+  assert.equal(await page.getByRole('button', { name: 'Edit changelog…' }).count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Cancel' }).count(), 0, 'no run is going');
   await page.screenshot({ path: shots + '/project-harmonize-history.png' });
 });
 

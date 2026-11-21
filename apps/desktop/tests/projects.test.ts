@@ -138,10 +138,13 @@ test('the plugins Muro installs as published are listed apart, with the harnesse
 test('without a plugin installed as published, there is no such section', () => {
   assert.doesNotMatch(projects.view(blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary()] } })), /Installed as published/);
 });
-test('the write actions of plan 3 are not on the page: no New project, no Create a project', () => {
-  const published = registryPlugin('commit-helper', 'commit-helper', ['t1'], [build('claude-code', '2.1.0')]);
-  const html = projects.view(blank({ snapshot: snapshot({ plugins: [published] }), projects: { ...blankProjects(), list: [summary()] } }));
-  assert.doesNotMatch(html, /New project|Create a project|make-project|new-project/);
+test('New project is offered beside Open project file, and the runs making a project have their card above the list', () => {
+  const state = blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary()] } });
+  assert.match(projects.view(state), /<button type="button" class="im-btn im-btn--primary" data-action="new-project">.*<span>New project…<\/span>/);
+  state.snapshot = { ...state.snapshot!, jobs: [{ id: 'run-1', kind: 'project', project_id: 'my-plugin', operation: 'create', title: 'New project My Plugin', status: 'running', phase: 'AI intake and harmonization', budget_usd: 5, log_path: 'D:/data/jobs/run-1/output.log', message: '', time: '1700000000' }] };
+  const html = projects.view(state);
+  assert.match(html, /<h2 class="im-grow" id="run-run-1">New project My Plugin<\/h2><button[^>]*data-action="cancel-job"[^>]*data-id="run-1"/);
+  assert.ok(html.indexOf('im-task-card') < html.indexOf('im-list-link'), 'the run comes before the list');
 });
 test('Open project file is offered while the shell can open a file dialog, and is gone once it said it cannot', () => {
   const state = blank({ snapshot: snapshot(), projects: { ...blankProjects(), list: [summary()] } });
@@ -158,7 +161,7 @@ test('the list while it is read, after it failed, and when it is empty', () => {
   assert.match(failed, /data-action="retry-projects"/);
   const none = projects.view(blank({ snapshot: s, projects: { ...blankProjects(), list: [] } }));
   assert.match(none, /No project yet/);
-  assert.doesNotMatch(none, /New project/);
+  assert.match(none, /<div class="im-panel im-surface im-empty"[\s\S]*data-action="new-project"/, 'an empty list offers to make one');
 });
 test('every value of the list goes through esc', () => {
   const evil = '<img src=x onerror=alert(1)>';
@@ -172,7 +175,7 @@ test('the project page: header, the file with its folder, repository, author, cr
   const html = projects.view(opened());
   assert.match(html, /<button[^>]*data-action="close-project"[^>]*>.*<span>Projects<\/span>/, 'back to the list');
   const head = html.match(/<div class="im-record-heading">[\s\S]*?<\/div>/)![0];
-  assert.equal(words(head), 'MA Marionette 0.5.0 Harmonized Included with Muro');
+  assert.equal(words(head), 'MA Marionette 0.5.0 Harmonized Included with Muro Edit details…', 'the project Muro ships can be edited, not deleted');
   assert.match(head, /<h1>Marionette<\/h1>/);
   const file = html.match(/<div class="im-record-meta">[\s\S]*?<\/details><\/div>/)![0];
   assert.match(file, /<code>D:\/Muro\/data\/projects\/marionette\.mp<\/code>/);
@@ -243,22 +246,36 @@ test('the project page escapes everything it shows', () => {
 test('Inputs: a table of what goes in, pinned how, under which license, and what each input became', () => {
   const html = inputs.view(opened(), info());
   assert.match(html, /<h2>What goes in<\/h2><small>The plugins and skills this project absorbs, each pinned to a release or a commit\.<\/small>/);
-  assert.deepEqual([...html.matchAll(/<th scope="col">([^<]+)<\/th>/g)].map(m => m[1]), ['Input', 'Pinned to', 'License', 'What it became']);
-  const rows = [...html.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0][1].split('</tr>').filter(r => r.includes('<td>')).map(words);
+  assert.deepEqual([...html.matchAll(/<th scope="col">([^<]*)<\/th>/g)].map(m => m[1]), ['Input', 'Pinned to', 'License', 'What it became', 'Upstream', '']);
+  const rows = [...html.matchAll(/<tbody>([\s\S]*?)<\/tbody>/g)][0][1].split('</tr>').filter(r => r.includes('<td')).map(words);
   assert.deepEqual(rows, [
-    'taste-skill https://github.com/example/taste-skill v1.2.0 published release MIT 11 capabilities · 1 always on · 2 dropped',
-    'genoffice https://github.com/example/genoffice Latest commit @0123456 Apache-2.0 4 capabilities · 1 hook',
-    'frozen-kit Local source Frozen commit not resolved yet — Not harmonized yet',
-  ]);
+    'taste-skill https://github.com/example/taste-skill v1.2.0 published release MIT 11 capabilities · 1 always on · 2 dropped — Move pin… Remove…',
+    'genoffice https://github.com/example/genoffice Latest commit @0123456 Apache-2.0 4 capabilities · 1 hook — Move pin… Remove…',
+    'frozen-kit Local source Frozen commit not resolved yet — Not harmonized yet — Remove…',
+  ], 'a frozen input has no pin to move');
 });
 test('Inputs: what an input became is a link to its choices, and counts of one read in the singular', () => {
   const html = inputs.view(opened(), info({ inputs: [{ id: 'one', url: 'https://x/y', pin: 'release', release: 'v1', commit: null, license: 'MIT', paths: [], became: became(1, 0, 1, 0) }] }));
   assert.match(html, /<button type="button" class="im-btn im-btn--sm im-btn--ghost" data-action="decisions-of" data-id="one"><span>1 capability · 1 hook<\/span><\/button>/);
 });
-test('Inputs: the write actions of plan 3 are not offered', () => {
-  const html = inputs.view(opened(), info({ inputs: [{ ...info().inputs[0], release: 'v0.0.1' }] }));
-  assert.doesNotMatch(html, /Move pin|Add input|move-pin|add-input|open-custom-instructions/);
-  assert.doesNotMatch(html, /Open folder/, 'the folder of the instructions is an edit: plan 3');
+test('Inputs: adding an input, checking for updates and editing the instructions are offered, and none of them while an AI run changes the project', () => {
+  const html = inputs.view(opened(), info());
+  for (const action of ['add-input', 'check-updates', 'edit-instructions', 'move-pin', 'remove-input']) assert.match(html, new RegExp(`data-action="${action}"`), action);
+  const state = opened();
+  state.snapshot = { ...state.snapshot!, jobs: [{ id: 'run-1', kind: 'project', project_id: 'marionette', operation: 'add_input', title: 'Add the input x', status: 'running', phase: 'AI intake and harmonization', budget_usd: 5, log_path: '', message: '', time: '1700000000' }] };
+  assert.doesNotMatch(inputs.view(state, info()), /data-action="(add-input|check-updates|edit-instructions|move-pin|remove-input)"/);
+});
+test('Inputs: the only input of a project cannot be removed', () => {
+  assert.doesNotMatch(inputs.view(opened(), info({ inputs: [info().inputs[0]] })), /data-action="remove-input"/);
+});
+test('Inputs: the last update check says, for the file it was made on, which input has a newer version', () => {
+  const state = opened();
+  state.projects.updates = { id: 'marionette', digest: 'sha256:aaa', inputs: [{ id: 'taste-skill', pin: 'release', pinned: 'v1.2.0', upstream: 'v1.3.0', status: 'behind', note: '' }, { id: 'genoffice', pin: 'head', pinned: 'x', upstream: 'x', status: 'current', note: '' }] };
+  const text = words(inputs.view(state, info()));
+  assert.match(text, /v1\.3\.0 available/);
+  assert.match(text, /Up to date/);
+  state.projects.updates = { ...state.projects.updates, digest: 'sha256:old' };
+  assert.doesNotMatch(words(inputs.view(state, info())), /available/, 'a check of another version of the file says nothing');
 });
 test('Inputs: the custom instructions are what the file holds, and none says so', () => {
   assert.match(words(inputs.view(opened(), info())), /Custom instructions house-style\.md, tone\.md Your own Markdown notes\. The AI reads them with the inputs and decides how they fit\./);

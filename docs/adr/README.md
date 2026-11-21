@@ -255,3 +255,13 @@ with Windows and keeps the harnesses in sync from the background. Proposed: the
 owner's decisions are recorded, the explanatory text and the implementation
 choices are not separately approved. The part about projects (the `.mp` file,
 decision records, harmonization per project) is not implemented yet.
+
+## Desktop projects, write side
+
+Manual note outside the generated index: [ADR-0030 — Projects are made and
+changed in the desktop app](ADR-0030-desktop-projects-write-side.md) records the
+owner's requirement of 2026-11-21 ("è fondamentale poterli creare gestire
+aggiornare editare") and its implementation, the third plan of ADR-0028: a
+change of a package is an AI run of Claude Code committed by the factory under a
+digest guard, and the details, records and changelog are edited offline.
+Proposed: the decisions are implementation choices, not separately approved.

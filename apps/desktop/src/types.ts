@@ -16,7 +16,8 @@ export interface Registry { schema:number; revision:number; plugins:Plugin[]; ta
 export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean }
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
-export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
+/** An AI run of the runtime: an adaptation of a plugin (`plugin_id`, `harness`), or, with `kind` "project", a project made or changed (`project_id`, `operation`, `title`, `file`). */
+export interface Job { id:string; kind?:'project'; plugin_id?:string; harness?:string; project_id?:string; operation?:string; title?:string; file?:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
 /** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan, and `errors` is the sources the last check could not resolve (null before any check). */
 export interface SyncTimes { checked:string|null; synced:string|null }
 export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; targets:Record<string,SyncTimes> }
@@ -46,17 +47,21 @@ export type DecisionForm = 'capability'|'always-on'|'hook'|'dropped';
 export interface ProjectInput { id:string; url:string|null; pin:string; release:string|null; commit:string|null; license:string|null; paths:string[]; became:Record<DecisionForm,number> }
 export interface ProjectDecision { source:string; content:string; form:DecisionForm; targets:string[]; reason:string }
 export interface ProjectRecord { id:string; date:string; subjects:string[]; text:string; author:'muro'|'you'; binding:boolean }
-export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; pins:Record<string,string>; changelog:string }
+export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; operation?:string; pins:Record<string,string>; changelog:string }
 /** One capability and one documented example as the guide's data model carries them (`guide_data`): the keys the graph reads are its own to name. */
 export interface GraphCapability { id:string; title:string; [key:string]:unknown }
 export interface GraphExample { [key:string]:unknown }
 /** What the action `project {id}` returns: `muro project info` of the file as it is, and `included`: whether it is the copy of the project Muro ships (the runtime says so; `project.builtin` is what the file claims of itself, and is not what decides). */
-export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; instructions?:{path:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
 export type ProjectStep = 'inputs'|'harmonize'|'graph'|'install';
 export type ProjectViewKind = 'records'|'choices'|'history'|'prompts';
 /** The open project page: which project, which step, step 2's view and filters (`dsrc` an input id or '', `dform` a form or 'all'), and step 3's simulation. Kept across renders and in the session. */
 export interface ProjectView { id:string; step:ProjectStep; view:ProjectViewKind; dsrc:string; dform:string; sim:SimState }
-/** What the Projects tab holds: the list, the information of the open project (`infoId` says whose), and which shell actions turned out to be missing. */
-export interface ProjectsState { list:ProjectSummary[]|null; loading:boolean; error:string|null; info:ProjectInfo|null; infoId:string|null; infoLoading:boolean; infoError:string|null; noPicker:boolean; noFolder:boolean }
+/** How one input's pin stands against its upstream (`muro baseline`): `behind` names the newest release or commit in `upstream`. */
+export interface ProjectUpdate { id:string; pin:string; pinned:string; upstream:string|null; status:'current'|'behind'|'frozen'|'drifted'|'unknown'|'error'; note:string }
+/** The last update check of a project's inputs, for the file it was made on (`digest`). */
+export interface ProjectUpdates { id:string; digest:string; inputs:ProjectUpdate[] }
+/** What the Projects tab holds: the list, the information of the open project (`infoId` says whose), the update check of its inputs, and which shell actions turned out to be missing. */
+export interface ProjectsState { list:ProjectSummary[]|null; loading:boolean; error:string|null; info:ProjectInfo|null; infoId:string|null; infoLoading:boolean; infoError:string|null; noPicker:boolean; noFolder:boolean; updates?:ProjectUpdates|null; checkingUpdates?:boolean; noFolderPicker?:boolean }
 /** `plan` is always the last full plan, the one the strip and every column read from; `autostart`, `afilter` and `setup` belong to Settings, Activity and the first run. */
 export interface ViewState {page:Page; snapshot:Snapshot|null; discovered:Discovered[]; discovering:boolean; plan:Plan|null; checking:boolean; applying:Applying|null; review:Review|null; query:string; filter:Filter; afilter:ActivityFilter; busy:string|null; error:string|null; checkErrors:CheckResult['errors']; discoveryError:string|null; maintenance:Maintenance|null; autostart:Autostart|null; setup:SetupState|null; projects:ProjectsState; project:ProjectView|null}

@@ -4,10 +4,11 @@ import { harnessNames } from '../../model.ts';
 import { dlHead } from '../../sheets.ts';
 import { esc, tag, seg, button, empty, when } from '../../ui.ts';
 import { actionChipHtml, codeViewHtml, stackRowHtml, stackListHtml, summaryHtml, tableHtml, tableRowHtml, toolbarHtml, selectHtml } from '@acaprino/imago/ui';
-import { VIEWS, STATE } from './state.ts';
+import { VIEWS, stateOf } from './state.ts';
+import { runOf } from './write.ts';
 
-/** Step 2, why the project is the way it is, read only: the state of the last harmonization, and four views of it (the decision records, the choices by part, the history, the
- * prompts). Writing any of it (harmonize, edit or add a record) is plan 3, so nothing here changes a project.
+/** Step 2, why the project is the way it is: the state of the last harmonization, and four views of it (the decision records, the choices by part, the history, the
+ * prompts). Harmonize again, a record added or edited and the changelog edited are pages/project/write.ts's: this module only offers them, and none while an AI run changes the project.
  *
  * What it reads (pages/projects.ts owns the page and the state): `state.project.view` (the view), `dsrc` (an input id, or '' for all inputs) and `dform` (a form, or 'all'); an
  * input the project does not have, or a form that is none, means all. The views and the form filter are radios (`hview`, `dform`), the input filter a select (`dsrc`):
@@ -35,22 +36,25 @@ const newestFirst = (runs: ProjectRun[]): ProjectRun[] => [...runs].sort((a, b) 
 const agent = (engine: string | null) => engine ? (harnessNames[engine] ?? engine) : '';
 
 // ---------- the strip ----------
-/** The state of the last harmonization: its time, the version of the plugin and the agent that ran it, when the run says. No button here: harmonizing again is plan 3. */
-function strip(info: ProjectInfo): string {
-  const last = newestFirst(info.history)[0], who = agent(last?.engine ?? null);
-  return summaryHtml({label:'Harmonization state',title:STATE.label,tone:STATE.tone,icon:'check',metadata:[
-    {label:'Last run',value:last?at(last.time):'never'},{label:'Version',value:info.plugin.version},...(who?[{label:'Agent',value:who}]:[])]});
+/** The state of the last harmonization: its time, the version of the plugin and the agent that ran it, when the run says; and Harmonize again, unless a run is changing the project. */
+function strip(state: ViewState, info: ProjectInfo, running: boolean): string {
+  const last = newestFirst(info.history)[0], who = agent(last?.engine ?? null), now = stateOf(state, state.project!.id);
+  return summaryHtml({label:'Harmonization state',title:now.label,tone:now.tone,icon:'check',metadata:[
+    {label:'Last run',value:last?at(last.time):'never'},{label:'Version',value:info.plugin.version},...(who?[{label:'Agent',value:who}]:[])]})
+    + (running ? '' : toolbarHtml('<small class="im-grow">The AI reads the inputs and the records again and fixes what no longer holds.</small>', button('Harmonize again…', 'harmonize-again', { primary: true, icon: 'sync' })));
 }
 
 // ---------- decision records ----------
-function recordRow(r: ProjectRecord): string {
+function recordRow(r: ProjectRecord, running: boolean): string {
   const mine = r.author === 'you', subjects = (r.subjects ?? []).join(', ');
   return stackRowHtml({title:[r.date,subjects].filter(Boolean).join(' · '),message:r.text,
-    leadingHtml:tag(`${mine?'Yours':'By Muro'}${r.binding?' · binding':''}`,mine||r.binding?'accent':'')});
+    leadingHtml:tag(`${mine?'Yours':'By Muro'}${r.binding?' · binding':''}`,mine||r.binding?'accent':''),
+    trailingHtml:running?'':button('Edit','edit-record',{sm:true,id:r.id,attrs:{'aria-label':`Edit the record of ${r.date}`}})});
 }
-function records(info: ProjectInfo): string {
-  return toolbarHtml('<small class="im-grow">Why the project is the way it is. Muro writes a record when a harmonization takes a decision that shapes the project. A binding record is a rule the next harmonization has to follow.</small>')
-    + (info.records.length ? stackListHtml(info.records.map(recordRow).join(''),'decisions') : empty('No record yet', 'The first harmonization writes them.'));
+function records(info: ProjectInfo, running: boolean): string {
+  return toolbarHtml('<small class="im-grow">Why the project is the way it is. Muro writes a record when a harmonization takes a decision that shapes the project. A binding record is a rule the next harmonization has to follow.</small>',
+    running ? '' : button('Add record…', 'add-record', { icon: 'plus' }))
+    + (info.records.length ? stackListHtml(info.records.map(r => recordRow(r, running)).join(''),'decisions') : empty('No record yet', 'The first harmonization writes them; you can add your own.'));
 }
 
 // ---------- choices by part ----------
@@ -77,10 +81,11 @@ function runRow(r: ProjectRun, info: ProjectInfo, current: boolean): string {
   return tableRowHtml([{html:esc(at(r.time)),className:'im-nowrap'},version,{html:esc(r.changelog||none),className:'im-log-note'},tag(result,tone),
     typeof r.budget_usd==='number'?`$${r.budget_usd.toFixed(2)}`:none,esc(agent(r.engine)||none)]);
 }
-function history(info: ProjectInfo): string {
-  if (!info.history.length) return empty('No run yet', 'Every harmonization is listed here with its version and its changelog entry.');
+function history(info: ProjectInfo, running: boolean): string {
+  const tools = toolbarHtml('<small class="im-grow">Every harmonization, with its version and its changelog entry.</small>', running ? '' : button('Edit changelog…', 'edit-changelog'));
+  if (!info.history.length) return tools + empty('No run yet', 'Every harmonization is listed here with its version and its changelog entry.');
   const runs = newestFirst(info.history), now = runs.findIndex(r => r.status === 'completed' && r.version === info.plugin.version);
-  return tableHtml(['When','Version','Changelog','Result','Budget','Engine'],runs.map((r,i)=>runRow(r,info,i===now)).join(''),{label:'Runs',variant:'log'});
+  return tools + tableHtml(['When','Version','Changelog','Result','Budget','Engine'],runs.map((r,i)=>runRow(r,info,i===now)).join(''),{label:'Runs',variant:'log'});
 }
 
 // ---------- prompts ----------
@@ -97,8 +102,9 @@ export function view(state: ViewState, info: ProjectInfo): string {
   if (!pv) return '';
   const now: ProjectViewKind = VIEWS.includes(pv.view) ? pv.view : 'records', counts = { records: info.records.length, choices: info.decisions.length, history: info.history.length, prompts: 0 };
   const label = (kind: ProjectViewKind) => kind === 'history' || counts[kind] ? `${LABELS[kind]} · ${counts[kind]}` : LABELS[kind];
-  const body = { records: () => records(info), choices: () => choices(pv, info), history: () => history(info), prompts: () => prompts(info) }[now]();
-  return strip(info)
+  const running = !!runOf(state, pv.id);
+  const body = { records: () => records(info, running), choices: () => choices(pv, info), history: () => history(info, running), prompts: () => prompts(info) }[now]();
+  return strip(state, info, running)
     + toolbarHtml(seg('hview', now, VIEWS.map(kind => [kind, label(kind)] as [string, string]), 'Harmonization views'))
     + `<section aria-label="${LABELS[now]}">${body}</section>`;
 }

@@ -34,6 +34,12 @@ navigation does not bypass modality. Unmount disposes listeners, layers, notices
 and timers. Ctrl+K opens commands, Ctrl+F or `/` finds plugins. Navigation commands
 wait for registry initialization and completion of the first-run wizard.
 
+## Pending Imago helpers
+
+The project dialogs (ADR-0030) need a multi-line field, which Imago draws (`im-native-textarea`) but has no markup helper
+for yet. `textArea` in `apps/desktop/src/forms.ts` writes it once, with the label, hint and error slot of
+`textFieldHtml`; it moves into Imago as a `textAreaFieldHtml` with its next release, and the Muro copy is then deleted.
+
 ## Shared dependency
 
 The npm package and Rust crate are pinned to the same released Imago tag.

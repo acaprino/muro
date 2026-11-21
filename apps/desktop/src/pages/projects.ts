@@ -1,17 +1,19 @@
 import { nextStepId, stepNavigationHtml, stepNavigationKey, stepPanelHtml } from '@acaprino/imago/ui';
-import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot } from '../types.ts';
+import type { ViewState, ProjectSummary, ProjectInfo, ProjectStep, Snapshot, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, versionOf } from '../model.ts';
 import { esc, plural, sym, tag, spin, button, head, empty, icon } from '../ui.ts';
-import { STEPS, STATE, fresh } from './project/state.ts';
+import { STEPS, stateOf, fresh } from './project/state.ts';
 import * as inputs from './project/inputs.ts';
 import * as install from './project/install.ts';
 import * as harmonize from './project/harmonize.ts';
 import * as graph from './project/graph.ts';
+import * as write from './project/write.ts';
 
 /** The Projects tab: the list of project files, and the page of the open one with its four steps. What each step shows and does is in pages/project/*.ts: this module
- * owns the list, the page's header, the tabs (a tablist with arrow keys), the reading of the list and of the project, and forwards a step's events to it. The write side
- * (new project, harmonize, add an input, move a pin, edit a record) is plan 3. A project's state is "Harmonized" until plan 3 computes the others. */
+ * owns the list, the page's header, the tabs (a tablist with arrow keys), the reading of the list and of the project, and forwards a step's events to it. Making and
+ * changing a project (new project, harmonize, add or remove an input, move a pin, the instructions, the details, the records, the changelog, delete) is
+ * pages/project/write.ts's; this module shows the runs that do it and reads the list and the project again when one ends. */
 interface Step {
   view(state: ViewState, info: ProjectInfo): string;
   actions: Actions;
@@ -31,7 +33,7 @@ const removal = (p: ProjectSummary) => p.included ? '' : button('Remove from lis
 function item(state: ViewState, p: ProjectSummary): string {
   if (p.error) return `<li>${sym(nameOf(p))}<div class="im-grow"><strong>${esc(p.path.split(/[\\/]/).pop() || p.id)}</strong><small class="im-wrap-text">${esc(p.error)}</small></div>${tag('Cannot be read', 'bad')}${removal(p)}</li>`;
   const counts = [count(p.inputs, 'input'), count(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
-  return `<li class="im-list-link"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="im-grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="im-muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="im-chip">Included with Muro</span>' : ''}</strong><small class="im-ellipsis" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="im-nowrap">${esc(counts)}</small>` : ''}${tag(STATE.label, STATE.tone)}<small class="im-nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
+  return `<li class="im-list-link"><button type="button" data-action="open-project" data-id="${esc(p.id)}">${sym(nameOf(p))}<span class="im-grow"><strong>${esc(nameOf(p))}${p.plugin?.version ? ` <span class="im-muted">${esc(p.plugin.version)}</span>` : ''}${p.included ? ' <span class="im-chip">Included with Muro</span>' : ''}</strong><small class="im-ellipsis" title="${esc(p.path)}">${esc(p.path)}</small></span>${counts ? `<small class="im-nowrap">${esc(counts)}</small>` : ''}${tag(stateOf(state, p.id).label, stateOf(state, p.id).tone)}<small class="im-nowrap">${esc(install.installLine(state, p.id))}</small>${icon('chev')}</button>${removal(p)}</li>`;
 }
 /** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no build of them. */
 function published(state: ViewState): string {
@@ -44,27 +46,38 @@ function published(state: ViewState): string {
   }).join('')}</ul>`;
 }
 function listPage(state: ViewState): string {
-  const pr = state.projects, open = pr.noPicker ? '' : button('Open project file…', 'open-project-file', { icon: 'folder' });
+  const pr = state.projects, open = pr.noPicker ? '' : button('Open project file…', 'open-project-file', { icon: 'folder' }), make = button('New project…', 'new-project', { icon: 'plus', primary: true });
   const body = pr.list === null
     ? (pr.error ? empty('Projects could not be read', pr.error, button('Try again', 'retry-projects')) : `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading your projects…</strong></div>`)
-    : pr.list.length ? `<ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Open a project file to add it here.', open);
-  return head('Projects', 'A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.', open) + body + (state.snapshot ? published(state) : '');
+    : pr.list.length ? `<ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${pr.list.map(p => item(state, p)).join('')}</ul>` : empty('No project yet', 'Make one from the plugins and skills you want in it, or open a project file.', make + open);
+  return head('Projects', 'A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.', make + open)
+    + write.creating(state).map(job => write.runCard(job)).join('') + body + (state.snapshot ? published(state) : '');
 }
 
 // ---------- the project page ----------
 /** What a tab says under its name. */
 function sub(state: ViewState, info: ProjectInfo, step: ProjectStep): string {
   if (step === 'inputs') return plural(info.inputs.length, 'input');
-  if (step === 'harmonize') return STATE.label;
+  if (step === 'harmonize') return stateOf(state, state.project!.id).label;
   if (step === 'graph') return `${plural(info.graph.capabilities.length, 'capability', 'capabilities')} · ${plural(info.graph.examples.length, 'example')}`;
   return install.installLine(state, state.project!.id);
 }
 function holds(info: ProjectInfo): string {
   return `<details class="im-grow" id="project-files"><summary>What this project file holds</summary><ul class="im-panel im-surface im-file-list" data-im-surface="sheet">${info.files.map(f => `<li><strong>${esc(f.part)}</strong><span>${esc(f.detail)}</span><code class="im-muted">${esc(f.path)}</code></li>`).join('')}<li><strong class="im-muted">Offline</strong><span class="im-muted">The file carries everything: the project rebuilds and installs without the network.</span><span></span></li></ul></details>`;
 }
+/** What a person does to the project itself: its details, and deleting it (never the one Muro ships). None while an AI run changes it. */
+function headActions(state: ViewState, info: ProjectInfo): string {
+  if (write.runOf(state, state.project!.id)) return '';
+  return button('Edit details…', 'edit-project-details', { sm: true }) + (info.included ? '' : button('Delete project…', 'delete-project', { sm: true, danger: true }));
+}
+/** The run changing the project, or the last one when it did not succeed. */
+function runNotice(state: ViewState): string {
+  const id = state.project!.id, running = write.runOf(state, id), failed = running ? undefined : write.lastFailure(state, id);
+  return running ? write.runCard(running) : failed ? write.failureNote(failed) : '';
+}
 function projectHead(state: ViewState, info: ProjectInfo): string {
-  const p = info.project, file = state.projects.list?.find(x => x.id === state.project!.id)?.path, repo = p.repository;
-  return `<div class="im-record-heading">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(STATE.label, STATE.tone)}${info.included ? tag('Included with Muro') : ''}</div>`
+  const p = info.project, file = state.projects.list?.find(x => x.id === state.project!.id)?.path, repo = p.repository, now = stateOf(state, state.project!.id);
+  return `<div class="im-record-heading">${sym(p.name)}<h1>${esc(p.name)}</h1>${tag(info.plugin.version)}${tag(now.label, now.tone)}${info.included ? tag('Included with Muro') : ''}<span class="im-grow"></span>${headActions(state, info)}</div>`
     + `<div class="im-record-meta">${file ? `<code>${esc(file)}</code>${state.projects.noFolder ? '' : button('Open folder', 'open-folder', { sm: true, icon: 'folder', id: file })}` : ''}<span>${repo ? `Repository <code>${esc(repo.url.replace(/^https?:\/\//, ''))}</code> · ${esc(repo.branch)}` : 'No Git repository set'} · by ${esc(p.author)} · created ${esc(day(p.created))}</span>${holds(info)}</div>`;
 }
 function tabs(state: ViewState, info: ProjectInfo): string {
@@ -75,7 +88,7 @@ function projectPage(state: ViewState): string {
   if (pr.infoError && pr.infoId === pv.id) return crumb + empty('This project could not be read', pr.infoError, button('Try again', 'retry-projects'));
   const info = pr.infoId === pv.id ? pr.info : null;
   if (!info) return crumb + `<div class="im-panel im-surface im-empty" data-im-surface="sheet">${spin}<strong>Reading the project…</strong></div>`;
-  return crumb + projectHead(state, info) + tabs(state, info) + stepPanelHtml(steps[pv.step].view(state,info),'step-panel',`step-tab-${pv.step}`);
+  return crumb + projectHead(state, info) + runNotice(state) + tabs(state, info) + stepPanelHtml(steps[pv.step].view(state,info),'step-panel',`step-tab-${pv.step}`);
 }
 export function view(state: ViewState): string {
   return state.project ? projectPage(state) : listPage(state);
@@ -106,6 +119,16 @@ export async function opened(app: App): Promise<void> {
   if (!pv || !pr.list) return;
   if (!pr.list.some(p => p.id === pv.id)) { app.state.project = null; app.render(); return; }
   await loadInfo(app, pv.id);
+}
+// What a change wrote is on the file: the page that made it reads the list and the project again with these.
+write.readsWith(app => opened(app));
+/** The AI runs moved on: a run of a project that ended (made, changed, failed or cancelled) is said, and the list and the open project are read again, since the file
+ * may have changed. On another page the list is read when the tab is opened. */
+export function jobsChanged(app: App, before: Job[], after: Job[]): void {
+  const ended = after.filter(j => j.kind === 'project' && j.status !== 'running' && before.some(b => b.id === j.id && b.status === 'running'));
+  if (!ended.length) return;
+  for (const job of ended) app.notify(job.status === 'completed' ? `${job.title || 'The change'}: done.` : `${job.title || 'The change'}: ${job.status === 'cancelled' ? 'cancelled' : 'failed'}. ${job.message}`, job.status === 'completed' ? 'good' : 'bad');
+  if (app.state.page === 'projects') void opened(app);
 }
 
 // ---------- the shell ----------
@@ -164,7 +187,7 @@ const own: Actions = {
   'remove-project': askRemoval,
   'open-folder': async (app, d) => { if (d.id) await viaShell(app, 'open_folder', { path: d.id }, 'noFolder', 'open folders'); },
 };
-export const actions: Actions = merge(own, ...Object.values(steps).map(s => s.actions));
+export const actions: Actions = merge(own, write.actions, ...Object.values(steps).map(s => s.actions));
 
 /** The step a key moves to from the one it is pressed on: arrows wrap around, Home and End go to the ends; any other key moves nowhere. */
 export const nextStep = (step: ProjectStep, key: string): ProjectStep | null => nextStepId(STEPS.map(([id])=>id),step,key);
@@ -175,7 +198,9 @@ export function keydown(app: App, event: KeyboardEvent): boolean {
   return stepNavigationKey(event,{ids:STEPS.map(([id])=>id),action:'step',onSelect:id=>{pv.step=id;app.render();}});
 }
 export function input(app: App, el: TextBox): boolean {
-  return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));
+  if (app.state.page !== 'projects') return false;
+  if (write.input(app, el)) return true;
+  return !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));
 }
 export function change(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.change?.(app, el));

@@ -19,7 +19,8 @@ async function start() {
     if (i === 100) throw Error('The dev server did not start: ' + output);
     await delay(200);
   }
-  browser = await chromium.launch({ channel: 'msedge', headless: true });
+  // Edge in CI (the runner image ships it); MURO_BROWSER_PATH runs another Chromium build where there is no Edge.
+  browser = await chromium.launch({ ...(process.env.MURO_BROWSER_PATH ? { executablePath: process.env.MURO_BROWSER_PATH } : { channel: 'msedge' }), headless: true });
 }
 const stop = async () => { await browser?.close(); server?.kill(); browser = server = starting = undefined; };
 process.on('exit', () => server?.kill());

@@ -86,12 +86,17 @@ test('an agent the page has no name for is shown as it came, a time that is no d
   assert.match(words(html.match(/<section class="im-summary[\s\S]*?<\/section>/)![0]), /Last run sometime .* Agent <local>/);
   assert.match(html, /&lt;local&gt;/, 'escaped');
 });
-test('step 2 writes nothing: no Edit, no Add a record, no Harmonize button, in any view', () => {
+test('step 2 offers Harmonize again, records to add and edit and the changelog to edit, and none of them while an AI run changes the project', () => {
+  assert.match(panel(opened('records')), /data-action="harmonize-again"[^>]*>.*<span>Harmonize again…<\/span>/);
+  assert.match(panel(opened('records')), /data-action="add-record"/);
+  assert.equal([...panel(opened('records')).matchAll(/data-action="edit-record"/g)].length, 3, 'one Edit per record');
+  assert.match(panel(opened('history')), /data-action="edit-changelog"/);
   for (const view of ['records', 'choices', 'history', 'prompts'] as const) {
-    const html = panel(opened(view));
-    assert.doesNotMatch(words(html), WRITES, view);
-    assert.doesNotMatch(html, /data-action="(harmonize|add-record|edit-record|cancel-job)"/, view);
-    assert.doesNotMatch(html, /<button[^>]*disabled/, `${view}: nothing is drawn disabled either`);
+    const state = opened(view);
+    state.snapshot = { ...state.snapshot!, jobs: [{ id: 'run-1', kind: 'project', project_id: state.project!.id, operation: 'harmonize', title: 'Harmonize again', status: 'running', phase: 'AI intake and harmonization', budget_usd: 5, log_path: '', message: '', time: '1700000000' }] };
+    const html = panel(state);
+    assert.doesNotMatch(html, /data-action="(harmonize-again|add-record|edit-record|edit-changelog)"/, view);
+    assert.match(words(html), /^Changing/, `${view}: the strip says the project is changing`);
   }
 });
 
@@ -121,9 +126,9 @@ test('Decision records: who wrote each, its date, its subjects and its text, in 
   const html = panel(opened('records'));
   assert.match(words(html), /Why the project is the way it is\. Muro writes a record when a harmonization takes a decision that shapes the project\. A binding record is a rule the next harmonization has to follow\./);
   assert.deepEqual(items(html.slice(html.indexOf('<ul class="im-panel im-surface im-stack-list im-decision-list" data-im-surface="sheet">'))), [
-    'By Muro 2026-11-10 · design-taste, ai-design-skills One owner per output.',
-    'Yours · binding 2026-11-12 Documents keep the source\'s limits.',
-    'By Muro · binding 2026-11-19 · office-docs Never <b>bold</b> & "quoted"',
+    'By Muro 2026-11-10 · design-taste, ai-design-skills One owner per output. Edit',
+    'Yours · binding 2026-11-12 Documents keep the source\'s limits. Edit',
+    'By Muro · binding 2026-11-19 · office-docs Never <b>bold</b> & "quoted" Edit',
   ]);
   assert.match(html, /<span class="im-chip" data-im-tone="accent">Yours · binding<\/span>/);
   assert.match(html, /<span class="im-chip" data-im-tone="">By Muro<\/span>/, 'a record of Muro that does not bind is not highlighted');
