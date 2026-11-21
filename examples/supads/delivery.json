@@ -1,0 +1,107 @@
+{
+  "decisions": [
+    {
+      "source": "supercmo-skills",
+      "content": "The 23 skills under skills/ with their references and the two build_ledger.py scripts, and TELEMETRY.md and scripts/doctor.py for the setup.",
+      "form": "capability",
+      "targets": [
+        "media-setup",
+        "brand-onboarding",
+        "brand-analysis",
+        "product-analysis",
+        "competitor-list",
+        "competitor-ads-research",
+        "own-ads-audit",
+        "campaign-plan",
+        "ad-copy",
+        "video-script",
+        "video-prompt",
+        "storyboard",
+        "image-generation",
+        "image-ad",
+        "product-photos",
+        "ai-actor",
+        "format-adaptation",
+        "video-generation",
+        "ad-video",
+        "ugc-video",
+        "cartoon-video",
+        "video-ad-clone",
+        "audio-generation"
+      ],
+      "reason": "Each skill is a procedure for one kind of request (an analysis, a plan, a text, an image, a video), useful only in the task that asks for it and loaded then. None gives rules that hold in every session. One capability per skill: no two produce the same thing. The originals travel whole and each body opens them for the part a task needs. TELEMETRY.md is carried by media-setup, on demand: it answers a question a user asks rarely, and the source itself states it only in that file."
+    },
+    {
+      "source": "supercmo-skills",
+      "content": "The MCP server the skills call: scripts/supercmo_skills (started by the source as supercmo-skills) with scripts/supercmo_env.py and the two Inter fonts its caption tool uses.",
+      "form": "mcp-server",
+      "targets": [
+        "media-setup",
+        "brand-onboarding",
+        "brand-analysis",
+        "product-analysis",
+        "competitor-list",
+        "competitor-ads-research",
+        "own-ads-audit",
+        "video-prompt",
+        "storyboard",
+        "image-generation",
+        "image-ad",
+        "product-photos",
+        "ai-actor",
+        "format-adaptation",
+        "video-generation",
+        "ad-video",
+        "ugc-video",
+        "cartoon-video",
+        "video-ad-clone",
+        "audio-generation"
+      ],
+      "reason": "Breadth and timing: the skills do their work only through this server's tools, so a plugin without it would hand the user an install step before any task; the owner asked that the server be absorbed (2026-11-21). It starts from the packaged files at the pinned release, on the standard library; the source's own registration downloads the published package with uvx. Cost in every session: 22 tools whose descriptions and schemas are 46 KB, about 11,500 tokens where a host loads every schema at start (the packaged server's own tools/list, read on 2026-11-21; a host that defers tool schemas pays less). The package pays it because every capability but four calls these tools. It also registers tools no skill calls (caption_video, video_overlay, transcribe, four calendar tools): they come with the server as shipped. What the tools send, and to which provider, is stated in each capability; the server's own opt-out telemetry is in media-setup. If the original plugin or a server named supercmo is already configured on the host, every tool is offered twice and on some hosts the user's own entry wins: media-setup says so. Open doubt: on Codex and Hermes the server starts in the plugin's folder and its default output folder lands there; media-setup carries the source's variable for it."
+    },
+    {
+      "source": "supercmo-skills",
+      "content": "The source's own installation and registration: .mcp.json (uvx supercmo-skills@0.1.27), pyproject.toml, the install sections of README.md, the npm installer, the host manifests and marketplace files.",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Installing the source itself. This plugin carries the skills and registers the absorbed server; the original's installer would add a second copy of both. .mcp.json, pyproject.toml and README.md were read as evidence of how the server starts and what it depends on, and are not packaged. The managed-key login (npx @supercmo/skills login) is not installation: it stays in media-setup as the source's way to deliver the key."
+    },
+    {
+      "source": "supercmo-skills",
+      "content": "skills/*/evals/eval_cases.json, the source's own evaluation cases.",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Tests of the original skills' triggering. They were read to draw each intent's boundaries and are not packaged; no capability runs them."
+    },
+    {
+      "source": "awesome-opus5-5-videos",
+      "content": "data/videos.json (703 prompts with category, technique tags, author and original post) and the sections 'How to use a prompt' and 'Credits' of README.md.",
+      "form": "capability",
+      "targets": [
+        "coded-animation"
+      ],
+      "reason": "A library consulted only when someone wants a coded animation or a reference prompt. The file is about 810 KB: it is read through a filter inside the task and never loaded in a session. The credit rule (every prompt belongs to its creator) is carried in the capability and checked there. The MIT license covers the collection, not the prompts; the owner chose to absorb it with credits (2026-11-21)."
+    },
+    {
+      "source": "awesome-opus5-5-videos",
+      "content": "The rest of README.md: the gallery tables, preview images and links to the curator's site.",
+      "form": "dropped",
+      "targets": [],
+      "reason": "Presentation of the collection and promotion of the curator's site. The same entries are in data/videos.json, which keeps each entry's link. README.md is read at intake only and is not packaged."
+    }
+  ],
+  "mcp_servers": [
+    {
+      "name": "supercmo",
+      "source": "supercmo-skills",
+      "run": [
+        "python",
+        "-m",
+        "supercmo_skills.mcp"
+      ],
+      "env": {
+        "PYTHONPATH": "<package_root>/scripts/supercmo-skills/scripts"
+      }
+    }
+  ]
+}

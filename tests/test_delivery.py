@@ -134,7 +134,7 @@ def test_hermes_registers_a_policy_longer_than_one_source_allowance_whole(tmp_pa
 
 @pytest.mark.parametrize("broken, message", [
     ({"decisions": []}, "nonempty"),
-    ({"extra": 1}, "only decisions, always_on, hooks and custom_instructions"),
+    ({"extra": 1}, "only decisions, always_on, hooks, mcp_servers and custom_instructions"),
     ({"decisions": [dict(decision("capability", ["x"]), weight=3)]}, "exactly source, content, form, targets and reason"),
     ({"decisions": [decision("system-prompt", [])]}, "form must be one of"),
     ({"decisions": [decision("capability", ["x"], source="ghost")]}, "unknown source ghost"),

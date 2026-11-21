@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 from pathlib import Path
 from typing import Any
 
 from .custom_instructions import metadata_errors, reference_errors, validate_binding
 
 DELIVERY_FILE = "delivery.json"
-FORMS = ("capability", "always-on", "hook", "dropped")
+FORMS = ("capability", "always-on", "hook", "mcp-server", "dropped")
 # Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
 # permanent place: one allowance for each source with an always-on decision (owner, 2026-11-12).
 # The allowance is sized so a real always-on source fits in its own words: content is never shortened to fit
@@ -31,6 +32,16 @@ def always_on_limit(document: Any) -> int:
 _DECISION_KEYS = {"source", "content", "form", "targets", "reason"}
 _WIRING_KEYS = {"host", "capability", "event", "matcher", "run"}
 _WIRING_OPTIONAL = {"timeout"}
+# One declaration per server, host-neutral: each adapter writes the form its host reads (ADR-0030).
+_SERVER_KEYS = {"name", "source", "run"}
+_SERVER_OPTIONAL = {"env"}
+_SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
+_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_PACKAGE_ROOT = "<package_root>"
+# A packaged path inside a value: alone, after `--option=`, or in a list joined by `;` or `:`.
+_PACKAGED_PATH = re.compile(re.escape(_PACKAGE_ROOT) + r"/([^;:]*)")
+_RESERVED_ENV = ("PLUGIN_ROOT", "PLUGIN_DATA")   # an Agent Plugins host drops a server that sets them
+MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
 
 
 def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
@@ -45,14 +56,118 @@ def session_text(document: dict[str, Any] | None) -> str:
     return (document or {}).get("always_on", "") or ""
 
 
+def mcp_servers(document: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The MCP servers a release registers: the ones its delivery document declares, and no other."""
+    return (document or {}).get("mcp_servers", []) or []
+
+
+def server_launch(server: dict[str, Any], package_root: str) -> dict[str, Any]:
+    """One declared server as a program, its arguments and its environment, with the package root in place."""
+    place = lambda value: value.replace(_PACKAGE_ROOT, package_root)
+    return {"command": server["run"][0], "args": [place(part) for part in server["run"][1:]],
+            "env": {name: place(value) for name, value in server.get("env", {}).items()}}
+
+
+def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """The declared servers for a host whose plugin resolves its own location in code (Pi, OpenCode)."""
+    return [{"name": server["name"], **server_launch(server, _PACKAGE_ROOT)} for server in mcp_servers(document)]
+
+
+def claude_code_mcp(document: dict[str, Any] | None, command: str) -> dict[str, Any] | None:
+    """The `.mcp.json` a Claude Code plugin registers when enabled, or None when no server is declared."""
+    root = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{command}"
+    servers = {server["name"]: server_launch(server, root) for server in mcp_servers(document)}
+    return {"mcpServers": servers} if servers else None
+
+
+def agent_plugins_mcp(document: dict[str, Any] | None, package_root: str) -> dict[str, Any] | None:
+    """The `mcp.json` of an Agent Plugins v1 package (Codex, Hermes), or None when no server is declared."""
+    servers = {server["name"]: {"type": "stdio", **server_launch(server, package_root)}
+               for server in mcp_servers(document)}
+    return {"$schema": MCP_SCHEMA, "mcpServers": servers} if servers else None
+
+
+def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> list[str]:
+    """A declared server must start from files the release carries. A path check, not a judgment."""
+    errors = []
+    for server in mcp_servers(document):
+        own = f"scripts/{server['source']}/"
+        for value in [*server["run"], *server.get("env", {}).values()]:
+            for relative in _PACKAGED_PATH.findall(value):
+                # Its own source's folder is all a server may name: a host that installs the servers as a
+                # package of their own (Hermes) carries nothing else.
+                if ".." in relative.split("/") or not (relative + "/").startswith(own):
+                    errors.append(f"mcp server {server['name']} names a path outside {own}: {relative}")
+                elif not (package_dir / relative).exists():
+                    errors.append(f"mcp server {server['name']} names a file that is not packaged: {relative}")
+    return errors
+
+
 def _text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+def _run_errors(run: Any, label: str) -> list[str]:
+    """A declared command is literal argv, for a hook and for a server alike."""
+    if not isinstance(run, list) or not run or any(not _text(part) for part in run):
+        return [f"{label}: run must be a nonempty list of command parts"]
+    errors = []
+    if any(ch.isspace() for ch in run[0]) or '"' in run[0]:
+        errors.append(f"{label}: the program (first part of run) must be one bare word")
+    if any('"' in part for part in run[1:]):
+        errors.append(f"{label}: a run argument must not contain a double quote")
+    return errors
+
+
+def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str]) -> list[str]:
+    """Shape and references of the declared servers; which source ships a server is the AI's decision."""
+    if not isinstance(servers, list):
+        return ["mcp_servers must be an array of server declarations"]
+    errors: list[str] = []
+    names: set[str] = set()
+    declared: set[str] = set()
+    for server in servers:
+        if not isinstance(server, dict) or set(server) - _SERVER_OPTIONAL != _SERVER_KEYS:
+            errors.append("each mcp server requires exactly name, source and run, and may add env")
+            continue
+        name, source = server["name"], server["source"]
+        if not isinstance(name, str) or not _SERVER_NAME.fullmatch(name):
+            errors.append(f"mcp server {name}: name must be lowercase letters, digits and hyphens, starting with a letter")
+        elif name in names:
+            errors.append(f"mcp server {name} is declared twice")
+        else:
+            names.add(name)
+        if not isinstance(source, str) or source not in source_ids:
+            errors.append(f"mcp server {name} names unknown source {source}")
+        elif source not in server_sources:
+            errors.append(f"mcp server {name}: source {source} has no mcp-server decision")
+        else:
+            declared.add(source)
+        errors += _run_errors(server["run"], f"mcp server {name}")
+        if isinstance(server["run"], list) and server["run"] and isinstance(server["run"][0], str) \
+                and _PACKAGE_ROOT in server["run"][0]:
+            # Codex and Hermes accept only a bare program name, and no host form substitutes the program.
+            errors.append(f"mcp server {name}: the program (first part of run) is a command on the host, never a "
+                          f"{_PACKAGE_ROOT} path; pass the packaged file as an argument")
+        env = server.get("env", {})
+        if not isinstance(env, dict):
+            errors.append(f"mcp server {name}: env must be an object of names and text values")
+        elif any(not isinstance(key, str) or not _ENV_NAME.fullmatch(key) for key in env):
+            errors.append(f"mcp server {name}: env names must be plain variable names")
+        elif any(not isinstance(value, str) for value in env.values()):
+            errors.append(f"mcp server {name}: env values must be text")
+        elif any(key.upper() in _RESERVED_ENV for key in env):
+            errors.append(f"mcp server {name}: env names {' and '.join(_RESERVED_ENV)} are reserved by the hosts, "
+                          "which set them for the server")
+    for source in sorted(server_sources - declared):
+        errors.append(f"source {source} has an mcp-server decision but declares no server")
+    return errors
+
+
 def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -> list[str]:
     """Check shape, references and that every declared form has something behind it. Forms stay the AI's decision."""
-    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "custom_instructions"}:
-        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks and custom_instructions"]
+    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "mcp_servers", "custom_instructions"}:
+        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks, mcp_servers and custom_instructions"]
     custom = document.get("custom_instructions")
     if "custom_instructions" in document:
         errors = metadata_errors(custom)
@@ -69,6 +184,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     decided_sources: set[str] = set()
     forms: set[str] = set()
     hook_targets: set[str] = set()
+    server_sources: set[str] = set()
     for item in decisions:
         if not isinstance(item, dict) or set(item) != _DECISION_KEYS:
             errors.append("each decision requires exactly source, content, form, targets and reason")
@@ -90,12 +206,14 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
         for target in targets:
             if target not in known:
                 errors.append(f"decision for {source}: unknown capability {target}")
-        if form in ("capability", "hook") and not targets:
+        if form in ("capability", "hook", "mcp-server") and not targets:
             errors.append(f"decision for {source}: form {form} needs at least one target capability")
         if form in ("dropped", "always-on") and targets:
             errors.append(f"decision for {source}: form {form} takes no targets")
         if form == "hook":
             hook_targets.update(t for t in targets if t in known)
+        if form == "mcp-server" and isinstance(source, str):
+            server_sources.add(source)
     for missing in sorted(source_ids - decided_sources):
         errors.append(f"source {missing} has no delivery decision: every intake records what it became and why")
 
@@ -141,13 +259,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
             errors.append(f"hook wiring for {capability}: event must be the host's event name")
         if not isinstance(wiring["matcher"], str):
             errors.append(f"hook wiring for {capability}: matcher must be a string (empty for every occurrence)")
-        if not isinstance(run, list) or not run or any(not _text(part) for part in run):
-            errors.append(f"hook wiring for {capability}: run must be a nonempty list of command parts")
-            continue
-        if any(ch.isspace() for ch in run[0]) or '"' in run[0]:
-            errors.append(f"hook wiring for {capability}: the program (first part of run) must be one bare word")
-        if any('"' in part for part in run[1:]):
-            errors.append(f"hook wiring for {capability}: a run argument must not contain a double quote")
+        errors += _run_errors(run, f"hook wiring for {capability}")
     for capability in sorted(hook_targets):
         if not any(h.get("policy") == "active" for h in known[capability].hooks):
             errors.append(f"capability {capability} is a hook target but its catalog declares no hook with policy active")
@@ -156,7 +268,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     for cap in capabilities:
         if cap.id not in hook_targets and any(h.get("policy") == "active" for h in cap.hooks):
             errors.append(f"capability {cap.id} declares an active hook but no hook decision targets it")
-    return errors
+    return errors + _server_errors(document.get("mcp_servers", []), source_ids, server_sources)
 
 
 def unregistered_active_hooks(capabilities: list) -> list[str]:
@@ -246,11 +358,30 @@ def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[s
     return {"description": f"{name}: declared delivery", "hooks": events} if events else None
 
 
+# Where each host reads a plugin's servers (ADR-0030). Run live on 2026-11-21: Claude Code, Pi and OpenCode in a
+# session, Codex up to `codex mcp list`; Hermes only through its own validator and loader.
+_SERVER_CHANNELS = {
+    "claude-code": "the plugin's `.mcp.json`, when the plugin is enabled",
+    "codex": "the plugin's `mcp.json`",
+    "pi": "`pi.registerMcpServer` in the package's `extensions/mcp.js`, at every load",
+    "opencode": "the package plugin's `mcp.transform`",
+    "hermes": ("the portable package in `../hermes-mcp`, a second plugin to install and enable beside this one "
+               "(Hermes reads a plugin's servers only from a package whose one manifest is `plugin.json`; accepted by "
+               "Hermes's own validator and loader, not run in a live Hermes session)"),
+}
+
+
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
     """What this host's adapter registers by itself, and what it does not."""
-    if not document or not (session_text(document) or document.get("hooks")):
+    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document)):
         return ""
     notes = []
+    channel = _SERVER_CHANNELS.get(host)
+    if mcp_servers(document) and channel:
+        names = ", ".join(f"`{server['name']}`" for server in mcp_servers(document))
+        notes.append(f"MCP server {names}: registered automatically through {channel}, and started from this "
+                     "package's own files. If a server with the same tools is already configured on this host "
+                     "(the original this package absorbed), remove it: two copies offer the same tools twice.")
     if session_text(document):
         channels = {
             "claude-code": "a native `prompt.compose` module in `hooks/hooks.json`, adding a system-prompt section while preserving the host's other sections. Requires Claude Code mods (2.1.287+) enabled",

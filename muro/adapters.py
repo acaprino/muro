@@ -5,11 +5,12 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 
-from .delivery import DELIVERY_FILE, claude_code_hooks, codex_hooks, install_note, session_text
+from .delivery import (DELIVERY_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp, codex_hooks,
+                       install_note, mcp_servers, placeholder_launches, session_text)
 from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
-from .hermes_adapter import write_hermes_adapter
+from .hermes_adapter import write_hermes_adapter, write_hermes_servers
 from .native_policy import write_opencode_adapter, write_pi_adapter
 
 
@@ -358,6 +359,9 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             if registered:
                 (root / "hooks").mkdir(exist_ok=True)
                 (root / "hooks" / "hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+            servers = claude_code_mcp(delivery, plugin["command"])
+            if servers:
+                (root / ".mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
         elif host == "codex":
             # Both modern and compatibility entrypoints refer to the same packaged resources.
             portable = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
@@ -379,12 +383,20 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             if registered:
                 (root / "hooks").mkdir()
                 (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+            # Beside the root Agent Plugins manifest written above, which is where Codex looks for it.
+            servers = agent_plugins_mcp(delivery, f"${{PLUGIN_ROOT}}/skills/{plugin['command']}")
+            if servers:
+                (root / "mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
         elif host == "pi":
-            write_pi_adapter(root, plugin, bool(policy))
+            write_pi_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "opencode":
-            write_opencode_adapter(root, plugin, bool(policy))
+            write_opencode_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "hermes":
             write_hermes_adapter(root, plugin, bool(policy))
+            servers = agent_plugins_mcp(delivery, "${PLUGIN_ROOT}")
+            if servers:
+                write_hermes_servers(dist / "adapters" / "hermes-mcp", plugin, servers, dist,
+                                     {server["source"] for server in mcp_servers(delivery)})
 
 
 def _repository_source(source, adapter: PurePosixPath):

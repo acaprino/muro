@@ -255,3 +255,13 @@ with Windows and keeps the harnesses in sync from the background. Proposed: the
 owner's decisions are recorded, the explanatory text and the implementation
 choices are not separately approved. The part about projects (the `.mp` file,
 decision records, harmonization per project) is not implemented yet.
+
+## Absorbed MCP servers
+
+Manual note outside the generated index: [ADR-0030 — A source's MCP server is
+absorbed and registered by the release](ADR-0030-absorbed-mcp-servers.md)
+records the owner's decision of 2026-11-21 that a server a source ships travels
+with it and is registered by the generated plugin, declared once in
+`delivery.json` and written by each adapter in its host's form. Proposed: the
+owner approved the design before the code; the explanatory text is not
+separately approved.

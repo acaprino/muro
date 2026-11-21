@@ -242,7 +242,9 @@ fn plugin_of<'a>(registry: &'a Value, id: &str) -> Option<&'a Value> {
 /// The plugin inside the file is first checked against the package beside it (`muro project verify`): a
 /// file whose plugin was not built from its own package is refused. The next plan installs it, and a plan
 /// finds the builds stale when the file changes (`Project file changed: open the project again`). A plugin
-/// of that name that is not this project's is never touched.
+/// of that name that is not this project's is never touched. A copy of the plugin already installed on a
+/// named target, under the name the build declares, is taken over: it is the project's from then on, and
+/// a plugin of the list that held it lets that target go.
 pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
     let current = registry(data)?;
@@ -268,9 +270,9 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         let adapter = release.join("adapters").join(kind);
         ensure!(adapter.is_dir(), "This project's build has no adapter for {kind}");
         let adapter = adapter.canonicalize()?;
-        let version = list::build_version(kind, &adapter)
+        let (native_name, version) = list::build_identity(kind, &adapter)
             .with_context(|| format!("The {kind} build of this project cannot be read"))?;
-        builds.push((kind.clone(), adapter, version));
+        builds.push((kind.clone(), adapter, version, native_name));
     }
     // The folder `release/` of the unpack, not the plugin inside it: a registry source that holds
     // `adapters/<harness>` is resolved into native distributions of its own, which carry no record of
@@ -316,7 +318,7 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         }
         let distributions: Vec<Value> = builds
             .iter()
-            .map(|(kind, adapter, version)| {
+            .map(|(kind, adapter, version, _)| {
                 json!({"harness":kind,"path":adapter.to_string_lossy(),"version":version,"origin":"muro",
                        "source_revision":revision,"project_digest":digest})
             })
@@ -330,6 +332,24 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         .and_then(|snapshot| plugin_of(&snapshot["registry"], id))
         .cloned()
         .context("The plugin was not saved")?;
+    // A copy of the same plugin already on a named target (the person installed it, or another plugin
+    // of the list holds it) becomes this project's, so the next plan replaces it with the build instead
+    // of installing a second copy beside it (`take_over` of the registry).
+    for target in &target_ids {
+        let kind = current["targets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .find(|t| t["id"] == target.as_str())
+            .and_then(|t| t["harness"].as_str())
+            .unwrap_or("");
+        let Some((_, _, _, native_name)) = builds.iter().find(|build| build.0 == kind) else {
+            continue;
+        };
+        update(data, |_| {
+            Ok(Some(("take_over", json!({"plugin_id":id,"target_id":target,"name":native_name}))))
+        })?;
+    }
     sweep_cache(data);
     Ok(json!({"id":id,"plugin":plugin,"digest":digest,"harnesses":kinds,"targets":target_ids}))
 }

@@ -12,8 +12,9 @@ export interface AiSettings { engine:AiEngine; harness:AiHarness; budget_usd:num
 /** `agent` is the old setting of the harness: the service keeps it equal to `ai.harness`. */
 export interface Settings { auto_sync:boolean; interval_minutes:number; close_to_tray:boolean; agent:string; python:string; factory_path:string; ai:AiSettings }
 export interface Registry { schema:number; revision:number; plugins:Plugin[]; targets:Target[]; settings:Settings }
-/** `present` is false for a Claude Code record whose files are gone (its `installPath` is not a folder); a harness that does not say, or an entry without the field, has them. */
-export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean }
+/** `present` is false for a Claude Code record whose files are gone (its `installPath` is not a folder); a harness that does not say, or an entry without the field, has them.
+ * `plugin_name` is the name the harness installed it under (what its manifest calls it), as the service reads it from the entry: null where the harness lists a plugin by its folder or its source. `enabled` is absent where the harness does not say. */
+export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean; plugin_name?:string|null; enabled?:boolean }
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
 export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }

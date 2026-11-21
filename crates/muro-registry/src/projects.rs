@@ -47,7 +47,12 @@ pub fn same_file(path: &str) -> String {
 /// The version a built adapter folder declares for `harness`, read by the registry's own reader: the
 /// value a distribution of that folder must record, or the plan refuses it.
 pub fn build_version(harness: &str, adapter: &Path) -> Result<String> {
-    Ok(crate::native::identity(harness, adapter)?.1)
+    Ok(build_identity(harness, adapter)?.1)
+}
+
+/// The name and version the harness installs a project's build under: those its manifest declares.
+pub fn build_identity(harness: &str, adapter: &Path) -> Result<(String, String)> {
+    crate::native::identity(harness, adapter)
 }
 
 /// The list a request asks to save, as the registry keeps it: each project is `{id, path}` and nothing
