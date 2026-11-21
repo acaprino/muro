@@ -246,7 +246,7 @@ await test('a runtime that leaves the harness out of the plugin\'s targets is an
   await tab(page, 'Install').click();
   const before = (await app.calls()).length;
   await switchOf(page, 'Codex').click();
-  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'marionette was not set up for Codex' }).waitFor();
+  await page.locator('.im-notice-text', { hasText: 'marionette was not set up for Codex' }).waitFor();
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false');
   assert.equal((await app.calls()).slice(before).some(c => c.action === 'save_plugin'), false, 'the page does not save the targets itself');
 });
@@ -257,7 +257,7 @@ await test('an install that fails says why and changes nothing', 'projects', {},
   await openMarionette(page);
   await tab(page, 'Install').click();
   await switchOf(page, 'Codex').click();
-  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'no build for codex' }).waitFor();
+  await page.locator('.im-notice-text', { hasText: 'no build for codex' }).waitFor();
   assert.equal(await switchOf(page, 'Codex').getAttribute('aria-checked'), 'false');
 });
 
@@ -316,7 +316,7 @@ await test('a cancelled file dialog changes nothing; a file that is not a projec
   assert.equal(await page.locator('.im-note').count(), 0);
   await app.flags({ pickPath: 'D:/Notes/Notes.txt' });
   await page.getByRole('button', { name: 'Open project file…' }).click();
-  await page.locator('.im-note[data-im-tone="err"]', { hasText: 'Not a Muro project file' }).waitFor();
+  await page.locator('.im-notice-text', { hasText: 'Not a Muro project file' }).waitFor();
   assert.equal(await page.locator('li.im-list-link').count(), 1, 'nothing was added');
 });
 
