@@ -19,7 +19,7 @@ const saves = async app => (await calls(app, 'settings')).map(c => c.payload);
 const tab = (page, name) => page.locator('nav').getByRole('tab', { name: new RegExp('^' + name) });
 /** A row of the page, found by its title. */
 const row = (page, title) => page.locator('.im-setting-row').filter({ has: page.locator('strong').filter({ hasText: new RegExp('^' + escapeRe(title) + '$') }) });
-const hint = (page, title) => row(page, title).locator('small');
+const hint = (page, title) => row(page, title).locator('small[id^="hint-"]');   // a row with a field also holds the empty error slot, a small too
 const switchOf = (page, label) => page.getByRole('switch', { name: label, exact: true });
 const AUTO = 'Automatic sync', TRAY = 'Keep running when the window is closed', START = 'Start Muro when Windows starts';
 async function openSettings(page) {
@@ -97,7 +97,7 @@ await test('the interval is used only when automatic sync is on', 'default', {},
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
   assert.equal(await interval.isDisabled(), false);
-  assert.equal(await row(page, 'Check').locator('small').count(), 0, 'no hint once it is used');
+  assert.equal(await row(page, 'Check').locator('small[id^="hint-"]').count(), 0, 'no hint once it is used');
 });
 
 await test('an interval outside 1 to 1440 is refused where it enters, and the control is restored', 'stored-settings', {}, async app => {

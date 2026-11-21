@@ -171,15 +171,15 @@ await test('nothing under way is disturbed: not a dialog that is open, not a box
   const { page } = app;
   await strip(page).getByText('Not checked yet').waitFor();
   const snapshots = () => count(app, 'snapshot');
-  // A dialog is open: it is the person's.
+  // A form is open in the inspector: it is the person's.
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
-  await page.locator('dialog[open]').waitFor();
+  await page.locator('.im-inspector:not([hidden])').waitFor();
   await behind(page, () => window.behind.check());
   await page.clock.fastForward(31_000);
   await focus(page);
-  assert.equal(await snapshots(), 1, 'a dialog was open');
+  assert.equal(await snapshots(), 1, 'a form of the inspector was open');
   await page.keyboard.press('Escape');
-  await page.locator('dialog[open]').waitFor({ state: 'detached' });
+  await page.locator('.im-inspector:not([hidden])').waitFor({ state: 'detached' });
   // A text box has the keyboard: what is typed in it is not put back to what is stored.
   await page.locator('#search').click();
   await page.locator('#search').fill('pack');
