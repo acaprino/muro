@@ -84,7 +84,7 @@ test('a harness needs a name, an absolute configuration folder and an executable
 test('a saved plugin\'s dialog has its own heading, Save, and a More disclosure with the five actions; a new one has neither',()=>{
  const state=viewState(snapshot()),html=pluginPanel(state,plugin);
  assert.match(html,/<h2 class="im-panel-title" id="plugin-form-title">Package<\/h2>/);assert.match(html,/<form id="plugin-form" novalidate data-named="1">/);
- assert.doesNotMatch(html,/im-btn--primary/,'the window's one primary is in the action bar, not in the panel');assert.match(html,/<button type="button" class="im-icon-btn" data-action="close-inspector" aria-label="Close" title="Close">/,'a Close with its tooltip');assert.match(html,/<details id="plugin-more"[^>]*><summary>More<\/summary>/);
+ assert.doesNotMatch(html,/im-btn--primary/,'the one primary of the window is in the action bar, not in the panel');assert.match(html,/<button type="button" class="im-icon-btn" data-action="close-inspector" aria-label="Close" title="Close">/,'a Close with its tooltip');assert.match(html,/<details id="plugin-more"[^>]*><summary>More<\/summary>/);
  const more=html.slice(html.indexOf('<summary>More</summary>'));
  for(const [action,label] of [['resolve-plugin','Check for updates'],['adapt-plugin','Adapt with AI'],['reinstall-plugin','Plan a reinstall'],['open-custom-instructions','Open instructions folder'],['remove-plugin','Remove from my list']])assert.match(more,new RegExp(`data-action="${action}" data-id="pkg"[^>]*>(?:<svg[\\s\\S]*?</svg>)?<span>${label}</span>`),label);
  assert.match(html,/<button type="submit" class="im-btn">Save<\/button>/);assert.match(html,/<div class="im-field-error" id="form-error" role="alert"/);

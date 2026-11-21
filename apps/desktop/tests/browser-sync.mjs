@@ -325,7 +325,7 @@ await test('Ctrl+F and / search the current view: Sync focuses its search box, t
   assert.equal(await page.locator('nav button[aria-current=page] .label').textContent(), 'Activity', 'the page does not change');
 });
 
-await test('a plugin row opens its inspector, and Plan a reinstall opens the review dialog over it (not run locally: the owner's rule)', 'changes', {}, async ({ page }) => {
+await test('a plugin row opens its inspector, and Plan a reinstall opens the review dialog over it', 'changes', {}, async ({ page }) => {
   const panel = page.locator('.im-inspector:not([hidden])');
   await page.locator('#rows [data-action=open-plugin]').first().click();
   await panel.locator('h2.im-panel-title').waitFor();
@@ -336,7 +336,7 @@ await test('a plugin row opens its inspector, and Plan a reinstall opens the rev
   assert.equal(await panel.count(), 1, 'the inspector stays under the review');
 });
 
-await test('a window of 500 at 200% zoom (250): the title bar, the Views menu and the primary action stay inside the shell (not run locally: the owner's rule)', 'demo', { viewport: { width: 250, height: 700 } }, async app => {
+await test('a window of 500 at 200% zoom (250): the title bar, the Views menu and the primary action stay inside the shell', 'demo', { viewport: { width: 250, height: 700 } }, async app => {
   const { page } = app;
   await check(page);
   assert.ok(await sideways(page) <= 0, 'no sideways scroll at 250');
