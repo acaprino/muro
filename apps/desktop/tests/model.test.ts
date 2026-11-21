@@ -325,8 +325,8 @@ test('names, sources, harnesses, check errors and failures are escaped on the Sy
  const s=snapshot();s.registry.plugins=[{...plugin,name:'<b>Evil</b>',source:'x"><i>y'}];s.registry.targets[0].name='<u>Harness</u>';
  const html=frame(viewState(s,{error:'<img src=x>',checkErrors:[{plugin_id:'pkg',message:'<script>'}]}));
  for(const raw of ['<b>Evil','<u>Harness','<img src=x>','<script>','"><i>'])assert.ok(!html.includes(raw),`${raw} is escaped`);
- for(const text of ['&lt;b&gt;Evil','&lt;u&gt;Harness','&lt;img src=x&gt;','&lt;script&gt;'])assert.ok(html.includes(text),text);
- assert.match(html,/1 source could not be checked/);assert.match(html,/Reload/);
+ for(const text of ['&lt;b&gt;Evil','&lt;u&gt;Harness','&lt;script&gt;'])assert.ok(html.includes(text),text);
+ assert.match(html,/1 source could not be checked/);assert.doesNotMatch(html,/<img src=x>|That did not complete/,'a failed operation is a notice of the app, not a note of the page');
 });
 test('a plugin row opens its dialog, a column header its harness, and each cell reads the held plan',()=>{
  const html=frame(viewState(snapshot(),{plan:plan([op('update','1','2')])}));

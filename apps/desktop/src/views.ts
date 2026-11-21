@@ -1,6 +1,6 @@
 import type { ViewState, Page } from './types.ts';
 import type { PageModule } from './context.ts';
-import { chipHtml, noteHtml, pageContentHtml, shellFrameHtml, tabNavigationHtml, titlebarHtml } from '@acaprino/imago/ui';
+import { chipHtml, pageContentHtml, shellFrameHtml, tabNavigationHtml, titlebarHtml } from '@acaprino/imago/ui';
 import { syncHeadline, stamp, nextCheck } from './model.ts';
 import { esc, plural, button, head, empty } from './ui.ts';
 import * as projects from './pages/projects.ts';
@@ -25,20 +25,11 @@ function footerRow(state:ViewState):string {
  return `<span class="im-dot"${auto?' data-im-tone="ok"':''}></span><span class="im-footer-text">Automatic sync ${auto?'on':'off'} · last sync ${esc(stamp(s.sync.last_sync))} · ${esc(plural(s.registry.plugins.length,'plugin'))} in your list</span><span class="im-spacer"></span><span data-muro-footer="${state.page}"></span>`;
 }
 
-/** What went wrong or needs attention, as notes at the top of the content. The running operation is a loader the app mounts there after each paint (`paintBusy`). */
-function notes(state:ViewState):string {
- const s=state.snapshot,name=(id:string)=>s?.registry.plugins.find(p=>p.id===id)?.name||id;
- return (state.error&&s?noteHtml({title:'That did not complete',message:state.error,actionsHtml:button('Reload','refresh'),tone:'err'}):'')
-  +(state.checkErrors.length?noteHtml({title:`${plural(state.checkErrors.length,'source')} could not be checked`,items:state.checkErrors.map(e=>({label:name(e.plugin_id),message:e.message})),tone:'warn'}):'')
-  +(state.discoveryError?noteHtml({title:'Harness detection failed',message:state.discoveryError,tone:'err'}):'')
-  ;
-}
-
 export function frame(state:ViewState):string {
  const s=state.snapshot,first=!!s&&setup.needed(state),running=s?.jobs?.filter(j=>j.status==='running').length||0,waiting=s?syncHeadline(s,state.plan).operations:0;
  const badge:Record<string,[number,string]>={sync:[waiting,`${plural(waiting,'change')} waiting`],activity:[running,`${plural(running,'run')} in progress`]};
  const shown=!!s&&!first;
  const nav=first?'':tabNavigationHtml(tabs.map(([id,icon,label])=>{const [count,countLabel]=badge[id]||[0,''];return {id,icon,label,count,countLabel};}),state.page,{label:'Main',action:'page'});
  const page=!s?pageContentHtml(head('Sync','Your plugins and the harnesses they are installed in.')+empty(state.busy?'Opening your registry.':'Registry not available',state.error||'Loading local data.',button('Try again','refresh')),'narrow'):first?setup.view(state):pageContentHtml(modules[state.page].view(state),state.page==='sync'||state.page==='projects'?'normal':'narrow');
- return shellFrameHtml({skipLabel:'Skip to content',busy:!!state.busy,contentHtml:notes(state)+page,contentLabel:state.snapshot&&!first?tabs.find(t=>t[0]===state.page)![2]:first?'Set up Muro':'Sync',inspectorLabel:'Details',statusHtml:shown?statusRow(state):undefined,actionsHtml:shown?modules[state.page].bar?.(state)||undefined:undefined,footerHtml:shown?footerRow(state):undefined,titlebarHtml:titlebarHtml({brand:{name:'Muro'},navigationHtml:nav,views:first?undefined:{label:'Views',action:'views'},commands:{label:'Commands',action:'commands'},windowControls:typeof window!=='undefined'&&'__TAURI_INTERNALS__' in window})});
+ return shellFrameHtml({skipLabel:'Skip to content',busy:!!state.busy,contentHtml:page,contentLabel:state.snapshot&&!first?tabs.find(t=>t[0]===state.page)![2]:first?'Set up Muro':'Sync',inspectorLabel:'Details',statusHtml:shown?statusRow(state):undefined,actionsHtml:shown?modules[state.page].bar?.(state)||undefined:undefined,footerHtml:shown?footerRow(state):undefined,titlebarHtml:titlebarHtml({brand:{name:'Muro'},navigationHtml:nav,views:first?undefined:{label:'Views',action:'views'},commands:{label:'Commands',action:'commands'},windowControls:typeof window!=='undefined'&&'__TAURI_INTERNALS__' in window})});
 }

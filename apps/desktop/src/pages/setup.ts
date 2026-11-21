@@ -79,8 +79,9 @@ function stepOne(state: ViewState, s: Held): string {
   const body = list.length ? choiceRowsHtml(list.map(r => ({name:'pick',value:r.harness,checked:picked(s,r),disabled:!!r.why||!!state.busy,leadingHtml:mark(r.harness),label:r.name,hintHtml:r.why?esc(r.why):`<code>${esc(r.root)}</code>`})))
     : state.discovering ? loadingPanel(3)
     : empty('No harness found', 'Muro looks for the coding agents installed on this computer. Add one by hand from Sync, with its configuration folder.', button('Look again', 'setup-discover'));
+  const failed = state.discoveryError ? noteHtml({title:'Harness detection failed',message:state.discoveryError,tone:'err'}) : '';
   const later = nothing && !state.discovering ? button('Set up later', 'setup-later') : '';
-  return wizardHeadingHtml('Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.',{id:'setup-title',describedBy:headingDescription(s)}) + body + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(later, button('Continue', 'setup-next', { primary: true }));
+  return wizardHeadingHtml('Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.',{id:'setup-title',describedBy:headingDescription(s)}) + failed + body + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(later, button('Continue', 'setup-next', { primary: true }));
 }
 function stepTwo(state: ViewState, s: Held): string {
   const { items, unread } = installed(state, s);

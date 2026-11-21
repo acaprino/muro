@@ -334,7 +334,8 @@ test('AI: choosing the engine or the coding agent saves its field, and the API\'
   assert.equal(s.saves()[2].settings.agent, 'claude-code', 'the page sends the old agent as it is stored: the registry keeps it equal to ai.harness');
   for (const [setting, value, text] of [['ai_engine', 'cloud', 'That engine is not available.'], ['ai_harness', 'gemini', 'That agent is not available.']]) {
     assert.equal(edit(s.app, setting, value), true);
-    assert.equal(s.state.error, text);
+    assert.equal(s.state.error, null, 'not a page-wide error');
+    assert.equal(s.toasts.at(-1), text, 'a notice: there is no field to say it in');
   }
   assert.equal(s.saves().length, 3, 'a value the page does not list is never sent');
 });

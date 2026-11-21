@@ -45,6 +45,12 @@ export function bar(state:ViewState):string {
  const st=stripOf(state),a=state.applying;
  return withCap(button('Check now','check',{icon:'sync',primary:st.lead&&!a,busy:state.checking,disabled:state.checking||!!a,attrs:state.checking?{'aria-busy':'true'}:undefined}),'data-muro-keys="muro.check"')+(a?'':st.actions);
 }
+/** What the last check could not do, as notes under the sync note: the sources it could not resolve, with their list, and the harness detection that failed. */
+function problems(state:ViewState):string {
+ const s=state.snapshot!,name=(id:string)=>s.registry.plugins.find(p=>p.id===id)?.name||id;
+ return (state.checkErrors.length?noteHtml({title:`${plural(state.checkErrors.length,'source')} could not be checked`,items:state.checkErrors.map(e=>({label:name(e.plugin_id),message:e.message})),tone:'warn'}):'')
+  +(state.discoveryError?noteHtml({title:'Harness detection failed',message:state.discoveryError,tone:'err'}):'');
+}
 /** One plugin on one harness, read by `cellState`: the installed version, or the change the plan holds for it. */
 export function cell(state:ViewState,p:Plugin,t:Target):string {
  const c=cellState(p,t,state.snapshot!,state.plan);
@@ -92,7 +98,7 @@ function unlistedSection(state:ViewState):string {
  return `<div class="im-section-heading"><h2>Installed, not in your list</h2><span class="im-count">${items.length}</span><span class="im-grow"></span>${exclusiveSeg(state.snapshot!.registry.targets)}</div><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${items.map(({target:t,plugin:p})=>`<li>${mark(t.harness)}<div class="im-grow"><strong>${esc(p.name)}</strong><small>${esc(p.version)} · on ${esc(t.name)}${filesMissing(p)}</small></div>${t.exclusive?'<span class="im-chip" data-im-tone="err">Removal waits for your confirmation</span>':'<small>Left alone</small>'}${button('Add to my list','add-to-list',{id:t.id,attrs:{'data-native':p.id}})}</li>`).join('')}</ul>`;
 }
 export function view(state:ViewState):string {
- return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus'})))+unlistedSection(state);
+ return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+problems(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus'})))+unlistedSection(state);
 }
 
 // ---------- check, review, apply ----------
@@ -138,7 +144,7 @@ async function rescan(app:App):Promise<void>{closeMenu(true);await app.run('Read
 export function harnessMenuItems(app:App):MenuItem[] {
  const items:MenuItem[]=foundHarnesses(app.state).map(found=>({label:found.supported?'Manage '+found.name:found.name+' · no plugin support yet',disabled:found.supported?undefined:'Plugin installation is not supported by this harness',run:()=>editTarget(app,undefined,found)}));
  if(!items.length)items.push({label:app.state.discovering?'Looking for harnesses…':'No other harness found on this computer',disabled:'No unmanaged harness available',run:()=>{}});
- items.push('separator',{label:'Add by hand…',run:()=>editTarget(app)},{label:'Rescan this computer',run:()=>{void rescan(app).catch(error=>{app.state.error=message(error);app.render();});}});
+ items.push('separator',{label:'Add by hand…',run:()=>editTarget(app)},{label:'Rescan this computer',run:()=>{void rescan(app).catch(error=>{app.notify(message(error),'err');});}});
  return items;
 }
 

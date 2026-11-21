@@ -9,7 +9,7 @@ export interface App {
   render(): void;
   /** One request at a time: sets `state.busy` to `label`, runs `work`, hands its value to `after`, shows a failure in `state.error`. Does nothing while another run is busy. */
   run<T>(label: string, work: () => Promise<T>, after?: (value: T) => void | Promise<void>): Promise<void>;
-  notify(text: string, tone?: 'err'): void;
+  notify(text: string, tone?: 'err', action?: { label: string; run: () => void }): void;
   /** One request that the person waits for: `state.slow[key]` is set once `work` has lasted `LOADING_DELAY_MS` (and the page paints it), and cleared when it ends. The one place for every delay of the app. */
   loading<T>(key: string, work: () => Promise<T>): Promise<T>;
   /** Reads the snapshot again. */
