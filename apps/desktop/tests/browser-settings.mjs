@@ -234,9 +234,10 @@ await test('a value that is not changed saves nothing', 'default', {}, async app
 await test('a settings save keeps the last plan: no new plan, the strip stays, Apply all still works', 'changes', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
-  const meta = async n => page.locator('section.im-summary .im-summary-meta span').nth(n).textContent();
-  const [lastCheck, lastSync] = [await meta(0), await meta(1)];
+  await page.locator('#sync-state b', { hasText: '1 change ready to apply' }).waitFor();
+  const lastCheckOf = async () => (await page.locator('.im-status-text').textContent()).match(/Last check (.*?)(?: · |$)/)[1];
+  const lastSyncOf = async () => (await page.locator('.im-footer-text').textContent()).match(/last sync (.*?) · /)[1];
+  const [lastCheck, lastSync] = [await lastCheckOf(), await lastSyncOf()];
   const before = (await app.calls()).length;
   await openSettings(page);
   await switchOf(page, TRAY).click();
@@ -245,14 +246,14 @@ await test('a settings save keeps the last plan: no new plan, the strip stays, A
   await waitSwitch(page, AUTO, true);
   assert.deepEqual((await app.calls()).slice(before).map(c => c.action), ['autostart', 'settings', 'settings'], 'no plan, no check, no snapshot after a save');
   await tab(page, 'Sync').click();
-  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
-  assert.equal(await page.locator('section.im-summary button', { hasText: 'Apply all 1 change' }).count(), 1);
-  assert.match(await meta(2), /^Next check/, 'the strip reads the new setting');
-  assert.equal(await meta(0), lastCheck, 'Last check is as it was');
-  assert.equal(await meta(1), lastSync, 'and so is Last sync');
+  await page.locator('#sync-state b', { hasText: '1 change ready to apply' }).waitFor();
+  assert.equal(await page.locator('.im-actions button', { hasText: 'Apply all 1 change' }).count(), 1);
+  assert.match(await page.locator('.im-status-text').textContent(), /next check/, 'the status row reads the new setting');
+  assert.equal(await lastCheckOf(), lastCheck, 'Last check is as it was');
+  assert.equal(await lastSyncOf(), lastSync, 'and so is Last sync');
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
   await page.locator('[data-im-notices]').getByText('1 change applied.').waitFor();
-  assert.equal(await page.locator('section.im-summary strong').first().textContent(), 'Everything is in sync');
+  assert.equal(await page.locator('#sync-state b').first().textContent(), 'Everything is in sync');
 });
 
 await test('the first settings save of a session, with nothing checked yet, asks for no plan', 'default', {}, async app => {

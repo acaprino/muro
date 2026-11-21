@@ -18,7 +18,7 @@ const dialog = page => page.locator('dialog[open], [role=alertdialog]');
 const toast = page => page.locator('.im-notice-text');
 const focused = (page, what) => page.evaluate(w => { const e = document.activeElement; return w === 'name' ? e?.getAttribute('name') : w === 'text' ? e?.textContent : w === 'inside' ? !!e?.closest('dialog') : e?.id; }, what);
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('section.im-summary .im-summary-meta').getByText('today').first().waitFor(); };
+const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('.im-status-text').getByText('today').first().waitFor(); };
 const column = (page, name) => page.getByRole('button', { name, exact: true });
 const rowOf = (page, name) => page.locator('#rows').getByRole('button', { name: new RegExp('^' + name) });
 const errorOf = (dlg, field) => dlg.locator('#err-' + field);
@@ -202,8 +202,8 @@ await test('Uninstall, asking first lists the removal before Apply', 'unlisted',
   assert.equal(await toast(page).first().textContent(), 'Saved. Muro will ask before it uninstalls plugins outside your list.');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'remove', 'the radio keeps the focus');
   assert.deepEqual((await actions(app)).slice(-2), ['save_target', 'plan'], 'the plan is asked for after the save, and nothing is applied');
-  await page.locator('section.im-summary strong').getByText('1 change ready to apply').waitFor();
-  assert.match(await page.locator('section.im-summary small').first().textContent(), /1 removal/);
+  await page.locator('#sync-state b').getByText('1 change ready to apply').waitFor();
+  assert.match(await page.locator('#sync-state span').first().textContent(), /1 removal/);
   await page.screenshot({ path: shots + '/harness-unlisted-removal.png' });
   await page.getByRole('button', { name: 'Review', exact: true }).click();
   const sheet = page.locator('dialog[open]');
@@ -296,7 +296,7 @@ await test('Apply all on a plan with removals opens the review sheet and applies
   const sent = (await callsOf(app, 'apply')).at(-1).payload;
   assert.deepEqual(Object.keys(sent).sort(), ['plan_id', 'skip_removals']);assert.equal(sent.skip_removals, true);
   assert.equal(await toast(page).first().textContent(), '1 change applied. 2 removals left out.');
-  await page.locator('section.im-summary strong').getByText('2 changes ready to apply').waitFor();
+  await page.locator('#sync-state b').getByText('2 changes ready to apply').waitFor();
   await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).waitFor();
   await page.locator('ul.im-stack-list li').filter({ hasText: 'ghost' }).getByText('files missing').waitFor();
 });
@@ -310,7 +310,7 @@ await test('the primary button of a review with removals confirms their number a
   const sent = (await callsOf(app, 'apply')).at(-1).payload;
   assert.deepEqual(Object.keys(sent).sort(), ['confirm_removals', 'plan_id']);assert.equal(sent.confirm_removals, 2, 'the number of removals of the plan');
   assert.equal(await toast(page).first().textContent(), '3 changes applied.');
-  await page.locator('section.im-summary strong').getByText('Everything is in sync').waitFor();
+  await page.locator('#sync-state b').getByText('Everything is in sync').waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Installed, not in your list' }).count(), 0);
 });
 
@@ -512,8 +512,8 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await page.screenshot({ path: shots + '/harness-reinstall.png' });
   await page.keyboard.press('Escape');
   await sheet.waitFor({ state: 'detached' });
-  assert.equal(await page.locator('section.im-summary strong').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
-  assert.doesNotMatch(await page.locator('section.im-summary small').first().textContent(), /reinstall/, 'and the reinstall is not in it');
+  assert.equal(await page.locator('#sync-state b').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
+  assert.doesNotMatch(await page.locator('#sync-state span').first().textContent(), /reinstall/, 'and the reinstall is not in it');
   assert.equal((await actions(app)).includes('apply'), false);
   // Remove from my list asks first
   await rowOf(page, 'Package').click();

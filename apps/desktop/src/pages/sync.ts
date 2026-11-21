@@ -1,4 +1,4 @@
-import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFieldRow, removeRepeatedFieldRow, replaceHtmlRegion, type MenuItem } from '@acaprino/imago/ui';
+import { openMenu as imagoMenu, closeLayers, runFormOperation, appendRepeatedFieldRow, removeRepeatedFieldRow, replaceHtmlRegion, noteHtml, type MenuItem, type Tone } from '@acaprino/imago/ui';
 import type { ViewState, Snapshot, Plan, Plugin, Target, Discovered, CheckResult, Filter, Job } from '../types.ts';
 import type { App, Actions, TextBox } from '../context.ts';
 import { cellState, harnessState, syncHeadline, mustReview, applyPayload, appliedNotice, filesMissing, filterPlugins, stamp, unlisted, listedPlugin, listing, currentPlan, engineOf, versionOf } from '../model.ts';
@@ -17,22 +17,31 @@ const samePath=(a:string,b:string)=>{const flat=(p:string)=>p.replace(/\\/g,'/')
 const foundHarnesses=(state:ViewState)=>state.discovered.filter(d=>d.available&&!state.snapshot!.registry.targets.some(t=>t.harness===d.harness&&!!d.config_root&&samePath(t.root,d.config_root)));
 
 // ---------- the view ----------
-/** The strip over the table: what the last check found, when, and the one next thing to do. */
-function strip(state:ViewState):string {
- const s=state.snapshot!,h=syncHeadline(s,state.plan),settings=s.registry.settings,last=s.sync.last_check,a=state.applying;
- let tone='',ico=icon('sync'),title='',text='',extra='',lead=false;
- const unreadable=h.unreadable.length?`${esc(nameList(h.unreadable.map(u=>u.target.name)))} cannot be read`:'';
- if(a){tone='accent';ico=spin;title=`Applying ${plural(a.total,'change')}…`;text=esc(a.name);}
- else if(state.checking){ico=spin;title='Checking sources and harnesses…';text='Reading what is installed and looking for new versions.';}
- else if(h.kind==='no-harness'){const found=foundHarnesses(state).find(d=>d.supported);tone='warn';ico=icon('alert');title='No harness is managed';text='Muro needs at least one harness to install plugins into.';extra=found?button(`Manage ${found.name}`,'manage-found',{id:found.harness,primary:true}):button('Add a harness','add-target',{primary:true});}
+/** What the last check found and the one next thing to do: a note over the table (what it says), and the buttons of the action bar (what to do). */
+interface Strip { tone: Tone | undefined; icon: string; title: string; text: string; lead: boolean; actions: string }
+function stripOf(state:ViewState):Strip {
+ const s=state.snapshot!,h=syncHeadline(s,state.plan),a=state.applying;
+ let tone:Tone|undefined,ico='sync',title='',text='',actions='',lead=false;
+ const unreadable=h.unreadable.length?`${nameList(h.unreadable.map(u=>u.target.name))} cannot be read`:'';
+ if(a){tone='info';ico='spinner';title=`Applying ${plural(a.total,'change')}…`;text=a.name;}
+ else if(state.checking){ico='spinner';title='Checking sources and harnesses…';text='Reading what is installed and looking for new versions.';}
+ else if(h.kind==='no-harness'){const found=foundHarnesses(state).find(d=>d.supported);tone='warn';ico='alert';title='No harness is managed';text='Muro needs at least one harness to install plugins into.';actions=found?button(`Manage ${found.name}`,'manage-found',{id:found.harness,primary:true}):button('Add a harness','add-target',{primary:true});}
  else if(h.kind==='not-checked'){lead=true;title='Not checked yet';text='Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.';}
- else if(h.kind==='changes'){const parts=CHANGE_WORDS.filter(([k])=>h.byKind[k]).map(([k,w])=>plural(h.byKind[k],w)),bits=[parts.join(', '),h.blockers?`${plural(h.blockers,'item')} not ready yet`:'',unreadable,h.errors?`${plural(h.errors,'source')} could not be checked`:''].filter(Boolean);tone='accent';title=`${plural(h.operations,'change')} ready to apply`;text=`${bits.length?`${bits.join(' · ')}. `:''}Nothing changes until you apply.`;extra=button('Review','review')+button(`Apply all ${plural(h.operations,'change')}`,'apply-all',{primary:true});}
- else if(h.kind==='unreadable'){lead=true;tone='warn';ico=icon('alert');title=unreadable;text=h.unreadable.some(u=>!u.count)?'Muro could not read what is installed there, so it cannot say whether it is in sync. Check the harness settings, then check again.':'The custom instructions of a plugin on it could not be read, so it cannot say whether it is in sync. Check the plugin, then check again.';}
- else if(h.kind==='sources'){lead=true;tone='warn';ico=icon('alert');const one=h.errors===1;title=`${plural(h.errors,'source')} could not be checked`;text=`Muro could not resolve ${one?'it':'them'}, so it cannot say ${one?'it is':'they are'} up to date.${h.blockers?` ${plural(h.blockers,'item')} not ready yet.`:''} Check again when ${one?'it answers':'they answer'}.`;extra=h.blockers?button('Review','review'):'';}
- else if(h.kind==='blocked'){lead=true;tone='warn';ico=icon('alert');const b=currentPlan(s,state.plan)?.blockers||[];title='Some plugins are not ready';text=b.length?`${esc(b[0])}${b.length>1?` and ${b.length-1} more`:''}. Muro leaves them out until they are fixed.`:`${plural(h.blockers,'item')} ${h.blockers===1?'is':'are'} not ready yet. Muro leaves them out until they are fixed.`;extra=button('Review','review');}
- else{tone='good';ico=icon('check');title='Everything is in sync';text='What is installed on your harnesses matches your list.';}
- const next=settings.auto_sync?`Next check <b>${last&&/^\d+$/.test(last)?esc(stamp(String(Number(last)+settings.interval_minutes*60))):'soon'}</b>`:'Automatic sync off';
- return `<section class="im-summary" data-im-tone="${tone==='good'?'ok':tone}" aria-label="Sync state"><span class="im-summary-icon">${ico}</span><div class="im-grow"><strong>${title}</strong><small>${text}</small><small class="im-summary-meta"><span>Last check <b>${esc(stamp(last))}</b></span><span>Last sync <b>${esc(stamp(s.sync.last_sync))}</b></span><span>${next}</span></small></div>${button('Check now','check',{icon:'sync',primary:lead&&!a,busy:state.checking,disabled:state.checking||!!a})}${a?'':extra}</section>`;
+ else if(h.kind==='changes'){const parts=CHANGE_WORDS.filter(([k])=>h.byKind[k]).map(([k,w])=>plural(h.byKind[k],w)),bits=[parts.join(', '),h.blockers?`${plural(h.blockers,'item')} not ready yet`:'',unreadable,h.errors?`${plural(h.errors,'source')} could not be checked`:''].filter(Boolean);tone='info';title=`${plural(h.operations,'change')} ready to apply`;text=`${bits.length?`${bits.join(' · ')}. `:''}Nothing changes until you apply.`;actions=button('Review','review')+withCap(button(`Apply all ${plural(h.operations,'change')}`,'apply-all',{primary:true}),'data-muro-cap="Enter"');}
+ else if(h.kind==='unreadable'){lead=true;tone='warn';ico='alert';title=unreadable;text=h.unreadable.some(u=>!u.count)?'Muro could not read what is installed there, so it cannot say whether it is in sync. Check the harness settings, then check again.':'The custom instructions of a plugin on it could not be read, so it cannot say whether it is in sync. Check the plugin, then check again.';}
+ else if(h.kind==='sources'){lead=true;tone='warn';ico='alert';const one=h.errors===1;title=`${plural(h.errors,'source')} could not be checked`;text=`Muro could not resolve ${one?'it':'them'}, so it cannot say ${one?'it is':'they are'} up to date.${h.blockers?` ${plural(h.blockers,'item')} not ready yet.`:''} Check again when ${one?'it answers':'they answer'}.`;actions=h.blockers?button('Review','review'):'';}
+ else if(h.kind==='blocked'){lead=true;tone='warn';ico='alert';const b=currentPlan(s,state.plan)?.blockers||[];title='Some plugins are not ready';text=b.length?`${b[0]}${b.length>1?` and ${b.length-1} more`:''}. Muro leaves them out until they are fixed.`:`${plural(h.blockers,'item')} ${h.blockers===1?'is':'are'} not ready yet. Muro leaves them out until they are fixed.`;actions=button('Review','review');}
+ else{tone='ok';ico='check';title='Everything is in sync';text='What is installed on your harnesses matches your list.';}
+ return {tone,icon:ico,title,text,lead,actions};
+}
+/** A key cap on a button: `attr` is an attribute of an empty span that the app fills from the registry after each paint (`fillKeys` in app.ts). */
+const withCap=(html:string,attr:string)=>html.replace(/<\/button>$/,`<span ${attr} aria-hidden="true"></span></button>`);
+const strip=(state:ViewState):string=>{const st=stripOf(state);return `<div id="sync-state">${noteHtml({icon:st.icon,title:st.title,message:st.text,tone:st.tone})}</div>`;};
+/** The action bar of Sync: Check now always, then what the note says to do. At most one primary action. */
+export function bar(state:ViewState):string {
+ if(state.page!=='sync')return '';
+ const st=stripOf(state),a=state.applying;
+ return withCap(button('Check now','check',{icon:'sync',primary:st.lead&&!a,busy:state.checking,disabled:state.checking||!!a,attrs:state.checking?{'aria-busy':'true'}:undefined}),'data-muro-keys="muro.check"')+(a?'':st.actions);
 }
 /** One plugin on one harness, read by `cellState`: the installed version, or the change the plan holds for it. */
 export function cell(state:ViewState,p:Plugin,t:Target):string {
@@ -81,7 +90,7 @@ function unlistedSection(state:ViewState):string {
  return `<div class="im-section-heading"><h2>Installed, not in your list</h2><span class="im-count">${items.length}</span><span class="im-grow"></span>${exclusiveSeg(state.snapshot!.registry.targets)}</div><ul class="im-panel im-surface im-stack-list" data-im-surface="sheet">${items.map(({target:t,plugin:p})=>`<li>${mark(t.harness)}<div class="im-grow"><strong>${esc(p.name)}</strong><small>${esc(p.version)} · on ${esc(t.name)}${filesMissing(p)}</small></div>${t.exclusive?'<span class="im-chip" data-im-tone="err">Removal waits for your confirmation</span>':'<small>Left alone</small>'}${button('Add to my list','add-to-list',{id:t.id,attrs:{'data-native':p.id}})}</li>`).join('')}</ul>`;
 }
 export function view(state:ViewState):string {
- return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus',primary:true})))+unlistedSection(state);
+ return head('Sync','Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.',addHarnessMenu(state)+button('Add plugin','add-plugin',{icon:'plus'}))+strip(state)+(state.snapshot!.registry.plugins.length?table(state):empty('Your list is empty','Add a plugin by its source, or take one that is already installed from the list below.',button('Add plugin','add-plugin',{icon:'plus'})))+unlistedSection(state);
 }
 
 // ---------- check, review, apply ----------

@@ -58,12 +58,12 @@ const words = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, 
 const rowOf = (html: string, id: string) => html.match(new RegExp(`<li class="im-list-link"><button[^>]*data-id="${id}"[\\s\\S]*?</li>`))?.[0] ?? '';
 
 // ---------- the tabs ----------
-test('Projects is the first of four tabs, and the app bar still has one state button', () => {
+test('Projects is the first of four tabs, and the status row is no button', () => {
   const html = frame(blank({ page: 'sync', snapshot: snapshot() }));
   assert.deepEqual([...html.matchAll(/data-action="page" data-id="(\w+)"[^>]*><svg[^>]*>.*?<\/svg><span class="label">([^<]+)<\/span>/g)].map(m => [m[1], m[2]]), [['projects', 'Projects'], ['sync', 'Sync'], ['activity', 'Activity'], ['settings', 'Settings']]);
   assert.match(html, /data-id="sync" aria-current="page"/, 'the app opens on Sync');
   assert.doesNotMatch(html, /data-id="projects" aria-current/);
-  assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length, 5, 'four tabs and the state button');
+  assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length, 4, 'four tabs: the status row navigates nowhere');
 });
 test('the Projects tab is current on its page, which is wide like Sync', () => {
   const html = frame(opened());
@@ -299,10 +299,13 @@ test('Install: without a harness it sends to Sync', () => {
 test('Install: the changes waiting for this project are reviewed in Sync\'s own sheet, which lists the whole plan', () => {
   const held = plan([op('marionette', 'install', 't2'), op('marionette', 'update', 't1', '0.6.0', '0.5.0'), op('other', 'install', 't1')]);
   const html = install.view(live({ targetsOn: ['t1', 't2'], plan: held }), info());
-  assert.match(html, /<button[^>]*class="im-btn im-btn--primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'only this project\'s changes count');
-  assert.doesNotMatch(html.match(/<button[^>]*data-action="review"[^>]*>/)![0], /data-id/, 'the review of the whole plan, not of one harness');
+  assert.equal(install.waitingChanges(live({ targetsOn: ['t1', 't2'], plan: held })), 2, 'only this project\'s changes count');
+  assert.doesNotMatch(html, /data-action="review"/, 'the review is in the action bar, not in the step');
+  const bar = projects.bar(live({ targetsOn: ['t1', 't2'], plan: held }));
+  assert.match(bar, /<button[^>]*class="im-btn im-btn--primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'the one primary action of the window');
+  assert.doesNotMatch(bar.match(/<button[^>]*data-action="review"[^>]*>/)![0], /data-id/, 'the review of the whole plan, not of one harness');
   assert.match(html, /data-action="page" data-id="sync"[^>]*>.*<span>Open Sync<\/span>/);
-  assert.doesNotMatch(install.view(live(), info()), /data-action="review"/, 'nothing waiting: no review');
+  assert.equal(projects.bar(live()), '', 'nothing waiting: no review');
 });
 test('Install: the line says where it is installed and what waits', () => {
   assert.equal(install.installLine(live(), 'marionette'), 'On 1 harness · in sync');

@@ -167,6 +167,11 @@ const own: Actions = {
 };
 export const actions: Actions = merge(own, ...Object.values(steps).map(s => s.actions));
 
+/** The action bar of the Projects page: on the Install step, Review the changes waiting for this project's plugin. */
+export function bar(state: ViewState): string {
+  const waiting = state.page === 'projects' && state.project?.step === 'install' && state.projects.info && state.projects.infoId === state.project.id ? install.waitingChanges(state) : 0;
+  return waiting ? button(`Review ${plural(waiting, 'change')}`, 'review', { primary: true }) : '';
+}
 export function input(app: App, el: TextBox): boolean {
   return app.state.page === 'projects' && !!app.state.project && Object.values(steps).some(s => s.input?.(app, el));
 }
