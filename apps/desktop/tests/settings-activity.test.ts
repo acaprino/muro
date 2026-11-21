@@ -433,6 +433,26 @@ test('Activity: a running adaptation has its card with phase, budget, log and Ca
   assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI adaptation|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI adaptation', 'Problems']);
 });
 
+test('Activity: Cancel adaptation names the plugin and the harness, and asks first with Keep running', () => {
+  const html = activity(viewState(snapshot({ jobs: [job()] })));
+  assert.match(html, /data-action="cancel-job"[^>]*aria-label="Cancel the adaptation of Docs &lt;b&gt;writer&lt;\/b&gt; for OpenCode"[^>]*><span>Cancel adaptation<\/span>/);
+  const asked: unknown[][] = [], state = viewState(snapshot({ jobs: [job()] })), calls: string[] = [];
+  const app = { state, confirm: (...a: unknown[]) => asked.push(a), request: async (action: string) => { calls.push(action); return snapshot(); }, run: async () => {}, adopt: () => {} } as unknown as App;
+  return import('../src/pages/activity.ts').then(m => {
+    m.actions['cancel-job'](app, { id: 'job-1' } as unknown as DOMStringMap, {} as HTMLElement);
+    assert.equal(asked.length, 1, 'it asks, and runs nothing yet');
+    assert.deepEqual([asked[0][0], asked[0][2], asked[0][4], asked[0][5]], ['Cancel adaptation?', 'Cancel adaptation', true, 'Keep running']);
+    assert.match(String(asked[0][1]), /Docs <b>writer<\/b> for OpenCode/);
+    assert.deepEqual(calls, []);
+  });
+});
+test('Settings: the confirming button of the clean up says what it does', async () => {
+  const asked: unknown[][] = [], app = { state: viewState(snapshot({})), confirm: (...a: unknown[]) => asked.push(a) } as unknown as App;
+  const m = await import('../src/pages/settings.ts');
+  await m.actions['maintenance-cleanup'](app, {} as DOMStringMap, {} as HTMLElement);
+  assert.equal(asked[0][2], 'Delete unused builds');
+});
+
 const START = 1700000500;
 test('Activity: a running adaptation shows its phase as text, a progress bar with no value and the time it has run', () => {
   const html = activity(viewState(snapshot({ jobs: [job({ time: String(START) })] })), (START + 125) * 1000);
