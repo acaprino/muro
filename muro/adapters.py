@@ -175,7 +175,15 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    keep valid upstream outputs). A `confirm` result with `approval: not-needed` is one
    long step that gets a map so it can be resumed: repeat with `--confirm` without asking.
    When the user refines a request that has an active map, classify the refined request
-   and repeat the plan call with `--amend`: steps whose work is still valid are kept.
+   and repeat the plan call with `--amend`. This redoes every step by default. Inspect
+   the previous map's task, classification, outputs and checks in
+   `<current project>/{state}/state.json` before deciding what to reuse; `resume` also
+   returns recorded outputs for the active step. If validity is unclear, redo the work.
+   Judge which completed outputs still satisfy the refined request, then explicitly add
+   `--preserve-completed <step IDs>` only for those steps and their unchanged upstream
+   inputs. Never preserve work the user asked to change, or a step whose intent changed.
+   The runtime rejects incompatible catalog, intent, stack and dependency bindings;
+   matching IDs alone do not establish that the old work answers the new request.
    Read only the returned active capability body.
 4. Perform the returned step using the host's tools. Do not load other capabilities.
    Replace `<package_root>` and `<state_dir>` in its instructions with the returned

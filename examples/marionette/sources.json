@@ -3,7 +3,7 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "language": "it",
     "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
@@ -161,7 +161,22 @@
         "docs/engineering/wayfinder.md",
         "skills/engineering/to-tickets/SKILL.md",
         "skills/engineering/to-spec/SKILL.md",
-        "skills/engineering/research/SKILL.md"
+        "skills/engineering/research/SKILL.md",
+        "skills/engineering/code-review/SKILL.md",
+        "skills/engineering/codebase-design/DEEPENING.md",
+        "skills/engineering/codebase-design/DESIGN-IT-TWICE.md",
+        "skills/engineering/codebase-design/SKILL.md",
+        "skills/engineering/domain-modeling/ADR-FORMAT.md",
+        "skills/engineering/domain-modeling/GLOSSARY-FORMAT.md",
+        "skills/engineering/domain-modeling/SKILL.md",
+        "skills/engineering/implement/SKILL.md",
+        "skills/engineering/prototype/LOGIC.md",
+        "skills/engineering/prototype/SKILL.md",
+        "skills/engineering/prototype/UI.md",
+        "skills/engineering/tdd/SKILL.md",
+        "skills/engineering/tdd/mocking.md",
+        "skills/engineering/tdd/tests.md",
+        "skills/productivity/grilling/SKILL.md"
       ],
       "excluded_paths": [
         "skills/**/scripts/**",
@@ -174,9 +189,39 @@
         {
           "paths": [
             "AGENTS.md",
-            "CLAUDE.md"
+            "CLAUDE.md",
+            "CONTRIBUTING.md",
+            "GLOSSARY.md",
+            "docs/agents/triage-labels.md",
+            "docs/engineering/ask-matt.md",
+            "docs/engineering/code-review.md",
+            "docs/engineering/codebase-design.md",
+            "docs/engineering/diagnosing-bugs.md",
+            "docs/engineering/domain-modeling.md",
+            "docs/engineering/grill-with-docs.md",
+            "docs/engineering/implement-spec.md",
+            "docs/engineering/implement.md",
+            "docs/engineering/improve-codebase-architecture.md",
+            "docs/engineering/pr.md",
+            "docs/engineering/prototype.md",
+            "docs/engineering/research.md",
+            "docs/engineering/resolving-merge-conflicts.md",
+            "docs/engineering/retro.md",
+            "docs/engineering/setup-matt-pocock-skills.md",
+            "docs/engineering/tdd.md",
+            "docs/engineering/to-spec.md",
+            "docs/engineering/to-tickets.md",
+            "docs/engineering/triage.md",
+            "docs/engineering/wizard.md",
+            "docs/productivity/grill-me.md",
+            "docs/productivity/grilling.md",
+            "docs/productivity/handoff.md",
+            "docs/productivity/teach.md",
+            "docs/productivity/to-questionnaire.md",
+            "docs/productivity/wait-what.md",
+            "docs/productivity/writing-for-agents.md"
           ],
-          "reason": "The repository's own agent instruction files. docs/engineering/wayfinder.md names files of those names in the user's project, where the source's tracker setup writes a section; that setup is not carried (work-map, Sources)."
+          "reason": "These references name the user's project files and directories: tracker instructions in AGENTS.md/CLAUDE.md, project standards in CONTRIBUTING.md, domain terms in GLOSSARY.md, and local specs/ADRs under docs/. The similarly named upstream documentation is not runtime input; the selected Wayfinder guide remains packaged. Tracker setup is not carried (work-map, Sources)."
         },
         {
           "paths": [

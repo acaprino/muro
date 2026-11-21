@@ -1,0 +1,1536 @@
+{
+  "decisions": {
+    "case_02170fa3384110ff": {
+      "task": "Converti report.docx in PDF senza cambiare il contenuto.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-files",
+          "intent": "office.format-conversion",
+          "reason": "Convert the existing Word file to PDF with its content intact."
+        }
+      ],
+      "reason": "Convert the existing Word file to PDF with its content intact.",
+      "questions": []
+    },
+    "case_0f4cd4faab3fefc4": {
+      "task": "Prepara una presentazione PowerPoint di 8 slide sui risultati del trimestre, i dati sono in vendite.csv.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-deck",
+          "intent": "office.presentation-creation",
+          "reason": "Produce eight PowerPoint slides from the quarterly sales CSV."
+        }
+      ],
+      "reason": "Produce eight PowerPoint slides from the quarterly sales CSV.",
+      "questions": []
+    },
+    "case_302756fef274c8dc": {
+      "task": "Crea un file Excel con il budget 2027 e le formule dei totali per mese.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-authoring",
+          "intent": "office.spreadsheet-creation",
+          "reason": "Build the 2027 Excel budget with monthly total formulas."
+        }
+      ],
+      "reason": "Build the 2027 Excel budget with monthly total formulas.",
+      "questions": []
+    },
+    "case_10232eaa03f6051f": {
+      "task": "Riassumimi in tre righe qui in chat cosa dice questo testo sul lavoro da remoto.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "A three-line summary in the conversation needs no catalog workflow.",
+      "questions": []
+    },
+    "case_1d91ff65c432a792": {
+      "task": "Dimmi durate ed easing giusti per l'hover dei bottoni della nostra app, senza scrivere codice.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "motion-principles",
+          "intent": "ui.motion-design",
+          "reason": "Specify hover duration and easing without an implementation step."
+        }
+      ],
+      "reason": "Specify hover duration and easing without an implementation step.",
+      "questions": []
+    },
+    "case_75390809c78e21af": {
+      "task": "Fissa la sezione hero e fai scalare la sua immagine con lo scroll usando ScrollTrigger.",
+      "stack_tokens": [
+        "stack:gsap"
+      ],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "gsap-scrolltrigger",
+          "intent": "ui.scroll-animation",
+          "reason": "Implement the specified pinned hero and scroll-linked image scale with ScrollTrigger."
+        }
+      ],
+      "reason": "Implement the specified pinned hero and scroll-linked image scale with ScrollTrigger.",
+      "questions": []
+    },
+    "case_01cd6f1c60a798cf": {
+      "task": "Anima l'ingresso delle card allo scroll, ma senza nessuna libreria JavaScript: solo CSS.",
+      "stack_tokens": [
+        "stack:css-only"
+      ],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "motion-principles",
+          "intent": "ui.motion-design",
+          "reason": "Choose the entrance effect for the cards and its reduced-motion behavior."
+        },
+        {
+          "capability": "css-scroll",
+          "intent": "ui.scroll-animation",
+          "reason": "Implement the card entrances with CSS scroll animations under the CSS-only constraint."
+        }
+      ],
+      "reason": "Choose the entrance effect for the cards and its reduced-motion behavior. Implement the card entrances with CSS scroll animations under the CSS-only constraint.",
+      "questions": []
+    },
+    "case_9249fd0ca443891a": {
+      "task": "Disegna in Figma la landing del nostro nuovo prodotto; non abbiamo ancora una struttura dei contenuti. L'integrazione Figma è collegata.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "visual-direction",
+          "intent": "ui.landing-strategy",
+          "reason": "Establish the landing offer and content structure that the canvas page will use."
+        },
+        {
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
+          "reason": "Build the planned landing inside the connected Figma file.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": true,
+              "reason": "This is a new landing with no supplied or recorded outline."
+            }
+          ]
+        }
+      ],
+      "reason": "Establish the landing offer and content structure that the canvas page will use. Build the planned landing inside the connected Figma file.",
+      "questions": []
+    },
+    "case_f4bba2f426ea4f53": {
+      "task": "Aggiungi gli stati hover, focus e disabled al componente Button nel nostro file Figma. L'integrazione Figma è collegata.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
+          "reason": "Edit the Button interaction states inside the existing connected Figma file.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": false,
+              "reason": "This is a component update, not a new landing page."
+            }
+          ]
+        }
+      ],
+      "reason": "Edit the Button interaction states inside the existing connected Figma file.",
+      "questions": []
+    },
+    "case_ab429bf1a4045b17": {
+      "task": "Che palette, font e regole di accessibilità consigli per la dashboard di un'app fintech? Niente codice.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-guidance",
+          "intent": "ui.design-guidance",
+          "reason": "Recommend a palette, type and accessibility rules for the fintech dashboard without writing code."
+        }
+      ],
+      "reason": "Recommend a palette, type and accessibility rules for the fintech dashboard without writing code.",
+      "questions": []
+    },
+    "case_484a46a40144b6c1": {
+      "task": "Rifai il sito della mia pasticceria: una pagina sola, statica, senza animazioni.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "visual-direction",
+          "intent": "ui.visual-direction",
+          "reason": "Rebuild the bakery's static one-page site in a single visual system."
+        }
+      ],
+      "reason": "Rebuild the bakery's static one-page site in a single visual system.",
+      "questions": []
+    },
+    "case_3e50c9f710b0f147": {
+      "task": "Crea una spiegazione HTML interattiva di come questo repository costruisce una release, con figure navigabili.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interactive-explainer",
+          "intent": "explainer.codebase-walkthrough",
+          "reason": "Trace the actual release implementation into an HTML explanation with navigable figures."
+        }
+      ],
+      "reason": "Trace the actual release implementation into an HTML explanation with navigable figures.",
+      "questions": []
+    },
+    "case_8ad6e22bb41bf515": {
+      "task": "Verifica affermazione per affermazione questo explainer contro le sue fonti, senza riscriverlo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "explainer-fact-check",
+          "intent": "explainer.fact-check",
+          "reason": "Check each claim in the existing explainer against its sources and report findings only."
+        }
+      ],
+      "reason": "Check each claim in the existing explainer against its sources and report findings only.",
+      "questions": []
+    },
+    "case_871a0d9cc6ff7fa7": {
+      "task": "Scrivi la migrazione SQL per aggiungere la colonna created_at alla tabella orders.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "work-map",
+          "intent": "engineering.work-coordination",
+          "reason": "Implement the specific orders schema addition as a direct SQL change."
+        }
+      ],
+      "reason": "Implement the specific orders schema addition as a direct SQL change.",
+      "questions": []
+    },
+    "case_0c700124ab34ace3": {
+      "task": "Trovami i lavori recenti sulla compressione della KV cache nei transformer, con il codice se esiste.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "paper-search",
+          "intent": "research.literature-search",
+          "reason": "Find recent KV cache compression papers and associated implementations."
+        }
+      ],
+      "reason": "Find recent KV cache compression papers and associated implementations.",
+      "questions": []
+    },
+    "case_dcab053e0de7c074": {
+      "task": "Fammi una spiegazione HTML interattiva di questo paper che ti allego in PDF, con figure che posso manipolare.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interactive-explainer",
+          "intent": "explainer.source-walkthrough",
+          "reason": "Use the attached paper as the source for an HTML article with operable figures."
+        }
+      ],
+      "reason": "Use the attached paper as the source for an HTML article with operable figures.",
+      "questions": []
+    },
+    "case_006759dae15e70b8": {
+      "task": "Spiegami questo paper che ti allego: voglio capirlo davvero.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "html-explanation",
+          "intent": "explanation.html-page",
+          "reason": "Give a deep explanation of the supplied paper using the default HTML walkthrough."
+        }
+      ],
+      "reason": "Give a deep explanation of the supplied paper using the default HTML walkthrough.",
+      "questions": []
+    },
+    "case_8ff731e149b6e0a6": {
+      "task": "Spiegami in HTML come funziona il consenso Raft, partendo dalle basi.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "html-explanation",
+          "intent": "explanation.html-page",
+          "reason": "Build the requested HTML explanation of Raft starting from first principles."
+        }
+      ],
+      "reason": "Build the requested HTML explanation of Raft starting from first principles.",
+      "questions": []
+    },
+    "case_8fc1c727094f9b10": {
+      "task": "Trova il paper originale di Raft e spiegamelo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "paper-search",
+          "intent": "research.literature-search",
+          "reason": "Identify the original Raft paper in the enabled scholarly sources."
+        },
+        {
+          "capability": "html-explanation",
+          "intent": "explanation.html-page",
+          "reason": "Explain the paper identified by the search in the default rich HTML format."
+        }
+      ],
+      "reason": "Identify the original Raft paper in the enabled scholarly sources. Explain the paper identified by the search in the default rich HTML format.",
+      "questions": []
+    },
+    "case_d1d040987c19d3aa": {
+      "task": "Aggiungi alla dashboard della nostra app un grafico a barre interattivo delle vendite mensili.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "work-map",
+          "intent": "engineering.work-coordination",
+          "reason": "Add the interactive sales chart to the production dashboard."
+        }
+      ],
+      "reason": "Add the interactive sales chart to the production dashboard.",
+      "questions": []
+    },
+    "case_dcee4bd91b8d6573": {
+      "task": "Fammi vedere cosa ha imparato TokenEconomizer in questo repository e quanto sono costate le sessioni.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "token-economy",
+          "intent": "cost.economy-report",
+          "reason": "Report the repository's learned TokenEconomizer facts and actual session costs."
+        }
+      ],
+      "reason": "Report the repository's learned TokenEconomizer facts and actual session costs.",
+      "questions": []
+    },
+    "case_76fa21f7dd9f49b3": {
+      "task": "TokenEconomizer mi ha tolto lo strumento WebFetch dalle sessioni di questo progetto: rimettilo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "token-economy",
+          "intent": "cost.tool-pruning",
+          "reason": "Restore WebFetch to the project's sessions from the pruning state."
+        }
+      ],
+      "reason": "Restore WebFetch to the project's sessions from the pruning state.",
+      "questions": []
+    },
+    "case_0f87399be7e12c25": {
+      "task": "Quanto costa al milione di token il modello più grande rispetto a quello piccolo?",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "A model price comparison is outside the repository session-cost capabilities.",
+      "questions": []
+    },
+    "case_6e611c7b24f0b20b": {
+      "task": "Fammi un prototipo cliccabile del flusso di registrazione della nostra nuova app. Non abbiamo né un brand né un design system: si parte da zero.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "aesthetic-direction",
+          "intent": "ui.aesthetic-direction",
+          "reason": "Choose a visual direction for the new unbranded app."
+        },
+        {
+          "capability": "ui-prototype",
+          "intent": "ui.interactive-prototype",
+          "reason": "Build a clickable registration flow using the chosen look.",
+          "needs": [
+            {
+              "requires": "aesthetic-direction",
+              "applies": true,
+              "reason": "The app starts with neither a brand nor a design system or other look to match."
+            }
+          ]
+        }
+      ],
+      "reason": "Choose a visual direction for the new unbranded app. Build a clickable registration flow using the chosen look.",
+      "questions": []
+    },
+    "case_b13172a427f8e47e": {
+      "task": "Costruisci un prototipo HTML navigabile della schermata Impostazioni usando i colori e i componenti che trovi in src/theme.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "ui-prototype",
+          "intent": "ui.interactive-prototype",
+          "reason": "Build the navigable settings prototype using the existing theme and components.",
+          "needs": [
+            {
+              "requires": "aesthetic-direction",
+              "applies": false,
+              "reason": "The product's existing src/theme provides the look to match."
+            }
+          ]
+        }
+      ],
+      "reason": "Build the navigable settings prototype using the existing theme and components.",
+      "questions": []
+    },
+    "case_86729c6ab8d0e915": {
+      "task": "Schizzami tre wireframe alternativi per il checkout su mobile, in bianco e nero, giusto per decidere la struttura.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "wireframe",
+          "intent": "ui.wireframe-exploration",
+          "reason": "Compare three monochrome, low-fidelity structures for mobile checkout."
+        }
+      ],
+      "reason": "Compare three monochrome, low-fidelity structures for mobile checkout.",
+      "questions": []
+    },
+    "case_5561ae83647bef18": {
+      "task": "Show me three different takes on the hero of pricing.html, all in one file so I can compare them side by side.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-options",
+          "intent": "ui.design-variations",
+          "reason": "Make three comparable design alternatives for the existing pricing hero in one file."
+        }
+      ],
+      "reason": "Make three comparable design alternatives for the existing pricing hero in one file.",
+      "questions": []
+    },
+    "case_a6b7a8ce334e63d6": {
+      "task": "Controlla l'accessibilità di dashboard.html (contrasto, navigazione da tastiera, focus) e correggi quello che non va.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-review",
+          "intent": "ui.accessibility-audit",
+          "reason": "Audit and correct dashboard contrast, keyboard navigation and focus."
+        }
+      ],
+      "reason": "Audit and correct dashboard contrast, keyboard navigation and focus.",
+      "questions": []
+    },
+    "case_d946c0840026c401": {
+      "task": "Fammi una presentazione di dieci slide come pagina HTML che gira a schermo intero nel browser, con i colori del nostro brand in brand.css.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "html-deck",
+          "intent": "ui.html-deck",
+          "reason": "Create the ten-slide presentation as a fullscreen browser deck.",
+          "needs": [
+            {
+              "requires": "aesthetic-direction",
+              "applies": false,
+              "reason": "brand.css provides the deck's visual direction."
+            }
+          ]
+        }
+      ],
+      "reason": "Create the ten-slide presentation as a fullscreen browser deck.",
+      "questions": []
+    },
+    "case_4bacbf2b14ab63b8": {
+      "task": "Estrai i design token (colori, font, spaziature, raggi) dal nostro tailwind.config.js e dai CSS e mettili in un file di token.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-system-extract",
+          "intent": "ui.token-extraction",
+          "reason": "Extract actual Tailwind and CSS values into a token file."
+        }
+      ],
+      "reason": "Extract actual Tailwind and CSS values into a token file.",
+      "questions": []
+    },
+    "case_e787c5ca0b5a0f74": {
+      "task": "Implementa nel nostro progetto React la nuova pagina Impostazioni, con il salvataggio delle preferenze sul backend.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "work-map",
+          "intent": "engineering.work-coordination",
+          "reason": "Implement the production React settings page and backend persistence."
+        }
+      ],
+      "reason": "Implement the production React settings page and backend persistence.",
+      "questions": []
+    },
+    "case_c630f0669cd600cb": {
+      "task": "Review my uncommitted changes for correctness and inspect affected callers. Report only; do not edit code or audit unrelated files.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-review",
+          "intent": "engineering.change-review",
+          "reason": "Review uncommitted changes and affected callers for correctness, reporting only."
+        }
+      ],
+      "reason": "Review uncommitted changes and affected callers for correctness, reporting only.",
+      "questions": []
+    },
+    "case_845e4c31e33d4d60": {
+      "task": "Fai un audit di correttezza di tutto il repository, inclusi i percorsi non toccati dal diff. Non applicare correzioni.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-review",
+          "intent": "engineering.codebase-audit",
+          "reason": "Audit the full repository including unchanged paths without applying fixes."
+        }
+      ],
+      "reason": "Audit the full repository including unchanged paths without applying fixes.",
+      "questions": []
+    },
+    "case_68e32ec000a9db6d": {
+      "task": "Elenca le scorciatoie deliberate nei commenti con limite e trigger di upgrade; includi il nostro marker debt-limit, non creare file.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-debt",
+          "intent": "engineering.shortcut-ledger",
+          "reason": "Report documented shortcuts, limits and triggers including debt-limit in chat."
+        }
+      ],
+      "reason": "Report documented shortcuts, limits and triggers including debt-limit in chat.",
+      "questions": []
+    },
+    "case_10beb9931ea7a510": {
+      "task": "Explain the absorbed Ponytail method and the meaning of lite, full and ultra preferences. Do not change persistent settings.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-guidance",
+          "intent": "engineering.working-guidance",
+          "reason": "Explain the Ponytail method and simplification preferences without changing settings."
+        }
+      ],
+      "reason": "Explain the Ponytail method and simplification preferences without changing settings.",
+      "questions": []
+    },
+    "case_a0ac20d3394d1076": {
+      "task": "Spiegami i risultati pubblicati del benchmark Ponytail e i loro limiti, senza stimare risparmi nel mio repository.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-guidance",
+          "intent": "engineering.benchmark-evidence",
+          "reason": "Explain the published Ponytail benchmark results and their limitations."
+        }
+      ],
+      "reason": "Explain the published Ponytail benchmark results and their limitations.",
+      "questions": []
+    },
+    "case_f5f15810cf88f25c": {
+      "task": "Show the actual TokenEconomizer statistics for this repository, not the published Ponytail benchmark.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "token-economy",
+          "intent": "cost.economy-report",
+          "reason": "Read the repository's actual TokenEconomizer figures."
+        }
+      ],
+      "reason": "Read the repository's actual TokenEconomizer figures.",
+      "questions": []
+    },
+    "case_9459d403792e3e4a": {
+      "task": "Rispondi più chiaramente e senza ripetizioni, ma non rivedere codice, creare file o pianificare lavori.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "This changes reply style and requests no capability output.",
+      "questions": []
+    },
+    "case_630ff3a9d2c7fb3f": {
+      "task": "Crea un workbook Excel completo di budget con tutti i dodici mesi, formule e controlli. Mantieni breve solo la risposta in chat.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-authoring",
+          "intent": "office.spreadsheet-creation",
+          "reason": "Produce the complete checked twelve-month budget workbook; brevity applies to the handoff."
+        }
+      ],
+      "reason": "Produce the complete checked twelve-month budget workbook; brevity applies to the handoff.",
+      "questions": []
+    },
+    "case_8d997c49cad6142d": {
+      "task": "Correggi il bug già riprodotto nel parser CSV: le virgole tra virgolette devono restare nello stesso campo. Aggiungi la verifica mirata; non voglio un report di review o un piano lungo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "work-map",
+          "intent": "engineering.work-coordination",
+          "reason": "Fix CSV quoted commas and add the focused regression check as a direct change."
+        }
+      ],
+      "reason": "Fix CSV quoted commas and add the focused regression check as a direct change.",
+      "questions": []
+    },
+    "case_b71fc2d8796e76cc": {
+      "task": "Verifica solo contrasto, focus e accessibilità visiva di questa schermata HTML, non la logica del codice o il debito del repository.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-review",
+          "intent": "ui.accessibility-audit",
+          "reason": "Check the HTML screen's contrast, focus and visual accessibility within the specified scope."
+        }
+      ],
+      "reason": "Check the HTML screen's contrast, focus and visual accessibility within the specified scope.",
+      "questions": []
+    },
+    "case_f8073b49e8f2d36f": {
+      "task": "Crea un explainer HTML interattivo completo del flusso di autenticazione di questo repository, con figure e riferimenti al codice. Riassumi solo il messaggio finale, non l’elaborato.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interactive-explainer",
+          "intent": "explainer.codebase-walkthrough",
+          "reason": "Produce the full interactive HTML article traced through the repository's authentication code."
+        }
+      ],
+      "reason": "Produce the full interactive HTML article traced through the repository's authentication code.",
+      "questions": []
+    },
+    "case_0ecfa1419383dded": {
+      "task": "Con UI Pro Max dimmi quali regole di UX e accessibilità mancano alla pagina impostazioni della mia app React; per ora non toccare il codice.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-guidance",
+          "intent": "ui.design-guidance",
+          "reason": "Use the UI guidance checklist to report gaps in React settings UX and accessibility."
+        }
+      ],
+      "reason": "Use the UI guidance checklist to report gaps in React settings UX and accessibility.",
+      "questions": []
+    },
+    "case_ab9d28e0c41f07a4": {
+      "task": "Fammi un bozzetto HTML con cinque temi della stessa schermata, dal più classico al più nuovo, e poi un pannello per cambiare tema e palette dal vivo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-options",
+          "intent": "ui.design-variations",
+          "reason": "Create the five alternatives of the same screen in one HTML design.",
+          "step_id": "design-options#1"
+        },
+        {
+          "capability": "design-options",
+          "intent": "ui.tweak-controls",
+          "reason": "Add the requested live theme and palette panel to that design.",
+          "step_id": "design-options#2"
+        }
+      ],
+      "reason": "Create the five alternatives of the same screen in one HTML design. Add the requested live theme and palette panel to that design.",
+      "questions": []
+    },
+    "case_0a8a1fefc00d2b70": {
+      "task": "Ho un'idea ancora vaga: una cache condivisa tra i nostri servizi. Aiutami a metterla alla prova e a farne un brief, prima di scrivere qualunque design.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "concept-brief",
+          "intent": "docs.idea-brainstorm",
+          "reason": "Stress-test the shared cache idea and capture it in a concept brief."
+        }
+      ],
+      "reason": "Stress-test the shared cache idea and capture it in a concept brief.",
+      "questions": []
+    },
+    "case_6b3382e1ffd22ac9": {
+      "task": "Scrivi con me il design doc della migrazione a code di messaggi, sezione per sezione, con il piano di implementazione file per file; niente codice per ora.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Write the design doc section by section including its file-by-file technical plan."
+        }
+      ],
+      "reason": "Write the design doc section by section including its file-by-file technical plan.",
+      "questions": []
+    },
+    "case_a97ae3833dff2a5d": {
+      "task": "Fai rivedere docs/designs/billing.md da revisori che non hanno visto questa conversazione, prima che iniziamo a implementarlo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "fresh-review",
+          "intent": "docs.staged-review",
+          "reason": "Have independent fresh-context reviewers assess the billing design before implementation."
+        }
+      ],
+      "reason": "Have independent fresh-context reviewers assess the billing design before implementation.",
+      "questions": []
+    },
+    "case_a569b54d90654819": {
+      "task": "Con egm-resolve passa i finding del report del critic sul design e proponimi le correzioni al documento.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "fresh-review",
+          "intent": "docs.finding-resolution",
+          "reason": "Work through the critic's existing findings and propose document corrections."
+        }
+      ],
+      "reason": "Work through the critic's existing findings and propose document corrections.",
+      "questions": []
+    },
+    "case_b42d54f8c7c98aa4": {
+      "task": "Documenta questo repository con un README di contratto in ogni cartella di codice: interfaccia, invarianti ed effetti collaterali.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "codebase-contracts",
+          "intent": "docs.codebase-contracts",
+          "reason": "Create per-directory contract READMEs from the implementation."
+        }
+      ],
+      "reason": "Create per-directory contract READMEs from the implementation.",
+      "questions": []
+    },
+    "case_e1f5755267126e44": {
+      "task": "Controlla se il codice si è allontanato da quanto descritto nei documenti in docs/designs e fammi un report delle sole differenze.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-drift",
+          "intent": "docs.design-drift",
+          "reason": "Report only implementation differences against the technical documents in docs/designs."
+        }
+      ],
+      "reason": "Report only implementation differences against the technical documents in docs/designs.",
+      "questions": []
+    },
+    "case_31364d2cbee5f413": {
+      "task": "Parti dalla mia idea di un sistema di notifiche, falla criticare e poi scrivi il design document.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "concept-brief",
+          "intent": "docs.idea-brainstorm",
+          "reason": "Stress-test the notifications idea in a concept brief with fresh critique."
+        },
+        {
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Write the technical design document from the refined brief."
+        }
+      ],
+      "reason": "Stress-test the notifications idea in a concept brief with fresh critique. Write the technical design document from the refined brief.",
+      "questions": []
+    },
+    "case_7f5a82b923bd7562": {
+      "task": "Rivedi le modifiche del branch per bug e test mancanti; non mi serve una review del documento di design.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "engineering-review",
+          "intent": "engineering.change-review",
+          "reason": "Review the branch changes for defects and missing tests."
+        }
+      ],
+      "reason": "Review the branch changes for defects and missing tests.",
+      "questions": []
+    },
+    "case_c3c52d1ada29fba5": {
+      "task": "Il design doc docs/designs/export.md è approvato: scrivi il piano di implementazione a task eseguibili, con i file esatti, i test che falliscono prima e i punti di commit. Non eseguirlo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "impl-plan",
+          "intent": "plans.impl-plan-writing",
+          "reason": "Turn the approved export design into an executable test-first plan with files and commits."
+        }
+      ],
+      "reason": "Turn the approved export design into an executable test-first plan with files and commits.",
+      "questions": []
+    },
+    "case_cf390ed375e80afa": {
+      "task": "Esegui il piano docs/superpowers/plans/2026-11-14-export.md task per task, senza fermarti tra i task, con la review finale a contesto fresco.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Execute the stated plan continuously and give the branch a final fresh review.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": false,
+              "reason": "The request supplies the dated export plan file."
+            }
+          ]
+        }
+      ],
+      "reason": "Execute the stated plan continuously and give the branch a final fresh review.",
+      "questions": []
+    },
+    "case_3dd26bf3fbe7609d": {
+      "task": "Dalla spec in docs/specs/login.md: prepara il piano di implementazione e poi eseguilo fino alla review finale del branch.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "impl-plan",
+          "intent": "plans.impl-plan-writing",
+          "reason": "Write the executable implementation plan from the login spec."
+        },
+        {
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Execute the resulting plan through final branch review.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": true,
+              "reason": "Only the spec exists and the user explicitly requests a new plan before execution."
+            }
+          ]
+        }
+      ],
+      "reason": "Write the executable implementation plan from the login spec. Execute the resulting plan through final branch review.",
+      "questions": []
+    },
+    "case_71a34afd7e098f16": {
+      "task": "Usa executing-plans per implementare il piano che abbiamo salvato ieri in docs/superpowers/plans/.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Use the requested execution method on the previously saved plan.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": false,
+              "reason": "The request identifies an existing plan saved yesterday in the plans directory."
+            }
+          ]
+        }
+      ],
+      "reason": "Use the requested execution method on the previously saved plan.",
+      "questions": []
+    },
+    "case_864254d7ac2cd7d4": {
+      "task": "Implementa il piano salvato con un subagent fresco per ogni task e una review dopo ognuno, poi la review dell'intero branch.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Execute the saved plan with fresh implementers, per-task reviews and a final branch review.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": false,
+              "reason": "The user confirms the plan is already saved."
+            }
+          ]
+        }
+      ],
+      "reason": "Execute the saved plan with fresh implementers, per-task reviews and a final branch review.",
+      "questions": []
+    },
+    "case_bb2ec845a24e2a53": {
+      "task": "Scrivi il design document della migrazione, sezione per sezione; il piano dei task non ancora.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Write the migration design section by section, deferring the executable task plan."
+        }
+      ],
+      "reason": "Write the migration design section by section, deferring the executable task plan.",
+      "questions": []
+    },
+    "case_15764ee8424d9a8d": {
+      "task": "Fai rivedere il piano di implementazione in docs/superpowers/plans/ da revisori che non hanno visto questa conversazione, prima di eseguirlo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "fresh-review",
+          "intent": "docs.staged-review",
+          "reason": "Have independent reviewers assess the existing implementation plan before it is used."
+        }
+      ],
+      "reason": "Have independent reviewers assess the existing implementation plan before it is used.",
+      "questions": []
+    },
+    "case_d151c8a563105cec": {
+      "task": "Partiamo dalla mia idea di un rate limiter condiviso: mettila alla prova in un brief, scrivi il design document, poi il piano eseguibile e la sua esecuzione.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "concept-brief",
+          "intent": "docs.idea-brainstorm",
+          "reason": "Stress-test the shared rate limiter idea and write a brief."
+        },
+        {
+          "capability": "design-doc",
+          "intent": "docs.design-draft",
+          "reason": "Develop the technical design from the accepted brief."
+        },
+        {
+          "capability": "impl-plan",
+          "intent": "plans.impl-plan-writing",
+          "reason": "Turn the design into the requested executable plan."
+        },
+        {
+          "capability": "plan-execution",
+          "intent": "plans.plan-execution",
+          "reason": "Carry out the resulting plan.",
+          "needs": [
+            {
+              "requires": "impl-plan",
+              "applies": true,
+              "reason": "The work starts from an idea with no existing executable plan."
+            }
+          ]
+        }
+      ],
+      "reason": "Stress-test the shared rate limiter idea and write a brief. Develop the technical design from the accepted brief. Turn the design into the requested executable plan. Carry out the resulting plan.",
+      "questions": []
+    },
+    "case_9af64a78f40b76aa": {
+      "task": "Abbiamo già scelto colori, font e spaziature del gestionale: scrivili in un DESIGN.md nel repository.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file",
+          "intent": "design-file.create",
+          "reason": "Record the already selected design values in the project's DESIGN.md."
+        }
+      ],
+      "reason": "Record the already selected design values in the project's DESIGN.md.",
+      "questions": []
+    },
+    "case_328ec84324c0a1af": {
+      "task": "Ricava un DESIGN.md dall'interfaccia che c'è già nel codice, con i valori legati a dove li hai trovati.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file",
+          "intent": "design-file.extract",
+          "reason": "Create a DESIGN.md whose measured values trace back to the existing interface source."
+        }
+      ],
+      "reason": "Create a DESIGN.md whose measured values trace back to the existing interface source.",
+      "questions": []
+    },
+    "case_901a602c1d30640a": {
+      "task": "Rifai la pagina impostazioni seguendo il nostro DESIGN.md, usando i token e i componenti del progetto.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-apply",
+          "intent": "design-file.apply",
+          "reason": "Implement the settings page using the project DESIGN.md, components and tokens."
+        }
+      ],
+      "reason": "Implement the settings page using the project DESIGN.md, components and tokens.",
+      "questions": []
+    },
+    "case_387f58ed8bab8e1b": {
+      "task": "Confronta l'app in esecuzione con il DESIGN.md e riportami i valori che non coincidono, senza toccare nulla.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-inspection",
+          "intent": "design-file.interface-drift",
+          "reason": "Compare the running interface's actual values with DESIGN.md and report discrepancies."
+        }
+      ],
+      "reason": "Compare the running interface's actual values with DESIGN.md and report discrepancies.",
+      "questions": []
+    },
+    "case_64828c4a1a407519": {
+      "task": "Controlla se il codice si è allontanato da quello che descrivono i design document in docs/designs e scrivi il report.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-drift",
+          "intent": "docs.design-drift",
+          "reason": "Compare the technical design documents in docs/designs against the code."
+        }
+      ],
+      "reason": "Compare the technical design documents in docs/designs against the code.",
+      "questions": []
+    },
+    "case_6527b3210982c10b": {
+      "task": "Ispeziona il checkout rispetto a WCAG 2.2 livello AA e dammi solo il report con i criteri violati, senza correggere.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-inspection",
+          "intent": "design-file.accessibility-inspection",
+          "reason": "Report checkout defects by WCAG 2.2 AA criterion without applying corrections."
+        }
+      ],
+      "reason": "Report checkout defects by WCAG 2.2 AA criterion without applying corrections.",
+      "questions": []
+    },
+    "case_ba415634d0fe9fcc": {
+      "task": "Controlla l'accessibilità di questa pagina HTML e sistema quello che non passa.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-review",
+          "intent": "ui.accessibility-audit",
+          "reason": "Audit the HTML page for accessibility and fix failures."
+        }
+      ],
+      "reason": "Audit the HTML page for accessibility and fix failures.",
+      "questions": []
+    },
+    "case_feff3537d138d556": {
+      "task": "Aggiungi alla CI un controllo che fallisce se nel codice entrano colori o font non previsti dal DESIGN.md.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-integration",
+          "intent": "design-file.code-checks",
+          "reason": "Enforce the DESIGN.md colour and font rules in CI."
+        }
+      ],
+      "reason": "Enforce the DESIGN.md colour and font rules in CI.",
+      "questions": []
+    },
+    "case_c2ef7dbfcb8276d1": {
+      "task": "Esporta i token del DESIGN.md in formato DTCG JSON.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-integration",
+          "intent": "design-file.token-export",
+          "reason": "Export existing DESIGN.md tokens as DTCG JSON."
+        }
+      ],
+      "reason": "Export existing DESIGN.md tokens as DTCG JSON.",
+      "questions": []
+    },
+    "case_869bae5250f485bb": {
+      "task": "Estrai i token dal nostro tailwind.config e dai CSS in un tokens.css; non voglio altri file.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-system-extract",
+          "intent": "ui.token-extraction",
+          "reason": "Extract existing Tailwind and CSS values into the sole requested tokens.css."
+        }
+      ],
+      "reason": "Extract existing Tailwind and CSS values into the sole requested tokens.css.",
+      "questions": []
+    },
+    "case_cdc375e8d04676ad": {
+      "task": "L'app non ha ancora un'identità visiva: proponimi tre direzioni e fissiamone una.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "aesthetic-direction",
+          "intent": "ui.aesthetic-direction",
+          "reason": "Propose three visual directions and commit the unbranded app to one."
+        }
+      ],
+      "reason": "Propose three visual directions and commit the unbranded app to one.",
+      "questions": []
+    },
+    "case_cd28b8b839c0acce": {
+      "task": "Questo post suona finto, da intelligenza artificiale: riscrivilo perché sembri scritto da me, senza aggiungere fatti.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "text-humanize",
+          "intent": "writing.humanize-prose",
+          "reason": "Rewrite the existing post in the author's natural voice while preserving facts."
+        }
+      ],
+      "reason": "Rewrite the existing post in the author's natural voice while preserving facts.",
+      "questions": []
+    },
+    "case_8805028557689b71": {
+      "task": "Correggi solo gli errori di battitura e di punteggiatura in docs/guida.md, senza cambiare altro.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "text-humanize",
+          "intent": "writing.humanize-prose",
+          "reason": "Restrict the existing guide's edit to spelling and punctuation."
+        }
+      ],
+      "reason": "Restrict the existing guide's edit to spelling and punctuation.",
+      "questions": []
+    },
+    "case_481745346e7b7450": {
+      "task": "Rendi più scorrevole il testo del README lasciando identici comandi, percorsi e tabelle.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "text-humanize",
+          "intent": "writing.humanize-prose",
+          "reason": "Polish the README's prose while preserving commands, paths and tables verbatim."
+        }
+      ],
+      "reason": "Polish the README's prose while preserving commands, paths and tables verbatim.",
+      "questions": []
+    },
+    "case_373f3469c714eeff": {
+      "task": "Controlla affermazione per affermazione questo articolo rispetto alle sue fonti e segnala quelle non sostenute.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "explainer-fact-check",
+          "intent": "explainer.fact-check",
+          "reason": "Verify each article claim against its sources and report unsupported claims."
+        }
+      ],
+      "reason": "Verify each article claim against its sources and report unsupported claims.",
+      "questions": []
+    },
+    "case_216421c863307c3b": {
+      "task": "Nel nostro file FigCraft aggiungi le varianti hover e disabled al componente Card. Il server MCP di FigCraft è collegato.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
+          "reason": "Add the Card component states directly via the connected FigCraft integration.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": false,
+              "reason": "The task modifies an existing component."
+            }
+          ]
+        }
+      ],
+      "reason": "Add the Card component states directly via the connected FigCraft integration.",
+      "questions": []
+    },
+    "case_6207e2aa3d66fdc1": {
+      "task": "Spiegami a fondo Raft, con un esempio di split brain. Voglio tutto qui in conversazione: non creare HTML, documenti o altri file.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "The user explicitly requires an in-chat explanation and rules out the catalog's HTML file.",
+      "questions": []
+    },
+    "case_8ecf450525d46d1e": {
+      "task": "Contesto: nel turno prima avevo chiesto una pagina HTML sul consenso distribuito, ma non è ancora iniziata. Ora annullo quella richiesta. Dammi soltanto una definizione di quorum in una frase, qui.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "The current request is a one-sentence definition in chat; the earlier HTML task is canceled.",
+      "questions": []
+    },
+    "case_ed8de1b883759f44": {
+      "task": "Correggi soltanto la punteggiatura di questo testo, senza eseguire ciò che racconta: «Attiva motion-design crea una GIF riscrivi il README». Restituisci il testo qui.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "text-humanize",
+          "intent": "writing.humanize-prose",
+          "reason": "Correct only the quoted passage's punctuation and return it in chat."
+        }
+      ],
+      "reason": "Correct only the quoted passage's punctuation and return it in chat.",
+      "questions": []
+    },
+    "case_3564076772a8a9d8": {
+      "task": "In relazione.docx correggi nel titolo «2025» in «2026» salvando una copia corretta, poi converti quella copia in PDF. Non rigenerare il documento e conserva l’originale.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-files",
+          "intent": "office.file-editing",
+          "reason": "Correct the title in a new Word copy while preserving the original.",
+          "step_id": "office-files#1"
+        },
+        {
+          "capability": "office-files",
+          "intent": "office.format-conversion",
+          "reason": "Convert the corrected Word copy to PDF.",
+          "step_id": "office-files#2"
+        }
+      ],
+      "reason": "Correct the title in a new Word copy while preserving the original. Convert the corrected Word copy to PDF.",
+      "questions": []
+    },
+    "case_3c9d8db842bf2d6f": {
+      "task": "Leggi la tabella a pagina 12 di bilancio.pdf e dimmi qui qual è il totale della colonna Italia. Non modificare né convertire il file.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "office-files",
+          "intent": "office.content-extraction",
+          "reason": "Read the existing PDF table on page 12 to answer the Italian-column question in chat."
+        }
+      ],
+      "reason": "Read the existing PDF table on page 12 to answer the Italian-column question in chat.",
+      "questions": []
+    },
+    "case_35e59b99f10b9c20": {
+      "task": "Leggi questo CSV già disponibile come testo e dimmi il valore della terza riga. Non creare un Excel e non convertire niente.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "The CSV is already plain text; a direct row lookup needs no Office operation.",
+      "questions": []
+    },
+    "case_7413f8dbc62aa9b2": {
+      "task": "Modifica direttamente i componenti nel file Figma del team. In questa sessione non c’è alcuna integrazione Figma, non ho collegato l’account e non autorizzo login o installazioni; un HTML sostitutivo non va bene.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "A direct Figma edit requires an account integration that is absent and explicitly disallowed.",
+      "questions": []
+    },
+    "case_956ee52da1387e1a": {
+      "task": "Contesto: sono allegati proposal.docx, proposal.html e il file Figma Proposal. Sistema quello, mantenendo il suo formato. Non ho ancora indicato quale dei tre.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "needs_clarification",
+      "selections": [],
+      "reason": "The referent is ambiguous across three artifacts with different editing routes.",
+      "questions": [
+        "Which proposal should I edit, the DOCX, the HTML page or the Figma file, and what should I fix?"
+      ]
+    },
+    "case_e1a18f993935e44c": {
+      "task": "In un vecchio esempio c’era GSAP ma non devi usarlo. Per questa pagina voglio solo CSS: scala la foto da 0.8 a 1 mentre il suo contenitore attraversa il viewport, e disattiva l’effetto con reduced motion. Il browser è disponibile.",
+      "stack_tokens": [
+        "stack:css-only"
+      ],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "css-scroll",
+          "intent": "ui.scroll-animation",
+          "reason": "Implement the exact viewport-linked scale and reduced-motion override using CSS alone."
+        }
+      ],
+      "reason": "Implement the exact viewport-linked scale and reduced-motion override using CSS alone.",
+      "questions": []
+    },
+    "case_b0d9024370936136": {
+      "task": "Contesto già approvato: per la landing abbiamo offerta, pubblico, CTA, copy e outline hero-benefici-prezzi; sono nei risultati registrati. Ora disegnala nel file FigCraft usando quelli. MCP FigCraft e ispezione screenshot sono disponibili; non rifare la strategia.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "canvas-design",
+          "intent": "ui.canvas-design",
+          "reason": "Draw the landing in the connected FigCraft file from the approved strategy.",
+          "needs": [
+            {
+              "requires": "visual-direction",
+              "applies": false,
+              "reason": "The recorded offer, audience, CTA, copy and outline already provide the needed strategy."
+            }
+          ]
+        }
+      ],
+      "reason": "Draw the landing in the connected FigCraft file from the approved strategy.",
+      "questions": []
+    },
+    "case_bff692796d10d7bc": {
+      "task": "Fammi un prototipo HTML hi-fi dell’app. Il repository contiene solo DESIGN.md.example, dichiarato modello vuoto da compilare; non abbiamo brand, tema, valori scelti né riferimenti. Prima scegliamo il look.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "aesthetic-direction",
+          "intent": "ui.aesthetic-direction",
+          "reason": "Select a concrete look before drawing the unbranded hi-fi app."
+        },
+        {
+          "capability": "ui-prototype",
+          "intent": "ui.interactive-prototype",
+          "reason": "Build the hi-fi HTML prototype from the approved look.",
+          "needs": [
+            {
+              "requires": "aesthetic-direction",
+              "applies": true,
+              "reason": "The empty DESIGN.md.example contains no chosen values and there are no other design references."
+            }
+          ]
+        }
+      ],
+      "reason": "Select a concrete look before drawing the unbranded hi-fi app. Build the hi-fi HTML prototype from the approved look.",
+      "questions": []
+    },
+    "case_a3cc5bf272fc6c97": {
+      "task": "Dal DESIGN.md esporta prima i token in DTCG JSON; poi aggiungi alla CI il controllo sui valori vietati nel codice. Sono due risultati distinti, entrambi autorizzati. Non modificare i valori del DESIGN.md.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-integration",
+          "intent": "design-file.token-export",
+          "reason": "Export the existing design values to DTCG JSON.",
+          "step_id": "design-file-integration#1"
+        },
+        {
+          "capability": "design-file-integration",
+          "intent": "design-file.code-checks",
+          "reason": "Then add CI enforcement of forbidden code values using the unchanged DESIGN.md.",
+          "step_id": "design-file-integration#2"
+        }
+      ],
+      "reason": "Export the existing design values to DTCG JSON. Then add CI enforcement of forbidden code values using the unchanged DESIGN.md.",
+      "questions": []
+    },
+    "case_175845361100dbd0": {
+      "task": "Rivedi soltanto il DESIGN.md: cerca riferimenti a token inesistenti, istruzioni contraddittorie e stati mancanti. Non confrontarlo con l’app, non aprire il browser e non correggerlo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-file-inspection",
+          "intent": "design-file.document-review",
+          "reason": "Review only the design document for missing tokens, conflicting instructions and incomplete states."
+        }
+      ],
+      "reason": "Review only the design document for missing tokens, conflicting instructions and incomplete states.",
+      "questions": []
+    },
+    "case_f312393e4140c5c2": {
+      "task": "Prima usavo taste-skill. Ora rifai la landing del B&B: una pagina statica con camere, servizi e prenotazione, niente animazioni. Il vecchio nome è solo un riferimento, usa ciò che è disponibile.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "visual-direction",
+          "intent": "ui.visual-direction",
+          "reason": "Build the static B&B landing with rooms, services and booking in the available website workflow."
+        }
+      ],
+      "reason": "Build the static B&B landing with rooms, services and booking in the available website workflow.",
+      "questions": []
+    },
+    "case_086cd40fe39c5869": {
+      "task": "Rendi più naturale questa email italiana e traducila integralmente in giapponese. Entrambe le cose sono essenziali; non consegnare soltanto la revisione italiana.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "Prose humanization is available, but the equally essential full Japanese translation is outside the catalog.",
+      "questions": []
+    },
+    "case_f95e572b4268e673": {
+      "task": "In TokenEconomizer ripristina solo WebFetch che era stato potato. Non attivare la modalità automatica, non registrare hook e non cambiare gli altri tool.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "token-economy",
+          "intent": "cost.tool-pruning",
+          "reason": "Restore only the pruned WebFetch entry without changing other tools or registering hooks."
+        }
+      ],
+      "reason": "Restore only the pruned WebFetch entry without changing other tools or registering hooks.",
+      "questions": []
+    },
+    "case_02f16d465a03a18e": {
+      "task": "Voglio un MP4 dell’animazione del logo, non una specifica. Creator MCP non è connesso e non autorizzo collegare account o servizi esterni; non accetto un motore sostitutivo.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "no_match",
+      "selections": [],
+      "reason": "The required MP4 needs the disconnected Creator integration; connecting it and using alternate engines are expressly ruled out.",
+      "questions": []
+    },
+    "case_213822aa734cce2d": {
+      "task": "Trova il paper originale di Raft, recuperalo e poi trasformalo in un explainer HTML con figure che posso manipolare. La ricerca web è disponibile. Non mi serve una seconda pagina con solo walkthrough e quiz.",
+      "stack_tokens": [],
+      "catalog_digest": "2a73854569d8ad2de593fc8351035d2fc620b43b7808bb21af980356654412ce",
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "paper-search",
+          "intent": "research.literature-search",
+          "reason": "Identify the original Raft paper using enabled scholarly sources.",
+          "step_id": "paper-search#1"
+        },
+        {
+          "capability": "paper-search",
+          "intent": "research.paper-reading",
+          "reason": "Fetch the identified paper's text for the explainer.",
+          "step_id": "paper-search#2"
+        },
+        {
+          "capability": "interactive-explainer",
+          "intent": "explainer.source-walkthrough",
+          "reason": "Turn the retrieved paper into a single HTML explainer with operable figures."
+        }
+      ],
+      "reason": "Identify the original Raft paper using enabled scholarly sources. Fetch the identified paper's text for the explainer. Turn the retrieved paper into a single HTML explainer with operable figures.",
+      "questions": []
+    }
+  }
+}

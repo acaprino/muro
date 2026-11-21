@@ -10,6 +10,7 @@ intents: [{"id":"ui.scroll-animation","description":"Implement scroll-linked ani
 after: []
 outputs: ["code-patch", "scroll-verified"]
 checks: ["scroll_timeline_accurate", "pin_stable_css", "unsupported_browsers_static", "reduced_motion_disables_animation", "no_js_required"]
+check_conditions: {"pin_stable_css": "The requested scroll behavior uses a sticky element for pinning. A reveal or progress animation with no pinned element does not have a pin to test."}
 ---
 
 # CSS Scroll Animation (No-JS Variant)
@@ -62,6 +63,7 @@ Return every required output key as a JSON string. For a mapped step, submit the
 - Changes for coexistence (ADR-0017):
   - The source allows linear "only for spinners, progress bars"; step 3 also allows it where progress must track the scroll position one to one. motion-design does not address timing on a scroll timeline, and the source of the other `scroll-code` variant (gsap-scrolltrigger) requires `ease: "none"` on a horizontal-scroll tween because any other ease "breaks the 1:1 scroll-to-position mapping": this method follows the one-to-one mapping there and the motion-design rule everywhere else.
   - The rest of motion-design (personality, durations, choreography, the three motion layers) is not applied here: `motion-principles` is the one owner of `motion-spec`, and a recorded `motion-spec` and `reduced-motion` are implemented as recorded.
+  - Check scope (2026-11-20): `pin_stable_css` is conditional on the requested behavior actually using sticky pinning; no pin is added merely to satisfy a check.
 - Runtime dependency: none.
 - Hooks: none.
 - Open gap: a maintained upstream source for CSS scroll-driven animation would replace this Muro-authored method; choosing one is the owner's decision.

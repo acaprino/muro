@@ -126,8 +126,11 @@ and skill names. The install notes tell the user to switch them off, because an
 installed original competes with the coordinator for the same requests.
 
 Maintain `eval-cases.json`: representative requests in the users' own language
-with the expected `status` and ordered capabilities, including near-misses and
-requests the catalog must refuse (`no_match`). Write them as a user would, never
+with the expected `status` and ordered capabilities. For operations sharing a
+capability, declare the expected intent in `expect.selections`. Include close
+pairs where one change in the request changes the operation, an applicable
+and an inapplicable conditional prerequisite, repeated steps when supported,
+and cases for `no_match` and `needs_clarification`. Write them as a user would, never
 with capability or intent names. They are scored against a real model's decisions;
 when a case fails, decide whether the catalog wording or the expectation is wrong
 and record which.

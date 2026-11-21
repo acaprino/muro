@@ -72,7 +72,7 @@ def test_eval_receives_exact_policy_and_matches_runtime_and_guide_binding(portab
         prepared = prepare_eval(portable_project, tmp_path / "prepared")
         assert policy in (prepared / "PROMPT.md").read_text(encoding="utf-8")
         contexts = json.loads((prepared / "contexts.json").read_text(encoding="utf-8"))
-        assert contexts["verify"] == request["context"]
+        assert list(contexts.values()) == [request["context"]]
         _, guide = read_guide(write_release_guide(portable_project, manifest["plugin"], manifest["sources"]))
         assert guide.payload["catalog_digest"] == coordinator.digest
         if old_digest is None:

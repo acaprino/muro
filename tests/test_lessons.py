@@ -61,7 +61,7 @@ def test_build_out_stages_a_release_elsewhere_and_keeps_dist_protected(portable_
     assert not (portable_project / "dist").exists()
 
 
-def test_amend_keeps_valid_outputs_when_the_request_is_refined(pkg, tmp_path):
+def test_amend_keeps_only_explicitly_selected_valid_outputs_when_the_request_is_refined(pkg, tmp_path):
     c = Coordinator(pkg, tmp_path / "consumer")
     task = "Landing per il mio SaaS, poi il movimento"
     plan = proposed(c, task, ["visual-direction", "motion-principles"])["plan"]
@@ -72,7 +72,7 @@ def test_amend_keeps_valid_outputs_when_the_request_is_refined(pkg, tmp_path):
     ids = ["visual-direction", "motion-principles", "design-guidance"]
     route = response(c.propose(refined, set()), ids)
     assert c.propose(refined, set(), classification=route, amend=True) == {"mode": "confirm", "task": refined, "plan": ids}
-    nxt = c.confirm(refined, ids, amend=True)
+    nxt = c.confirm(refined, ids, amend=True, preserve_completed=["visual-direction"])
     assert nxt["capability"] == "motion-principles"          # visual-direction is not redone
     assert nxt["recorded_outputs"]["palette"] == "v_palette"
     assert nxt["map_id"] != step["map_id"] and nxt["task"] == refined
@@ -150,7 +150,14 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
         if case["id"] == wrong:
             ids = ["office-files"]
         selections = []
+        expected_selections = case["expect"].get("selections") if case["id"] != wrong else None
         for position, name in enumerate(ids):
+            if expected_selections is not None:
+                sel = {**expected_selections[position], "reason": "fixture"}
+                if "needs" in sel:
+                    sel["needs"] = [{**need, "reason": "fixture"} for need in sel["needs"]]
+                selections.append(sel)
+                continue
             # A capability expected twice is two steps: each occurrence gets its step_id and its own intent.
             occurrence = ids[:position + 1].count(name)
             intents = caps[name].intents
@@ -162,12 +169,13 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
                                 for n in caps[name].needs]
             selections.append(sel)
         status = "selected" if ids else case["expect"]["status"]
-        decisions[case["id"]] = {**contexts[case["id"]], "status": status, "selections": selections,
+        context = next(c for c in contexts.values() if c["task"] == case["task"] and c["stack_tokens"] == sorted(case["stack_tokens"]))
+        decisions[case["id"]] = {**context, "status": status, "selections": selections,
                                  "reason": "fixture", "questions": ["?"] if status == "needs_clarification" else []}
     return {"decisions": decisions}
 
 
-def test_eval_prepares_cases_for_the_host_ai_and_scores_only_structure(tmp_path):
+def test_eval_prepares_blind_cases_and_scores_authored_decisions(tmp_path):
     caps = {cap.id: cap for cap in parse_capabilities(MARIONETTE / "capabilities")}
     cases = json.loads((MARIONETTE / "eval-cases.json").read_text(encoding="utf-8"))
     assert validate_cases(cases, list(caps.values())) == [] and len(cases["cases"]) >= 10

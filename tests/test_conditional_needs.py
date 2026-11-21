@@ -84,6 +84,73 @@ def test_python_rejects_a_missing_or_inconsistent_judgment(coordinator):
     assert not coordinator.state_dir.exists()
 
 
+def instanced_answer(coordinator, producers, required, applies=True):
+    task = "Use the specified landing strategy for the canvas design"
+    answer = decision(coordinator, task, ["visual-direction"] * len(producers) + ["canvas-design"])
+    for selection, step_id in zip(answer["selections"], producers):
+        if step_id is not None:
+            selection["step_id"] = step_id
+    figma(answer)["needs"][0].update(requires=required, applies=applies)
+    return task, answer
+
+
+@pytest.mark.parametrize("producers", [[None], ["visual-direction#1"], ["visual-direction#1", "visual-direction#2"]])
+@pytest.mark.parametrize("applies", [True, False])
+def test_explicit_missing_instance_never_falls_back_to_another_producer(coordinator, producers, applies):
+    task, answer = instanced_answer(coordinator, producers, "visual-direction#999", applies)
+    with pytest.raises(ValueError, match="visual-direction#999.*not selected"):
+        coordinator.propose(task, set(), classification=answer)
+    assert not coordinator.state_dir.exists()
+
+
+def test_bare_applied_reference_to_repeated_producer_is_ambiguous(coordinator):
+    task, answer = instanced_answer(coordinator, ["visual-direction#1", "visual-direction#2"], "visual-direction")
+    with pytest.raises(ValueError, match="ambiguous.*explicit step_id"):
+        coordinator.propose(task, set(), classification=answer)
+    assert not coordinator.state_dir.exists()
+
+
+@pytest.mark.parametrize("producers,required", [
+    ([None], "visual-direction"),
+    (["visual-direction#7"], "visual-direction"),
+    (["visual-direction#7"], "visual-direction#7"),
+    (["visual-direction#1", "visual-direction#2"], "visual-direction#2"),
+])
+def test_unique_or_exact_prerequisite_references_preserve_selected_steps(coordinator, producers, required):
+    task, answer = instanced_answer(coordinator, producers, required)
+    result = coordinator.propose(task, set(), classification=answer)
+    assert result["plan"] == [step or "visual-direction" for step in producers] + ["canvas-design"]
+
+
+def test_explicit_reference_cannot_use_an_earlier_different_instance(coordinator):
+    task, answer = instanced_answer(coordinator, ["visual-direction#1", "visual-direction#2"], "visual-direction#2")
+    answer["selections"][1], answer["selections"][2] = answer["selections"][2], answer["selections"][1]
+    with pytest.raises(ValueError, match="select visual-direction#2 before it"):
+        coordinator.propose(task, set(), classification=answer)
+
+
+@pytest.mark.parametrize("required", ["visual-direction#", "visual-direction#0", "visual-direction#01",
+                                      "visual-direction#-1", "visual-direction#x", "visual-direction#1#2",
+                                      "visual-direction#1 ", "visual-direction#1\n"])
+@pytest.mark.parametrize("applies", [True, False])
+def test_needs_reference_syntax_is_checked_even_when_it_does_not_apply(coordinator, required, applies):
+    task, answer = instanced_answer(coordinator, ["visual-direction#1"], required, applies)
+    with pytest.raises(ValueError, match="Invalid conditional prerequisite reference"):
+        coordinator.propose(task, set(), classification=answer)
+    assert not coordinator.state_dir.exists()
+
+
+@pytest.mark.parametrize("producers,required", [
+    ([], "visual-direction"),
+    (["visual-direction#1", "visual-direction#2"], "visual-direction"),
+    (["visual-direction#1"], "visual-direction#1"),
+])
+def test_false_judgment_needs_no_producer_binding(coordinator, producers, required):
+    task, answer = instanced_answer(coordinator, producers, required, applies=False)
+    result = coordinator.propose(task, set(), classification=answer)
+    assert result["mode"] == ("confirm" if producers else "direct")
+
+
 def test_schema_rejects_invalid_needs_declarations():
     caps = parse_capabilities(PACKAGE / "capabilities")
     rows = parse_router(PACKAGE / "ROUTER.md")

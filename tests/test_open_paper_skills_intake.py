@@ -188,7 +188,10 @@ def test_delivery_accounts_for_what_stays_and_what_was_removed():
     mine = [item for item in document["decisions"] if item["source"] == "open-paper-skills"]
     kept = sorted(target for item in mine if item["form"] == "capability" for target in item["targets"])
     assert kept == ["html-explanation", "paper-search"]
-    assert {item["form"] for item in mine} == {"capability", "dropped"}
+    assert {item["form"] for item in mine} == {"capability", "always-on", "dropped"}
+    [policy] = [item for item in mine if item["form"] == "always-on"]
+    assert "A source that is off is off on every route" in policy["content"]
+    assert policy["targets"] == []
     dropped = " ".join(item["content"] for item in mine if item["form"] == "dropped")
     for skill in (*DROPPED_SKILLS, "explain-paper-html"):
         assert skill in dropped, skill

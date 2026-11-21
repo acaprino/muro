@@ -22,6 +22,7 @@ from .routing import (
     catalog_entries,
     catalog_digest,
     resolve_selection,
+    resolve_needs_step,
     selection_step_id,
     step_capability,
     step_output_keys,
@@ -217,6 +218,10 @@ class Coordinator:
         if not self.state_path.is_file():
             raise ValueError("No active map. Run plan first or work directly on a one-step task.")
         state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        return self._validate_state(state)
+
+    def _validate_state(self, state: Any) -> dict[str, Any]:
+        """Validate a saved or candidate map without changing the active map or its archive."""
         if not isinstance(state, dict) or state.get("schema_version") != 2 or "classification" not in state:
             raise ValueError("Legacy state lacks AI classification; run plan --new and classify again; previous evidence is archived on confirmation")
         if not isinstance(state.get("map_id"), str) or not state["map_id"].strip():
@@ -537,7 +542,7 @@ class Coordinator:
         amend: bool = False,
         focus: set[str] | None = None,
     ) -> dict[str, Any]:
-        # amend: the same conversation refined its request; plan against the new decision, keep valid work.
+        # A refined request is planned afresh; only the host may explicitly choose work to preserve.
         self._new_map = new or amend
         self._last_classification = None
         stack = (
@@ -616,30 +621,20 @@ class Coordinator:
         with self._transaction():
             return self._confirm(task, plan, stack, route, preserve_completed=preserve_completed, amend=amend)
 
-    def _amendable_steps(self, raw_prev: dict[str, Any] | None, full_plan: list[str], route: dict[str, Any]) -> list[str]:
-        """Steps of the active map whose recorded work is still valid under the amended plan."""
-        if (not raw_prev or raw_prev.get("map_status") == "completed" or not isinstance(raw_prev.get("outputs"), dict)
-                or not isinstance(raw_prev.get("plan"), list)):
-            raise ValueError("--amend needs an active map; plan without --amend to start one")
-        outputs, previous = raw_prev["outputs"], set(raw_prev["plan"])
-        caps = {step: self.capabilities[step_capability(step)] for step in full_plan}
-        keep = [step for step in full_plan if step in previous and all(
-            isinstance(outputs.get(key), str) and outputs[key].strip() for key in step_output_keys(step, caps[step].outputs))]
-        producers = {key: step for step in full_plan for key in caps[step].outputs}
-        judged = {selection_step_id(s): s.get("needs", []) for s in route["selections"]}
-        changed = True
-        while changed:  # a kept step is stale when anything it depends on or reads is redone
-            changed = False
-            for step in list(keep):
-                cap = caps[step]
-                stale = (any(a in full_plan and a not in keep for a in cap.after)
-                         or any(n.get("applies") and n["requires"] not in keep and step_capability(n["requires"]) not in keep
-                                for n in judged.get(step, []))
-                         or any(producers.get(key) not in (None, step) and producers[key] not in keep for key in cap.reads))
-                if stale:
-                    keep.remove(step)
-                    changed = True
-        return keep
+    def _preservation_dependencies(self, step_ref: str, plan: list[str], route: dict[str, Any]) -> dict[str, list[str]]:
+        """Declared inputs available before this step, including exact repeated-step bindings."""
+        cap = self.capabilities[step_capability(step_ref)]
+        selection = next((s for s in route["selections"] if selection_step_id(s) == step_ref), {})
+        dependencies = {
+            "after": list(cap.after),
+            "needs": [resolve_needs_step(n["requires"], plan)
+                      for n in selection.get("needs", []) if n["applies"]],
+            "reads": [],
+        }
+        for prior in plan[:plan.index(step_ref)]:
+            if set(cap.reads) & set(self.capabilities[step_capability(prior)].outputs):
+                dependencies["reads"].append(prior)
+        return dependencies
 
     def _preserved_evidence(
         self,
@@ -650,10 +645,18 @@ class Coordinator:
     ) -> tuple[dict[str, str], list[dict[str, str]]]:
         if not raw_prev or not isinstance(raw_prev.get("outputs"), dict) or not isinstance(raw_prev.get("plan"), list):
             raise ValueError("Cannot preserve completed steps: no previous valid map state exists")
+        # Old evidence must still belong to this catalog, not merely share output names.
+        self._validate_state(raw_prev)
+        if (not isinstance(preserve_steps, list) or any(not isinstance(step, str) for step in preserve_steps)
+                or len(set(preserve_steps)) != len(preserve_steps)):
+            raise ValueError("Preserved steps must be a list of distinct step IDs")
         prev_plan = set(raw_prev["plan"])
         prev_outputs: dict[str, str] = raw_prev["outputs"]
         keep_set = set(preserve_steps)
-        sel_by_step = {selection_step_id(s): s for s in route["selections"]}
+        old_route = raw_prev["classification"]
+        # Old state and the proposed plan both pass resolve_selection, including
+        # each capability's stack constraints; unrelated stack changes may coexist.
+        old_checks = self._effective_checks(raw_prev)
         kept_outputs: dict[str, str] = {}
         for step_ref in preserve_steps:
             if step_ref not in prev_plan:
@@ -665,16 +668,16 @@ class Coordinator:
                 raise ValueError(f"Cannot preserve incomplete step '{step_ref}': missing outputs {missing}")
             if step_ref not in full_plan:
                 raise ValueError(f"Cannot preserve step '{step_ref}': not present in new plan")
-            for prereq in cap.after:
-                if prereq not in keep_set:
-                    raise ValueError(f"Cannot preserve {step_ref} without its prerequisite {prereq}")
-            sel = sel_by_step.get(step_ref, {})
-            for need_item in sel.get("needs", []):
-                if need_item.get("applies"):
-                    req = need_item["requires"]
-                    req_cap = step_capability(req)
-                    if req not in keep_set and req_cap not in keep_set:
-                        raise ValueError(f"Cannot preserve {step_ref} without its conditional prerequisite {req} (needs)")
+            if self._step_intent(old_route, step_ref) != self._step_intent(route, step_ref):
+                raise ValueError(f"Cannot preserve step '{step_ref}': its selected intent changed")
+            if "fail" in old_checks[step_ref].values():
+                raise ValueError(f"Cannot preserve step '{step_ref}': it has failing checks")
+            previous_inputs = self._preservation_dependencies(step_ref, raw_prev["plan"], old_route)
+            current_inputs = self._preservation_dependencies(step_ref, full_plan, route)
+            if previous_inputs != current_inputs:
+                raise ValueError(f"Cannot preserve {step_ref}: its prerequisite or read dependencies changed")
+            if missing_inputs := {step for group in current_inputs.values() for step in group} - keep_set:
+                raise ValueError(f"Cannot preserve {step_ref} without its prerequisite/read steps: {', '.join(sorted(missing_inputs))}")
             for k in expected_keys:
                 kept_outputs[k] = prev_outputs[k]
         prev_results = raw_prev.get("results", [])
@@ -708,8 +711,12 @@ class Coordinator:
         )
         initial_outputs: dict[str, str] = {}
         initial_results: list[dict[str, str]] = []
-        if amend and not preserve_completed:
-            preserve_completed = self._amendable_steps(raw, full_plan, route) or None
+        if amend:
+            if raw is None or raw.get("map_status") == "completed":
+                raise ValueError("--amend needs an active map; plan without --amend to start one")
+            self._validate_state(raw)
+        # The host judges semantic validity and explicitly names reusable steps.
+        # An omitted or empty preservation list always redoes the amended work.
         if preserve_completed:
             initial_outputs, initial_results = self._preserved_evidence(preserve_completed, raw, full_plan, route)
         replace = (
@@ -717,22 +724,22 @@ class Coordinator:
             or self._new_map
             or (raw is not None and (raw.get("map_status") == "completed" or raw.get("task") != task))
         )
-        if replace and self.state_path.exists():
-            self._archive_map()
         if replace or not self.state_path.exists():
-            self._write_state(
-                {
-                    "schema_version": 2,
-                    "map_id": uuid.uuid4().hex,
-                    "map_status": "active",
-                    "task": task,
-                    "plan": full_plan,
-                    "classification": route,
-                    "stack_tokens": sorted(stack),
-                    "outputs": initial_outputs,
-                    "results": initial_results,
-                }
-            )
+            candidate = {
+                "schema_version": 2,
+                "map_id": uuid.uuid4().hex,
+                "map_status": "active",
+                "task": task,
+                "plan": full_plan,
+                "classification": route,
+                "stack_tokens": sorted(stack),
+                "outputs": initial_outputs,
+                "results": initial_results,
+            }
+            self._validate_state(candidate)
+            if replace and self.state_path.exists():
+                self._archive_map()
+            self._write_state(candidate)
         self._new_map = False
         current_state = self._state()
         remaining = self._plan(task, stack, route, outputs_override=set(current_state["outputs"]))
@@ -959,10 +966,10 @@ def runtime_main(argv: list[str] | None = None) -> int:
                         help="with --compact: return every capability as a brief index (role and intents)")
     parser.add_argument("--new", action="store_true", help="Start a fresh map, archiving any previous map")
     parser.add_argument("--amend", action="store_true",
-                        help="The request was refined in the same conversation: replan and keep outputs that are still valid")
+                        help="Replan an active refined request; redo work unless explicitly selected with --preserve-completed")
     parser.add_argument("--direct", action="store_true", help="Persist outputs from a direct one-step task for follow-up turns")
     parser.add_argument("--verify-files", action="store_true", help="Verify path-typed outputs exist on disk")
-    parser.add_argument("--preserve-completed", default="", help="Comma-separated completed step IDs to retain on --new")
+    parser.add_argument("--preserve-completed", default="", help="Comma-separated completed step IDs explicitly judged reusable on --new or --amend")
     parser.add_argument("--stack", action="append", default=[])
     parser.add_argument("--outputs")
     parser.add_argument("--outputs-json")

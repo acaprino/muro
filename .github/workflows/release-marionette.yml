@@ -24,8 +24,8 @@ jobs:
       MANIFEST: examples/marionette/sources.json
       PACKAGE_REPOSITORY: acaprino/marionette
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
       - name: Read the version
@@ -51,7 +51,8 @@ jobs:
           python muro_build.py --manifest "$MANIFEST" --validate
           python muro_build.py --manifest "$MANIFEST" --check-sources
           python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/release"
-      - uses: actions/checkout@v4
+      # checkout keeps the deploy key for the git commands run in `package`, the push below included.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ env.PACKAGE_REPOSITORY }}
           ssh-key: ${{ secrets.MARIONETTE_DEPLOY_KEY }}
