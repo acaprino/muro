@@ -123,9 +123,9 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   if(force){inspect.guard(()=>false,async()=>true);guarded=null;}
   inspect.close();
  }
- function confirm(title:string,text:string,ok:string,then:()=>void,danger=false){
+ function confirm(title:string,text:string,ok:string,then:()=>void,danger=false,cancel='Cancel'){
   if(disposed||(dialog.open&&!dialogView.dismiss()))return;
-  void confirmDialog(root,{title,body:text,confirm:ok,cancel:'Cancel',danger}).then(accepted=>{if(accepted&&!disposed)then();}).catch(fail);
+  void confirmDialog(root,{title,body:text,confirm:ok,cancel,danger}).then(accepted=>{if(accepted&&!disposed)then();}).catch(fail);
  }
  const app:App={state,request,render,run,loading,notify,reload,replan,adopt,discover,openDialog,closeDialog,openInspector,closeInspector,confirm};
 

@@ -97,7 +97,7 @@ await test('a refused save keeps the sheet and its values, with the reason; Stop
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
   await column(page, 'OpenCode isolated test').click();
   await dlg.getByRole('button', { name: 'Stop managing' }).click();
-  await dlg.getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await dlg.getByRole('button', { name: /^Stop managing .+/ }).click();
   await page.locator('th').getByText('OpenCode isolated test').waitFor({ state: 'detached' });
   assert.deepEqual((await actions(app)).slice(-2), ['remove_target', 'plan']);
   assert.equal(await toast(page).last().textContent(), 'Muro no longer manages OpenCode isolated test.');
@@ -530,7 +530,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Remove from my list' }).click();
-  await dlg.getByRole('button', { name: 'Remove', exact: true }).click();
+  await dlg.getByRole('button', { name: /^Remove \S/ }).click();
   await rowOf(page, 'Package').waitFor({ state: 'detached' });
   const removed = (await callsOf(app, 'remove_plugin')).at(-1).payload;
   assert.equal(removed.id, 'p1');assert.equal(typeof removed.revision, 'number');

@@ -27,7 +27,7 @@ export interface App {
   openInspector(html: string, options?: { opener?: HTMLElement; dirty?: () => boolean; name?: string }): HTMLElement;
   /** Closes the inspector. It asks first when its form has unsaved changes, unless `force`: the object is gone, or the form was saved. */
   closeInspector(force?: boolean): void;
-  confirm(title: string, text: string, ok: string, then: () => void, danger?: boolean): void;
+  confirm(title: string, text: string, ok: string, then: () => void, danger?: boolean, cancel?: string): void;
 }
 /** An action is named by a control's `data-action`; its `data-*` and the element come with it. A name has one owner: two modules declaring it make `mountApp` throw. */
 export type Actions = Record<string, (app: App, data: DOMStringMap, el: HTMLElement) => void | Promise<void>>;

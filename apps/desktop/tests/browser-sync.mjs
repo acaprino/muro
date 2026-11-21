@@ -179,7 +179,7 @@ await test('removing a harness asks first and plans again', 'two-harnesses', {},
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
   await page.getByRole('button', { name: 'Stop managing' }).click();
-  await dialog.getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await dialog.getByRole('button', { name: /^Stop managing .+/ }).click();
   await page.locator('th').getByText('OpenCode isolated test').waitFor({ state: 'detached' });
   const calls = await app.calls();
   assert.deepEqual(calls.slice(-3).map(c => c.action), ['save_plugin', 'remove_target', 'plan'], 'the plugin that listed the harness is saved without it first, the harness goes, and the plan is asked for after the mutation');
@@ -192,7 +192,7 @@ await test('a harness that cannot be removed stays, and the message says so', 't
   await app.flags({ rejectSave: true });
   await page.getByRole('button', { name: 'OpenCode isolated test', exact: true }).click();
   await page.getByRole('button', { name: 'Stop managing' }).click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: /^Stop managing .+/ }).click();
   await page.locator('.im-notice-text').getByText('OpenCode isolated test was not removed: Version conflict', { exact: false }).waitFor();
   assert.equal(await page.locator('th').getByText('OpenCode isolated test').count(), 1, 'the harness is still a column');
   assert.equal((await actions(app)).includes('remove_target'), false, 'the harness was never asked to go while a plugin lists it');

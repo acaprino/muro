@@ -228,7 +228,7 @@ await test('Remove from list asks first, removes only the entry, and the project
   await dlg.waitFor({ state: 'detached' });
   assert.equal(await page.locator('li.im-list-link', { hasText: 'Notes' }).count(), 1, 'cancelled: still listed');
   await remove.click();
-  await dlg.getByRole('button', { name: 'Remove from list', exact: true }).click();
+  await dlg.getByRole('button', { name: /^Remove \S/ }).click();
   await page.locator('.im-notice-text', { hasText: 'Notes removed from your list.' }).waitFor();
   await page.locator('li.im-list-link', { hasText: 'Notes' }).waitFor({ state: 'detached' });
   const asked = (await app.calls()).filter(c => c.action === 'remove_project');

@@ -210,7 +210,7 @@ export const actions: Actions = {
     if (data.id === 'close_to_tray') return save(app, { close_to_tray: !stored.close_to_tray });
   },
   'maintenance-verify': app => maintain(app, 'verify', VERIFYING),
-  'maintenance-cleanup': app => app.confirm('Clean up unused builds?', 'Only stored builds that nothing uses are deleted.', 'Clean up', () => void maintain(app, 'cleanup', 'Cleaning up…'), true),
+  'maintenance-cleanup': app => app.confirm('Clean up unused builds?', 'Only stored builds that nothing uses are deleted.', 'Delete unused builds', () => void maintain(app, 'cleanup', 'Cleaning up…'), true),
 };
 
 export function change(app: App, el: TextBox): boolean {

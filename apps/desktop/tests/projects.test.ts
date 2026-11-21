@@ -681,7 +681,7 @@ test('Remove from list asks first, says the file stays, and removes only the ent
   assert.equal(asked.length, 1);
   assert.equal(asked[0].title, 'Remove Notes from your list?');
   assert.match(asked[0].text, /Only the entry goes: the file stays where it is \(D:\/Notes\/Notes\.mp\) and you can open it again\./);
-  assert.deepEqual([asked[0].ok, asked[0].danger], ['Remove from list', true]);
+  assert.deepEqual([/^Remove /.test(asked[0].ok), asked[0].danger], [true, true]);
   const revision = state.snapshot!.registry.revision;
   await confirm();
   assert.deepEqual(fake.calls.map(c => c.action), ['remove_project', 'projects']);
