@@ -1,4 +1,4 @@
-import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, inspector, keyCaps, mountApp, PALETTE_COMMAND, SEARCH_COMMAND, footerKeys, showAfter, LOADING_DELAY_MS } from '@acaprino/imago/ui';
+import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, inspector, isFormOperationPending, keyCaps, mountApp, PALETTE_COMMAND, SEARCH_COMMAND, footerKeys, showAfter, LOADING_DELAY_MS } from '@acaprino/imago/ui';
 import { graphView, type GraphViewport } from '@acaprino/imago/graph';
 import { guardDesktop, mountZoom, mountWindowControls, type WindowApi } from '@acaprino/imago/shell';
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
@@ -69,7 +69,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   if(host&&state.project&&state.projects.info&&state.projects.infoId===state.project.id){
    graphProject=state.project.id;
    host.inert=!!state.busy;
-   mountedGraph=graphView(host,decisionGraphOptions(id=>{if(state.busy||hasModal())return;const action=actions['open-capability'];if(action)void Promise.resolve(action(app,{id},host)).catch(fail);}));
+   mountedGraph=graphView(host,decisionGraphOptions(id=>{if(state.busy||hasModal())return;const action=actions['open-capability'];if(action)void Promise.resolve(action(app,{id},(document.activeElement&&host.contains(document.activeElement)?document.activeElement:host) as HTMLElement)).catch(fail);}));
    mountedGraph.draw(sceneFor(state,state.projects.info));
    const viewport=viewports.get(graphProject);if(viewport)mountedGraph.restoreViewport(viewport);
   }
@@ -109,13 +109,23 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  }
  const closeDialog=()=>dialogView.close();
  // The inspector holds the form of the plugin and of the harness: not modal, the page stays usable beside it. Leaving it with changes asks once.
- const inspect=inspector(root);let guarded:{dirty:()=>boolean;name:string}|null=null;
+ const inspect=inspector(root);let guarded:{dirty:()=>boolean;name:string;element:HTMLElement}|null=null;
+ // A form that is saving is not left half-way: the guard holds the inspector while its operation runs, and says nothing.
+ const saving=()=>!!guarded&&isFormOperationPending(guarded.element);
  const askDiscard=(name:string)=>confirmDialog(root,{title:`Discard changes to ${name}?`,body:'What you changed is not saved.',confirm:'Discard changes',cancel:'Keep editing'});
  function openInspector(html:string,options:{opener?:HTMLElement;dirty?:()=>boolean;name?:string}={}):HTMLElement{
   const holder=document.createElement('template');holder.innerHTML=html.trim();const element=holder.content.firstElementChild as HTMLElement;
-  guarded=options.dirty?{dirty:options.dirty,name:options.name??'this form'}:null;
-  inspect.open(element,options.opener);
-  if(guarded){const g=guarded;inspect.guard(g.dirty,()=>askDiscard(g.name));}
+  const show=()=>{
+   const g=options.dirty?{dirty:options.dirty,name:options.name??'this form',element}:null;guarded=g;
+   inspect.open(element,options.opener);
+   // The first field, not the Close button: what the form marks `autofocus` starts the keyboard.
+   if(options.opener)element.querySelector<HTMLElement>('[autofocus]')?.focus();
+   if(g)inspect.guard(()=>isFormOperationPending(element)||g.dirty(),()=>isFormOperationPending(element)?Promise.resolve(false):askDiscard(g.name));
+  };
+  // Another object over a form with changes: ask first, and open only when the answer is to discard; the new form keeps its own guard.
+  if(inspect.isOpen()&&guarded&&!saving()&&guarded.dirty()){const g=guarded;void askDiscard(g.name).then(ok=>{if(ok&&!disposed){closeInspector(true);show();}});}
+  else if(inspect.isOpen()&&saving()){/* the answer of the save is awaited: nothing replaces the form */}
+  else show();
   return element;
  }
  function closeInspector(force=false){
@@ -133,7 +143,8 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  const go=(page:Page)=>{
   if(!canNavigate())return;
   // Another page closes the inspector; with unsaved changes it asks first, and the click is lost unless the person discards.
-  if(guarded?.dirty()){const g=guarded;void askDiscard(g.name).then(ok=>{if(ok&&!disposed){closeInspector(true);go(page);}});return;}
+  if(inspect.isOpen()&&saving())return;
+  if(inspect.isOpen()&&guarded?.dirty()){const g=guarded;void askDiscard(g.name).then(ok=>{if(ok&&!disposed){closeInspector(true);go(page);}});return;}
   closeInspector(true);state.page=page;render();void modules[page].opened?.(app);};
  // The Projects tab, clicked while a project is open, goes back to the list.
  // A page button inside a dialog (the Adapt with AI dialog links to Settings) takes the person there: the dialog closes first, unless an apply is running in it.
@@ -154,7 +165,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  const search=()=>{if(canNavigate())root.querySelector<HTMLInputElement>('#main #search')?.focus();};
  // The layers, the keys, the regions, Ctrl+K and Ctrl+F, and the look and theme commands: one call of the package.
  const stopImago=mountApp(root,registry,{search,labels:{palette:'Commands',search:'Search in this view',palettePlaceholder:'Search commands…',paletteEmpty:'No matching command'},appearance:{get:()=>({look:currentLook(),theme:currentTheme()}),set:next=>{saveAppearance(next);render();}}});
- registry.register({id:'muro.check',title:'Check now',keys:'r',when:()=>canNavigate()&&!state.busy&&!state.checking&&!state.applying&&!hasModal(),run:()=>{void actions.check(app,{},root);}});
+ registry.register({id:'muro.check',title:'Check now',keys:'r',when:()=>canNavigate()&&!state.busy&&!state.checking&&!state.applying&&!hasModal()&&!document.activeElement?.closest('.im-inspector'),run:()=>{void actions.check(app,{},root);}});
  registry.register({id:'quick-search',title:'Search in this view',keys:'/',when:canNavigate,run:search});
  for(const page of PAGES)registry.register({id:page,title:'Open '+tabLabel(page),when:canNavigate,run:()=>go(page)});
  if('__TAURI_INTERNALS__' in window){

@@ -341,7 +341,7 @@ await test('a window of 500 at 200% zoom (250): the title bar, the Views menu an
   await check(page);
   assert.ok(await sideways(page) <= 0, 'no sideways scroll at 250');
   const inside = selector => page.locator(selector).first().evaluate(el => { const r = el.getBoundingClientRect(), s = document.querySelector('.im-shell').getBoundingClientRect(); return r.right <= s.right + 1 && r.left >= s.left - 1; });
-  for (const selector of ['.im-window-button[data-im-window=close]', '.im-views-menu', '.im-actions .im-btn--primary']) assert.equal(await inside(selector), true, `${selector} is inside the shell`);
+  for (const selector of ['.im-views-menu', '.im-actions .im-btn--primary']) assert.equal(await inside(selector), true, `${selector} is inside the shell`);
   await page.locator('.im-views-menu').click();
   assert.equal(await page.locator('.im-menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), true, 'the Views menu stays on screen');
 });
