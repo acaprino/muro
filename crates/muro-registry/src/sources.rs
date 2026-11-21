@@ -564,15 +564,19 @@ mod tests {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
     }
+    /// The local folder `source` resolved as a plugin on its latest commit.
+    fn resolution(source: &Path) -> Value {
+        let data = tempfile::tempdir().unwrap();
+        let plugin = json!({"id":"p","source":source,"policy":"head","distributions":[]});
+        resolve(data.path(), &plugin).unwrap()
+    }
     fn dist(harness: &str, path: &str, version: &str) -> (String, String, String) {
         (harness.into(), path.into(), version.into())
     }
     /// The native distributions resolving the local folder `source` finds: harness, folder relative
     /// to the source, version.
     fn found(source: &Path) -> Vec<(String, String, String)> {
-        let data = tempfile::tempdir().unwrap();
-        let plugin = json!({"id":"p","source":source,"policy":"head","distributions":[]});
-        let resolved = resolve(data.path(), &plugin).unwrap();
+        let resolved = resolution(source);
         let base = source.canonicalize().unwrap();
         resolved["distributions"]
             .as_array()
@@ -785,6 +789,91 @@ mod tests {
             missing(&json!({"source":"o/r"}), "codex")
                 .starts_with("no Codex build yet: check for updates")
         );
+    }
+    // Owner, 2026-11-21, "fixalo": Claude Code installs a plugin without `.claude-plugin/plugin.json`
+    // (the marketplace entry is then its manifest) and one whose manifest has no version (the
+    // entry's version, else the commit's first 12 characters). Muro refused both.
+    fn claude_code(resolved: &Value) -> &Value {
+        resolved["distributions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["harness"] == "claude-code")
+            .unwrap()
+    }
+    fn short_revision(resolved: &Value) -> String {
+        resolved["upstream_revision"].as_str().unwrap()[..12].to_owned()
+    }
+    #[test]
+    fn a_claude_code_plugin_without_a_manifest_is_named_and_versioned_by_its_marketplace_entry() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"ay","source":"./ay","version":"1.4.0"}]}"#,
+        );
+        put(
+            &s.join("ay/skills/hello/SKILL.md"),
+            "---\nname: hello\ndescription: Says hello\n---\n",
+        );
+        assert_eq!(found(s), [dist("claude-code", "ay", "1.4.0")]);
+        assert_eq!(claude_code(&resolution(s))["name"], "ay");
+    }
+    #[test]
+    fn a_manifest_without_a_version_takes_the_version_of_the_marketplace_entry() {
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"bee","source":"./bee","version":"2.0.0"}]}"#,
+        );
+        put(
+            &s.join("bee/.claude-plugin/plugin.json"),
+            r#"{"name":"bee"}"#,
+        );
+        assert_eq!(found(s), [dist("claude-code", "bee", "2.0.0")]);
+        assert_eq!(claude_code(&resolution(s))["name"], "bee");
+    }
+    #[test]
+    fn without_any_version_it_is_the_first_12_characters_of_the_revision() {
+        // A manifest without one at the root.
+        let t = tempfile::tempdir().unwrap();
+        put(
+            &t.path().join(".claude-plugin/plugin.json"),
+            r#"{"name":"x"}"#,
+        );
+        let resolved = resolution(t.path());
+        assert_eq!(claude_code(&resolved)["version"], short_revision(&resolved));
+        // No manifest, and a marketplace entry without one.
+        let t = tempfile::tempdir().unwrap();
+        put(
+            &t.path().join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"sea","source":"./sea"}]}"#,
+        );
+        put(&t.path().join("sea/commands/hi.md"), "Say hi.");
+        let resolved = resolution(t.path());
+        assert_eq!(claude_code(&resolved)["version"], short_revision(&resolved));
+        assert_eq!(claude_code(&resolved)["name"], "sea");
+    }
+    #[test]
+    fn a_folder_without_a_manifest_is_a_claude_code_plugin_only_when_a_marketplace_lists_it() {
+        // Components at the root, with no manifest and no marketplace.
+        let t = tempfile::tempdir().unwrap();
+        put(
+            &t.path().join("skills/hello/SKILL.md"),
+            "---\nname: hello\ndescription: Says hello\n---\n",
+        );
+        assert!(found(t.path()).is_empty());
+        // A manifest that cannot be read, and a name Claude Code could not install.
+        let t = tempfile::tempdir().unwrap();
+        let s = t.path();
+        put(
+            &s.join(".claude-plugin/marketplace.json"),
+            r#"{"name":"m","plugins":[{"name":"broken","source":"./broken"},{"name":"a@b","source":"./named"}]}"#,
+        );
+        put(&s.join("broken/.claude-plugin/plugin.json"), "{");
+        put(&s.join("named/commands/hi.md"), "Say hi.");
+        assert!(found(s).is_empty());
     }
     #[test]
     fn the_layout_of_a_muro_build_comes_before_a_manifest_at_the_root() {
