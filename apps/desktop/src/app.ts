@@ -1,4 +1,4 @@
-import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, keyCaps, mountApp, PALETTE_COMMAND } from '@acaprino/imago/ui';
+import { closeLayers, createRegistry, hasModal, notify as notice, clearNotices, createContentDialog, confirm as confirmDialog, renderShellFrame, captureDomState, restoreDomState, restoreFocus, type FocusSnapshot, openMenu, roving, loader, keyCaps, mountApp, PALETTE_COMMAND, SEARCH_COMMAND, footerKeys, showAfter, LOADING_DELAY_MS } from '@acaprino/imago/ui';
 import { graphView, type GraphViewport } from '@acaprino/imago/graph';
 import { guardDesktop, mountZoom, mountWindowControls, type WindowApi } from '@acaprino/imago/shell';
 import type { Transport, ViewState, Snapshot, Discovered, Plan, Job, Page } from './types.ts';
@@ -19,7 +19,7 @@ export const REFRESH_MS=30_000;
 /** State, the one render, focus and scroll kept across it, the event listeners. What a page does is in pages/*.ts: app.ts merges their actions and routes their events, and is not edited to add a page feature. */
 export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>void)=>()=>void):()=>void {
  const request=serial(transport,ALONE);
- const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
+ const state:ViewState={page:'sync',snapshot:null,discovered:[],discovering:false,plan:null,checking:false,applying:null,review:null,query:'',filter:'all',afilter:'all',busy:null,slow:{},error:null,checkErrors:[],discoveryError:null,maintenance:null,autostart:null,setup:null,projects:blankProjects(),project:recall()};
  root.classList.add('im-shell');root.dataset.imSidebar='off';renderShellFrame(root,frame(state));
  const titlebar=root.querySelector<HTMLElement>('.im-titlebar')!,body=root.querySelector<HTMLElement>('.im-body')!;
  const dialogView=createContentDialog(root,{canDismiss:()=>!state.applying,onClose:()=>render(),fallbackFocus:()=>root.querySelector<HTMLElement>('#main')});
@@ -41,6 +41,9 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   const keys=registry.get(PALETTE_COMMAND)?.keys,button=root.querySelector<HTMLElement>('.im-titlebar-command');
   if(keys&&button&&!button.querySelector('.im-keys'))button.append(keyCaps(document,keys));
   root.querySelectorAll<HTMLElement>('[data-muro-keys]').forEach(el=>{const bound=registry.get(el.dataset.muroKeys!)?.keys;if(bound)el.replaceChildren(keyCaps(document,bound));});
+  root.querySelectorAll<HTMLElement>('[data-muro-cap]').forEach(el=>el.replaceChildren(keyCaps(document,el.dataset.muroCap!)));
+  // The footer lists the keys that work on the page: search only where there is something to search.
+  root.querySelectorAll<HTMLElement>('[data-muro-footer]').forEach(el=>el.replaceWith(footerKeys(document,registry,[PALETTE_COMMAND,...(el.dataset.muroFooter==='sync'?[SEARCH_COMMAND]:[]),'muro.check'])));
  }
 
  function render(){
@@ -58,7 +61,8 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   // The steps of a project are a tablist of one tab stop: the arrows, Home and End move the focus along them, and the tab the focus reaches is the one shown.
   const steps=root.querySelector<HTMLElement>('.im-steps');if(steps){stopSteps=roving(steps,{item:'[role=tab]',orientation:'horizontal',onSelect:el=>el.click()});steps.addEventListener('focusin',e=>{const tab=(e.target as HTMLElement).closest<HTMLElement>('[role=tab]');if(tab&&tab.getAttribute('aria-selected')!=='true'&&tab.matches(':focus-visible'))tab.click();});}
   // The running operation shows at the top of the content: the frame is strings, the loader an element of the package.
-  if(state.busy&&!state.checking&&!state.applying)root.querySelector<HTMLElement>('#main > .im-panel-body')?.prepend(loader(document,state.busy));
+  // The running operation shows in the status row once it has lasted LOADING_DELAY_MS (state.slow): the loader of the package, painted after the strings.
+  if(state.slow.busy&&state.busy&&!state.checking&&!state.applying)root.querySelector<HTMLElement>('.im-status .im-status-text')?.after(loader(document,state.busy));
   const host=body.querySelector<HTMLElement>('[data-project-graph]');
   if(host&&state.project&&state.projects.info&&state.projects.infoId===state.project.id){
    graphProject=state.project.id;
@@ -73,9 +77,14 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   if(state.discovering)root.querySelectorAll<HTMLButtonElement>('button[data-action=rescan]').forEach(b=>b.disabled=true);
   if(wantedFocus&&!hasModal())restoreFocus(root,wantedFocus,{fallback:main});
  }
+/** Under LOADING_DELAY_MS nothing shows; after it the page paints what is slow (the loader of the status row, a panel's loading layer). */
+ async function loading<T>(key:string,work:()=>Promise<T>):Promise<T>{
+  const stop=showAfter(LOADING_DELAY_MS,()=>{if(!disposed){state.slow[key]=true;render();}});
+  try{return await work();}finally{stop();if(state.slow[key]){state.slow[key]=false;if(!disposed)render();}}
+ }
  async function run<T>(label:string,work:()=>Promise<T>,after?:(value:T)=>void|Promise<void>):Promise<void>{
   if(state.busy)return;state.busy=label;state.error=null;render();
-  try{const value=await work();await after?.(value);}catch(e){state.error=message(e);}finally{state.busy=null;render();}
+  try{const value=await loading('busy',work);await after?.(value);}catch(e){state.error=message(e);}finally{state.busy=null;state.slow.busy=false;render();}
  }
  // The shell sends the jobs and the data folder only with `snapshot`: a snapshot a mutation returns keeps the ones already held.
  function adopt(s:Snapshot,options?:{replan?:boolean}){
@@ -101,7 +110,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
   if(disposed||(dialog.open&&!dialogView.dismiss()))return;
   void confirmDialog(root,{title,body:text,confirm:ok,cancel:'Cancel',danger}).then(accepted=>{if(accepted&&!disposed)then();}).catch(fail);
  }
- const app:App={state,request,render,run,notify,reload,replan,adopt,discover,openDialog,closeDialog,confirm};
+ const app:App={state,request,render,run,loading,notify,reload,replan,adopt,discover,openDialog,closeDialog,confirm};
 
  const canNavigate=()=>!disposed&&!!state.snapshot&&!setupNeeded(state);
  const go=(page:Page)=>{if(!canNavigate())return;state.page=page;render();void modules[page].opened?.(app);};
@@ -124,6 +133,7 @@ export function startMuro(root:HTMLElement,transport:Transport,shown?:(wake:()=>
  const search=()=>{if(canNavigate())root.querySelector<HTMLInputElement>('#main #search')?.focus();};
  // The layers, the keys, the regions, Ctrl+K and Ctrl+F, and the look and theme commands: one call of the package.
  const stopImago=mountApp(root,registry,{search,labels:{palette:'Commands',search:'Search in this view',palettePlaceholder:'Search commands…',paletteEmpty:'No matching command'},appearance:{get:()=>({look:currentLook(),theme:currentTheme()}),set:next=>{saveAppearance(next);render();}}});
+ registry.register({id:'muro.check',title:'Check now',keys:'r',when:()=>canNavigate()&&!state.busy&&!state.checking&&!state.applying&&!hasModal(),run:()=>{void actions.check(app,{},root);}});
  registry.register({id:'quick-search',title:'Search in this view',keys:'/',when:canNavigate,run:search});
  for(const page of PAGES)registry.register({id:page,title:'Open '+tabLabel(page),when:canNavigate,run:()=>go(page)});
  if('__TAURI_INTERNALS__' in window){

@@ -36,7 +36,7 @@ await test('with no harness the three steps take the place of the tabs, and a ha
   const { page } = app;
   await step(page, 1, ONE);
   assert.equal(await page.locator('nav').count(), 0, 'no tabs');
-  assert.equal(await page.locator('.im-titlebar-status').count(), 0, 'no state button');
+  assert.equal(await page.locator('.im-status, .im-actions, .im-footer').count(), 0, 'no status row, action bar or footer in the first run');
   assert.equal(await page.locator('.im-steps li:is([data-im-step="done"],[data-im-step="now"])').count(), 1, 'one bar of three is on');
   assert.deepEqual(await page.getByRole('checkbox').evaluateAll(boxes => boxes.map(b => [b.checked, b.disabled])), [[false, false], [false, false]], 'two harnesses found, nothing chosen for the person');
   assert.match(await page.locator('.im-choice-rows').textContent(), /D:\/config\/claude-code/);

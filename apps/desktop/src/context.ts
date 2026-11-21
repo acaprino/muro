@@ -10,6 +10,8 @@ export interface App {
   /** One request at a time: sets `state.busy` to `label`, runs `work`, hands its value to `after`, shows a failure in `state.error`. Does nothing while another run is busy. */
   run<T>(label: string, work: () => Promise<T>, after?: (value: T) => void | Promise<void>): Promise<void>;
   notify(text: string, tone?: 'err'): void;
+  /** One request that the person waits for: `state.slow[key]` is set once `work` has lasted `LOADING_DELAY_MS` (and the page paints it), and cleared when it ends. The one place for every delay of the app. */
+  loading<T>(key: string, work: () => Promise<T>): Promise<T>;
   /** Reads the snapshot again. */
   reload(): Promise<void>;
   /** Asks the service for a full plan and keeps it as `state.plan`. Calls that arrive meanwhile share one more plan, never one each. */
@@ -33,6 +35,8 @@ export interface PageModule {
   /** The page, as HTML for the `main` element. */
   view(state: ViewState): string;
   actions: Actions;
+  /** The buttons of the action bar for the page, as HTML (at most one primary); empty or absent: the page has no bar. */
+  bar?(state: ViewState): string;
   /** A text box of the page or of a dialog was typed in (the `input` event); true when handled. Never re-render here for a box that holds the caret. */
   input?(app: App, el: TextBox): boolean;
   /** A control of the page or of a dialog changed (the `change` event); true when handled. */
