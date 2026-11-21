@@ -69,8 +69,8 @@ none of these files; no real source is named in `muro/` or `prompts/`.
 Full suite, GitHub Actions `Tests` workflow on `develop`: run 44947854037 at
 `b183df2` failed on two expectations of `tests/test_project_file.py` that
 listed the four earlier forms (`muro project info` counts decisions by every
-form, so `became` gains `mcp-server`). Fixed in `26add45`; the result of the
-run on that commit is recorded at the end of this file.
+form, so `became` gains `mcp-server`). Fixed in `26add45`: run 44948770511 on
+that commit passed.
 
 ## Not run
 
