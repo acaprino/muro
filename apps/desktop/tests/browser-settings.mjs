@@ -16,20 +16,26 @@ const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, ag
 const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const calls = async (app, ...actions) => (await app.calls()).filter(c => actions.includes(c.action));
 const saves = async app => (await calls(app, 'settings')).map(c => c.payload);
+/** Goes to a view: the tab, or, in a narrow window where the tabs are hidden (under 620), the Views menu. */
+const goTab = async (page, name) => {
+  const tab = page.getByRole('tab', { name: new RegExp('^' + name) });
+  if (await tab.isVisible()) await tab.click();
+  else { await page.getByRole('button', { name: 'Views', exact: true }).click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); }
+};
 const tab = (page, name) => page.locator('nav').getByRole('tab', { name: new RegExp('^' + name) });
 /** A row of the page, found by its title. */
 const row = (page, title) => page.locator('.im-setting-row').filter({ has: page.locator('strong').filter({ hasText: new RegExp('^' + escapeRe(title) + '$') }) });
-const hint = (page, title) => row(page, title).locator('small[id^="hint-"]');   // a row with a field also holds the empty error slot, a small too
+const hint = (page, title) => row(page, title).locator('small:not(.im-field-error)');   // a row with a field also holds the empty error slot, a small too
 const switchOf = (page, label) => page.getByRole('switch', { name: label, exact: true });
 const AUTO = 'Automatic sync', TRAY = 'Keep running when the window is closed', START = 'Start Muro when Windows starts';
 async function openSettings(page) {
-  await tab(page, 'Settings').click();
+  await goTab(page, 'Settings');
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
   // `autostart` is read when the page opens: the switch is disabled until it is known.
   await page.waitForFunction(label => { const s = document.querySelector(`[aria-label="${label}"]`); return !!s && (!s.disabled || s.closest('.im-setting-row').textContent.includes('Available on Windows')); }, START);
 }
 async function openActivity(page) {
-  await tab(page, 'Activity').click();
+  await goTab(page, 'Activity');
   await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
 }
 const checked = async (page, label) => (await switchOf(page, label).getAttribute('aria-checked')) === 'true';
@@ -97,7 +103,7 @@ await test('the interval is used only when automatic sync is on', 'default', {},
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
   assert.equal(await interval.isDisabled(), false);
-  assert.equal(await row(page, 'Check').locator('small[id^="hint-"]').count(), 0, 'no hint once it is used');
+  assert.equal(await row(page, 'Check').locator('small:not(.im-field-error)').count(), 0, 'no hint once it is used');
 });
 
 await test('an interval outside 1 to 1440 is refused where it enters, and the control is restored', 'stored-settings', {}, async app => {
@@ -245,7 +251,7 @@ await test('a settings save keeps the last plan: no new plan, the strip stays, A
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
   assert.deepEqual((await app.calls()).slice(before).map(c => c.action), ['autostart', 'settings', 'settings'], 'no plan, no check, no snapshot after a save');
-  await tab(page, 'Sync').click();
+  await goTab(page, 'Sync');
   await page.locator('#sync-state b', { hasText: '1 change ready to apply' }).waitFor();
   assert.equal(await page.locator('.im-actions button', { hasText: 'Apply all 1 change' }).count(), 1);
   assert.match(await page.locator('.im-status-text').textContent(), /next check/, 'the status row reads the new setting');
@@ -448,7 +454,7 @@ for (const scheme of ['dark', 'light']) {
     await openActivity(page);
     await page.screenshot({ path: `${shots}/activity-${scheme}-running.png`, clip: { x: 0, y: 0, width: 1280, height: 520 } });
     await app.flags({ checkErrors: true });
-    await tab(page, 'Sync').click();
+    await goTab(page, 'Sync');
     await page.getByRole('button', { name: 'Check now', exact: true }).click();
     await page.locator('.im-note[data-im-tone="warn"]').waitFor();
     await openActivity(page);
@@ -516,13 +522,13 @@ await test('AI: the engine is a radio group and a keyboard moves it; the API sho
   assert.equal(await row(page, KEY).locator('[role=status]').count(), 1, 'the answer is a status');
   // Set for the Muro process: the next visit says so.
   await app.flags({ envSet: ['MURO_API_KEY'] });
-  await tab(page, 'Sync').click();
+  await goTab(page, 'Sync');
   await openSettings(page);
   await page.getByText('MURO_API_KEY is set for Muro.', { exact: true }).waitFor();
   assert.equal(await row(page, KEY).locator('.im-text-ok').count(), 1);
   // A runtime that cannot answer is a line in the row, no banner.
   await app.flags({ noEnvCheck: true });
-  await tab(page, 'Sync').click();
+  await goTab(page, 'Sync');
   await openSettings(page);
   await page.getByText('Could not check whether MURO_API_KEY is set.', { exact: true }).waitFor();
   assert.deepEqual(await bannerText(page), []);

@@ -15,7 +15,13 @@ async function test(name, scenario, options, body) {
 const actions = async app => (await app.calls()).map(c => c.action);
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const tab = (page, name) => page.getByRole('tab', { name: new RegExp('^' + name) });
-const goProjects = async page => { await page.locator('nav button', { hasText: 'Projects' }).click(); await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor(); };
+/** Goes to a view: the tab, or, in a narrow window where the tabs are hidden (under 620), the Views menu. */
+const goTab = async (page, name) => {
+  const tab = page.getByRole('tab', { name: new RegExp('^' + name) });
+  if (await tab.isVisible()) await tab.click();
+  else { await page.getByRole('button', { name: 'Views', exact: true }).click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); }
+};
+const goProjects = async page => { await goTab(page, 'Projects'); await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor(); };
 const openMarionette = async page => { await goProjects(page); await page.getByRole('button', { name: /Marionette/ }).click(); await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor(); };
 const kept = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('muro.project') ?? 'null'));
 /** The inspector that shows the object named `name` (its heading). */
