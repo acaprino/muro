@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",
-    "@acaprino/imago": "git+https://github.com/acaprino/imago.git#v0.2.0"
+    "@acaprino/imago": "git+https://github.com/acaprino/imago.git#v0.3.0"
   },
   "imago": {
     "src": ["apps/desktop/src", "apps/desktop/index.html"],
