@@ -406,6 +406,7 @@ async function session(scenario = 'projects', wrap: (r: (a: string, p?: any) => 
   const app = {
     state, request: wrap(fake.request), render: () => { renders++; },
     async run(label: string, work: () => Promise<unknown>, after?: (v: any) => unknown) { if (state.busy) return; state.busy = label; state.error = null; try { const value = await work(); await after?.(value); } catch (e) { state.error = String(e instanceof Error ? e.message : e); } finally { state.busy = null; } },
+    loading: <T>(_key: string, work: () => Promise<T>) => work(),
     notify: (text: string) => void toasts.push(text), reload: async () => {}, replan: async () => {}, adopt: (s: Snapshot) => { state.snapshot = s; }, discover: async () => {}, openDialog: () => { throw new Error('no dialog'); }, closeDialog: () => {}, confirm: () => {},
   } as unknown as App;
   const act = (name: string, data: Record<string, string> = {}) => Promise.resolve(modules.projects.actions[name](app, data as DOMStringMap, {} as HTMLElement));
