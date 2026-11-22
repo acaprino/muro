@@ -57,7 +57,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 ## Sources
 
 - AI intent mapping: wireframe → ui.wireframe-exploration, from its five phases; discovery-questions supplies the round of step 1; system prompt chapters 3, 15 ("Test assumptions") and 19 are stated in the body.
-- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, head; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `head`). Opened at run time, by section, from `<package_root>/scripts/claude-design-system-prompt/`: `claude/skills/wireframe.md` and `claude/skills/discovery-questions.md`. This capability opens no chapter of `claude/system-prompt.md`.
+- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, release v1-design-prompt; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `release`). Opened at run time, by section, from `<package_root>/scripts/claude-design-system-prompt/`: `claude/skills/wireframe.md` and `claude/skills/discovery-questions.md`. This capability opens no chapter of `claude/system-prompt.md`.
 - Provenance: the upstream README describes the repository as a "Reverse-engineered system prompt of Claude Design from Anthropic" (from the intake brief; README.md is excluded and was not read).
 - Changes for coexistence (ADR-0017):
   - The trigger phrases ("explore options," "sketch something out," "see a few directions") are not activation rules: the coordinator classifies by meaning (competing routing).

@@ -1,4 +1,4 @@
-"""Marionette ships with every Muro as the default project (ADR-0028, decision 5).
+"""The project files Marionette keeps beside its package (ADR-0028, decision 5: Marionette is the default project).
 
 `examples/marionette/` carries the project's own files beside the package: `project.json`, `records.json`,
 `history.json` and `CHANGELOG.md`. What they contain is checked for consistency (a run has its release note, a
@@ -7,17 +7,13 @@ equality with what the package or a note says now, so a release made by someone 
 edited note or router bullet, a removed source or capability fails nothing here: they are history.
 The version lives once, in `sources.json`: `muro project pack` writes it into the packed `project.json`.
 The subjects of a record are an AI judgment and may name what the package no longer has.
-The staging step in `scripts/desktop_resources.py` packs the project with the sources it can fetch; its tests run
-the step with a recording stand-in for the two commands, because a real run needs the network and a build.
+Muro's release does not build or pack this project: `scripts/desktop_resources.py` takes the latest published release
+of Marionette (see `tests/test_desktop_resources.py`). `muro project pack` is still the way to make the project file.
 """
-import importlib.util
 import json
 import re
 import shutil
-import subprocess
 from pathlib import Path
-
-import pytest
 
 from muro import project
 from muro.cli import main
@@ -30,11 +26,6 @@ RELEASES = ROOT / "docs" / "releases"
 DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 UTC_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 COMMIT = re.compile(r"[0-9a-f]{40}")
-
-spec = importlib.util.spec_from_file_location("desktop_resources", ROOT / "scripts" / "desktop_resources.py")
-resources = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(resources)
-
 
 def load(name):
     return json.loads((PACKAGE / name).read_text(encoding="utf-8"))
@@ -240,79 +231,3 @@ def test_pack_writes_the_version_of_sources_json_into_the_packed_project_json(tm
     assert packed == {**stale, "version": manifest()["plugin"]["version"]}
     assert list(packed) == list(stale)                                   # same fields, same order: only the version moved
     assert json.loads((copy / "project.json").read_text(encoding="utf-8"))["version"] == "0.0.1"   # the source is not touched
-
-
-# --- the staging step ---------------------------------------------------------------------------------
-
-class Recorder:
-    """Stands in for `subprocess.run`: records each command and does what the real one writes."""
-
-    def __init__(self, fail_on=None):
-        self.calls = []
-        self.fail_on = fail_on
-
-    def __call__(self, argv, **options):
-        self.calls.append((list(argv), options))
-        command = "pack" if "pack" in argv else "build"
-        if command == self.fail_on:
-            raise subprocess.CalledProcessError(1, argv)
-        value = lambda flag: Path(argv[argv.index(flag) + 1])
-        if command == "build":
-            (value("--out") / "marionette").mkdir(parents=True)
-        else:
-            assert (value("--release") / "marionette").is_dir(), "the release is built before it is packed"
-            value("--out").write_bytes(b"a project file")
-        return subprocess.CompletedProcess(argv, 0)
-
-
-def test_staging_builds_a_fresh_release_and_packs_the_default_project_into_the_resources(tmp_path):
-    out = tmp_path / "staging" / "resources"
-    out.mkdir(parents=True)
-    run, cache = Recorder(), tmp_path / "sources-cache"
-    target = resources.pack_default_project(out, ROOT, cache, run)
-    assert target == out / "projects" / "marionette.mp" and target.read_bytes() == b"a project file"
-
-    (build, build_options), (pack, pack_options) = run.calls
-    manifest_path = str(ROOT / "examples" / "marionette" / "sources.json")
-    release = Path(build[build.index("--out") + 1])
-    assert build[build.index("-m"):] == ["-m", "muro", "build", "--manifest", manifest_path, "--out", str(release)]
-    assert pack[pack.index("-m"):] == ["-m", "muro", "project", "pack", "--manifest", manifest_path,
-                                      "--out", str(target), "--sources-cache", str(cache), "--release", str(release)]
-    assert build_options["cwd"] == pack_options["cwd"] == ROOT      # the checkout's own `muro` package
-    assert build_options["check"] is pack_options["check"] is True
-    assert out not in release.parents and release.parent == out.parent   # the shipped folder never holds the build
-    assert not release.exists()                                          # and the build is gone once packed
-
-
-def test_staging_stops_and_removes_the_release_when_a_command_fails(tmp_path):
-    out = tmp_path / "staging" / "resources"
-    out.mkdir(parents=True)
-    for fail_on in ("build", "pack"):
-        with pytest.raises(subprocess.CalledProcessError):
-            resources.pack_default_project(out, ROOT, tmp_path / "cache", Recorder(fail_on=fail_on))
-        assert not (out / "projects" / "marionette.mp").exists()
-        assert [path.name for path in out.parent.iterdir()] == ["resources"]    # no build left beside it
-
-
-def test_a_failed_project_step_leaves_no_half_staged_folder_and_never_removes_an_existing_one(tmp_path, monkeypatch):
-    def staged(out, archive, root):
-        out.mkdir(parents=True)
-        (out / "factory").mkdir()
-
-    monkeypatch.setattr(resources, "stage", staged)
-    out = tmp_path / "resources"
-    with pytest.raises(subprocess.CalledProcessError):
-        resources.stage_resources(out, b"archive", ROOT, tmp_path / "cache", Recorder(fail_on="pack"))
-    assert not out.exists()
-
-    assert resources.stage_resources(out, b"archive", ROOT, tmp_path / "cache", Recorder()) == out / "projects" / "marionette.mp"
-    monkeypatch.undo()
-    monkeypatch.setattr(resources, "PYTHON_SHA256", resources.hashlib.sha256(b"archive").hexdigest())
-    with pytest.raises(FileExistsError):                  # a folder that was there before is never touched
-        resources.stage_resources(out, b"archive", ROOT, tmp_path / "cache", Recorder())
-    assert (out / "factory").is_dir() and (out / "projects" / "marionette.mp").is_file()
-
-
-def test_the_help_says_the_default_project_needs_the_network():
-    text = " ".join(resources.__doc__.split())
-    assert "default project" in text and "network" in text

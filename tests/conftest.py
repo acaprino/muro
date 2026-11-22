@@ -55,3 +55,24 @@ def portable_project(tmp_path):
     shutil.copytree(Path(__file__).resolve().parent.parent / "muro", project / "muro",
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return project
+
+
+# Muro has no tests on Marionette (owner rule of 2026-11-22). A test module that names Marionette (its folder
+# `examples/marionette`, its package, its state folder) is marked `marionette`: the `Tests` workflow runs
+# `-m "not marionette"`, `.github/workflows/marionette.yml` runs `-m marionette`, so a problem of the package (a
+# source that moved) cannot fail Muro's own checks or its release. Nothing is deselected anywhere else.
+def pytest_configure(config):
+    config.addinivalue_line("markers", "marionette: names the Marionette package; run by marionette.yml, not by Tests")
+
+
+def pytest_collection_modifyitems(config, items):
+    named = {}
+    for item in items:
+        path = Path(str(item.path))
+        if path not in named:
+            try:
+                named[path] = "marionette" in path.read_text(encoding="utf-8").lower()
+            except OSError:
+                named[path] = False
+        if named[path]:
+            item.add_marker(pytest.mark.marionette)
