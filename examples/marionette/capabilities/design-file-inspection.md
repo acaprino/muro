@@ -34,7 +34,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 - **Nothing is corrected.** Do not change the design file unless the developer tells you to correct it, and do not change the interface unless the developer tells you to correct it. A correction of the file is the `design-file` step; a correction of the interface is `design-file-apply`. The accessibility inspection ends with its report.
 - **What a result proves.** `drift` compares only the supplied observations after token resolution: a result with no differences does not show full interface conformance. The report does not show items without measured data as correct, and does not show interface conformance through document checks.
 - **Source data and interface checks** (`procedure.md`): record source paths or URLs and source dates, and the viewport, mode, route and state of measured data; keep measured values apart from estimates; a screenshot does not supply keyboard behavior or all component states; open external sources only with developer approval for access. Do not add or do tests unless the developer tells you to do tests, and do only the interface checks with developer approval.
-- `design-review` audits an HTML design and fixes what fails; `design-drift` compares technical documents with code. This capability measures against the design file or a stated standard and reports.
+- `design-drift` compares technical documents with code. This capability measures against the design file or a stated standard and reports.
 - Runtime dependency: Node.js 22 or later (`node --version`) for the lint and drift commands; the tool needs no npm installation and no service connection, and the source gives no install method for Node.js.
 
 ## Checks
@@ -58,4 +58,4 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 - `nothing_changed` is not asked of the accessibility inspection: its skill states no such line and has no correction step.
 - No prerequisite is declared: the source chains none of its skills.
 - Runtime dependency: Node.js 22 or later; the source states no install method. The bundle was read and hashed at intake, not run. Hooks: the selected files define none.
-- Harmonized by: prompts/harmonizer.md (2026-11-17) — kept apart from `design-review` (its accessibility audit fixes an HTML design against the WCAG AA minimums; this one reports against the standard and level the task states, also for a document) and from `design-drift` (same word, another object: design documents and READMEs against code).
+- Harmonized by: prompts/harmonizer.md (2026-11-17) — kept apart from `design-drift` (same word, another object: design documents and READMEs against code).

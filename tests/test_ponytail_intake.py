@@ -114,7 +114,7 @@ def test_new_outputs_have_one_owner_without_taking_design_or_cost_outputs():
     assert len(outputs) == len(set(outputs))
     for cap in caps.values():
         assert cap.id in PROCEDURES or not set(outputs) & set(cap.outputs), cap.id
-    assert not set(outputs) & {"review_findings", "review_fixes", "economy_report", "economy_changes", "handoff_state"}
+    assert not set(outputs) & {"economy_report", "economy_changes", "handoff_state"}
 
 
 def test_delivery_separates_permanent_guidance_requested_procedures_and_omissions():
@@ -170,8 +170,8 @@ def test_explicit_ai_fixtures_select_only_the_requested_method(coordinator, task
 @pytest.mark.parametrize("task, capability, intent", [
     ("Show my actual TokenEconomizer stats, not Ponytail's published benchmark.",
      "token-economy", "cost.economy-report"),
-    ("Audit only visual accessibility of this HTML screen, not code logic or repository debt.",
-     "design-review", "ui.accessibility-audit"),
+    ("Report only the accessibility of this interface against WCAG 2.2 AA, not code logic or repository debt.",
+     "design-file-inspection", "design-file.accessibility-inspection"),
 ])
 def test_explicit_negation_fixtures_preserve_existing_owners(coordinator, task, capability, intent):
     answer = decision(coordinator, task, [capability])

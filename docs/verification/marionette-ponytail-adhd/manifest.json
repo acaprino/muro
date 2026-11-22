@@ -6,8 +6,8 @@
     "utf8_bytes": 1986,
     "sha256": "3c802ce60404ec046badc5c3713c142885b7d02b11616167ed9386c6fb0103fe"
   },
-  "payload_files": 48,
-  "payload_bytes": 383865,
+  "payload_files": 47,
+  "payload_bytes": 376293,
   "files": [
     {
       "path": "combined-policy.md",
@@ -280,8 +280,8 @@
     },
     {
       "path": "prior-11-source-check/mirror-index.json",
-      "bytes": 6060,
-      "sha256": "8bacda22bd01e00de9b51931f2f7ce8af153564753643e5fef116aa9e0f62865",
+      "bytes": 5476,
+      "sha256": "68ad460601d25050ebf8cec991863e5e4f99396e2c4a95f891e71244dad2cf9e",
       "origin": "D:\\workspace\\muro-marionette-mirrors\\mirror-index.json",
       "category": "Earlier eleven-source mirror check, not final thirteen-source verification"
     },
@@ -290,13 +290,6 @@
       "bytes": 5024,
       "sha256": "7fd43065b196b320d75f86591be5604d32d88b44de320d0013a7711d0eb241e2",
       "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\ai-design-skills.json with commit file patch payload removed",
-      "category": "Earlier pin metadata, not a fresh remote fetch"
-    },
-    {
-      "path": "prior-11-source-check/pins/claude-design-system-prompt.json",
-      "bytes": 6988,
-      "sha256": "9d12ddf370adce8fc82b34faf196ca8f75ee9d9b06f48e5b69ad79394a458722",
-      "origin": "D:\\workspace\\muro-marionette-mirrors\\pins\\claude-design-system-prompt.json with commit file patch payload removed",
       "category": "Earlier pin metadata, not a fresh remote fetch"
     },
     {

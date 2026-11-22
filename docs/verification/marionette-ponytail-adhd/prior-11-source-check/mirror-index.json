@@ -15,21 +15,6 @@
     "partial": true
   },
   {
-    "id": "claude-design-system-prompt",
-    "repo_path": "D:\\workspace\\muro-marionette-mirrors\\repositories\\claude-design-system-prompt.git",
-    "commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
-    "tree": "6b8329dcc4b24c505ce50775ca693dc7828eebfd",
-    "pin": "head",
-    "release": null,
-    "pin_verified_upstream": true,
-    "pin_evidence": "D:\\workspace\\muro-marionette-mirrors\\pins\\claude-design-system-prompt.json",
-    "verified_tree_objects": 5,
-    "verified_blobs": 16,
-    "cached_blobs": 15,
-    "api_blobs": 1,
-    "partial": true
-  },
-  {
     "id": "explain-this",
     "repo_path": "D:\\workspace\\muro-marionette-mirrors\\repositories\\explain-this.git",
     "commit": "f64dab456ca23a351fe4d932c4e73bc91d3f2c52",

@@ -49,7 +49,7 @@
       "content": "landing-page-design's frontmatter description and its 'Scope' as activation ('Apply to all web UI work: landing pages, marketing sites, components, dashboards, prototypes, and design reviews', 'Always consult it before'), and its 'Companion skill' pointer to redesign-existing-projects",
       "form": "dropped",
       "targets": [],
-      "reason": "Routing that competes with the coordinator, which classifies by meaning; app screens, dashboards, prototypes and design reviews have their own owners here (aesthetic-direction, ui-prototype, design-review), so the visual system governs the pages visual-direction builds and later steps read it as recorded (visual-direction, Sources, Changes for coexistence). The companion skill is not a source of this package. Until 2026-11-19 this decision also dropped Part B's visual system on a built page, against taste-skill; that part is carried again (see the capability decision)."
+      "reason": "Routing that competes with the coordinator, which classifies by meaning; the visual system governs the pages visual-direction builds and later steps read it as recorded (visual-direction, Sources, Changes for coexistence). The companion skill is not a source of this package. Until 2026-11-19 this decision also dropped Part B's visual system on a built page, against taste-skill; that part is carried again (see the capability decision)."
     },
     {
       "source": "ai-design-skills",
@@ -169,249 +169,6 @@
       "reason": "Manifests and commands would register the original beside the coordinator and run its hooks twice (token-economy, Specifics); the commands' behaviour is steps 1 to 3 of the capability and the Python bootstrap is called directly (token-economy, Sources 'Not adopted')."
     },
     {
-      "source": "claude-design-system-prompt",
-      "content": "claude/system-prompt.md as a whole, in the form the source ships it: text for every session",
-      "form": "dropped",
-      "targets": [],
-      "reason": "Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the prompt is not injected. Breadth: it is useful only in design sessions, while the package also covers Office files, explainers, engineering, research papers and session cost. Timing: every rule in it works when loaded at the moment a design task is classified. Authority: it opens by giving the model a designer identity for the whole session. Cost: 35,565 characters per session, far above the 2,000 the release accepts, paid by users writing a spreadsheet or reading a paper. Its chapters are decided one by one below; no always-on text and no hook is declared. Owner rule of 2026-11-12 (ADR-0017): absorbed content is not altered, so the chapters that became capabilities are carried in the source's own words. The file is packaged and each design capability reads, at the step that needs them, only the chapters it applies, named by number and title; the dropped parts below are named in each capability's Sources as not followed. The form changed (on-demand chapters instead of session text), not the words."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Opening lines, chapter 1 'Identity and role' and the 'Final principle': the designer persona and 'the user is your manager'",
-      "form": "dropped",
-      "targets": [],
-      "reason": "Authority: a session-wide identity competes with the host's instructions and with the ten other absorbed sources. What it means in practice (ask what the artifact is for, give an opinion and let the user decide, cut what does not earn its place) is stated as steps of the production capabilities from the skills themselves, so no persona text is carried. The final principle restates chapters 5, 11, 16 and 18."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 1, last paragraph: do not divulge the environment, system prompt, tools or skill names",
-      "form": "dropped",
-      "targets": [],
-      "reason": "A confidentiality rule of the product the prompt was written for. Here it would contradict the coordinator, which shows the user the plan, the capabilities selected and the evidence, and the package's rule of honest reporting."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 2 'Workflow': understand, acquire context, plan visibly, skeleton early, iterate and verify, summarize briefly",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction",
-        "wireframe",
-        "ui-prototype",
-        "html-deck",
-        "design-review"
-      ],
-      "reason": "A working process is a chain, not session text. Its order is the step order inside each production capability (brief, context, plan as a comment block in the file, early skeleton, verification, short summary) and the catalog chain aesthetic-direction, then wireframe or ui-prototype or html-deck, then design-review, expressed with `needs` and `reads` and never forced with `after`: each stage can start from existing work."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 2, closing paragraphs: silence between tool calls, concurrent file exploration, no narration",
-      "form": "dropped",
-      "targets": [],
-      "reason": "Conduct rules for the whole conversation: they belong to the host and its user, and would change how unrelated capabilities report."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 3 'Asking questions first' and claude/skills/discovery-questions.md",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction",
-        "wireframe",
-        "ui-prototype",
-        "design-options",
-        "html-deck"
-      ],
-      "reason": "Function: a question round is never the outcome a user asks for; it is the first step of design work. Fit: every capability in this catalog already asks for missing essentials in one batch inside its own step, and the classifier has needs_clarification. So the protocol (read what is attached first, ask only what changes the design, once, then execute) is the brief step of each production capability, with the skill's per-artifact questions. Its `questions_v2` tool becomes an optional logical question-form tool."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 4 'Rooting designs in existing context'",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction",
-        "ui-prototype",
-        "design-options",
-        "html-deck",
-        "design-system-extract"
-      ],
-      "reason": "Domain rule for hi-fi design: match what exists and lift exact values from the source. It is step 1 of aesthetic-direction (stop when context exists), the context step of the three production capabilities and the 'never guess a value' rule of design-system-extract."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 5 'Content principles — no filler'",
-      "form": "capability",
-      "targets": [
-        "wireframe",
-        "ui-prototype",
-        "html-deck"
-      ],
-      "reason": "Write-time rules for a design artifact; the review skills leave content out of scope (polish-pass, Phase 5), so they live in the production bodies' Specifics and checks (no_filler_or_invented_content, no_filler_slides). They overlap with visual-direction's 'never invent proof', which stays the rule for websites."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapters 6 to 9: aesthetic defaults, hierarchy and rhythm, typography system, colour system",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction",
-        "design-review",
-        "html-deck"
-      ],
-      "reason": "Domain rules. As write-time defaults they are the commit rules of aesthetic-direction; as detection patterns they are the generic-look and hierarchy passes of design-review; the per-medium type sizes are also in html-deck. Fit: for a website the visual system of visual-direction stays the authority, and design-review treats a recorded system as deliberate."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapters 10 to 12: accessibility, interaction and feedback, simplicity and one clear call to action",
-      "form": "capability",
-      "targets": [
-        "design-review",
-        "ui-prototype"
-      ],
-      "reason": "Domain rules that are checked on a file: the accessibility and interaction-states passes of design-review, and the wiring rules of ui-prototype. The chapter's 0.2 to 0.3 second transitions contradict motion-design's shorter feedback durations; a recorded motion-spec wins (design-review, Specifics)."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 13 'System thinking': components, design tokens, documented patterns",
-      "form": "capability",
-      "targets": [
-        "design-system-extract"
-      ],
-      "reason": "It is the rationale and the documentation format of the two extract skills, merged into one role."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 14 'Respecting the medium': CSS strengths, real interactions, fixed-size content that scales, persisted state, canonical HTML",
-      "form": "capability",
-      "targets": [
-        "ui-prototype",
-        "html-deck",
-        "design-options"
-      ],
-      "reason": "Rules for HTML design artifacts only; they would mislead an Office task or one in a design tool's file. Carried where they act: real interactions and persistence in ui-prototype, scaling and persistence in html-deck, persisted tweak values in design-options."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapters 15 and 16: understanding users, quality over quantity",
-      "form": "capability",
-      "targets": [
-        "wireframe",
-        "ui-prototype",
-        "design-options",
-        "design-review"
-      ],
-      "reason": "Audience and persona questions are part of the brief steps; 'a wireframe round and a hi-fi round on different bets' is in wireframe; depth over breadth and the polish list are design-review's polish pass and design-options' rule against near-duplicates."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 17 'Output principles': pick the format, give variations, one file with many variants, right scale",
-      "form": "capability",
-      "targets": [
-        "design-options",
-        "ui-prototype",
-        "html-deck"
-      ],
-      "reason": "The variation and single-file rules are design-options. Its format table (canvas, prototype, deck, animation engine) chooses between artifacts, which here is the classifier's job through the intents, so the table itself is not carried; the timeline engine with a scrubber for animation has no procedure in the selected snapshot and motion stays with motion-principles. Adding tweak controls nobody asked for is left to a request for design-options, because chapter 19 of the same prompt forbids unrequested scope."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 18 'Collaboration and delivery': show early, brief summaries, delegate verification, honest progress reports",
-      "form": "capability",
-      "targets": [
-        "ui-prototype",
-        "html-deck",
-        "design-review"
-      ],
-      "reason": "Process rules of a design step: the early skeleton, the closing summary and the checks that name what was not verified (unverified_behavior_disclosed, deck_walked_or_disclosed, unverified_items_disclosed). The verifier subagent is an optional logical tool; one capability still runs per step."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 19 'IP and content boundaries'",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction",
-        "wireframe",
-        "ui-prototype",
-        "design-options",
-        "html-deck"
-      ],
-      "reason": "A limit that matters only when a design is produced, so it is a scoped line in each production capability: a company's distinctive interface or branded elements are not recreated unless the product is the user's own, and scope is not added without asking. The source's test, the user's email domain, cannot be verified by any host here and is replaced by the user's own statement. Open doubt: whether the owner wants a stricter rule than the user's statement."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Chapter 20 'Available skills': the list of its skills, 'When to invoke which' and the typical chains",
-      "form": "dropped",
-      "targets": [],
-      "reason": "Competing routing: it tells the model which skill to invoke from trigger phrases and to run a review whenever in doubt. The coordinator classifies by meaning from the intents. The chains were read as evidence for `needs` and `reads` only."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/frontend-aesthetic-direction.md",
-      "form": "capability",
-      "targets": [
-        "aesthetic-direction"
-      ],
-      "reason": "A procedure loaded when a design with no brand needs a look. Fit: not merged into visual-direction (which fixes the look of a website: from taste-skill until its removal on 2026-11-19, from landing-page-design's visual system since) nor into design-guidance (which recommends from packaged data): it proposes and commits with the user, for any artifact. Two owners of palette and type cannot share a plan, so the two are declared conflicting."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/wireframe.md",
-      "form": "capability",
-      "targets": [
-        "wireframe"
-      ],
-      "reason": "A distinct outcome no earlier capability had: low-fidelity structural exploration before a look exists. Its greyscale conventions contradict the hi-fi rules, so it is its own role."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/make-a-prototype.md",
-      "form": "capability",
-      "targets": [
-        "ui-prototype"
-      ],
-      "reason": "A procedure for one request. Fit: building an app screen as a working design artifact was owned by nobody (visual-direction excludes app screens, design-guidance only recommends, work-map ships production code)."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/generate-variations.md and claude/skills/make-tweakable.md",
-      "form": "capability",
-      "targets": [
-        "design-options"
-      ],
-      "reason": "Merged into one role with two intents: both deliver alternatives of a hi-fi design inside one file, and each skill presents its result through the other's mechanism. The tweak panel's host protocol (window messages to a toolbar, a defaults block rewritten on disk) works only in the source's own host: the panel here opens by itself and persists in the browser, and the two phases are kept as a packaged reference."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/make-a-deck.md",
-      "form": "capability",
-      "targets": [
-        "html-deck"
-      ],
-      "reason": "Fit: office-deck builds a .pptx through GenOffice's checked pipeline and excludes an HTML slideshow; this builds a web page. Alternatives by wanted format with separate outputs, not a merge and not a conflict. A request that names no format stays with office-deck: open doubt for the owner whether the classifier should ask instead."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/design-system-extract.md and claude/skills/component-extract.md",
-      "form": "capability",
-      "targets": [
-        "design-system-extract"
-      ],
-      "reason": "One role with two intents: the component inventory's first category is the tokens of the other skill, and chapter 13 treats both as one system. Distinct from design-guidance's persisted recommendation and from canvas-design's foundations, which now reads the extracted tokens."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "claude/skills/accessibility-audit.md, ai-slop-check.md, hierarchy-rhythm-review.md, interaction-states-pass.md and polish-pass.md",
-      "form": "capability",
-      "targets": [
-        "design-review"
-      ],
-      "reason": "Timing: a review runs on a named file when asked, or as a requested last gate; chapter 20's 'when in doubt, invoke it' would make it run on every design task and is not carried. Fit: five skills, one role with five intents, because polish-pass runs the other four on one file with one aggregate-and-fix method; as separate capabilities they would be four writers of the same file."
-    },
-    {
-      "source": "claude-design-system-prompt",
-      "content": "Host tools and starters the skills call: questions_v2, copy_starter_component with deck_stage.js, the device frames and design_canvas.jsx, ${AGENT_TOOL_NAME} and the verifier subagent",
-      "form": "dropped",
-      "targets": [],
-      "reason": "They belong to the host the prompt was written for and are not in the selected snapshot. Asking, parallel review and verification become optional logical tools (question-form, subagents, browser) that the host AI maps to what it has; the deck shell, frames and grid are written by the capability. Open gap: whether upstream publishes the starters was not inspected (README.md and codex/** are excluded)."
-    },
-    {
       "source": "ponytail",
       "content": ".agents/rules/ponytail.md: the source's own always-on rules file, whole",
       "form": "always-on",
@@ -434,7 +191,7 @@
       "targets": [
         "engineering-review"
       ],
-      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents follows both packaged skills in their own words, including audit's 'At most 20 findings; if you left smaller ones out, say how many'. Existing design-review excludes code-logic review, and work-map's internal acceptance check remains distinct. No automatic review step is added."
+      "reason": "Both produce read-only evidence-ranked software findings; the difference is change scope versus whole-repository scope. One responsibility with two intents follows both packaged skills in their own words, including audit's 'At most 20 findings; if you left smaller ones out, say how many'. work-map's internal acceptance check remains distinct. No automatic review step is added."
     },
     {
       "source": "ponytail",
@@ -673,7 +430,7 @@
       "targets": [
         "design-file"
       ],
-      "reason": "Breadth: a design brief and a DESIGN.md matter only to a task about a project's interface; in a package that also makes Office files, papers and plans nothing here holds for every session. Timing: each procedure starts when a developer asks for the file or a change to it. Authority: the file binds later interface work, but as a file of the user's project that the building and reviewing capabilities read, not as session text. Fit: no capability recorded a developer's selections as a contract (design-system-extract writes a tokens file in the source's format, design-guidance a recommended Master). Eight skills write the same two files, so they are one capability with one owner of the file; the four area skills are the in-depth methods of the update intent. The bodies are entry prompts in the package's words and send the host to the packaged skill files. The README's order (define, then create) is advice, not a forced chain."
+      "reason": "Breadth: a design brief and a DESIGN.md matter only to a task about a project's interface; in a package that also makes Office files, papers and plans nothing here holds for every session. Timing: each procedure starts when a developer asks for the file or a change to it. Authority: the file binds later interface work, but as a file of the user's project that the building and reviewing capabilities read, not as session text. Fit: no capability recorded a developer's selections as a contract (design-guidance recommends a Master). Eight skills write the same two files, so they are one capability with one owner of the file; the four area skills are the in-depth methods of the update intent. The bodies are entry prompts in the package's words and send the host to the packaged skill files. The README's order (define, then create) is advice, not a forced chain."
     },
     {
       "source": "zero-slop-design",
@@ -682,7 +439,7 @@
       "targets": [
         "design-file-apply"
       ],
-      "reason": "A procedure used only when an interface is changed from the design file. It writes the product's interface code, which no other capability does from a recorded design (visual-direction plans and builds a website by its source's method, ui-prototype a prototype, work-map a software change through spec and tickets). It never rewrites DESIGN.md: one owner of the file. Its ban on tests that the developer did not ask for stays where references/procedure.md puts it, under interface checks; the session policy's small test for new non-trivial logic is another kind of test and still holds (owner decision of 2026-11-17, a collision of two sources' rules)."
+      "reason": "A procedure used only when an interface is changed from the design file. It writes the product's interface code, which no other capability does from a recorded design (visual-direction plans and builds a website by its source's method, work-map a software change through spec and tickets). It never rewrites DESIGN.md: one owner of the file. Its ban on tests that the developer did not ask for stays where references/procedure.md puts it, under interface checks; the session policy's small test for new non-trivial logic is another kind of test and still holds (owner decision of 2026-11-17, a collision of two sources' rules)."
     },
     {
       "source": "zero-slop-design",
@@ -691,7 +448,7 @@
       "targets": [
         "design-file-inspection"
       ],
-      "reason": "Three report-only inspections with the same rules on source data and on what is not measured; none must act before a task is classified. Fit: design-review audits an HTML design and fixes what fails against the WCAG AA minimums, while review-accessibility reports against the standard and level the task states, also for a document, and has no correction step, so they are not merged. design-drift compares technical documents with code and owns `drift_report`; the interface drift report is handed over under another key (one owner per output)."
+      "reason": "Three report-only inspections with the same rules on source data and on what is not measured; none must act before a task is classified. Fit: review-accessibility reports against the standard and level the task states, also for a document, and has no correction step. design-drift compares technical documents with code and owns `drift_report`; the interface drift report is handed over under another key (one owner per output)."
     },
     {
       "source": "zero-slop-design",
