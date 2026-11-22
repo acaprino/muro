@@ -402,10 +402,10 @@ of what changed, then push the branch and read the run.
 
 Owner rule of 2026-11-22 ("Muro non deve avere test su Marionette"): Muro's own CI and
 release never run Marionette checks, so a problem of the package (a source that moved)
-cannot block them. The `Tests` workflow (`.github/workflows/tests.yml`: every push to `develop`, or
-`gh workflow run tests.yml --ref <branch>`; not again on the `develop` -> `main` pull request
-or on `main`, which carry the same commit: merge the release pull request when the run of
-`develop`'s tip is green, because the Release workflow builds and does not test) runs the Python tests that do not name Marionette (`-m "not marionette"`:
+cannot block them. The `Tests` workflow, which is Muro's Verify run (`.github/workflows/tests.yml`: every push to
+and pull request to `develop`, or `gh workflow run tests.yml --ref <branch>`; never the
+`develop` -> `main` pull request or `main`, whose commit the push to `develop` already
+verified) runs the Python tests that do not name Marionette (`-m "not marionette"`:
 `tests/conftest.py` marks every test module that names it) and the desktop job. The
 tests that name it (`-m marionette`), the manifest validation, the source check, the
 package build and the default-project pack run in `.github/workflows/marionette.yml`
@@ -553,6 +553,7 @@ verification records belong in docs/verification/. Never write new docs/superpow
   Release (the installer of `release\installer\` and one portable zip with all of `release\` in a folder; no loose
   program) are published, and `main` is merged back into
   `develop`. Nothing is published when the build fails.
+- A release is the pull request develop → main, merged only when the Verify run on develop's tip is green: the release workflow builds and publishes, it does not run the tests again.
 - Never change the version or create release tags by hand: the workflow does it (`.github/release.json` lists
   the version files, `.github/scripts/release.mjs` writes them).
 
