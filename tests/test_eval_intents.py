@@ -93,9 +93,9 @@ def test_equivalent_step_labels_do_not_change_operation_meaning(package, tmp_pat
 
 
 def test_semantic_need_judgment_is_not_hidden_by_matching_capabilities(package, tmp_path):
-    gold = [selection("aesthetic-direction", "ui.aesthetic-direction"),
-            selection("ui-prototype", "ui.interactive-prototype",
-                      needs=[{"requires": "aesthetic-direction", "applies": True}])]
+    gold = [selection("impl-plan", "plans.impl-plan-writing"),
+            selection("plan-execution", "plans.plan-execution",
+                      needs=[{"requires": "impl-plan", "applies": True}])]
     actual = copy.deepcopy(gold)
     actual[1]["needs"][0]["applies"] = False
     result = score(package, tmp_path, authored(gold), actual)
@@ -103,16 +103,16 @@ def test_semantic_need_judgment_is_not_hidden_by_matching_capabilities(package, 
 
 
 def test_true_need_refers_to_the_expected_repeated_occurrence(package, tmp_path):
-    gold = [selection("aesthetic-direction", "ui.aesthetic-direction", step_id="aesthetic-direction#1"),
-            selection("aesthetic-direction", "ui.aesthetic-direction", step_id="aesthetic-direction#2"),
-            selection("ui-prototype", "ui.interactive-prototype",
-                      needs=[{"requires": "aesthetic-direction#2", "applies": True}])]
+    gold = [selection("impl-plan", "plans.impl-plan-writing", step_id="impl-plan#1"),
+            selection("impl-plan", "plans.impl-plan-writing", step_id="impl-plan#2"),
+            selection("plan-execution", "plans.plan-execution",
+                      needs=[{"requires": "impl-plan#2", "applies": True}])]
     actual = copy.deepcopy(gold)
-    actual[0]["step_id"] = "aesthetic-direction#4"
-    actual[1]["step_id"] = "aesthetic-direction#8"
-    actual[2]["needs"][0]["requires"] = "aesthetic-direction#8"
+    actual[0]["step_id"] = "impl-plan#4"
+    actual[1]["step_id"] = "impl-plan#8"
+    actual[2]["needs"][0]["requires"] = "impl-plan#8"
     assert score(package, tmp_path, authored(gold), actual)["passed"] == 1
-    actual[2]["needs"][0]["requires"] = "aesthetic-direction#4"
+    actual[2]["needs"][0]["requires"] = "impl-plan#4"
     assert score(package, tmp_path, authored(gold), actual)["passed"] == 0
 
 
@@ -120,14 +120,14 @@ def test_true_need_refers_to_the_expected_repeated_occurrence(package, tmp_path)
     ([selection("office-files", "not.an.intent")], "Unknown intent"),
     ([selection("office-files", "office.file-editing"),
       selection("office-files", "office.format-conversion")], "Duplicate capability"),
-    ([selection("ui-prototype", "ui.interactive-prototype")], "conditional prerequisites"),
-    ([selection("ui-prototype", "ui.interactive-prototype",
-                needs=[{"requires": "aesthetic-direction", "applies": "false"}])], "boolean applies"),
-    ([selection("ui-prototype", "ui.interactive-prototype",
-                needs=[{"requires": "aesthetic-direction", "applies": True}])], "not selected"),
-    ([selection("ui-prototype", "ui.interactive-prototype",
-                needs=[{"requires": "aesthetic-direction", "applies": True}]),
-      selection("aesthetic-direction", "ui.aesthetic-direction")], "before it"),
+    ([selection("plan-execution", "plans.plan-execution")], "conditional prerequisites"),
+    ([selection("plan-execution", "plans.plan-execution",
+                needs=[{"requires": "impl-plan", "applies": "false"}])], "boolean applies"),
+    ([selection("plan-execution", "plans.plan-execution",
+                needs=[{"requires": "impl-plan", "applies": True}])], "not selected"),
+    ([selection("plan-execution", "plans.plan-execution",
+                needs=[{"requires": "impl-plan", "applies": True}]),
+      selection("impl-plan", "plans.impl-plan-writing")], "before it"),
 ])
 def test_invalid_rich_gold_is_rejected_before_classifier_material(package, tmp_path, gold, fragment):
     write_case(package, authored(gold))
@@ -138,8 +138,8 @@ def test_invalid_rich_gold_is_rejected_before_classifier_material(package, tmp_p
 
 
 @pytest.mark.parametrize("gold,stack,fragment", [
-    ([selection("visual-direction", "ui.visual-direction"),
-      selection("aesthetic-direction", "ui.aesthetic-direction")], [], "conflict"),
+    ([selection("html-explanation", "explanation.html-page"),
+      selection("interactive-explainer", "explainer.source-walkthrough")], [], "conflict"),
     ([selection("css-scroll", "ui.scroll-animation")], [], "stack"),
 ])
 def test_unexecutable_rich_gold_uses_runtime_graph_validation(package, tmp_path, gold, stack, fragment):
@@ -224,8 +224,8 @@ def test_malformed_or_nested_alternatives_are_rejected_before_preparation(packag
 @pytest.mark.parametrize("rich", [False, True])
 def test_alternative_graph_is_validated_even_when_the_canonical_route_is_valid(package, tmp_path, rich):
     case = authored([selection("office-files", "office.format-conversion")])
-    case["alternatives"] = [authored([selection("visual-direction", "ui.visual-direction"),
-                                      selection("aesthetic-direction", "ui.aesthetic-direction")], rich=rich)["expect"]]
+    case["alternatives"] = [authored([selection("html-explanation", "explanation.html-page"),
+                                      selection("interactive-explainer", "explainer.source-walkthrough")], rich=rich)["expect"]]
     write_case(package, case)
     with pytest.raises(ValueError, match="(?i)alternative 1.*conflict"):
         prepare_eval(package, tmp_path / "must-not-exist")

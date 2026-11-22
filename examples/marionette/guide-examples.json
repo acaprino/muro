@@ -120,80 +120,6 @@
       "questions": []
     },
     {
-      "title": "Prototipo di un'app senza brand",
-      "task": "Fammi un prototipo cliccabile dell'onboarding della nostra nuova app: non abbiamo ancora né brand né design system. Prima di consegnarlo controlla accessibilità e stati dei bottoni.",
-      "stack_tokens": [],
-      "status": "selected",
-      "selections": [
-        {
-          "capability": "aesthetic-direction",
-          "intent": "ui.aesthetic-direction",
-          "reason": "Non esiste nulla a cui adeguarsi: prima si sceglie e si scrive una direzione visiva insieme all'utente."
-        },
-        {
-          "capability": "ui-prototype",
-          "intent": "ui.interactive-prototype",
-          "reason": "Il risultato richiesto è un flusso cliccabile con stato, validazione e feedback reali, costruito sulla direzione registrata.",
-          "needs": [
-            {
-              "requires": "aesthetic-direction",
-              "applies": true,
-              "reason": "Il prototipo è hi-fi e né il progetto né l'utente forniscono brand, design system o direzione."
-            }
-          ]
-        },
-        {
-          "capability": "design-review",
-          "intent": "ui.polish-pass",
-          "reason": "L'utente chiede un controllo prima della consegna: accessibilità e stati rientrano nel passaggio completo, che corregge ciò che trova."
-        }
-      ],
-      "reason": "Tre passi in ordine: la direzione, il prototipo che la legge, la revisione che la rispetta come sistema dichiarato. Con un brand o un design system esistente l'IA avrebbe risposto che il prerequisito non si applica.",
-      "questions": []
-    },
-    {
-      "title": "Esplorare prima di disegnare",
-      "task": "Fammi tre o quattro wireframe diversi per la schermata di checkout su mobile, così scegliamo la struttura prima di disegnarla davvero.",
-      "stack_tokens": [],
-      "status": "selected",
-      "selections": [
-        {
-          "capability": "wireframe",
-          "intent": "ui.wireframe-exploration",
-          "reason": "Serve confrontare strutture a bassa fedeltà, in scala di grigi e annotate: nessuna direzione visiva e nessun prototipo sono ancora richiesti."
-        }
-      ],
-      "reason": "Un solo passo. La scelta dell'utente viene registrata e diventa il brief del prototipo, che è un'altra richiesta.",
-      "questions": []
-    },
-    {
-      "title": "Token dal codice a Figma",
-      "task": "Estrai i design token dal tema del nostro frontend e usali per impostare le variabili nel file Figma. L'integrazione Figma è collegata.",
-      "stack_tokens": [],
-      "status": "selected",
-      "selections": [
-        {
-          "capability": "design-system-extract",
-          "intent": "ui.token-extraction",
-          "reason": "I valori reali vanno letti dal codice e scritti in un file di token, segnalando lacune e incoerenze."
-        },
-        {
-          "capability": "canvas-design",
-          "intent": "ui.canvas-design",
-          "reason": "Le fondamenta nel file Figma si costruiscono con i token registrati dal passo precedente.",
-          "needs": [
-            {
-              "requires": "visual-direction",
-              "applies": false,
-              "reason": "Non è una landing nuova: si impostano variabili e fondamenta, non sezioni di pagina."
-            }
-          ]
-        }
-      ],
-      "reason": "L'estrazione produce i token, Figma li legge come flusso di dati. Nessun prerequisito viene forzato.",
-      "questions": []
-    },
-    {
       "title": "Review delle modifiche",
       "task": "Rivedi solo le modifiche non committate: controlla la logica e i chiamanti, segnala problemi concreti senza modificare file.",
       "stack_tokens": [],
@@ -275,28 +201,6 @@
       "status": "no_match",
       "selections": [],
       "reason": "La policy permanente guida la comunicazione senza attivare una procedura o creare un piano. no_match riguarda il catalogo, non impedisce la risposta ordinaria dell’host.",
-      "questions": []
-    },
-    {
-      "title": "Temi a confronto e pannello per provarli",
-      "task": "Fammi un bozzetto HTML con cinque temi della stessa schermata, dal più classico al più nuovo, e poi un pannello per cambiare tema e palette dal vivo.",
-      "stack_tokens": [],
-      "status": "selected",
-      "selections": [
-        {
-          "step_id": "design-options#1",
-          "capability": "design-options",
-          "intent": "ui.design-variations",
-          "reason": "Cinque temi sono variazioni sostanziali della stessa schermata, da confrontare con una raccomandazione."
-        },
-        {
-          "step_id": "design-options#2",
-          "capability": "design-options",
-          "intent": "ui.tweak-controls",
-          "reason": "Sul file delle variazioni serve un pannello dal vivo per tema e palette: è un'operazione distinta, dopo la prima."
-        }
-      ],
-      "reason": "Due passi della stessa capability, ciascuno con il suo intento: il primo risponde alle verifiche delle variazioni e segna quelle del pannello come non applicabili, perché il pannello arriva nel secondo; il secondo risponde solo alle verifiche del pannello (ADR-0018).",
       "questions": []
     },
     {

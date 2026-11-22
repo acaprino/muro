@@ -44,7 +44,7 @@ Return `document_review_reports` (the report file paths, the preset or reviewers
 
 - Reports go to the working directory, or to the folder named by a line `EGM artifact directory: <path>`; never only to a per-session scratchpad, because they must outlive the session (`<package_root>/scripts/egm/docs/claude.md`, "Invocation and resources"). The other parts of the packaged host guides that describe installing the upstream plugin, its commands, its cache and its registered reviewer types do not apply here.
 - Resolution belongs in the session that wrote the document. In another session say so: its contests carry less evidence.
-- design-review, engineering-review and explainer-fact-check keep their own targets (interfaces, code, factual claims); this capability reviews documents against the packaged standards.
+- engineering-review and explainer-fact-check keep their own targets (code, factual claims); this capability reviews documents against the packaged standards.
 - Runtime dependencies: a host subagent tool. The source prescribes no installation.
 
 ## Checks

@@ -156,7 +156,7 @@ def test_new_outputs_have_one_owner_and_resumable_steps_are_declared():
     assert len(outputs) == len(set(outputs))
     for cap in caps.values():
         assert cap.id in PROCEDURES or not set(outputs) & set(cap.outputs), cap.id
-    assert not set(outputs) & {"spec", "review_findings", "review_fixes", "code_review_findings"}
+    assert not set(outputs) & {"spec", "code_review_findings"}
     assert {name for name in PROCEDURES if caps[name].resumable} == RESUMABLE
     assert caps["design-doc"].reads == ["concepts_brief"]
     assert caps["fresh-review"].reads == ["design_document"]
