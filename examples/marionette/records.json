@@ -257,6 +257,16 @@
       "text": "2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.",
       "author": "muro",
       "binding": false
+    },
+    {
+      "id": "harmonization-21",
+      "date": "2026-11-22",
+      "subjects": [
+        "claude-design-system-prompt"
+      ],
+      "text": "2026-11-22: claude-design-system-prompt is pinned to its tag v1-design-prompt (release mode) instead of its upstream head. The commit is the same, 3c3ddb07; the upstream replaced the design prompt that day, so head no longer matched, and the tag is where it keeps the one Marionette absorbed. No capability, intent, output, edge or delivery decision changes.",
+      "author": "muro",
+      "binding": false
     }
   ]
 }
