@@ -5,14 +5,14 @@ This archive records the source inspection and AI-authored integration checkpoin
 - Exact selected upstream bytes and both licenses are retained. Only evidence filenames `SKILL.md` become `SKILL.txt`; their bytes and original Git blob IDs are unchanged. Source directory structure is otherwise preserved.
 - Raw unselected upstream source bulk, Git object directories, unfinished routing cases/expected decisions and runtime state are excluded. Metadata keeps original pins, release references, signed commit bodies, tree identities and inspected-blob verification reports.
 - Source proposals are historical AI drafts. `production-source-entries.json`, `production-delivery-excerpt.json` and `combined-policy.md` record the actual consolidated checkpoint, including `intake_only_paths`. The permanent policy is 1986 characters; its text SHA256 (without the Markdown file's terminal newline) is `3c802ce60404ec046badc5c3713c142885b7d02b11616167ed9386c6fb0103fe`.
-- `prior-11-source-check/` preserves an earlier exact-mirror check of the eleven prior sources (the pin and the mirror-index entry of `claude-design-system-prompt` were removed on 2026-11-22, when the source left Marionette; the other ten are unchanged). It is not the final thirteen-source integration check. Large commit diff payloads were removed from pin metadata while preserving ref/commit verification fields.
+- `prior-11-source-check/` preserves an earlier exact-mirror check of the eleven prior sources. It is not the final thirteen-source integration check. Large commit diff payloads were removed from pin metadata while preserving ref/commit verification fields.
 - No upstream runtime, hook, installer, transcript importer or benchmark was executed by archiving these files.
 
 ## Integrity and provenance
 
-`manifest.json` records every payload file's byte length, SHA256, origin and category, with original Git blob IDs for selected source bytes. It excludes itself and this README to avoid a recursive self-hash. Its SHA256 is `0a9d4bf107fadf3cb116254a440a7dc6320dbc5fda6eef878be7167c76576ae7`.
+`manifest.json` records every payload file's byte length, SHA256, origin and category, with original Git blob IDs for selected source bytes. It excludes itself and this README to avoid a recursive self-hash. Its SHA256 is `b4699d9115842d6ec2e357c935121fc99e6cde3c382419f6f75faef8fa19638c`.
 
-Payload count: 47. Payload size: 376293 bytes. Recompute a file's SHA256 from its bytes; for an upstream text file, Git's blob identity is SHA1 of `blob <byte length>`, a NUL byte, then the unchanged file bytes. The analogous `commit` header verifies `upstream-commit.txt` against the recorded source pin.
+Payload count: 48. Payload size: 383865 bytes. Recompute a file's SHA256 from its bytes; for an upstream text file, Git's blob identity is SHA1 of `blob <byte length>`, a NUL byte, then the unchanged file bytes. The analogous `commit` header verifies `upstream-commit.txt` against the recorded source pin.
 
 | File | Bytes | SHA256 | Provenance |
 |---|---:|---|---|
@@ -49,8 +49,9 @@ Payload count: 47. Payload size: 376293 bytes. Recompute a file's SHA256 from it
 | [ponytail/source-proposal.json](ponytail/source-proposal.json) | 2219 | `a8e2a01c9bc422637f4b7daf6a3334bc0b3df3732b5463adf0c6111d8cd6fcf0` | D:\workspace\muro-integration-20261112\ponytail\source-proposal.json |
 | [ponytail/upstream-commit.txt](ponytail/upstream-commit.txt) | 1131 | `42c5fe6a35011efa609c781c73dce75459883827d0152ac8c06b59283436266b` | git cat-file commit 7801d061243d7b753bad0e0b3c057cd250b11755 from exact scratch mirror |
 | [ponytail/work-map-addendum.md](ponytail/work-map-addendum.md) | 2506 | `7d99ab807d1172e0f9a75f386252d941c745044cd9ba4f3f0f2840932d785617` | D:\workspace\muro-integration-20261112\ponytail\work-map-addendum.md |
-| [prior-11-source-check/mirror-index.json](prior-11-source-check/mirror-index.json) | 5476 | `68ad460601d25050ebf8cec991863e5e4f99396e2c4a95f891e71244dad2cf9e` | D:\workspace\muro-marionette-mirrors\mirror-index.json |
+| [prior-11-source-check/mirror-index.json](prior-11-source-check/mirror-index.json) | 6060 | `8bacda22bd01e00de9b51931f2f7ce8af153564753643e5fef116aa9e0f62865` | D:\workspace\muro-marionette-mirrors\mirror-index.json |
 | [prior-11-source-check/pins/ai-design-skills.json](prior-11-source-check/pins/ai-design-skills.json) | 5024 | `7fd43065b196b320d75f86591be5604d32d88b44de320d0013a7711d0eb241e2` | D:\workspace\muro-marionette-mirrors\pins\ai-design-skills.json with commit file patch payload removed |
+| [prior-11-source-check/pins/claude-design-system-prompt.json](prior-11-source-check/pins/claude-design-system-prompt.json) | 6988 | `9d12ddf370adce8fc82b34faf196ca8f75ee9d9b06f48e5b69ad79394a458722` | D:\workspace\muro-marionette-mirrors\pins\claude-design-system-prompt.json with commit file patch payload removed |
 | [prior-11-source-check/pins/explain-this.json](prior-11-source-check/pins/explain-this.json) | 5935 | `7fdd45f41056010f1cc9090c366e4cdcbca7be252b1bc860882b5de3b59ff0f8` | D:\workspace\muro-marionette-mirrors\pins\explain-this.json with commit file patch payload removed |
 | [prior-11-source-check/pins/genoffice.json](prior-11-source-check/pins/genoffice.json) | 514 | `b2a607f831871f4910075ea5929b9c758fe58985c7353b057f9c7497f80ae4e7` | D:\workspace\muro-marionette-mirrors\pins\genoffice.json |
 | [prior-11-source-check/pins/gsap-scrolltrigger.json](prior-11-source-check/pins/gsap-scrolltrigger.json) | 5361 | `30ff5884d7a323bc337a7c133d670cecdb2db4051249ad80a1bad5a505ff316a` | D:\workspace\muro-marionette-mirrors\pins\gsap-scrolltrigger.json with commit file patch payload removed |

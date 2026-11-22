@@ -390,6 +390,147 @@
       "why": "A pricing question is excluded by the economy report intent and no other capability answers it."
     },
     {
+      "id": "app-prototype-no-brand",
+      "task": "Fammi un prototipo cliccabile del flusso di registrazione della nostra nuova app. Non abbiamo né un brand né un design system: si parte da zero.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "aesthetic-direction",
+          "ui-prototype"
+        ],
+        "selections": [
+          {
+            "capability": "aesthetic-direction",
+            "intent": "ui.aesthetic-direction"
+          },
+          {
+            "capability": "ui-prototype",
+            "intent": "ui.interactive-prototype",
+            "needs": [
+              {
+                "requires": "aesthetic-direction",
+                "applies": true
+              }
+            ]
+          }
+        ]
+      },
+      "why": "The conditional prerequisite applies: hi-fi prototype, nothing to match."
+    },
+    {
+      "id": "prototype-on-existing-system",
+      "task": "Costruisci un prototipo HTML navigabile della schermata Impostazioni usando i colori e i componenti che trovi in src/theme.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "ui-prototype"
+        ],
+        "selections": [
+          {
+            "capability": "ui-prototype",
+            "intent": "ui.interactive-prototype",
+            "needs": [
+              {
+                "requires": "aesthetic-direction",
+                "applies": false
+              }
+            ]
+          }
+        ]
+      },
+      "why": "An existing theme is matched; no aesthetic direction step."
+    },
+    {
+      "id": "checkout-wireframes",
+      "task": "Schizzami tre wireframe alternativi per il checkout su mobile, in bianco e nero, giusto per decidere la struttura.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "wireframe"
+        ]
+      },
+      "why": "Low-fidelity exploration needs neither a look nor a prototype."
+    },
+    {
+      "id": "hero-variations",
+      "task": "Show me three different takes on the hero of pricing.html, all in one file so I can compare them side by side.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-options"
+        ],
+        "selections": [
+          {
+            "capability": "design-options",
+            "intent": "ui.design-variations"
+          }
+        ]
+      }
+    },
+    {
+      "id": "accessibility-fix",
+      "task": "Controlla l'accessibilità di dashboard.html (contrasto, navigazione da tastiera, focus) e correggi quello che non va.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.accessibility-audit"
+          }
+        ]
+      },
+      "why": "Audit and fix of an existing file; the dashboard-guidance case asks only for advice."
+    },
+    {
+      "id": "browser-deck",
+      "task": "Fammi una presentazione di dieci slide come pagina HTML che gira a schermo intero nel browser, con i colori del nostro brand in brand.css.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "html-deck"
+        ],
+        "selections": [
+          {
+            "capability": "html-deck",
+            "intent": "ui.html-deck",
+            "needs": [
+              {
+                "requires": "aesthetic-direction",
+                "applies": false
+              }
+            ]
+          }
+        ]
+      },
+      "why": "A browser deck with a brand to match; the new-deck case asks for PowerPoint."
+    },
+    {
+      "id": "tokens-from-codebase",
+      "task": "Estrai i design token (colori, font, spaziature, raggi) dal nostro tailwind.config.js e dai CSS e mettili in un file di token.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-system-extract"
+        ],
+        "selections": [
+          {
+            "capability": "design-system-extract",
+            "intent": "ui.token-extraction"
+          }
+        ]
+      }
+    },
+    {
       "id": "settings-page-in-product",
       "task": "Implementa nel nostro progetto React la nuova pagina Impostazioni, con il salvataggio delle preferenze sul backend.",
       "stack_tokens": [],
@@ -535,6 +676,23 @@
       }
     },
     {
+      "id": "ponytail-visual-only",
+      "task": "Verifica solo contrasto, focus e accessibilità visiva di questa schermata HTML, non la logica del codice o il debito del repository.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.accessibility-audit"
+          }
+        ]
+      }
+    },
+    {
       "id": "adhd-complete-explainer",
       "task": "Crea un explainer HTML interattivo completo del flusso di autenticazione di questo repository, con figure e riferimenti al codice. Riassumi solo il messaggio finale, non l’elaborato.",
       "stack_tokens": [],
@@ -559,6 +717,30 @@
         "status": "selected",
         "capabilities": [
           "design-guidance"
+        ]
+      }
+    },
+    {
+      "id": "theme-variations-then-panel",
+      "task": "Fammi un bozzetto HTML con cinque temi della stessa schermata, dal più classico al più nuovo, e poi un pannello per cambiare tema e palette dal vivo.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-options",
+          "design-options"
+        ],
+        "selections": [
+          {
+            "capability": "design-options",
+            "intent": "ui.design-variations",
+            "step_id": "design-options#1"
+          },
+          {
+            "capability": "design-options",
+            "intent": "ui.tweak-controls",
+            "step_id": "design-options#2"
+          }
         ]
       }
     },
@@ -934,6 +1116,23 @@
       }
     },
     {
+      "id": "zsd-a11y-fix-stays-review",
+      "task": "Controlla l'accessibilità di questa pagina HTML e sistema quello che non passa.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.accessibility-audit"
+          }
+        ]
+      }
+    },
+    {
       "id": "zsd-enforce-ci",
       "task": "Aggiungi alla CI un controllo che fallisce se nel codice entrano colori o font non previsti dal DESIGN.md.",
       "stack_tokens": [],
@@ -964,6 +1163,34 @@
             "capability": "design-file-integration",
             "intent": "design-file.token-export"
           }
+        ]
+      }
+    },
+    {
+      "id": "zsd-tokens-without-file-stays-extract",
+      "task": "Estrai i token dal nostro tailwind.config e dai CSS in un tokens.css; non voglio altri file.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-system-extract"
+        ],
+        "selections": [
+          {
+            "capability": "design-system-extract",
+            "intent": "ui.token-extraction"
+          }
+        ]
+      }
+    },
+    {
+      "id": "zsd-choose-look-stays-direction",
+      "task": "L'app non ha ancora un'identità visiva: proponimi tre direzioni e fissiamone una.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "aesthetic-direction"
         ]
       }
     },
@@ -1201,6 +1428,35 @@
         ]
       },
       "why": "Existing strategy outputs make the conditional landing prerequisite false; do not repeat completed planning."
+    },
+    {
+      "id": "prototype-starter-is-not-authority",
+      "task": "Fammi un prototipo HTML hi-fi dell’app. Il repository contiene solo DESIGN.md.example, dichiarato modello vuoto da compilare; non abbiamo brand, tema, valori scelti né riferimenti. Prima scegliamo il look.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "aesthetic-direction",
+          "ui-prototype"
+        ],
+        "selections": [
+          {
+            "capability": "aesthetic-direction",
+            "intent": "ui.aesthetic-direction"
+          },
+          {
+            "capability": "ui-prototype",
+            "intent": "ui.interactive-prototype",
+            "needs": [
+              {
+                "requires": "aesthetic-direction",
+                "applies": true
+              }
+            ]
+          }
+        ]
+      },
+      "why": "A starter/reference file is explicitly excluded from design authority and cannot suppress the conditional prerequisite."
     },
     {
       "id": "design-file-export-then-enforce",
