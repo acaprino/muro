@@ -4,9 +4,14 @@ name: Tests
 # verification". Muro has no tests on Marionette (owner rule of 2026-11-22): the Python tests that name it, and its
 # validation, source check, build and default-project pack, are in marionette.yml, so a problem of the package (an
 # upstream that moved) cannot fail this workflow or, through it, a release of Muro.
+#
+# It runs on the push to develop, where the work is integrated, and by hand (`gh workflow run tests.yml --ref
+# <branch>`): not again on the develop -> main release pull request or on main, which carry the same commit, and a
+# run per pull request (`refs/pull/N/merge`) would also keep its own copy of the Rust cache. The Release workflow
+# builds before it publishes; it does not test, so merge the release pull request when the run of develop's tip is green.
 on:
   push:
-  pull_request:
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
@@ -34,20 +39,39 @@ jobs:
   # Windows-first and its start-with-Windows tests write the per-user Run key.
   desktop:
     runs-on: windows-latest
+    env:
+      # No incremental data in the cached target: smaller, and the same result from a cold or a restored build.
+      CARGO_INCREMENTAL: "0"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # The cargo dependency build is restored, not rebuilt: the registry index and crates, the git dependencies,
+      # and `target` (tauri, wry, windows-* and the rest). The key holds the compiler (a new rustc makes the cached
+      # artifacts useless) and Cargo.lock; with no exact hit the newest cache of the same compiler is restored and
+      # cargo rebuilds only what the lock changed. `v1` is bumped to start over. It is saved by the last step, once
+      # the two steps that compile have passed, not only when the whole job is green (the browser tests are slow and
+      # can fail apart from Rust). A run can read only the caches of its own branch and of the default branch.
+      - id: rustc
+        name: Rust toolchain
+        run: |
+          $version = (rustc --version) -replace '[^A-Za-z0-9.]+', '-'
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - id: cargo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             target
-          key: desktop-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-      - name: Rust tests
+          key: ${{ runner.os }}-cargo-desktop-v1-${{ steps.rustc.outputs.version }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-desktop-v1-${{ steps.rustc.outputs.version }}-
+      - id: rust_tests
+        name: Rust tests
         run: cargo test --locked -p muro-registry -p muro-desktop-runtime
       - name: Frontend unit tests
         if: always()
@@ -68,12 +92,23 @@ jobs:
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
       # one stands in.
-      - name: Shell tests
+      - id: shell_tests
+        name: Shell tests
         if: always()
         run: |
           New-Item -ItemType Directory -Force apps/desktop/src-tauri/resources | Out-Null
           cargo test --locked -p muro-desktop
-      # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
+      # Headless Edge through Playwright's msedge channel; the runner image ships Edge: there is no browser to cache.
       - name: Browser tests
         if: always()
         run: node apps/desktop/tests/browser.mjs
+      - name: Save the cargo cache
+        if: ${{ !cancelled() && steps.cargo.outputs.cache-hit != 'true' && steps.rust_tests.outcome == 'success' && steps.shell_tests.outcome == 'success' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ steps.cargo.outputs.cache-primary-key }}
