@@ -10,6 +10,13 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 | visual-direction | art-direction | — | — | offer, page_outline, palette, typography, layout, constraints, page | ui.visual-direction, ui.landing-strategy |
 | design-guidance | design-guidance | — | — | design_candidates, stack_guidance | ui.design-guidance |
 | canvas-design | canvas-design | — | — | foundations, component_map, screen_plan | ui.canvas-design |
+| aesthetic-direction | aesthetic-direction | — | — | aesthetic_direction, direction_sample | ui.aesthetic-direction |
+| wireframe | lofi-exploration | — | — | wireframe_file, wireframe_decision | ui.wireframe-exploration |
+| ui-prototype | prototype-authoring | — | — | prototype_plan, prototype_file, prototype_verification | ui.interactive-prototype |
+| design-options | design-options | — | — | options_file, options_summary | ui.design-variations, ui.tweak-controls |
+| html-deck | html-deck-authoring | — | — | html_deck_plan, html_deck_file, html_deck_review | ui.html-deck |
+| design-system-extract | design-system-extraction | — | — | design_tokens, component_inventory | ui.token-extraction, ui.component-inventory |
+| design-review | design-review | — | — | review_findings, review_fixes | ui.accessibility-audit, ui.generic-look-check, ui.hierarchy-rhythm-review, ui.interaction-states, ui.polish-pass |
 | motion-principles | motion-spec | — | — | motion-spec, reduced-motion | ui.motion-design |
 | gsap-scrolltrigger | scroll-code | stack:gsap | — | code-patch, scroll-verified | ui.scroll-animation |
 | css-scroll | scroll-code | stack:css-only | — | code-patch, scroll-verified | ui.scroll-animation |
@@ -79,9 +86,18 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six
   default hooks are passive `host-approved` entries; registering them is an
   explicit user-requested step of the capability, never done at build or install.
-- 2026-11-22, owner decision: claude-design-system-prompt is removed (its upstream had replaced the design prompt, so the pinned head no longer matched).
-  Gone with it: aesthetic-direction, wireframe, ui-prototype, design-options, html-deck, design-system-extract and design-review, which held nothing else,
-  and the discovery entries marionette-product-design and marionette-design-review. visual-direction no longer conflicts with another capability.
+- claude-design-system-prompt (2026-11-12, head 3c3ddb07): a system prompt of
+  twenty chapters and fourteen skills become seven roles loaded on demand. No text
+  or hook from this source is session-wide (`delivery.json`): its persona,
+  non-disclosure and chat-conduct lines and its own skill routing are dropped,
+  its domain rules live in the bodies and the prompt file is not shipped. Merged: the five review skills into
+  design-review (polish runs the other four on one file); variations/tweak panel
+  into design-options; both extracts into design-system-extract; questions into briefs.
+  aesthetic-direction conflicts with visual-direction (two owners of palette and
+  type) and is a `needs` of ui-prototype and html-deck only when nothing gives a
+  look. html-deck and office-deck differ by wanted format; unspecified stays office-deck.
+  A motion-spec overrides the transition band; design-guidance stays lookup/report. Eval:
+  32 of 33 historically; db-migration was later corrected as in scope.
 - ponytail v5.3.3 and i-have-adhd v0.4.1 (2026-11-12): one permanent policy that
   carries both in their own words; three marked lines let them coexist with the catalog.
   Ponytail enriches work-map; review/audit share engineering-review; shortcut ledgers
@@ -99,4 +115,4 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - text-humanizer 2.0.0 (2026-11-17, head c4d8276c: no release upstream): one on-demand role, text-humanize; nothing session-wide, since as policy its rules would rewrite every reply. The skill, its editor agent and three references are one procedure; the editor is an optional subagent with the packaged agent file, or inline by the source's own fallback. The command and trigger lines are dropped as routing; a file is written only on the user's choice.
 - 2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.
 <!-- Dependencies are judged at runtime (ADR-0007). Open gaps: no maintained source for CSS scroll-driven animation;
-EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->
+the host starters and tools named by claude-design-system-prompt are not packaged; EGM's Claude reviewer adapters (omitClaudeMd, read-only tools) are not carried. -->

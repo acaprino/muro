@@ -138,5 +138,6 @@ def test_manifest_declares_a_mode_for_every_source():
         "gsap-scrolltrigger": ("head", None),
         "ai-design-skills": ("head", None),
         "explain-this": ("head", None),
+        "claude-design-system-prompt": ("head", None),
         "text-humanizer": ("head", None),
     }

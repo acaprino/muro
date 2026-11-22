@@ -46,7 +46,7 @@ PROCEDURES = {
 }
 RESUMABLE = {"design-file", "design-file-apply", "design-file-integration"}
 # Capabilities that take a look from what exists: a project DESIGN.md comes first and is never rewritten there.
-LOOK_CONSUMERS = ("visual-direction", "canvas-design")
+LOOK_CONSUMERS = ("visual-direction", "design-review", "ui-prototype", "html-deck", "design-options", "canvas-design")
 
 
 def read_json(name):
@@ -200,11 +200,12 @@ def test_new_outputs_have_one_owner_and_resumable_steps_are_declared():
         assert cap.id in PROCEDURES or not set(outputs) & set(cap.outputs), cap.id
     # The interface drift report does not take the key of the document drift report.
     assert "drift_report" not in outputs and caps["design-drift"].outputs == ["drift_report"]
+    assert not set(outputs) & {"design_tokens", "component_inventory", "review_findings", "aesthetic_direction"}
     assert {name for name in PROCEDURES if caps[name].resumable} == RESUMABLE
     assert caps["design-file-apply"].reads == ["design_file"]
     assert caps["design-file-integration"].reads == ["design_file"]
     assert caps["design-file-inspection"].reads == ["design_file", "design_brief", "design_application"]
-    assert {"palette", "typography"} <= set(caps["design-file"].reads)
+    assert {"aesthetic_direction", "palette", "typography", "design_tokens"} <= set(caps["design-file"].reads)
 
 
 def test_a_project_design_file_comes_first_and_only_its_owner_writes_it():
@@ -227,6 +228,9 @@ def test_a_project_design_file_comes_first_and_only_its_owner_writes_it():
     for name in ("design-file-apply", "design-file-inspection"):
         assert "design-file" in before_sources(caps[name])
     assert "design_file_not_rewritten" in caps["design-file-apply"].checks
+    # Capabilities that only produce a look or candidates are unchanged.
+    assert caps["aesthetic-direction"].reads == ["design_candidates"]
+    assert caps["aesthetic-direction"].conflicts == ["visual-direction"]
 
 
 def test_the_file_is_followed_as_recorded_and_a_starter_is_not_a_system():
@@ -236,10 +240,17 @@ def test_the_file_is_followed_as_recorded_and_a_starter_is_not_a_system():
     assert "or from the confirmed typography of a project design file" in visual
     assert "or the confirmed values of a project design file" in visual
     # Steps that write source code name what the design code checks reject (references/code-checks.md).
-    for name in ("visual-direction", "design-file-apply"):
+    for name in ("visual-direction", "design-review", "ui-prototype", "html-deck", "design-options",
+                 "design-file-apply"):
         body = before_sources(caps[name])
         assert "`design-check.config.json`" in body and "a colour function such as `rgb()` or `oklch()`" in body, name
+    for name in ("ui-prototype", "html-deck"):
+        when = caps[name].needs[0]["when"]
+        assert "a starter or a reference file does not" in when, name
+        assert "A project `DESIGN.md` that is not a starter or a reference comes first" in before_sources(caps[name])
     assert "comes first" in before_sources(caps["canvas-design"])
+    aesthetic = before_sources(caps["aesthetic-direction"])
+    assert "`x-zsd.kind` is `starter` or `reference` holds example data and is not" in aesthetic
     motion = caps["motion-principles"]
     assert motion.reads[-1] == "design_file"
     assert "confirmed `x-zsd.motion` values" in before_sources(motion)
@@ -280,6 +291,8 @@ def test_methods_are_discoverable_under_their_original_names_and_have_authored_e
     # Near-misses keep their owners in the authored expectations.
     expected = {case["id"]: case["expect"]["capabilities"] for case in cases}
     assert expected["zsd-doc-drift-stays-egm"] == ["design-drift"]
+    assert expected["zsd-a11y-fix-stays-review"] == ["design-review"]
+    assert expected["zsd-tokens-without-file-stays-extract"] == ["design-system-extract"]
 
 
 @pytest.mark.parametrize("task, capability, intent", [
@@ -317,6 +330,12 @@ def test_explicit_ai_fixtures_select_only_the_requested_method(coordinator, task
 @pytest.mark.parametrize("task, capability, intent", [
     ("Report where the code diverged from the design documents in docs/designs; this is not about the interface.",
      "design-drift", "docs.design-drift"),
+    ("Audit this HTML page for accessibility and fix what fails; no DESIGN.md is involved.",
+     "design-review", "ui.accessibility-audit"),
+    ("Extract the tokens of our codebase into a tokens.css; I do not want a DESIGN.md.",
+     "design-system-extract", "ui.token-extraction"),
+    ("The app has no visual identity yet: propose directions and commit one; do not write a design file.",
+     "aesthetic-direction", "ui.aesthetic-direction"),
 ])
 def test_explicit_negation_fixtures_preserve_existing_owners(coordinator, task, capability, intent):
     answer = decision(coordinator, task, [capability])

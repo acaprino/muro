@@ -257,24 +257,6 @@
       "text": "2026-11-15: owner `custom-instructions/recap-adhd.md` adds permanent progress guidance, coexists with ADHD rule 10 and adds no procedure; provenance is in delivery.json.",
       "author": "muro",
       "binding": false
-    },
-    {
-      "id": "harmonization-21",
-      "date": "2026-11-22",
-      "subjects": [
-        "claude-design-system-prompt",
-        "aesthetic-direction",
-        "wireframe",
-        "ui-prototype",
-        "design-options",
-        "html-deck",
-        "design-system-extract",
-        "design-review",
-        "visual-direction"
-      ],
-      "text": "2026-11-22, owner decision: claude-design-system-prompt is removed (its upstream had replaced the design prompt, so the pinned head no longer matched). Gone with it: aesthetic-direction, wireframe, ui-prototype, design-options, html-deck, design-system-extract and design-review, which held nothing else, and the discovery entries marionette-product-design and marionette-design-review. visual-direction no longer conflicts with another capability.",
-      "author": "muro",
-      "binding": false
     }
   ]
 }

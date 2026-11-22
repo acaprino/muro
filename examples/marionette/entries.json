@@ -15,6 +15,43 @@
       ]
     },
     {
+      "name": "marionette-product-design",
+      "description": "Use when sketching wireframes or a few low-fidelity layouts of a screen or flow, choosing a look for an app or product that has no brand or design system, building a clickable hi-fi prototype or mockup of app screens in HTML, wanting several design variations or a live tweak panel to play with colours, fonts and layout, or making a slide deck as an HTML page that runs in the browser. Not for a company website or landing page, a PowerPoint file, or shipping the screen in the product's production code.",
+      "capabilities": [
+        "aesthetic-direction",
+        "wireframe",
+        "ui-prototype",
+        "design-options",
+        "html-deck"
+      ],
+      "absorbs": [
+        "frontend-aesthetic-direction",
+        "discovery-questions",
+        "wireframe",
+        "make-a-prototype",
+        "generate-variations",
+        "make-tweakable",
+        "make-a-deck"
+      ]
+    },
+    {
+      "name": "marionette-design-review",
+      "description": "Use when checking and fixing an existing HTML design or web interface before it is shown or shipped: accessibility (contrast, keyboard, focus, labels), a generic AI-made look, visual hierarchy and spacing rhythm, missing hover, focus, disabled or loading states, or a full polish pass; or when extracting design tokens from a brand, codebase, site or screenshots into a tokens file, or listing the reusable components of a design as an inventory. Not for a code review of logic, for fact-checking content or for changes inside a design tool's file (Figma, FigCraft).",
+      "capabilities": [
+        "design-review",
+        "design-system-extract"
+      ],
+      "absorbs": [
+        "accessibility-audit",
+        "ai-slop-check",
+        "hierarchy-rhythm-review",
+        "interaction-states-pass",
+        "polish-pass",
+        "design-system-extract",
+        "component-extract"
+      ]
+    },
+    {
       "name": "marionette-motion",
       "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
       "capabilities": [

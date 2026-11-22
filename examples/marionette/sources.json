@@ -5,7 +5,7 @@
     "command": "marionette",
     "version": "0.5.1",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
       "landing-page-design",
       "figma-designer",
@@ -19,6 +19,20 @@
       "explain-anything-html",
       "paper-search",
       "tokeneconomizer",
+      "discovery-questions",
+      "frontend-aesthetic-direction",
+      "wireframe",
+      "make-a-deck",
+      "make-a-prototype",
+      "make-tweakable",
+      "generate-variations",
+      "design-system-extract",
+      "component-extract",
+      "accessibility-audit",
+      "ai-slop-check",
+      "hierarchy-rhythm-review",
+      "interaction-states-pass",
+      "polish-pass",
       "ponytail",
       "ponytail-review",
       "ponytail-audit",
@@ -506,6 +520,26 @@
         "tokeneconomizer/toolprune/README.md",
         "tokeneconomizer/trace/README.md"
       ]
+    },
+    {
+      "id": "claude-design-system-prompt",
+      "repo_url": "https://github.com/Trystan-SA/claude-design-system-prompt",
+      "commit": "3c3ddb07d7aa3fef051d83608596470c95cfd8fe",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Trystan Sarrade",
+      "selected_paths": [
+        "claude/system-prompt.md",
+        "claude/skills/**"
+      ],
+      "excluded_paths": [
+        "codex/**",
+        "README.md"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Read the system prompt chapter by chapter and the fourteen procedural skills, and decide the delivery form of each part with the delivery protocol. Owner direction of 2026-11-12: this package spans many themes, contexts and intents, so the system prompt is not injected into every session; its content becomes capabilities found from context, harmonized and coordinated with the others. Compare its design rules, review passes and production procedures with the existing design, motion, deck and explainer capabilities and justify merges, separate stages or alternatives from source evidence; do not preassign the destination by name or source order. Leave out the Codex variant and the source's own list of when to invoke which skill. Record that the upstream describes itself as a reverse-engineered rendition of Anthropic's Claude Design system prompt, and carry its methods in the source's own words (owner rule of 2026-11-12, ADR-0017, which replaces the earlier instruction to restate them): the capabilities read the packaged skills and the chapters of the prompt they apply, and change wording only for a recorded collision."
+      }
     },
     {
       "id": "ponytail",

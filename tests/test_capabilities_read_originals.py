@@ -29,7 +29,7 @@ def packaged_paths(text):
 
 
 def test_all_capabilities_are_covered():
-    assert len(CAPABILITIES) == 30
+    assert len(CAPABILITIES) == 37
 
 
 @pytest.mark.parametrize("path", CAPABILITIES, ids=lambda p: p.stem)
@@ -61,7 +61,8 @@ def test_every_packaged_original_a_body_names_is_in_the_release(release):
             if not (release / "scripts" / named).exists():
                 missing.append(f"{path.stem}: scripts/{named}")
     assert not missing, missing
-    # The originals a formerly intake-only source now carries.
+    # The originals the two formerly intake-only sources now carry.
+    assert (release / "scripts/claude-design-system-prompt/claude/system-prompt.md").is_file()
     # The factory drops `skills/<source-id>/` from a helper path, so the skill named like its source sits at the top.
     assert (release / "scripts/ponytail/SKILL.source.md").is_file()
     for skill in ("ponytail-review", "ponytail-audit", "ponytail-debt", "ponytail-gain", "ponytail-help"):

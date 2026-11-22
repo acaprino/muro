@@ -58,7 +58,7 @@ Return `code_review_findings` (numbered findings and verdict) and `code_review_c
 ## Sources
 
 - Source: ponytail (DietrichGebert/ponytail@7801d061243d7b753bad0e0b3c057cd250b11755, release v5.3.3, MIT) — `skills/ponytail-review/SKILL.md` and `skills/ponytail-audit/SKILL.md`, packaged as `<package_root>/scripts/ponytail/skills/ponytail-review/SKILL.source.md` and `<package_root>/scripts/ponytail/skills/ponytail-audit/SKILL.source.md`.
-- AI mapping: ponytail-review → engineering.change-review; ponytail-audit → engineering.codebase-audit. One report responsibility preserves two scopes; source names alone did not decide the merge. Outputs are separate from TokenEconomizer's measured reports.
+- AI mapping: ponytail-review → engineering.change-review; ponytail-audit → engineering.codebase-audit. One report responsibility preserves two scopes; source names alone did not decide the merge. Outputs are separate from design-review's findings/fixes and TokenEconomizer's measured reports.
 - Changes for coexistence (ADR-0017):
   - The trigger phrases, `/ponytail-review` and `/ponytail-audit` are not carried: the coordinator classifies by meaning.
   - The numbering "so the user can say "fix 2 and 5"" is kept, but a fix request is a separate implementation step (one capability per step).
