@@ -22,7 +22,7 @@ export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   const installations=targets.map(t=>({target:t,installed:installedOn(plugin,t,snapshot)}));
   if(installations.some(i=>!i.installed)) return status('missing','Not installed yet','accent');
   if(installations.some(i=>i.installed?.version!==distributionFor(plugin,i.target)?.version)) return status('update','Update available','warn');
-  return status('ok','Up to date','good');
+  return status('ok','Up to date','ok');
 }
 export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'unknown'|'paused'|'none';
 export interface CellStatus { kind:CellKind; from?:string; to?:string }
@@ -151,3 +151,5 @@ export const listing=(installed:InstalledPlugin,target:Target,revision:number)=>
 export const inList=(snapshot:Snapshot,target:Target,installed:InstalledPlugin):boolean=>installed.managed||(!!installed.path&&snapshot.registry.plugins.some(p=>p.targets.includes(target.id)&&p.distributions.some(d=>d.harness===target.harness&&d.path===installed.path)));
 /** What a line of an inventory adds for an entry whose files are gone (`present === false`): its record is still there, its folder is not. */
 export const filesMissing=(installed:InstalledPlugin):string=>installed.present===false?' · files missing':'';
+/** When the automatic sync checks next: its interval after the last check, "soon" when there is no last check to count from, and nothing when the automatic sync is off. */
+export const nextCheck=(snapshot:Snapshot):string|null=>{const settings=snapshot.registry.settings,last=snapshot.sync.last_check;return !settings.auto_sync?null:last&&/^\d+$/.test(last)?stamp(String(Number(last)+settings.interval_minutes*60)):'soon';};

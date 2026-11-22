@@ -58,12 +58,12 @@ const words = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/&amp;/g, 
 const rowOf = (html: string, id: string) => html.match(new RegExp(`<li class="im-list-link"><button[^>]*data-id="${id}"[\\s\\S]*?</li>`))?.[0] ?? '';
 
 // ---------- the tabs ----------
-test('Projects is the first of four tabs, and the app bar still has one state button', () => {
+test('Projects is the first of four tabs, and the status row is no button', () => {
   const html = frame(blank({ page: 'sync', snapshot: snapshot() }));
   assert.deepEqual([...html.matchAll(/data-action="page" data-id="(\w+)"[^>]*><svg[^>]*>.*?<\/svg><span class="label">([^<]+)<\/span>/g)].map(m => [m[1], m[2]]), [['projects', 'Projects'], ['sync', 'Sync'], ['activity', 'Activity'], ['settings', 'Settings']]);
   assert.match(html, /data-id="sync" aria-current="page"/, 'the app opens on Sync');
   assert.doesNotMatch(html, /data-id="projects" aria-current/);
-  assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length, 5, 'four tabs and the state button');
+  assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length, 4, 'four tabs: the status row navigates nowhere');
 });
 test('the Projects tab is current on its page, which is wide like Sync', () => {
   const html = frame(opened());
@@ -152,7 +152,8 @@ test('Open project file is offered while the shell can open a file dialog, and i
 });
 test('the list while it is read, after it failed, and when it is empty', () => {
   const s = snapshot();
-  assert.match(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /Reading your projects…/);
+  assert.doesNotMatch(projects.view(blank({ snapshot: s, projects: { ...blankProjects(), loading: true } })), /data-im-state-layer/, 'under 300 ms nothing shows');
+  assert.match(projects.view(blank({ snapshot: s, slow: { projects: true }, projects: { ...blankProjects(), loading: true } })), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/, 'then the loading layer');
   const failed = projects.view(blank({ snapshot: s, projects: { ...blankProjects(), error: 'The factory did not answer' } }));
   assert.match(failed, /Projects could not be read/);
   assert.match(failed, /The factory did not answer/);
@@ -193,7 +194,7 @@ test('a project with no repository says so, and one from the user is not marked 
 test('the four steps are a tablist: selected, labelled, with one tab in the tab order', () => {
   for (const [at, [id]] of STEPS.entries()) {
     const html = projects.view(opened({}, id));
-    const list = html.match(/<div class="im-step-nav" role="tablist" aria-label="Project steps">([\s\S]*?)<\/div><div role="tabpanel"/)?.[1] ?? '';
+    const list = html.match(/<ol class="im-steps" role="tablist" aria-label="Project steps">([\s\S]*?)<\/ol><div role="tabpanel"/)?.[1] ?? '';
     const tabs = [...list.matchAll(/<button type="button" role="tab"([^>]*)>([\s\S]*?)<\/button>/g)];
     assert.equal(tabs.length, 4);
     assert.deepEqual(tabs.map(t => /aria-selected="true"/.test(t[1])), STEPS.map(([s]) => s === id), `${id} is the one selected`);
@@ -210,18 +211,9 @@ test('the tabs read: number, name and a line of what the step holds', () => {
   const tabs = [...html.matchAll(/role="tab"[^>]*>([\s\S]*?)<\/button>/g)].map(m => words(m[1]));
   assert.deepEqual(tabs, ['1 Inputs 3 inputs', '2 Harmonize Harmonized', '3 Graph & simulator 3 capabilities · 2 examples', '4 Install On 1 harness · in sync']);
 });
-test('arrow keys move through the steps and wrap; Home and End go to the ends; other keys do nothing', () => {
-  assert.equal(projects.nextStep('inputs', 'ArrowRight'), 'harmonize');
-  assert.equal(projects.nextStep('install', 'ArrowRight'), 'inputs', 'wraps');
-  assert.equal(projects.nextStep('inputs', 'ArrowLeft'), 'install', 'wraps');
-  assert.equal(projects.nextStep('graph', 'ArrowLeft'), 'harmonize');
-  assert.equal(projects.nextStep('graph', 'Home'), 'inputs');
-  assert.equal(projects.nextStep('graph', 'End'), 'install');
-  for (const key of ['ArrowDown', 'ArrowUp', 'Enter', ' ', 'a']) assert.equal(projects.nextStep('graph', key), null, key);
-});
 test('while the project is read, and when it cannot be, the page says so and offers to try again', () => {
-  const loading = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
-  assert.match(loading, /Reading the project…/);
+  const loading = projects.view(blank({ snapshot: snapshot(), slow: { project: true }, project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoLoading: true } }));
+  assert.match(loading, /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
   assert.match(loading, /data-action="close-project"/, 'the way back is there');
   assert.doesNotMatch(loading, /role="tablist"/);
   const failed = projects.view(blank({ snapshot: snapshot(), project: fresh('marionette'), projects: { ...blankProjects(), list: [summary()], infoId: 'marionette', infoError: 'The project file is not a Muro project file' } }));
@@ -232,7 +224,8 @@ test('while the project is read, and when it cannot be, the page says so and off
 test('the information of another project is never shown for this one', () => {
   const state = opened({}, 'inputs', info());
   state.projects.infoId = 'other';
-  assert.match(projects.view(state), /Reading the project…/);
+  state.slow = { project: true };
+  assert.match(projects.view(state), /aria-busy="true"[\s\S]*data-im-state-layer="loading"/);
 });
 test('the project page escapes everything it shows', () => {
   const evil = '<script>alert(1)</script>';
@@ -296,7 +289,7 @@ test('Install: a harness the plan changes shows the change, and one with no buil
 test('Install: a harness that is paused has no switch', () => {
   const html = install.view(live({ targets: [claude, { ...codex, enabled: false }] }), info());
   assert.equal(html.match(/role="switch"/g)?.length, 1);
-  assert.match(html, /<span class="im-chip" data-im-tone="">Paused<\/span>/);
+  assert.match(html, /<span class="im-chip">Paused<\/span>/);
 });
 test('Install: without a harness it sends to Sync', () => {
   const html = install.view(live({ targets: [] }), info());
@@ -308,10 +301,13 @@ test('Install: without a harness it sends to Sync', () => {
 test('Install: the changes waiting for this project are reviewed in Sync\'s own sheet, which lists the whole plan', () => {
   const held = plan([op('marionette', 'install', 't2'), op('marionette', 'update', 't1', '0.6.0', '0.5.0'), op('other', 'install', 't1')]);
   const html = install.view(live({ targetsOn: ['t1', 't2'], plan: held }), info());
-  assert.match(html, /<button[^>]*class="im-btn im-btn--primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'only this project\'s changes count');
-  assert.doesNotMatch(html.match(/<button[^>]*data-action="review"[^>]*>/)![0], /data-id/, 'the review of the whole plan, not of one harness');
+  assert.equal(install.waitingChanges(live({ targetsOn: ['t1', 't2'], plan: held })), 2, 'only this project\'s changes count');
+  assert.doesNotMatch(html, /data-action="review"/, 'the review is in the action bar, not in the step');
+  const bar = projects.bar(live({ targetsOn: ['t1', 't2'], plan: held }));
+  assert.match(bar, /<button[^>]*class="im-btn im-btn--primary"[^>]*data-action="review"[^>]*>.*<span>Review 2 changes<\/span>/, 'the one primary action of the window');
+  assert.doesNotMatch(bar.match(/<button[^>]*data-action="review"[^>]*>/)![0], /data-id/, 'the review of the whole plan, not of one harness');
   assert.match(html, /data-action="page" data-id="sync"[^>]*>.*<span>Open Sync<\/span>/);
-  assert.doesNotMatch(install.view(live(), info()), /data-action="review"/, 'nothing waiting: no review');
+  assert.equal(projects.bar(live()), '', 'nothing waiting: no review');
 });
 test('Install: the line says where it is installed and what waits', () => {
   assert.equal(install.installLine(live(), 'marionette'), 'On 1 harness · in sync');
@@ -410,6 +406,7 @@ async function session(scenario = 'projects', wrap: (r: (a: string, p?: any) => 
   const app = {
     state, request: wrap(fake.request), render: () => { renders++; },
     async run(label: string, work: () => Promise<unknown>, after?: (v: any) => unknown) { if (state.busy) return; state.busy = label; state.error = null; try { const value = await work(); await after?.(value); } catch (e) { state.error = String(e instanceof Error ? e.message : e); } finally { state.busy = null; } },
+    loading: <T>(_key: string, work: () => Promise<T>) => work(),
     notify: (text: string) => void toasts.push(text), reload: async () => {}, replan: async () => {}, adopt: (s: Snapshot) => { state.snapshot = s; }, discover: async () => {}, openDialog: () => { throw new Error('no dialog'); }, closeDialog: () => {}, confirm: () => {},
   } as unknown as App;
   const act = (name: string, data: Record<string, string> = {}) => Promise.resolve(modules.projects.actions[name](app, data as DOMStringMap, {} as HTMLElement));
@@ -687,7 +684,7 @@ test('Remove from list asks first, says the file stays, and removes only the ent
   assert.equal(asked.length, 1);
   assert.equal(asked[0].title, 'Remove Notes from your list?');
   assert.match(asked[0].text, /Only the entry goes: the file stays where it is \(D:\/Notes\/Notes\.mp\) and you can open it again\./);
-  assert.deepEqual([asked[0].ok, asked[0].danger], ['Remove from list', true]);
+  assert.deepEqual([/^Remove /.test(asked[0].ok), asked[0].danger], [true, true]);
   const revision = state.snapshot!.registry.revision;
   await confirm();
   assert.deepEqual(fake.calls.map(c => c.action), ['remove_project', 'projects']);

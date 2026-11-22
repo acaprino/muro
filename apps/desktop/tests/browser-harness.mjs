@@ -14,11 +14,14 @@ async function test(name, scenario, options, body) {
 }
 const actions = async app => (await app.calls()).map(c => c.action);
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
-const dialog = page => page.locator('dialog[open], [role=alertdialog]');
+/** The surfaces a test talks to: the inspector (the form of a plugin or a harness: not modal, closed with `hidden`) and the dialogs over it. `.last()` is the topmost: dialogs come after the inspector in the document. */
+const dialog = page => page.locator('.im-inspector:not([hidden]), dialog[open], [role=alertdialog]');
+/** Escape on the inspector: a form with changes asks once, and the test discards them. */
+const leave = async page => { await page.keyboard.press('Escape'); await page.getByRole('button', { name: 'Discard changes' }).click({ timeout: 700 }).catch(() => {}); };
 const toast = page => page.locator('.im-notice-text');
-const focused = (page, what) => page.evaluate(w => { const e = document.activeElement; return w === 'name' ? e?.getAttribute('name') : w === 'text' ? e?.textContent : w === 'inside' ? !!e?.closest('dialog') : e?.id; }, what);
+const focused = (page, what) => page.evaluate(w => { const e = document.activeElement; return w === 'name' ? e?.getAttribute('name') : w === 'text' ? e?.textContent : w === 'inside' ? !!e?.closest('dialog, .im-inspector') : e?.id; }, what);
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('section.im-summary .im-summary-meta').getByText('today').first().waitFor(); };
+const check = async page => { await page.getByRole('button', { name: 'Check now', exact: true }).click(); await page.locator('.im-status-text').getByText('today').first().waitFor(); };
 const column = (page, name) => page.getByRole('button', { name, exact: true });
 const rowOf = (page, name) => page.locator('#rows').getByRole('button', { name: new RegExp('^' + name) });
 const errorOf = (dlg, field) => dlg.locator('#err-' + field);
@@ -28,12 +31,10 @@ const ready = async page => { await page.locator('.im-titlebar').waitFor(); awai
 
 // ---------- the harness sheet ----------
 await test('a column header opens the harness sheet; each wrong field says what is wrong, tied to the field, and takes the focus', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'Codex isolated test').click();
   await dlg.locator('h2').getByText('Codex isolated test', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), true, 'a sheet on the right');
   assert.equal(await focused(page, 'inside'), true, 'the sheet takes the focus');
-  assert.equal(await dlg.getAttribute('aria-labelledby'), 'dlg-title');
   for (const label of ['Name', 'Harness', 'Configuration folder', 'Executable', 'Keep this harness in sync', 'Uninstall plugins that are not in my list']) await dlg.getByLabel(label).first().waitFor();
   await dlg.getByText('Checked never · last sync never').waitFor();
   await page.screenshot({ path: shots + '/harness-sheet.png' });
@@ -59,13 +60,13 @@ await test('a column header opens the harness sheet; each wrong field says what 
   assert.equal(await focused(page, 'name'), 'name', 'the first wrong field, in the order of the form');
   await page.screenshot({ path: shots + '/harness-sheet-error.png' });
   assert.equal((await actions(app)).includes('save_target'), false, 'nothing is sent while a field is wrong');
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   assert.equal(await on(page), 'edit-target:t1', 'the focus goes back to the header');
 });
 
 await test('pausing a harness in its sheet saves it and the column says Paused', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'Codex isolated test').click();
   assert.equal(await dlg.getByLabel('Keep this harness in sync').isChecked(), true);
   await dlg.getByLabel('Keep this harness in sync').uncheck();
@@ -79,7 +80,7 @@ await test('pausing a harness in its sheet saves it and the column says Paused',
 });
 
 await test('a refused save keeps the sheet and its values, with the reason; Stop managing asks first', 'two-harnesses', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'OpenCode isolated test').click();
   await dlg.locator('[name=name]').fill('Renamed <b>');
   await app.flags({ rejectSave: true });
@@ -94,9 +95,12 @@ await test('a refused save keeps the sheet and its values, with the reason; Stop
   assert.equal(await page.evaluate(() => document.activeElement?.matches('[role=alertdialog] .im-btn') && document.activeElement.textContent === 'Cancel'), true, 'Cancel has the focus');
   await dlg.getByRole('button', { name: 'Cancel' }).click();
   assert.equal((await actions(app)).includes('remove_target'), false, 'Cancel removes nothing');
+  // The form still holds the typed name: close it (Close, then Discard) so that opening it again asks nothing.
+  await page.locator('.im-inspector:not([hidden])').getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Discard changes' }).click({ timeout: 700 }).catch(() => {});
   await column(page, 'OpenCode isolated test').click();
   await dlg.getByRole('button', { name: 'Stop managing' }).click();
-  await dlg.getByRole('button', { name: 'Stop managing', exact: true }).click();
+  await dlg.getByRole('button', { name: /^Stop managing .+/ }).click();
   await page.locator('th').getByText('OpenCode isolated test').waitFor({ state: 'detached' });
   assert.deepEqual((await actions(app)).slice(-2), ['remove_target', 'plan']);
   assert.equal(await toast(page).last().textContent(), 'Muro no longer manages OpenCode isolated test.');
@@ -139,7 +143,7 @@ await test('Add harness lists the harness found, opens its sheet with the folder
   assert.equal(await menu.isHidden(), true, 'a click elsewhere closes it');
   await toggle.click();
   await menu.getByRole('menuitem', { name: /Manage Claude Code/ }).click();
-  const dlg = dialog(page).first();
+  const dlg = dialog(page).last();
   await dlg.locator('h2').getByText('Add a harness', { exact: true }).waitFor();
   assert.equal(await menu.isHidden(), true, 'the menu closed on its own');
   assert.equal(await dlg.locator('[name=root]').inputValue(), 'D:/config/claude-code', 'the folder is the one found');
@@ -148,7 +152,7 @@ await test('Add harness lists the harness found, opens its sheet with the folder
   assert.equal(await dlg.locator('[name=harness]').inputValue(), 'claude-code');
   await dlg.getByText('Muro filled in the folder where this harness keeps its plugin configuration by default.').waitFor();
   assert.equal(await focused(page, 'name'), 'name', 'a new harness starts in its name');
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('data-action')), 'menu', 'the keyboard is back at Add harness');
   await toggle.click();
@@ -165,7 +169,7 @@ await test('Add harness lists the harness found, opens its sheet with the folder
 });
 
 await test('Add by hand opens an empty sheet and Rescan reads the computer again', 'changes', {}, async app => {
-  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.im-menu'), dlg = dialog(page).first();
+  const { page } = app, toggle = page.getByRole('button', { name: 'Add harness', exact: true }), menu = page.locator('.im-menu'), dlg = dialog(page).last();
   await ready(page);
   await toggle.click();
   await menu.getByRole('menuitem', { name: 'Add by hand…' }).click();
@@ -178,7 +182,7 @@ await test('Add by hand opens an empty sheet and Rescan reads the computer again
   assert.equal(await errorOf(dlg, 'name').textContent(), 'Give the harness a name.');
   assert.equal(await errorOf(dlg, 'root').textContent(), 'Enter the configuration folder.');
   assert.equal(await focused(page, 'name'), 'name');
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   const before = (await app.calls()).length;
   await toggle.click();
@@ -203,11 +207,11 @@ await test('Uninstall, asking first lists the removal before Apply', 'unlisted',
   assert.equal(await toast(page).first().textContent(), 'Saved. Muro will ask before it uninstalls plugins outside your list.');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('value')), 'remove', 'the radio keeps the focus');
   assert.deepEqual((await actions(app)).slice(-2), ['save_target', 'plan'], 'the plan is asked for after the save, and nothing is applied');
-  await page.locator('section.im-summary strong').getByText('1 change ready to apply').waitFor();
-  assert.match(await page.locator('section.im-summary small').first().textContent(), /1 removal/);
+  await page.locator('#sync-state b').getByText('1 change ready to apply').waitFor();
+  assert.match(await page.locator('#sync-state span').first().textContent(), /1 removal/);
   await page.screenshot({ path: shots + '/harness-unlisted-removal.png' });
   await page.getByRole('button', { name: 'Review', exact: true }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByText('Remove', { exact: true }).waitFor();
   await sheet.getByText('old-snippets').waitFor();
   await sheet.getByText('1 plugin will be uninstalled.').waitFor();
@@ -224,7 +228,7 @@ await test('Uninstall, asking first lists the removal before Apply', 'unlisted',
 });
 
 await test('the rule is saved harness by harness; it stops at the first one that fails, says so, and keeps the ones saved', 'unlisted', {}, async app => {
-  const { page } = app, dlg = dialog(page).first(), toggle = page.getByRole('button', { name: 'Add harness', exact: true });
+  const { page } = app, dlg = dialog(page).last(), toggle = page.getByRole('button', { name: 'Add harness', exact: true });
   await ready(page);
   await toggle.click();
   await page.getByRole('menuitem', { name: 'Add by hand…' }).click();
@@ -286,7 +290,7 @@ await test('Apply all on a plan with removals opens the review sheet and applies
   const { page } = app;
   await check(page);
   await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).waitFor();
   assert.equal((await actions(app)).includes('apply'), false, 'Apply all asked for a fresh plan and applied nothing');
   await sheet.getByText('Install', { exact: true }).waitFor();
@@ -297,7 +301,7 @@ await test('Apply all on a plan with removals opens the review sheet and applies
   const sent = (await callsOf(app, 'apply')).at(-1).payload;
   assert.deepEqual(Object.keys(sent).sort(), ['plan_id', 'skip_removals']);assert.equal(sent.skip_removals, true);
   assert.equal(await toast(page).first().textContent(), '1 change applied. 2 removals left out.');
-  await page.locator('section.im-summary strong').getByText('2 changes ready to apply').waitFor();
+  await page.locator('#sync-state b').getByText('2 changes ready to apply').waitFor();
   await page.locator('ul.im-stack-list li').filter({ hasText: 'old-snippets' }).waitFor();
   await page.locator('ul.im-stack-list li').filter({ hasText: 'ghost' }).getByText('files missing').waitFor();
 });
@@ -305,18 +309,18 @@ await test('the primary button of a review with removals confirms their number a
   const { page } = app;
   await check(page);
   await page.getByRole('button', { name: 'Apply all 3 changes' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.getByRole('button', { name: 'Apply, uninstall 1 and clear 1 without files', exact: true }).click();
   await sheet.waitFor({ state: 'detached' });
   const sent = (await callsOf(app, 'apply')).at(-1).payload;
   assert.deepEqual(Object.keys(sent).sort(), ['confirm_removals', 'plan_id']);assert.equal(sent.confirm_removals, 2, 'the number of removals of the plan');
   assert.equal(await toast(page).first().textContent(), '3 changes applied.');
-  await page.locator('section.im-summary strong').getByText('Everything is in sync').waitFor();
+  await page.locator('#sync-state b').getByText('Everything is in sync').waitFor();
   assert.equal(await page.getByRole('heading', { name: 'Installed, not in your list' }).count(), 0);
 });
 
 await test('the harness sheet lists what is installed there and adds a plugin to the list without closing', 'unlisted', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'Codex isolated test').click();
   const here = dlg.locator('#installed-here');
   await here.getByText('Installed here').waitFor();
@@ -332,14 +336,14 @@ await test('the harness sheet lists what is installed there and adds a plugin to
   assert.equal(await here.getByRole('button', { name: 'Add to my list' }).count(), 0);
   assert.equal(await focused(page, 'inside'), true, 'the keyboard stays in the sheet');
   assert.equal((await callsOf(app, 'save_plugin')).length, 1);
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   await page.locator('#rows').getByRole('button', { name: /^old-snippets/ }).waitFor();
   assert.equal(await toast(page).first().textContent(), 'old-snippets added to your list.');
 });
 
 await test('a failed Add to my list says why inside the sheet, which stays', 'unlisted', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'Codex isolated test').click();
   await app.flags({ rejectSave: true });
   await dlg.locator('#installed-here').getByRole('button', { name: 'Add to my list' }).click();
@@ -349,10 +353,9 @@ await test('a failed Add to my list says why inside the sheet, which stays', 'un
 
 // ---------- the plugin dialog ----------
 await test('a new plugin: wrong fields say so, the name follows the source, a refused save keeps the form, the saved one is a row', 'default', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
   await dlg.locator('h2').getByText('Add a plugin', { exact: true }).waitFor();
-  assert.equal(await dlg.evaluate(d => d.classList.contains('im-content-dialog--drawer')), false, 'a dialog, not a sheet');
   assert.equal(await focused(page, 'name'), 'source', 'it starts in the source');
   assert.equal(await dlg.getByRole('checkbox', { name: 'Codex isolated test' }).isChecked(), true, 'every enabled harness is checked');
   assert.equal(await dlg.getByText('More', { exact: true }).count(), 0, 'a plugin that is not in the list has no More');
@@ -400,7 +403,7 @@ await test('a new plugin: wrong fields say so, the name follows the source, a re
 });
 
 await test('a plugin row opens its dialog: edits keep what the form does not show, a changed source drops the builds', 'default', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await page.getByRole('button', { name: 'Add plugin' }).first().click();
   await dlg.locator('[name=name]').fill('Pkg');
   await dlg.locator('[name=source]').fill('https://example.com/plugin');
@@ -442,13 +445,13 @@ await test('a plugin row opens its dialog: edits keep what the form does not sho
   await rowOf(page, 'Pkg renamed').click();
   await dlg.getByText('Custom instructions · none yet', { exact: true }).click();
   await dlg.getByText('D:/isolated/data/custom-instructions/' + saved.id, { exact: true }).waitFor();
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   assert.equal(await page.evaluate(() => document.activeElement?.closest('#rows') !== null), true, 'the keyboard goes back to the row');
 });
 
 await test('the instructions of a plugin: reload them, open their folder, and a warning when they changed', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await rowOf(page, 'Package').click();
   await dlg.getByText('Custom instructions · none yet', { exact: true }).click();
   await dlg.getByText('More', { exact: true }).click();
@@ -471,7 +474,7 @@ await test('the instructions of a plugin: reload them, open their folder, and a 
 });
 
 await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove from my list', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await rowOf(page, 'Package').click();
   await dlg.locator('h2').getByText('Package', { exact: true }).waitFor();
   assert.equal(await dlg.locator('#plugin-more').evaluate(d => d.open), false, 'More is closed at first');
@@ -499,7 +502,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await dlg.locator('[name=budget]').fill('3');
   await dlg.locator('[name=harness]').selectOption('opencode');
   await dlg.getByRole('button', { name: 'Start' }).click();
-  await dlg.waitFor({ state: 'detached' });
+  await page.locator('dialog[open]').waitFor({ state: 'detached' });
   assert.deepEqual((await callsOf(app, 'adapt')).map(c => c.payload), [{ id: 'p1', harness: 'opencode', agent: 'claude-code', budget_usd: 3 }]);
   assert.equal(await toast(page).last().textContent(), 'Started. Follow it in Activity.');
   await page.getByRole('tab', { name: 'Activity, 1 run in progress' }).waitFor();
@@ -507,15 +510,15 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Plan a reinstall' }).click();
-  const sheet = page.locator('dialog.im-content-dialog--drawer[open]');
+  const sheet = page.locator('dialog[open]');
   await sheet.locator('h2').getByText('Review changes', { exact: true }).waitFor();
   assert.deepEqual((await callsOf(app, 'plan')).at(-1).payload, { reinstall: 'p1' });
   await sheet.getByText('Reinstall', { exact: true }).waitFor();
   await page.screenshot({ path: shots + '/harness-reinstall.png' });
   await page.keyboard.press('Escape');
   await sheet.waitFor({ state: 'detached' });
-  assert.equal(await page.locator('section.im-summary strong').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
-  assert.doesNotMatch(await page.locator('section.im-summary small').first().textContent(), /reinstall/, 'and the reinstall is not in it');
+  assert.equal(await page.locator('#sync-state b').textContent(), '1 change ready to apply', 'the strip keeps the plan it had');
+  assert.doesNotMatch(await page.locator('#sync-state span').first().textContent(), /reinstall/, 'and the reinstall is not in it');
   assert.equal((await actions(app)).includes('apply'), false);
   // Remove from my list asks first
   await rowOf(page, 'Package').click();
@@ -530,7 +533,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await dlg.getByRole('button', { name: 'Remove from my list' }).click();
-  await dlg.getByRole('button', { name: 'Remove', exact: true }).click();
+  await dlg.getByRole('button', { name: /^Remove \S/ }).click();
   await rowOf(page, 'Package').waitFor({ state: 'detached' });
   const removed = (await callsOf(app, 'remove_plugin')).at(-1).payload;
   assert.equal(removed.id, 'p1');assert.equal(typeof removed.revision, 'number');
@@ -540,7 +543,7 @@ await test('More: Check for updates, Adapt with AI, Plan a reinstall, Remove fro
 });
 
 await test('Adapt with AI with Codex as the coding agent says what is needed before it starts, links to Settings and cannot be started', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   // Settings, AI: Codex as the coding agent (the paragraph changes once the save is kept)
   await page.locator('nav button', { hasText: 'Settings' }).click();
   await page.getByRole('combobox', { name: 'Coding agent' }).selectOption('codex');
@@ -571,7 +574,7 @@ await test('Adapt with AI with Codex as the coding agent says what is needed bef
 });
 
 await test('More acts on the saved plugin: with unsaved changes it says so and does nothing', 'changes', {}, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await rowOf(page, 'Package').click();
   await dlg.locator('[name=name]').fill('Package, edited');
   await dlg.getByText('More', { exact: true }).click();
@@ -587,25 +590,25 @@ await test('More acts on the saved plugin: with unsaved changes it says so and d
 });
 
 await test('the dialogs and the menu fit a phone-width window, in the light theme', 'unlisted', { viewport: { width: 390, height: 844 }, colorScheme: 'light' }, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await ready(page);
   const views = page.getByRole('button', { name: 'Views', exact: true });
   await views.click();
   const navigation = page.getByRole('menu');
-  assert.deepEqual(await navigation.getByRole('menuitem').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings'], 'the compact Views menu keeps every page reachable');
-  await navigation.getByRole('menuitem', { name: 'Sync', exact: true }).click();
+  assert.deepEqual(await navigation.getByRole('menuitemradio').allTextContents(), ['Projects', 'Sync', 'Activity', 'Settings'], 'the compact Views menu keeps every page reachable');
+  await navigation.getByRole('menuitemradio', { name: 'Sync', exact: true }).click();
   await page.getByRole('heading', { name: 'Sync', level: 1 }).waitFor();
   assert.equal(await page.getByRole('menu').count(), 0, 'selecting a view closes compact navigation');
   await page.screenshot({ path: shots + '/harness-narrow-page.png' });
   await page.getByRole('button', { name: 'Add harness', exact: true }).click();
   await page.screenshot({ path: shots + '/harness-narrow-menu.png' });
   assert.ok(await page.locator('.im-menu').evaluate(m => { const r = m.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), 'the menu stays on screen');
-  await page.keyboard.press('Escape');
+  await leave(page);
   await column(page, 'Codex isolated test').click();
   assert.ok(await dlg.evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'nothing inside the sheet scrolls sideways');
   assert.ok(await dlg.evaluate(d => { const r = d.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; }), 'and it fits the window');
   await page.screenshot({ path: shots + '/harness-narrow-sheet.png' });
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   await rowOf(page, 'Package').click();
   await dlg.getByText('Advanced', { exact: true }).click();
@@ -617,15 +620,81 @@ await test('the dialogs and the menu fit a phone-width window, in the light them
 });
 
 await test('the harness sheet and the plugin dialog in the light theme', 'unlisted', { colorScheme: 'light' }, async app => {
-  const { page } = app, dlg = dialog(page).first();
+  const { page } = app, dlg = dialog(page).last();
   await column(page, 'Codex isolated test').click();
   await dlg.locator('#installed-here').waitFor();
   await page.screenshot({ path: shots + '/harness-sheet-light.png' });
-  await page.keyboard.press('Escape');
+  await leave(page);
   await dlg.waitFor({ state: 'detached' });
   await rowOf(page, 'Package').click();
   await dlg.getByText('More', { exact: true }).click();
   await page.screenshot({ path: shots + '/harness-plugin-light.png' });
+});
+
+// ---------- the inspector ----------
+await test('a harness opens in the docked inspector at 1512 and the table stays usable; Escape closes it, and a change asks once', 'changes', {}, async app => {
+  const { page } = app, panel = page.locator('.im-inspector:not([hidden])');
+  await column(page, 'Codex isolated test').click();
+  await panel.getByRole('heading', { name: 'Codex isolated test', level: 2 }).waitFor();
+  assert.equal(await page.evaluate(() => document.querySelector('.im-body').inert), false, 'the inspector is not modal');
+  assert.equal(await page.evaluate(() => { const c = document.querySelector('#main').getBoundingClientRect(), i = document.querySelector('.im-inspector').getBoundingClientRect(); return c.right <= i.left + 1; }), true, 'docked beside the content, never over it');
+  assert.equal(await page.locator('#rows tr').first().isVisible(), true, 'the table is still there');
+  await page.keyboard.press('Escape');
+  await panel.waitFor({ state: 'detached' });
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').fill('Renamed');
+  await page.keyboard.press('Escape');
+  await page.getByRole('heading', { name: 'Discard changes to Codex isolated test?' }).waitFor();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  assert.equal(await panel.locator('[name=name]').inputValue(), 'Renamed', 'Keep editing keeps the form and its values');
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  await page.getByRole('heading', { name: 'Discard changes to Codex isolated test?' }).waitFor();
+  await page.getByRole('button', { name: 'Discard changes' }).click();
+  await panel.waitFor({ state: 'detached' });
+  await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
+});
+
+await test('buttons of the inspector are enabled after a run from the action bar, and one Save sends one save_target', 'changes', {}, async app => {
+  const { page } = app, panel = page.locator('.im-inspector:not([hidden])');
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').waitFor();
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await page.locator('#sync-state b').getByText('change').first().waitFor();
+  assert.equal(await panel.getByRole('button', { name: 'Save', exact: true }).isEnabled(), true, 'Save is enabled after the run');
+  assert.equal(await panel.getByRole('button', { name: 'Stop managing' }).isEnabled(), true, 'and so is Stop managing');
+  await panel.locator('[name=name]').fill('Saved once');
+  await panel.getByRole('button', { name: 'Save', exact: true }).click();
+  await panel.waitFor({ state: 'detached' });
+  assert.equal((await callsOf(app, 'save_target')).length, 1, 'exactly one save_target');
+  await toast(page).getByText('Saved once saved.').waitFor();
+  await column(page, 'Saved once').waitFor();
+});
+
+await test('the guard follows the form: nothing is asked after a discard, and another object over a form with changes asks first', 'two-harnesses', {}, async app => {
+  const { page } = app, panel = page.locator('.im-inspector:not([hidden])');
+  const asks = () => page.getByRole('button', { name: 'Discard changes' });
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').fill('Edited');
+  await page.keyboard.press('Escape');
+  await asks().click();
+  await panel.waitFor({ state: 'detached' });
+  await page.getByRole('tab', { name: 'Activity' }).click();
+  await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
+  assert.equal(await asks().count(), 0, 'a form that was discarded asks nothing when the page changes');
+  await page.getByRole('tab', { name: 'Sync' }).click();
+  await column(page, 'Codex isolated test').click();
+  await panel.locator('[name=name]').fill('Edited again');
+  await column(page, 'OpenCode isolated test').click();
+  await asks().waitFor();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
+  assert.equal(await panel.locator('[name=name]').inputValue(), 'Edited again', 'Keep editing keeps the first form');
+  await column(page, 'OpenCode isolated test').click();
+  await asks().click();
+  await panel.getByRole('heading', { name: 'OpenCode isolated test', level: 2 }).waitFor();
+  await panel.locator('[name=name]').fill('Typed');
+  await page.keyboard.press('Escape');
+  await asks().waitFor();
+  await page.getByRole('button', { name: 'Keep editing' }).click();
 });
 
 console.log('PASS: ' + done.join('; '));

@@ -35,7 +35,9 @@ sources, and that the MCP server of one of them be absorbed
   thing), no prerequisite, `reads` for the outputs a body uses when recorded,
   `resumable` for the steps that pause for approval. Two changes for two
   owners of one output: `campaign-plan` hands approved concepts to their
-  producers instead of building them in place; `media-setup` offers the brand
+  producers instead of building them in place (it still gathers its four
+  inputs inside its step, as the source designs, and declares the tools those
+  analyses call); `media-setup` offers the brand
   setup instead of running the onboarding inside its step. Both are recorded
   in the capability and in `ROUTER.md`.
 - The server is declared in `delivery.json` as `supercmo`, started with
@@ -67,16 +69,34 @@ the ones written with a shorthand: 251 paths, none missing.
   un annuncio Meta…"): the model invoked the discovery entry
   `supads:supads-planning`, whose text loaded, and then wrote the copy
   directly. It ran no coordinator command, so nothing was classified, mapped
-  or recorded. 3 turns, 0 denials, 0.09 USD. Sample size: one.
+  or recorded. 3 turns, 0 denials, 0.09 USD.
+- Same host and model, a script request ("cosa deve dire la persona in un
+  video di 12 secondi…"): the model answered in one turn and invoked no skill.
+  0.05 USD.
+- Same host and model, a production request ("Fammi un video UGC di 15
+  secondi per la nostra crema solare…"), with only `Skill` allowed so that no
+  generating tool could run: the model invoked `supads:supads-videos`, ran
+  `muro.py plan`, got `classification-required`, wrote
+  `.supads/classification.json`, confirmed the plan `["ugc-video"]` and
+  received the step with its `package_root`. It then followed the capability:
+  it asked for a photo or link of the product before generating anything and
+  proposed a concept for approval. 7 turns, 0 denials, 0.43 USD. Nothing was
+  generated.
+- Four samples in all, one per request. The coordinator ran in the one that
+  asked for a production; the two short writing requests were answered
+  without it, and the readiness question went straight to the tool.
 
 ## Routing eval
 
 `muro eval prepare` staged 23 cases; a fresh agent on a smaller model
 (Claude Sonnet), which saw the prompt and the catalog and not the
-expectations, wrote the decisions. `muro eval score`: 23 of 23 passed, catalog
-digest `e94c2865…`. It named three cases as ambiguous and chose the expected
-answer in each: setup alone for "configurare tutto", competitor ad research
-without the competitor list first, the plan alone for "quali annunci testare".
+expectations, wrote the decisions. `muro eval score`: 23 of 23 passed, twice:
+on the first catalog (digest `e94c2865…`) and again, with a new agent, after
+`campaign-plan` declared its tools and joined the server's targets (digest
+`ac7f230c…`, the committed catalog). The agents named as ambiguous
+"configurare tutto" (setup alone or with the brand onboarding), competitor ad
+research without the competitor list first, and "quali annunci testare" (the
+plan, or a single ranked answer); in each they chose the expected answer.
 
 ## Tests
 
@@ -94,9 +114,11 @@ only.
   capability is unexecuted.
 - supads was loaded only on Claude Code. Codex, Pi, OpenCode and Hermes were
   run with a stub server (see the ADR-0030 record), not with this package.
-- In the one sample where a supads skill was invoked, the model skipped the
-  coordinator. Whether this is the request, the model or the entry text is not
-  known; the routing eval does not measure it.
+- A short writing request did not reach the coordinator in two samples of
+  two: once the entry skill loaded and was not followed, once no skill was
+  invoked. Whether this is the size of the request, the model or the entry
+  text is not known, and the routing eval does not measure it. The same was
+  not tried on the default model or on another host.
 - The capability bodies were written by four delegated intakes and were not
   each re-read line by line in the main session. What was checked: they parse,
   their packaged paths exist, their reports were read, and the two places that

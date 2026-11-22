@@ -107,7 +107,7 @@ function aiSection(s: Settings): string {
   ];
   return settingsGroupHtml(row('Use', note(api ? 'Muro calls the service itself, with a key it reads from the environment.' : "Claude Code or Codex, as installed on this computer. It reaches Muro's factory over MCP."), segSetting('ai_engine', ai.engine, ENGINES, 'Use'))
     + engine.join('')
-    + row('Python', note('The command or full path of the interpreter.'), inputHtml({ name: 'python', label: 'Python', value: s.python, attrs: { class: 'im-mono', 'data-setting': 'python', autocomplete: 'off', spellcheck: 'false' } }))
+    + row('Python', note('The command or full path of the interpreter.'), inputHtml({ name: 'python', label: 'Python', value: s.python, attrs: { class: 'im-mono', 'data-setting': 'python', autocomplete: 'off', spellcheck: 'false' } }), 'python')
     + row('Muro factory folder', note('Leave empty to use the one that ships with Muro.'), inputHtml({ name: 'factory_path', label: 'Muro factory folder', value: s.factory_path, attrs: { class: 'im-mono', 'data-setting': 'factory_path', placeholder: 'Built in', autocomplete: 'off', spellcheck: 'false' } }))
     , { title: 'AI', description: aiLead(ai) });
 }
@@ -117,7 +117,7 @@ export function view(state: ViewState): string {
   return head('Settings', 'Saved as you change them.')
     + settingsGroupHtml(row('Plugins that are not in my list', note('Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own settings.'), exclusiveSeg(registry.targets)), { title: 'Sync' })
     + settingsGroupHtml(row(AUTO, note('Checks for changes and applies them by itself.'), sw(s.auto_sync, AUTO, 'toggle-setting', 'auto_sync'))
-    + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), selectHtml({ name: 'interval_minutes', value: s.interval_minutes, options: intervalOptions(s.interval_minutes), label: 'Check interval', attrs: { 'data-setting': 'interval_minutes', disabled: !s.auto_sync } }))
+    + row('Check', s.auto_sync ? '' : note('Used when automatic sync is on.'), selectHtml({ name: 'interval_minutes', value: s.interval_minutes, options: intervalOptions(s.interval_minutes), label: 'Check interval', attrs: { 'data-setting': 'interval_minutes', disabled: !s.auto_sync } }), 'interval_minutes')
     + row(START, startHint(a, s), sw(!!a?.enabled, START, 'toggle-setting', 'autostart', !a?.supported))
     + row(TRAY, s.close_to_tray ? note('Closing the window leaves Muro in the notification area. Quit from its icon there.') : note('Closing the window quits Muro: nothing syncs until you open it again.', true), sw(s.close_to_tray, TRAY, 'toggle-setting', 'close_to_tray'))
     , { title: 'Background', description: 'How Muro keeps your harnesses in sync without you opening it.' })
@@ -158,12 +158,12 @@ const differs = (stored: Settings, patch: Patch) => (Object.keys(patch) as (keyo
 async function save(app: App, patch: Patch): Promise<void> {
   const stored = app.state.snapshot!.registry.settings;
   if (differs(stored, patch))
-    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.', 'good'); if (patch.ai && ('engine' in patch.ai || 'api_key_env' in patch.ai)) void readKey(app); });
+    await app.run('Saving settings…', () => saveRequest(app, patch), saved => { accept(app, saved); app.notify('Saved.'); if (patch.ai && ('engine' in patch.ai || 'api_key_env' in patch.ai)) void readKey(app); });
   app.render();
 }
-/** Refused where it enters: the message, and the control goes back to what is stored. */
+/** Refused where there is no field to say it in: a notice, and the control goes back to what is stored. */
 function refuse(app: App, text: string): true {
-  app.state.error = text;
+  app.notify(text, 'err');
   app.render();
   return true;
 }
@@ -195,7 +195,7 @@ async function startWithWindows(app: App): Promise<void> {
   await app.run('Saving settings…', async () => {
     state.autostart = await app.request<Autostart>('set_autostart', { enabled: on });
     return alsoSync ? await saveRequest(app, { auto_sync: true }) : null;
-  }, saved => { if (saved) accept(app, saved); app.notify('Saved.', 'good'); });
+  }, saved => { if (saved) accept(app, saved); app.notify('Saved.'); });
 }
 
 async function maintain(app: App, kind: 'verify' | 'cleanup', label: string): Promise<void> {
@@ -210,14 +210,14 @@ export const actions: Actions = {
     if (data.id === 'close_to_tray') return save(app, { close_to_tray: !stored.close_to_tray });
   },
   'maintenance-verify': app => maintain(app, 'verify', VERIFYING),
-  'maintenance-cleanup': app => app.confirm('Clean up unused builds?', 'Only stored builds that nothing uses are deleted.', 'Clean up', () => void maintain(app, 'cleanup', 'Cleaning up…'), true),
+  'maintenance-cleanup': app => app.confirm('Clean up unused builds?', 'Only stored builds that nothing uses are deleted.', 'Delete unused builds', () => void maintain(app, 'cleanup', 'Cleaning up…'), true),
 };
 
 export function change(app: App, el: TextBox): boolean {
   const setting = el.dataset.setting;
   if (!setting) return false;
   const value = el.value;
-  if (setting.startsWith('ai_')) learned.refused = null;
+  learned.refused = null;
   switch (setting) {
     case 'look':
       saveLook(el.value === 'oni' ? 'oni' : 'smooth'); app.render(); return true;
@@ -227,7 +227,7 @@ export function change(app: App, el: TextBox): boolean {
       return true;
     case 'interval_minutes': {
       const minutes = /^\d+$/.test(value) ? Number(value) : NaN;
-      if (!(minutes >= 1 && minutes <= 1440)) return refuse(app, 'The interval goes from 1 to 1440 minutes.');
+      if (!(minutes >= 1 && minutes <= 1440)) return refuseField(app, 'interval_minutes', 'The interval goes from 1 to 1440 minutes.');
       void save(app, { interval_minutes: minutes });
       return true;
     }
@@ -264,7 +264,7 @@ export function change(app: App, el: TextBox): boolean {
       return true;
     }
     case 'python':
-      if (!value.trim()) return refuse(app, 'Enter the Python command or its full path.');
+      if (!value.trim()) return refuseField(app, 'python', 'Enter the Python command or its full path.');
       void save(app, { python: value.trim() });
       return true;
     case 'factory_path':
@@ -288,7 +288,7 @@ export function input(_app: App, el: TextBox): boolean {
 /** The page was opened: whether Muro starts with Windows is read now, because the shell owns it and it can change outside Muro; so is whether the key's variable is set, when the API is the engine. Nothing held from an earlier visit is kept. */
 export async function opened(app: App): Promise<void> {
   forgetLearned();
-  try { app.state.autostart = await app.request<Autostart>('autostart'); } catch (e) { app.state.error = message(e); }
+  try { app.state.autostart = await app.request<Autostart>('autostart'); } catch (e) { app.notify(message(e), 'err'); }
   app.render();
   await readKey(app);
 }

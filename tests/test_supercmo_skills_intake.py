@@ -105,7 +105,7 @@ def test_the_server_is_declared_and_served_to_the_capabilities_that_call_it():
         "env": {"PYTHONPATH": "<package_root>/scripts/supercmo-skills/scripts"}}]
     [served] = [d for d in document["decisions"] if d["form"] == "mcp-server"]
     calling = {cap.id for cap in caps.values() if any(tool["name"] in SERVER_TOOLS for tool in cap.tools)}
-    assert set(served["targets"]) == calling and len(calling) == 20
+    assert set(served["targets"]) == calling and len(calling) == 21
     assert "11,500 tokens" in served["reason"]                        # the stated cost of every session
     assert not document.get("always_on") and not document.get("hooks")
 

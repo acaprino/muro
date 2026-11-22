@@ -91,3 +91,49 @@ that commit passed.
 - Sessions were ephemeral where the host allows it (Claude Code, Pi). One
   short session remains in the owner's OpenCode history. The session folder
   Claude Code left under `~/.claude/projects/` was deleted.
+
+## Decisions taken during the work
+
+The implementation followed a written plan kept outside the repository. Where
+the plan or the review left a choice, this is what was decided and what it
+costs if wrong.
+
+- Work went straight onto `develop`, with no worktree: AGENTS.md says to work
+  there and the owner allowed the commits.
+- The remote had five newer commits (release `muro-v0.5.7` and others, no
+  shared file). The local commits were rebased on them; nothing was forced.
+- The guide's labels for the new form were added with the adapters, not with
+  the documentation: the build renders `GUIDE.html` and failed without them.
+- The release tests declare the one file the test fixture packages as the
+  server's program and check paths only; a server is started from a hand-made
+  root in a separate test, and from a built release only in the live runs.
+- The packaged-path check applies to servers, not to hook wirings: an existing
+  hook test declares a file its fixture does not package. A hook that names a
+  missing file still builds, as before.
+- The desktop app was left alone: it falls back to the raw form name, and a
+  new segment in its form filter changes screenshots under the Imago rules. It
+  shows `mcp-server` untranslated and leaves it out of "What it became".
+- `muro project info` counts decisions by every form, so `became` gains
+  `mcp-server`; two test expectations were updated. A consumer that refused an
+  unknown key there would break; the desktop reads known keys only.
+- The env names `PLUGIN_ROOT` and `PLUGIN_DATA` were graded up from minor and
+  refused: validation accepted them and Hermes drops such a server.
+- One CI run (44949810718) failed in the `desktop` job on a browser test
+  timeout waiting for the setup title; the commit touched no desktop file and
+  the job passed when rerun.
+
+## Left as it is after the review
+
+Small findings of the reviewer that were not fixed:
+
+- A double quote in a server argument is refused though no shell is involved.
+- A `.cmd` or `.bat` program is accepted for a server; hooks refuse it only at
+  run time.
+- The Hermes install note says "registered automatically" although the
+  companion is a second package to install, and no note states which server
+  wins on each host when two share a name.
+- `<package_root>` is written again as a literal inside the JavaScript that
+  `muro/native_policy.py` generates.
+- The Hermes byte-equal test compares three files, not the whole folder.
+- The literal-env test expands only `${CLAUDE_PLUGIN_ROOT}` itself: what a host
+  does with `${HOME}` inside a value was not run.

@@ -136,7 +136,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -274,7 +274,7 @@ export function createTransport(scenario = 'default') {
       case 'snapshot': case 'scan': return snapshot();
       case 'discover': return structuredClone(data.found);
       case 'jobs': return structuredClone(jobs);
-      case 'plan': return makePlan(payload.target_id, payload.reinstall);
+      case 'plan': if (flags.planDelay) await new Promise(done => setTimeout(done, flags.planDelay)); return makePlan(payload.target_id, payload.reinstall);
       case 'check': {
         if (flags.checkDelay) await new Promise(done => setTimeout(done, flags.checkDelay));
         const errors = flags.checkErrors && reg.plugins[0] ? [{ plugin_id: reg.plugins[0].id, message: 'Source unreachable: could not resolve the release' }] : [];

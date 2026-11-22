@@ -339,7 +339,7 @@ try {
   holdRegistry();
   await until('the registry is held', registryBusy, 15000);
   const slow = await launch([], { dataDir: slowData, cdpPort: port + 1 });
-  await slow.page.locator('section.im-summary').waitFor({ timeout: 60000 });
+  await slow.page.locator('#sync-state').waitFor({ timeout: 60000 });
   results.push('a launch while the registry is held waits for it and shows the Sync page');
 
   // 8b. The worker's first check could not resolve the source: the run is a failed one, with the plugin's name.
@@ -359,11 +359,11 @@ try {
   await until('the registry is held again', registryBusy, 15000);
   const began = Date.now();
   await slow.page.reload();
-  await slow.page.locator('section.im-summary').waitFor({ timeout: 60000 });
+  await slow.page.locator('#sync-state').waitFor({ timeout: 60000 });
   assert.ok(Date.now() - began >= 1000, `the first request did not wait (${Date.now() - began} ms)`);
   assert.equal(await slow.page.evaluate(() => window.__unavailable), false, 'the page said the registry is not available');
-  assert.equal(await slow.page.locator('section.im-summary strong').first().textContent(), '1 source could not be checked');
-  assert.match(await slow.page.locator('.im-titlebar-status').textContent(), /Sources not checked/);
+  assert.equal(await slow.page.locator('#sync-state b').first().textContent(), '1 source could not be checked');
+  assert.match(await slow.page.locator('.im-status').textContent(), /Sources not checked/);
   results.push('a request that meets a held registry waits for it; the window opens on the recorded check, with the source it could not resolve');
 
   // 8d. A sync in progress is waited for by any request, however long it lasts (here longer than the 15 s a busy registry is
