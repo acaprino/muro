@@ -9,7 +9,7 @@ await mkdir(shots, { recursive: true });
 const done = [];
 async function test(name, scenario, options, body) {
   const app = await open(scenario, options);
-  try { await app.page.locator('nav').waitFor(); await body(app); done.push(name); } finally { await app.close(); }
+  try { await app.page.locator('nav').waitFor({ state: 'attached' }); await body(app); done.push(name); } finally { await app.close(); }
 }
 const AI = { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' };
 const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: AI };
