@@ -226,11 +226,8 @@ if not defined MUKADE_REV (echo [ERROR] Mukade revision not read from crates\mur
 if exist "%STAGING%\" rmdir /s /q "%STAGING%"
 
 echo     private Python and the current factory
-rem In CI (the release) a default project that cannot be built is a warning, not an error: Muro runs without one,
-rem and a problem of the package must never stop a release of Muro. On a machine of its own it stays an error.
-set "OPTIONAL_PROJECT="
-if defined CI set "OPTIONAL_PROJECT=--optional-default-project"
-python scripts\desktop_resources.py --out "%STAGING%\resources" %OPTIONAL_PROJECT% || goto :sub_fail
+rem Muro builds nothing of Marionette: this takes its latest published release (acaprino/marionette) and checks its SHA-256.
+python scripts\desktop_resources.py --out "%STAGING%\resources" || goto :sub_fail
 rem Tauri's build checks that its resource folder exists; the package uses the fresh copy above.
 if not exist "apps\desktop\src-tauri\resources\" xcopy /e /i /q "%STAGING%\resources" "apps\desktop\src-tauri\resources" >nul || goto :sub_fail
 

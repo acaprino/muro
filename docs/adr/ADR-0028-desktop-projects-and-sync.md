@@ -272,3 +272,16 @@ were.
 ## Amendment of 2026-11-20 (fix wave after the final review of plan 2)
 
 This is a labelled note, not a decision: `install_project` takes `{id, targets}`, the ids of the managed harnesses the project is installed on (the plugin's targets become exactly those; a build is made for each distinct kind), the plugin inside a `.mp` is checked against its package (`muro project verify`) at pack and at install, `remove_project` takes a project off the list (never the default one), and a coding agent is given only `muro mcp --tools simulate_prepare,simulate_check` and judged by the factory on the answer it ends with (decisions 10 and 11 unchanged otherwise).
+
+## Amendment of 2026-11-22 (the default project is taken as a release, not built)
+
+This is a labelled note, not a decision of its own; decision 5 stands. Owner: "Muro non deve costruire niente di
+default. Muro prende dalla repository, punto. La repository di Marionette. È Marionette a essere costruita con Muro.
+Muro mette in bundle l'ultima release di Marionette, punto." Muro's release (`build-release.bat`,
+`scripts/desktop_resources.py`) therefore runs no `muro build`, no `muro project pack` and no validation of Marionette:
+it takes the latest published release of `acaprino/marionette` (built with Muro by `release-marionette.yml`), checks the
+`.sha256` published beside it and places the zip, unchanged, as `projects/marionette-<version>.zip` in the bundle. That
+release is a zip of the built plugin folder, not a `.mp` project file, and the runtime installs a default project only
+from `projects/marionette.mp` (`install_default`): today it finds none (`NotBundled`), so a new data directory lists no
+default project, and a copy installed by an earlier Muro stays as it is. Making the runtime read the release is a
+follow-up, not done here, and no conversion of a release into a project file was invented.
