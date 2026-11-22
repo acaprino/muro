@@ -409,12 +409,14 @@ tests that name it (`-m marionette`), the manifest validation, the source check,
 package build and the default-project pack run in `.github/workflows/marionette.yml`
 (when Marionette's paths change, or `gh workflow run marionette.yml --ref <branch>`);
 the gate of its own release stays in `release-marionette.yml`. The release of Muro
-(`release.yml`) runs no Marionette test or check. The desktop installer still ships
-Marionette as the default project, so `build-release.bat` still builds it
-(`scripts/desktop_resources.py`: `muro build` and `muro project pack`, which validate the
-package and its pins as any build does); in CI that one step is optional
-(`--optional-default-project`): a failure is a warning and Muro ships without a default
-project, which the runtime supports, so it can no longer block the release.
+(`release.yml`) runs no Marionette test or check and builds nothing of it (owner decision
+of 2026-11-22: "Muro prende dalla repository, punto. È Marionette a essere costruita con
+Muro"): `build-release.bat` runs `scripts/desktop_resources.py`, which takes the latest
+published release of `acaprino/marionette` (built with Muro by `release-marionette.yml`),
+checks its `.sha256` and places the zip, unchanged, under `projects/` in the bundle. The
+runtime only installs `projects/marionette.mp`, which nothing makes any more, so the zip
+is carried and not read: a new Muro has no default project until the runtime reads the
+release (`docs/desktop-cli.md`).
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 examples/marionette/sources.json --validate`. For source/build changes also run

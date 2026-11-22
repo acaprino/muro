@@ -2,9 +2,10 @@ name: Marionette
 
 # Marionette's own checks, apart from Muro's: the Python tests that name it (marked `marionette` by tests/conftest.py),
 # and what a release of it needs, run on the same commit: the manifest validated, its pinned sources checked
-# against their remotes, the package built, and the default project packed from the real sources with that build.
+# against their remotes, the package built, and its project file packed from the real sources with that build.
 # Owner rule of 2026-11-22: Muro has no tests on Marionette. A problem here (a source that moved, a pin that no
-# longer matches) fails only this workflow; neither `Tests` nor `Release` (release.yml) depends on it. Its release
+# longer matches) fails only this workflow; neither `Tests` nor `Release` (release.yml) depends on it, and Muro's
+# release does not build Marionette: it takes the release that release-marionette.yml published. Its release
 # gate is release-marionette.yml and is not changed. Runs when what Marionette is made of changes, or by hand
 # (`gh workflow run marionette.yml --ref <branch>`).
 on:
@@ -16,7 +17,6 @@ on:
       - muro_build.py
       - pyproject.toml
       - tests/**
-      - scripts/desktop_resources.py
       - docs/adr/**
       - docs/releases/**
       - .github/scripts/marionette_release.py
@@ -30,7 +30,6 @@ on:
       - muro_build.py
       - pyproject.toml
       - tests/**
-      - scripts/desktop_resources.py
       - docs/adr/**
       - docs/releases/**
       - .github/scripts/marionette_release.py
@@ -65,10 +64,10 @@ jobs:
           python muro_build.py --manifest "$MANIFEST" --validate
           python muro_build.py --manifest "$MANIFEST" --check-sources
           python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
-      # The default project, packed from its real sources (fetched at their pins) with the release just built,
-      # on every run: a release of Marionette must not be the first time it is packed (ADR-0028). The size of
+      # Its project file (`muro project pack`, ADR-0028), packed from its real sources (fetched at their pins) with
+      # the release just built, on every run: a release of Marionette must not be the first time it is packed. The size of
       # the file and what reading it costs (the first read unpacks it, the second finds it unpacked) are printed.
-      - name: Pack the default project
+      - name: Pack the project file
         if: always()
         run: |
           python -m muro project pack --manifest "$MANIFEST" --out "$RUNNER_TEMP/marionette.mp" --sources-cache "$RUNNER_TEMP/sources-cache" --release "$RUNNER_TEMP/stage"
