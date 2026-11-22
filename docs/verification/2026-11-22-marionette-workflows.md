@@ -41,8 +41,11 @@ what stopped it. Now `build-release.bat` passes `--optional-default-project` to 
 set (GitHub Actions sets it): if building or packing the default project fails, a `::warning title=No default
 project::` annotation is printed, the folder `projects/` is removed and the resources are staged without it. A Muro
 without a default project is a supported state (`DefaultProject::NotBundled` in the runtime, covered by its Rust
-tests). On a machine of its own the same failure is still an error. Nothing is checked or tested in this step beyond
-what building the package does by itself.
+tests). On a machine of its own the same failure is still an error. The build still validates the package and its pins, as any
+build does; it can no longer fail the release. The installer script (`installer.iss`) copies the release folder as it
+is and names no project file. Skipping the step altogether would mean installers without Marionette, against ADR-0028;
+the alternative that keeps it without building it in the release (a pack made by `marionette.yml` and fetched by the
+release) needs a new artifact path and was not built.
 
 ## Checks made
 
@@ -55,9 +58,21 @@ Read-only; no test, build or pack was run (the owner's rule).
   two that read `examples/` read `examples/supads`, another package, from local files only).
 - `tests/conftest.py`, `scripts/desktop_resources.py` and `tests/test_marionette_project.py` parse.
 
+## Consequences for the owner
+
+- The rule is met only in part for `Release`: it still fetches and builds Marionette for the default project, because
+  the installer ships `projects/marionette.mp` and nothing else makes that file. The build cannot block the release
+  any more, but it still runs.
+- 49 of the 73 Python test modules, among them `test_runtime`, `test_ai_routing`, `test_delivery`, `test_cli` and
+  `test_pin_modes`, use Marionette as example data and now run only in `marionette.yml`. A regression of the factory
+  that only those modules catch passes `Tests`, and the installer bundles the factory. Which of them Muro should keep
+  by moving them onto a fixture package is the owner's call.
+- The test of the optional default project is in `test_marionette_project.py`, so it runs in `marionette.yml` too:
+  `Tests` does not run the guard that protects the release.
+
 ## Not executed
 
-The `Tests` workflow with `-m "not marionette"`, `marionette.yml`, the `marionette` marker hook (written for pytest 7
+The `Tests` workflow with `-m "not marionette"`, the fallback path of `desktop_resources.py`, `marionette.yml`, the `marionette` marker hook (written for pytest 7
 or later: `item.path`), the new test of the optional default project (it belongs to the Marionette tests: its file
 names Marionette), `build-release.bat` with `CI` set, and the Release workflow. The first run is on `develop`.
 There is no scheduled run of `marionette.yml`, so an upstream that moves is seen at the next change to a
