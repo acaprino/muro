@@ -19,8 +19,8 @@ Read-only look at the upstream on 2026-11-22 (`gh api`, `git ls-remote`):
   among the changed files.
 - `5e0534c9` (2026-11-22T10:37Z) is the HEAD now: three more skills. The gate would have failed again on it.
 - The old content is kept upstream at the annotated tag `v1-design-prompt`, which peels to `3c3ddb07`. There is no
-  GitHub release. A pin in `release` mode on that tag would have kept every byte. That option was found while the work
-  was under way, after the owner's instruction, and was not put to them; the source was removed as instructed.
+  GitHub release. A pin in `release` mode on that tag would have kept every byte; the owner chose to remove the
+  source instead, so it was not done.
 
 ## What was removed
 
@@ -91,8 +91,7 @@ license and notice entry of that source are no longer in the package: the build 
 
 `examples/marionette/history.json` (the pins of the published runs), `examples/marionette/CHANGELOG.md`,
 `records.json` (`harmonization-13`), `docs/releases/marionette-v0.2.0.md`, the ADRs that tell how the source was
-absorbed (ADR-0016, ADR-0018, ADR-0019), the other verification records that mention it among other things (ADR-0016 and
-`2026-11-12-delivery-form.md` still link to the deleted intake record, which is in the Git history),
+absorbed (ADR-0016, ADR-0018, ADR-0019), the other verification records that mention it among other things,
 `docs/verification/ponytail-native/logs/` and `docs/mockups/muro-redesign.html` (a mock-up of 0.4.1). The generic
 example of `prompts/intake.md` still names the intents `ui.design-variations` and `ui.tweak-controls`: it is a
 format example in a factory prompt, not a dependency, and it was left as it is.
