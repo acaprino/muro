@@ -294,6 +294,27 @@ def test_staging_stops_and_removes_the_release_when_a_command_fails(tmp_path):
         assert [path.name for path in out.parent.iterdir()] == ["resources"]    # no build left beside it
 
 
+def test_an_optional_default_project_that_cannot_be_built_is_a_warning_and_the_resources_stay(tmp_path, monkeypatch, capsys):
+    """The release (in CI) ships Muro without a default project rather than stopping (`NotBundled` in the runtime)."""
+    def staged(out, archive, root):
+        out.mkdir(parents=True)
+        (out / "factory").mkdir()
+
+    monkeypatch.setattr(resources, "stage", staged)
+    out = tmp_path / "resources"
+    for fail_on in ("build", "pack"):
+        shutil.rmtree(out, ignore_errors=True)
+        got = resources.stage_resources(out, b"archive", ROOT, tmp_path / "cache", Recorder(fail_on=fail_on),
+                                        optional_project=True)
+        assert got is None
+        assert (out / "factory").is_dir() and not (out / "projects").exists()
+        assert "::warning title=No default project::" in capsys.readouterr().out
+    shutil.rmtree(out)
+    assert resources.stage_resources(out, b"archive", ROOT, tmp_path / "cache", Recorder(),
+                                     optional_project=True) == out / "projects" / "marionette.mp"
+    assert "::warning" not in capsys.readouterr().out
+
+
 def test_a_failed_project_step_leaves_no_half_staged_folder_and_never_removes_an_existing_one(tmp_path, monkeypatch):
     def staged(out, archive, root):
         out.mkdir(parents=True)

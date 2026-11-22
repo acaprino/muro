@@ -3,7 +3,8 @@
 The default project is Marionette (examples/marionette), packed as projects/marionette.mp: a fresh release
 is built, then `muro project pack` carries the package, every input at its pinned commit and that release.
 This step needs the network, as `muro check-sources` does: the pinned sources are fetched for the build and
-for the inputs. The inputs are kept in --sources-cache (default .scratch/sources-cache), so the next run
+for the inputs. With --optional-default-project (build-release.bat passes it in CI) a project that cannot be built
+is a warning and the resources are staged without it. The inputs are kept in --sources-cache (default .scratch/sources-cache), so the next run
 fetches only what changed. --archive covers the Python download only.
 """
 from __future__ import annotations
@@ -64,11 +65,26 @@ def pack_default_project(out: Path, root: Path, sources_cache: Path, run=subproc
              "--sources-cache", str(sources_cache), "--release", release], cwd=root, check=True)
     return target
 
-def stage_resources(out: Path, archive: bytes, root: Path, sources_cache: Path, run=subprocess.run) -> Path:
-    """`stage`, then the default project. A failed project step removes the folder `stage` made a moment ago."""
+def stage_resources(out: Path, archive: bytes, root: Path, sources_cache: Path, run=subprocess.run,
+                    optional_project: bool = False) -> Path | None:
+    """`stage`, then the default project. A failed project step removes the folder `stage` made a moment ago.
+
+    With `optional_project` (the release, in CI) a project that cannot be built is a warning instead: the
+    resources stay without it and None is returned. A Muro built without a default project is a supported state
+    (`NotBundled` in the runtime), so a problem of the package never stops a release of Muro.
+    """
     stage(out, archive, root)
     try:
         return pack_default_project(out, root, sources_cache, run)
+    except Exception as error:
+        if not optional_project:
+            shutil.rmtree(out, ignore_errors=True)
+            raise
+        shutil.rmtree(out / "projects", ignore_errors=True)
+        reason = " ".join(str(error).split())
+        print(f"::warning title=No default project::The default project was not built, so this Muro ships without one: {reason}",
+              flush=True)
+        return None
     except BaseException:
         shutil.rmtree(out, ignore_errors=True)
         raise
@@ -79,11 +95,17 @@ def main() -> None:
     parser.add_argument("--archive", type=Path, help="an already downloaded copy of the embedded Python archive")
     parser.add_argument("--sources-cache", type=Path, metavar="DIR",
                         help=f"where the default project's inputs are kept between runs (default: <repository>/{SOURCES_CACHE})")
+    parser.add_argument("--optional-default-project", action="store_true",
+                        help="a default project that cannot be built is a warning and the resources are staged without it")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     archive = args.archive.read_bytes() if args.archive else urllib.request.urlopen(PYTHON_URL, timeout=90).read()
-    project = stage_resources(args.out.resolve(), archive, root, (args.sources_cache or root / SOURCES_CACHE).resolve())
-    print(f"Staged private Python + factory + default project: {args.out.resolve()} ({project.name})")
+    project = stage_resources(args.out.resolve(), archive, root, (args.sources_cache or root / SOURCES_CACHE).resolve(),
+                              optional_project=args.optional_default_project)
+    if project is None:
+        print(f"Staged private Python + factory, no default project: {args.out.resolve()}")
+    else:
+        print(f"Staged private Python + factory + default project: {args.out.resolve()} ({project.name})")
 
 if __name__ == "__main__":
     main()
