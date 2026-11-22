@@ -1,10 +1,18 @@
 name: Tests
 
-# The full suite and the package checks run here, not on a developer machine
-# (owner rule of 2026-11-17): see AGENTS.md, "Changes and verification".
+# Muro's own tests run here, not on a developer machine (owner rule of 2026-11-17): see AGENTS.md, "Changes and
+# verification". Muro has no tests on Marionette (owner rule of 2026-11-22): the Python tests that name it, and its
+# validation, source check, build and default-project pack, are in marionette.yml, so a problem of the package (an
+# upstream that moved) cannot fail this workflow or, through it, a release of Muro.
+#
+# Triggers and cache as in the CI standard of all the repositories: the push to develop, the pull requests to develop and
+# by hand (`gh workflow run tests.yml --ref <branch>`); never the develop -> main release pull request or main, whose
+# commit the push to develop already verified.
 on:
   push:
+    branches: [develop]
   pull_request:
+    branches: [develop]
   workflow_dispatch:
 
 permissions:
@@ -17,51 +25,52 @@ concurrency:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    env:
-      MANIFEST: examples/marionette/sources.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
       - name: Test
+        # tests/conftest.py marks every test module that names Marionette; marionette.yml runs those.
         run: |
           python -m pip install pytest
-          python -m pytest -q -rf --tb=short
-      - name: Validate, check sources and build
-        if: always()
-        run: |
-          python muro_build.py --manifest "$MANIFEST" --validate
-          python muro_build.py --manifest "$MANIFEST" --check-sources
-          python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
-      # The default project, packed from its real sources (fetched at their pins) with the release just built,
-      # on every push: a release of Marionette must not be the first time it is packed (ADR-0028). The size of
-      # the file and what reading it costs (the first read unpacks it, the second finds it unpacked) are printed.
-      - name: Pack the default project
-        if: always()
-        run: |
-          python -m muro project pack --manifest "$MANIFEST" --out "$RUNNER_TEMP/marionette.mp" --sources-cache "$RUNNER_TEMP/sources-cache" --release "$RUNNER_TEMP/stage"
-          echo "marionette.mp: $(stat -c %s "$RUNNER_TEMP/marionette.mp") bytes"
-          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache"
-          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache" > /dev/null
+          python -m pytest -q -rf --tb=short -m "not marionette"
 
   # The desktop app: the job above builds none of it. Windows, because the app is
   # Windows-first and its start-with-Windows tests write the per-user Run key.
   desktop:
     runs-on: windows-latest
+    env:
+      CARGO_INCREMENTAL: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
           cache: npm
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          cache-dependency-path: package-lock.json
+      - name: Cargo cache key
+        id: cargo-key
+        run: |
+          $info = rustc -vV
+          if ($LASTEXITCODE) { exit 1 }
+          $release = ($info | Select-String '^release: (\S+)').Matches[0].Groups[1].Value
+          $commit = ($info | Select-String '^commit-hash: (\w{9})').Matches[0].Groups[1].Value
+          $pins = Select-String -Path Cargo.lock -Pattern '^(source|checksum) = ' | ForEach-Object Line
+          $lock = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($pins -join "`n"))).Substring(0, 20).ToLower()
+          "toolchain=$release-$commit" >> $env:GITHUB_OUTPUT
+          "lock=$lock" >> $env:GITHUB_OUTPUT
+      - name: Restore the compiled Rust dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             target
-          key: desktop-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-desktop-${{ steps.cargo-key.outputs.toolchain }}-${{ steps.cargo-key.outputs.lock }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-desktop-${{ steps.cargo-key.outputs.toolchain }}-
       - name: Rust tests
         run: cargo test --locked -p muro-registry -p muro-desktop-runtime
       - name: Frontend unit tests
@@ -88,7 +97,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force apps/desktop/src-tauri/resources | Out-Null
           cargo test --locked -p muro-desktop
-      # Headless Edge through Playwright's msedge channel; the runner image ships Edge.
+      # Headless Edge through Playwright's msedge channel; the runner image ships Edge: there is no browser to cache.
       - name: Browser tests
         if: always()
         run: node apps/desktop/tests/browser.mjs

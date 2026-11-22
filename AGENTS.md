@@ -396,11 +396,29 @@ registers exactly what `delivery.json` declares, and nothing without it). A fixt
 AI reasoning quality. Report real and simulated integrations separately.
 
 Owner rule of 2026-11-17 ("le suite falle sempre in remoto in github actions"):
-the full suite runs in GitHub Actions, in the `Tests` workflow
-(`.github/workflows/tests.yml`: every push and pull request, or `gh workflow run
-tests.yml --ref <branch>`), not on the developer machine, where it took about an
+the suite runs in GitHub Actions, not on the developer machine, where it took about an
 hour against about two minutes on a runner. Locally run only the targeted tests
 of what changed, then push the branch and read the run.
+
+Owner rule of 2026-11-22 ("Muro non deve avere test su Marionette"): Muro's own CI and
+release never run Marionette checks, so a problem of the package (a source that moved)
+cannot block them. The `Tests` workflow, which is Muro's Verify run (`.github/workflows/tests.yml`: every push to
+and pull request to `develop`, or `gh workflow run tests.yml --ref <branch>`; never the
+`develop` -> `main` pull request or `main`, whose commit the push to `develop` already
+verified) runs the Python tests that do not name Marionette (`-m "not marionette"`:
+`tests/conftest.py` marks every test module that names it) and the desktop job. The
+tests that name it (`-m marionette`), the manifest validation, the source check, the
+package build and the default-project pack run in `.github/workflows/marionette.yml`
+(when Marionette's paths change, or `gh workflow run marionette.yml --ref <branch>`);
+the gate of its own release stays in `release-marionette.yml`. The release of Muro
+(`release.yml`) runs no Marionette test or check and builds nothing of it (owner decision
+of 2026-11-22: "Muro prende dalla repository, punto. È Marionette a essere costruita con
+Muro"): `build-release.bat` runs `scripts/desktop_resources.py`, which takes the latest
+published release of `acaprino/marionette` (built with Muro by `release-marionette.yml`),
+checks its `.sha256` and places the zip, unchanged, under `projects/` in the bundle. The
+runtime only installs `projects/marionette.mp`, which nothing makes any more, so the zip
+is carried and not read: a new Muro has no default project until the runtime reads the
+release (`docs/desktop-cli.md`).
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 examples/marionette/sources.json --validate`. For source/build changes also run
@@ -535,6 +553,7 @@ verification records belong in docs/verification/. Never write new docs/superpow
   Release (the installer of `release\installer\` and one portable zip with all of `release\` in a folder; no loose
   program) are published, and `main` is merged back into
   `develop`. Nothing is published when the build fails.
+- A release is the pull request develop → main, merged only when the Verify run on develop's tip is green: the release workflow builds and publishes, it does not run the tests again.
 - Never change the version or create release tags by hand: the workflow does it (`.github/release.json` lists
   the version files, `.github/scripts/release.mjs` writes them).
 

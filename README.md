@@ -359,7 +359,7 @@ Upstream code stays inert during intake and build. If a selected capability need
 
 See [AGENTS.md](AGENTS.md) for repository conventions. [Architecture decisions](docs/adr/README.md), the [functional requirements](docs/frd/README.md), and [verification records](docs/verification/) explain how the desktop app, the factory and the adapters fit together.
 
-The full suite runs in GitHub Actions, in the `Tests` workflow, on every push and pull request. Locally, run the tests of what you changed:
+Muro's tests run in GitHub Actions, in the `Tests` workflow (the Verify run of the gate below), on every push to and pull request to `develop` (and by hand on any branch). The tests that name Marionette, and the validation, source check and build of its package, run in the `Marionette` workflow, so a problem of the package cannot fail `Tests` or block a release of Muro. Locally, run the tests of what you changed:
 
 ```sh
 python -m pytest -q tests/test_<area>.py
@@ -374,7 +374,7 @@ The two tests that drive the real executable, `native.mjs` and `native-shell.mjs
 
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
 
-The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. Every merge of `develop` into `main` publishes a Muro release. When a merge changes Marionette's `plugin.version` on Muro's `main`, GitHub Actions builds the package and opens a release PR. Merging that PR publishes the ZIP and its SHA-256 in [acaprino/marionette](https://github.com/acaprino/marionette).
+The screenshots in this README come from `node apps/desktop/tests/screenshots.mjs`, which uses demo data; `MURO_GUIDE=<a release's GUIDE.html>` adds Marionette's guide. A release is the pull request develop → main, merged only when the Verify run on develop's tip is green: the release workflow builds and publishes, it does not run the tests again. Every merge of `develop` into `main` publishes a Muro release. When a merge changes Marionette's `plugin.version` on Muro's `main`, GitHub Actions builds the package and opens a release PR. Merging that PR publishes the ZIP and its SHA-256 in [acaprino/marionette](https://github.com/acaprino/marionette).
 
 [Routing verification](docs/verification/2026-11-09-ai-owned-routing.md) · [Guide verification](docs/verification/2026-11-10-release-html-guide.md) · [Routing eval and development principles](docs/adr/ADR-0015-design-principles-from-first-real-use.md)
 

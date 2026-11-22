@@ -86,7 +86,7 @@ Merges and edges need source-grounded reasons. GUIDE.html illustrates, never cla
 - tokeneconomizer (2026-11-11, release v0.1.0): one role, token-economy. Its six
   default hooks are passive `host-approved` entries; registering them is an
   explicit user-requested step of the capability, never done at build or install.
-- claude-design-system-prompt (2026-11-12, head 3c3ddb07): a system prompt of
+- claude-design-system-prompt (2026-11-12, head 3c3ddb07; since 2026-11-22 release v1-design-prompt, same commit): a system prompt of
   twenty chapters and fourteen skills become seven roles loaded on demand. No text
   or hook from this source is session-wide (`delivery.json`): its persona,
   non-disclosure and chat-conduct lines and its own skill routing are dropped,
