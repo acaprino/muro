@@ -1,7 +1,9 @@
 name: Tests
 
-# The full suite and the package checks run here, not on a developer machine
-# (owner rule of 2026-11-17): see AGENTS.md, "Changes and verification".
+# Muro's own tests run here, not on a developer machine (owner rule of 2026-11-17): see AGENTS.md, "Changes and
+# verification". Muro has no tests on Marionette (owner rule of 2026-11-22): the Python tests that name it, and its
+# validation, source check, build and default-project pack, are in marionette.yml, so a problem of the package (an
+# upstream that moved) cannot fail this workflow or, through it, a release of Muro.
 on:
   push:
   pull_request:
@@ -17,33 +19,16 @@ concurrency:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    env:
-      MANIFEST: examples/marionette/sources.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
       - name: Test
+        # tests/conftest.py marks every test module that names Marionette; marionette.yml runs those.
         run: |
           python -m pip install pytest
-          python -m pytest -q -rf --tb=short
-      - name: Validate, check sources and build
-        if: always()
-        run: |
-          python muro_build.py --manifest "$MANIFEST" --validate
-          python muro_build.py --manifest "$MANIFEST" --check-sources
-          python muro_build.py --manifest "$MANIFEST" --build --out "$RUNNER_TEMP/stage"
-      # The default project, packed from its real sources (fetched at their pins) with the release just built,
-      # on every push: a release of Marionette must not be the first time it is packed (ADR-0028). The size of
-      # the file and what reading it costs (the first read unpacks it, the second finds it unpacked) are printed.
-      - name: Pack the default project
-        if: always()
-        run: |
-          python -m muro project pack --manifest "$MANIFEST" --out "$RUNNER_TEMP/marionette.mp" --sources-cache "$RUNNER_TEMP/sources-cache" --release "$RUNNER_TEMP/stage"
-          echo "marionette.mp: $(stat -c %s "$RUNNER_TEMP/marionette.mp") bytes"
-          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache"
-          time python -m muro project info --summary "$RUNNER_TEMP/marionette.mp" --cache "$RUNNER_TEMP/project-cache" > /dev/null
+          python -m pytest -q -rf --tb=short -m "not marionette"
 
   # The desktop app: the job above builds none of it. Windows, because the app is
   # Windows-first and its start-with-Windows tests write the per-user Run key.

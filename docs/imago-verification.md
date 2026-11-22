@@ -59,7 +59,7 @@ Imago's Verify workflow runs the pinned package/gallery builds, all unit and
 browser regressions, Rust formatting/lint/tests and a native demo build.
 The release uses its develop-to-main PR; Muro depends on the resulting tag.
 
-Muro's Tests workflow runs the full factory suite and desktop jobs: reproducible
+Muro's Tests workflow runs the factory suite that does not name Marionette and the desktop jobs: reproducible
 npm installation, frontend unit tests, TypeScript/Vite, browser tests, registry
 and runtime Rust tests, and the desktop shell tests with Cargo `--locked`.
 The npm lock is composed from Imago's resolved runtime entries and checked with

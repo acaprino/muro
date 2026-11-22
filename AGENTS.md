@@ -396,11 +396,23 @@ registers exactly what `delivery.json` declares, and nothing without it). A fixt
 AI reasoning quality. Report real and simulated integrations separately.
 
 Owner rule of 2026-11-17 ("le suite falle sempre in remoto in github actions"):
-the full suite runs in GitHub Actions, in the `Tests` workflow
-(`.github/workflows/tests.yml`: every push and pull request, or `gh workflow run
-tests.yml --ref <branch>`), not on the developer machine, where it took about an
+the suite runs in GitHub Actions, not on the developer machine, where it took about an
 hour against about two minutes on a runner. Locally run only the targeted tests
 of what changed, then push the branch and read the run.
+
+Owner rule of 2026-11-22 ("Muro non deve avere test su Marionette"): Muro's own CI and
+release never run Marionette checks, so a problem of the package (a source that moved)
+cannot block them. The `Tests` workflow (`.github/workflows/tests.yml`: every push and
+pull request) runs the Python tests that do not name Marionette (`-m "not marionette"`:
+`tests/conftest.py` marks every test module that names it) and the desktop job. The
+tests that name it (`-m marionette`), the manifest validation, the source check, the
+package build and the default-project pack run in `.github/workflows/marionette.yml`
+(when Marionette's paths change, or `gh workflow run marionette.yml --ref <branch>`);
+the gate of its own release stays in `release-marionette.yml`. The release of Muro
+(`release.yml`) runs none of them. The desktop installer still ships Marionette as the
+default project, so `build-release.bat` builds it (`scripts/desktop_resources.py`); in CI
+that step is optional (`--optional-default-project`): a project that cannot be built is
+a warning and Muro ships without one, which the runtime supports.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 examples/marionette/sources.json --validate`. For source/build changes also run
