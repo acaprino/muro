@@ -1,6 +1,6 @@
 """Integration contract for the claude-design-system-prompt intake (product design in HTML).
 
-Pinned at head 3c3ddb07 (the upstream publishes no release or tag). The source ships a
+Pinned to the tag v1-design-prompt, commit 3c3ddb07 (head until 2026-11-22; the upstream publishes no GitHub release). The source ships a
 system prompt and fourteen skills; owner direction of 2026-11-12: nothing of it is injected
 into sessions. Runtime decisions below are explicit host-AI response fixtures: they exercise
 Python's validation and ordering, not the quality of AI classification.
@@ -65,10 +65,10 @@ def delivery():
     return json.loads((PACKAGE / "delivery.json").read_text(encoding="utf-8"))
 
 
-def test_manifest_pins_head_and_selects_the_prompt_and_its_skills_only():
+def test_manifest_pins_the_tag_and_selects_the_prompt_and_its_skills_only():
     manifest, src = manifest_and_source()
     assert src["repo_url"] == "https://github.com/Trystan-SA/claude-design-system-prompt"
-    assert src["commit"] == COMMIT and src["pin"] == "head" and "release" not in src
+    assert src["commit"] == COMMIT and src["pin"] == "release" and src["release"] == "v1-design-prompt"
     assert src["license"] == "MIT" and src["copyright"] == "Copyright (c) 2026 Trystan Sarrade"
     assert src["selected_paths"] == ["claude/system-prompt.md", "claude/skills/**"]
     # Absorbed content is not altered (ADR-0017): the capabilities read the prompt's chapters in its own words.
@@ -90,7 +90,7 @@ def test_design_capabilities_match_the_router_and_carry_their_provenance():
         assert all(intent["description"].strip() and intent["excludes"] for intent in cap.intents)
         assert cap.when == "—" and cap.after == [] and cap.hooks == []
         sources = cap.body[cap.body.index("## Sources"):]
-        assert f"{SOURCE} (Trystan-SA/{SOURCE}@{COMMIT[:8]}, head; commit `{COMMIT}`, pin `head`)" in sources
+        assert f"{SOURCE} (Trystan-SA/{SOURCE}@{COMMIT[:8]}, release v1-design-prompt; commit `{COMMIT}`, pin `release`)" in sources
         assert 'Reverse-engineered system prompt of Claude Design from Anthropic' in sources
         assert "AI intent mapping:" in sources and "Harmonized by: prompts/harmonizer.md (2026-11-12)" in sources
         assert "## Output handoff" in cap.body and "<state_dir>/map.md" in cap.body

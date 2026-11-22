@@ -52,7 +52,7 @@ Resolve `<package_root>` with the `package_root` returned beside these instructi
 ## Sources
 
 - AI intent mapping: frontend-aesthetic-direction → ui.aesthetic-direction, from its five phases; discovery-questions supplies the round of step 2; system prompt chapters 6 to 9 are the commit rules of step 4; chapters 3, 4 and 19 are stated in the body.
-- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, head; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `head`). Opened at run time, by section, from `<package_root>/scripts/claude-design-system-prompt/`: `claude/skills/frontend-aesthetic-direction.md`, `claude/skills/discovery-questions.md` and, of `claude/system-prompt.md`, chapters 6, 8 and 9 and the section "Rhythm" of chapter 7.
+- Source: claude-design-system-prompt (Trystan-SA/claude-design-system-prompt@3c3ddb07, release v1-design-prompt; commit `3c3ddb07d7aa3fef051d83608596470c95cfd8fe`, pin `release`). Opened at run time, by section, from `<package_root>/scripts/claude-design-system-prompt/`: `claude/skills/frontend-aesthetic-direction.md`, `claude/skills/discovery-questions.md` and, of `claude/system-prompt.md`, chapters 6, 8 and 9 and the section "Rhythm" of chapter 7.
 - Provenance: the upstream README describes the repository as a "Reverse-engineered system prompt of Claude Design from Anthropic" (from the intake brief; README.md is excluded and was not read).
 - Changes for coexistence (ADR-0017):
   - Added by the package (2026-11-17, with the intake of zero-slop-design): a project `DESIGN.md` stops step 1 like any existing system, and a starter or reference file does not, because the source of that file calls its values example data (competing design authority; owner decision of 2026-11-17).
