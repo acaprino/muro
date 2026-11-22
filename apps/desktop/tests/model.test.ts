@@ -5,9 +5,10 @@ import type { Snapshot, Plugin, Plan, Operation, ViewState } from '../src/types.
 import { frame, modules } from '../src/views.ts';
 import { cell, rows, actions as syncActions } from '../src/pages/sync.ts';
 import type { App } from '../src/context.ts';
-import { reviewSheet } from '../src/sheets.ts';
+import { reviewSheet, pluginPanel, harnessPanel, adaptDialog } from '../src/sheets.ts';
 import { when, sw, seg, button } from '../src/ui.ts';
 import { storedTheme, resolveTheme } from '../src/look.ts';
+import { blankProjects } from '../src/pages/project/state.ts';
 
 const plugin: Plugin = {id:'pkg',name:'Package',source:'owner/pkg',policy:'stable',pinned_version:'',targets:['target'],distributions:[{harness:'codex',path:'/artifact',version:'2'}]};
 function snapshot(): Snapshot {return {registry:{schema:1,revision:4,plugins:[plugin],targets:[{id:'target',harness:'codex',name:'Codex',root:'/profile',executable:'codex',exclusive:false,enabled:true}],settings:{auto_sync:false,interval_minutes:60,close_to_tray:true,agent:'claude-code',python:'python',factory_path:''}},inventory:[{target_id:'target',complete:true,supported:true,error:null,plugins:[{id:'pkg',name:'Package',version:'1',path:'/plugin',managed:true}]}],activity:[],sync:{last_check:null,last_sync:null,revision:null,pending:null,blockers:null,errors:null,targets:{}}};}
@@ -254,36 +255,39 @@ test('sameOperations compares the operations of two plans in any order, and neve
  assert.equal(sameOperations(null,null),false);assert.equal(sameOperations(a,null),false);assert.equal(sameOperations(plan([]),plan([])),true);
 });
 
-const stripOf=(html:string)=>html.match(/<section class="im-summary[\s\S]*?<\/section>/)?.[0]||'';
+/** The note of the Sync page (what the last check found), the status row, and the action bar of a frame. */
+const stripOf=(html:string)=>html.match(/<div id="sync-state">[\s\S]*?<\/span><\/div><\/div><\/div>/)?.[0]||'';
+const statusOf=(html:string)=>html.match(/<div class="im-status">[\s\S]*?<\/div><div class="im-columns"/)?.[0]||'';
+const barOf=(html:string)=>html.match(/<div class="im-actions">[\s\S]*?<\/div><footer/)?.[0]||'';
 const actionsOf=(html:string)=>html.match(/data-action="[a-z-]+"/g)?.map(a=>a.slice(13,-1));
-test('the frame is an app bar with four tabs and a state button, no sidebar; Sync is current',()=>{
+test('the frame is a title bar with four tabs, a status row, an action bar and a footer, no sidebar; Sync is current',()=>{
  const html=frame(viewState(snapshot()));
- assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,5,'four tabs and the state button');
+ assert.equal(html.match(/data-action="page" data-id="[a-z]+"/g)?.length,4,'four tabs: the status row navigates nowhere');assert.match(statusOf(html),/class="im-chip"/);assert.match(html,/<footer class="im-footer">/);assert.doesNotMatch(html,/im-titlebar-status/);
  assert.match(html,/data-id="sync" aria-current="page"/);assert.doesNotMatch(html,/data-id="activity" aria-current/);
  assert.doesNotMatch(html,/class="(sidebar|topbar|bottom|shell)/);assert.match(html,/<header class="im-titlebar" data-tauri-drag-region>/);assert.match(html,/<main id="main"/);
 });
 test('the strip says Not checked yet and offers only Check now when nothing was recorded for this revision, and for a plan of another revision',()=>{
- for(const held of [null,plan([op('update','1','2')],3)]){const strip=stripOf(frame(viewState(snapshot(),{plan:held})));assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(strip),['check']);}
+ for(const held of [null,plan([op('update','1','2')],3)]){const html=frame(viewState(snapshot(),{plan:held})),strip=stripOf(html);assert.match(strip,/Not checked yet/);assert.deepEqual(actionsOf(barOf(html)),['check']);}
 });
 test('a recorded check shows on open: its count, Review and Apply all, and no text built from a plan that is not there',()=>{
  const s=snapshot();s.sync=recordedSync({pending:3});
  const html=frame(viewState(s)),strip=stripOf(html);
- assert.match(strip,/<strong>3 changes ready to apply<\/strong>/);
- assert.match(strip,/<small>Nothing changes until you apply\.<\/small>/,'no leading full stop, no breakdown');
- assert.deepEqual(actionsOf(strip),['check','review','apply-all']);assert.match(strip,/Apply all 3 changes/);
- assert.doesNotMatch(strip,/Not checked yet/);assert.doesNotMatch(strip,/Last check <b>never/);
- assert.match(html,/3 changes waiting · checked /,'the app bar button agrees');
+ assert.match(strip,/<b>3 changes ready to apply<\/b>/);
+ assert.match(strip,/<span>Nothing changes until you apply\.<\/span>/,'no leading full stop, no breakdown');
+ assert.deepEqual(actionsOf(barOf(html)),['check','review','apply-all']);assert.match(barOf(html),/Apply all 3 changes/);assert.equal(barOf(html).match(/im-btn--primary/g)?.length,1,'one primary action');
+ assert.doesNotMatch(strip,/Not checked yet/);assert.doesNotMatch(statusOf(html),/Last check never/);
+ assert.match(statusOf(html),/3 changes waiting/);assert.match(statusOf(html),/Last check /,'the status row agrees');
  assert.match(html,/aria-label="Sync, 3 changes waiting"/,'and so does the tab badge');
  s.sync=recordedSync({pending:2,blockers:1});
- assert.match(stripOf(frame(viewState(s))),/<small>1 item not ready yet\. Nothing changes until you apply\.<\/small>/);
+ assert.match(stripOf(frame(viewState(s))),/<span>1 item not ready yet\. Nothing changes until you apply\.<\/span>/);
 });
 test('a recorded check with blockers or sources not checked or nothing to do reads as such',()=>{
  const s=snapshot();s.inventory[0].plugins[0].version='2';
  s.sync=recordedSync({pending:0,blockers:2});
- const blocked=stripOf(frame(viewState(s)));assert.match(blocked,/Some plugins are not ready/);assert.match(blocked,/2 items are not ready yet/);assert.doesNotMatch(blocked,/<small>\./);assert.deepEqual(actionsOf(blocked),['check','review']);
+ const blockedHtml=frame(viewState(s)),blocked=stripOf(blockedHtml);assert.match(blocked,/Some plugins are not ready/);assert.match(blocked,/2 items are not ready yet/);assert.doesNotMatch(blocked,/<span>\./);assert.deepEqual(actionsOf(barOf(blockedHtml)),['check','review']);
  s.sync=recordedSync({pending:0,errors:2});
- const sources=stripOf(frame(viewState(s)));assert.match(sources,/<strong>2 sources could not be checked<\/strong>/);assert.doesNotMatch(sources,/Everything is in sync/);assert.deepEqual(actionsOf(sources),['check']);assert.match(sources,/class="im-btn im-btn--primary" data-action="check"/,'Check now leads');
- assert.match(frame(viewState(s)),/Sources not checked/,'the app bar button says it too');
+ const sourcesHtml=frame(viewState(s)),sources=stripOf(sourcesHtml);assert.match(sources,/<b>2 sources could not be checked<\/b>/);assert.doesNotMatch(sources,/Everything is in sync/);assert.deepEqual(actionsOf(barOf(sourcesHtml)),['check']);assert.match(barOf(sourcesHtml),/class="im-btn im-btn--primary" data-action="check"/,'Check now leads');
+ assert.match(statusOf(sourcesHtml),/Sources not checked/,'the status row says it too');
  s.sync=recordedSync({pending:2,errors:1});
  assert.match(stripOf(frame(viewState(s))),/1 source could not be checked\. Nothing changes until you apply\./,'changes still lead and the count follows');
  s.sync=recordedSync({pending:0});
@@ -301,28 +305,28 @@ test('a column the record cannot describe says to check, and never In sync',()=>
  s.inventory[0].plugins[0].version='2';t.enabled=false;assert.equal(harnessState(t,s,null).kind,'paused');
 });
 test('the strip counts the held plan and offers Review and Apply all',()=>{
- const strip=stripOf(frame(viewState(snapshot(),{plan:plan([op('update','1','2')],4,['Codex / D: no build'])})));
+ const html=frame(viewState(snapshot(),{plan:plan([op('update','1','2')],4,['Codex / D: no build'])})),strip=stripOf(html);
  assert.match(strip,/1 change ready to apply/);assert.match(strip,/1 update · 1 item not ready yet/);
- assert.deepEqual(actionsOf(strip),['check','review','apply-all']);assert.match(strip,/Apply all 1 change/);
+ assert.deepEqual(actionsOf(barOf(html)),['check','review','apply-all']);assert.match(barOf(html),/Apply all 1 change/);
 });
 test('the strip never says everything is in sync while a harness cannot be read',()=>{
  const s=snapshot();s.inventory[0].plugins[0].version='2';
  assert.match(stripOf(frame(viewState(s,{plan:plan([])}))),/Everything is in sync/);
  s.inventory[0].complete=false;s.inventory[0].error='Folder not found';
  const html=frame(viewState(s,{plan:plan([],4,['Codex: Folder not found'])})),strip=stripOf(html);
- assert.doesNotMatch(html,/Everything is in sync/);assert.match(strip,/Codex cannot be read/);assert.deepEqual(actionsOf(strip),['check']);
- assert.match(html,/A harness cannot be read/);
+ assert.doesNotMatch(html,/Everything is in sync/);assert.match(strip,/Codex cannot be read/);assert.deepEqual(actionsOf(barOf(html)),['check']);
+ assert.match(statusOf(html),/A harness cannot be read/);
 });
 test('while an apply runs the strip says what it applies and only Check now is left, disabled',()=>{
- const strip=stripOf(frame(viewState(snapshot(),{plan:plan([op('update','1','2')]),applying:{index:0,total:1,name:'Pack <b>'}})));
- assert.match(strip,/Applying 1 change…/);assert.match(strip,/Pack &lt;b&gt;/);assert.doesNotMatch(strip,/data-action="(review|apply-all)"/);assert.match(strip,/data-action="check"[^>]*disabled/);
+ const html=frame(viewState(snapshot(),{plan:plan([op('update','1','2')]),applying:{index:0,total:1,name:'Pack <b>'}})),strip=stripOf(html);
+ assert.match(strip,/Applying 1 change…/);assert.match(strip,/Pack &lt;b&gt;/);assert.doesNotMatch(barOf(html),/data-action="(review|apply-all)"/);assert.match(barOf(html),/data-action="check"[^>]*disabled/);
 });
 test('names, sources, harnesses, check errors and failures are escaped on the Sync page',()=>{
  const s=snapshot();s.registry.plugins=[{...plugin,name:'<b>Evil</b>',source:'x"><i>y'}];s.registry.targets[0].name='<u>Harness</u>';
  const html=frame(viewState(s,{error:'<img src=x>',checkErrors:[{plugin_id:'pkg',message:'<script>'}]}));
  for(const raw of ['<b>Evil','<u>Harness','<img src=x>','<script>','"><i>'])assert.ok(!html.includes(raw),`${raw} is escaped`);
- for(const text of ['&lt;b&gt;Evil','&lt;u&gt;Harness','&lt;img src=x&gt;','&lt;script&gt;'])assert.ok(html.includes(text),text);
- assert.match(html,/1 source could not be checked/);assert.match(html,/Reload/);
+ for(const text of ['&lt;b&gt;Evil','&lt;u&gt;Harness','&lt;script&gt;'])assert.ok(html.includes(text),text);
+ assert.match(html,/1 source could not be checked/);assert.doesNotMatch(html,/<img src=x>|That did not complete/,'a failed operation is a notice of the app, not a note of the page');
 });
 test('a plugin row opens its dialog, a column header its harness, and each cell reads the held plan',()=>{
  const html=frame(viewState(snapshot(),{plan:plan([op('update','1','2')])}));
@@ -358,7 +362,7 @@ test('sw and seg carry what their change or click runs, and escape their text',(
  assert.match(on,/role="switch" aria-checked="true" aria-label="Automatic &lt;sync&gt;" data-action="toggle" data-id="auto"/);assert.match(sw(false,'x','toggle'),/aria-checked="false"/);
  const group=seg('filter','action',[['all','All'],['action','Needs <action>']],'Filter plugins');
  assert.match(group,/role="radiogroup" aria-label="Filter plugins"/);assert.match(group,/value="action" checked/);assert.doesNotMatch(group,/value="all" checked/);assert.match(group,/Needs &lt;action&gt;/);
- assert.match(button('Go','run',{id:'a"b',sm:true,accent:true}),/class="im-btn im-btn--accent im-btn--sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="im-spinner"/);
+ assert.match(button('Go','run',{id:'a"b',sm:true}),/class="im-btn im-btn--sm" data-action="run" data-id="a&quot;b"/);assert.match(button('Go','run',{disabled:true}),/disabled/);assert.match(button('Go','run',{busy:true}),/class="im-spinner"/);
 });
 
 test('every action has one owner: no two page modules, and none of them the app, declare the same name',()=>{
@@ -492,4 +496,45 @@ test('the one-harness review of a plan with removals confirms that plan\'s own n
 });
 test('every action the review sheet names has an owner: apply and apply-keep',()=>{
  for(const wanted of ['apply','apply-keep'])assert.ok(Object.values(modules).some(m=>wanted in m.actions),`${wanted} is declared`);
+});
+
+// The tones of the canon: a note and a message take ok, warn, err or info; the accent stays a tone of data (a chip, a dot, a summary), and good, bad and danger are gone.
+const TONES=['ok','warn','err','info'];
+const toneFindings=(html:string)=>[...html.matchAll(/<(\w+)\b([^>]*?)\bdata-im-tone="([^"]*)"[^>]*>/g)].filter(([,,attrs,value])=>{
+ if(value===''||TONES.includes(value))return false;
+ const data=value==='accent'&&/\bclass="[^"]*\bim-(chip|dot|summary)\b/.test(attrs+' ');
+ return !data;
+}).map(m=>m[0].slice(0,120));
+test('the tone check itself reads an accent note, a good chip and a danger tone as findings, and an accent chip as data',()=>{
+ assert.equal(toneFindings('<div class="im-note" data-im-tone="accent">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="good">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="danger">').length,1);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="accent"><span class="im-dot" data-im-tone="accent"><section class="im-summary" data-im-tone="accent">').length,0);
+ assert.equal(toneFindings('<span class="im-chip" data-im-tone="warn"><b data-im-tone="">').length,0);
+});
+test('every page, state and sheet writes data-im-tone only in the four tones, and the accent only on a chip, a dot or a summary',()=>{
+ const shells:string[]=[];
+ const all=(over:Partial<ViewState>)=>{
+  for(const page of ['sync','projects','activity','settings'] as const){const s=snapshot();s.sync=recordedSync({pending:2,errors:1});s.registry.settings.ai={engine:'harness',harness:'claude-code',budget_usd:1,api_base:'',model:'',api_key_env:''};shells.push(frame(viewState(s,{page,projects:blankProjects(),project:null,autostart:{supported:true,enabled:false,current:false},...over})));}
+ };
+ all({});all({plan:plan([op('install','','2'),op('update','1','2','b'),op('reinstall','2','2','c'),op('activate','1','1','d'),op('remove','1','')])});
+ all({applying:{index:0,total:1,name:'Package'},plan:plan([op('update','1','2')])});all({checking:true});all({busy:'Syncing…',error:'Failed'});
+ all({checkErrors:[{plugin_id:'pkg',message:'x'}],discoveryError:'x'});all({plan:plan([],4,['blocked'])});
+ const unread=snapshot();unread.inventory[0].complete=false;shells.push(frame(viewState(unread,{projects:blankProjects(),project:null})));
+ const none=snapshot();none.registry.targets=[];shells.push(frame(viewState(none,{projects:blankProjects(),project:null})));
+ const ok=snapshot();ok.sync=recordedSync({pending:0});shells.push(frame(viewState(ok,{projects:blankProjects(),project:null})));
+ const v=viewState(snapshot(),{projects:blankProjects(),project:null,plan:plan([op('install','','2'),op('update','1','2'),op('remove','1','','')],4,['blocked'])});
+ shells.push(reviewSheet(v,v.plan!,null),reviewSheet(v,v.plan!,{index:1}),pluginPanel(v),pluginPanel(v,plugin),harnessPanel(v),harnessPanel(v,v.snapshot!.registry.targets[0]),adaptDialog(v,plugin));
+ assert.ok(shells.length>=20);
+ assert.deepEqual(shells.flatMap(toneFindings),[]);
+});
+
+test('every state of the strip, and of the empty list, has at most one primary action in the window',()=>{
+ const base=()=>{const s=snapshot();s.registry.settings.ai={engine:'harness',harness:'claude-code',budget_usd:1,api_base:'',model:'',api_key_env:''};return s;};
+ const states:ViewState[]=[];
+ const add=(mut:(s:Snapshot)=>void,over:Partial<ViewState>={})=>{const s=base();mut(s);states.push(viewState(s,{projects:blankProjects(),project:null,...over}));};
+ add(()=>{});add(s=>{s.sync=recordedSync({pending:3});});add(s=>{s.sync=recordedSync({pending:0,blockers:2});});add(s=>{s.sync=recordedSync({pending:0,errors:2});});
+ add(s=>{s.sync=recordedSync({pending:0});});add(s=>{s.registry.targets=[];});add(s=>{s.registry.plugins=[];});add(s=>{s.inventory[0].complete=false;});
+ add(()=>{},{plan:plan([op('update','1','2')])});add(()=>{},{checking:true});add(()=>{},{applying:{index:0,total:1,name:'Package'},plan:plan([op('update','1','2')])});
+ for(const state of states){const html=frame(state);assert.ok((html.match(/im-btn--primary/g)?.length??0)<=1,'at most one primary action: '+stripOf(html).slice(0,120));}
 });

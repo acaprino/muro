@@ -9,32 +9,38 @@ await mkdir(shots, { recursive: true });
 const done = [];
 async function test(name, scenario, options, body) {
   const app = await open(scenario, options);
-  try { await app.page.locator('nav').waitFor(); await body(app); done.push(name); } finally { await app.close(); }
+  try { await app.page.locator('nav').waitFor({ state: 'attached' }); await body(app); done.push(name); } finally { await app.close(); }
 }
 const AI = { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' };
 const STORED = { auto_sync: false, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: AI };
 const escapeRe = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const calls = async (app, ...actions) => (await app.calls()).filter(c => actions.includes(c.action));
 const saves = async app => (await calls(app, 'settings')).map(c => c.payload);
+/** Goes to a view: the tab, or, in a narrow window where the tabs are hidden (under 620), the Views menu. */
+const goTab = async (page, name) => {
+  const tab = page.getByRole('tab', { name: new RegExp('^' + name) });
+  if (await tab.isVisible()) await tab.click();
+  else { await page.getByRole('button', { name: 'Views', exact: true }).click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); }
+};
 const tab = (page, name) => page.locator('nav').getByRole('tab', { name: new RegExp('^' + name) });
 /** A row of the page, found by its title. */
 const row = (page, title) => page.locator('.im-setting-row').filter({ has: page.locator('strong').filter({ hasText: new RegExp('^' + escapeRe(title) + '$') }) });
-const hint = (page, title) => row(page, title).locator('small');
+const hint = (page, title) => row(page, title).locator('small:not(.im-field-error)');   // a row with a field also holds the empty error slot, a small too
 const switchOf = (page, label) => page.getByRole('switch', { name: label, exact: true });
 const AUTO = 'Automatic sync', TRAY = 'Keep running when the window is closed', START = 'Start Muro when Windows starts';
 async function openSettings(page) {
-  await tab(page, 'Settings').click();
+  await goTab(page, 'Settings');
   await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
   // `autostart` is read when the page opens: the switch is disabled until it is known.
   await page.waitForFunction(label => { const s = document.querySelector(`[aria-label="${label}"]`); return !!s && (!s.disabled || s.closest('.im-setting-row').textContent.includes('Available on Windows')); }, START);
 }
 async function openActivity(page) {
-  await tab(page, 'Activity').click();
+  await goTab(page, 'Activity');
   await page.getByRole('heading', { name: 'Activity', level: 1 }).waitFor();
 }
 const checked = async (page, label) => (await switchOf(page, label).getAttribute('aria-checked')) === 'true';
 const waitSwitch = (page, label, on) => page.locator(`[role=switch][aria-label="${label}"][aria-checked="${on}"]`).waitFor();
-const bannerText = page => page.locator('.im-banner[role=alert]').allTextContents();
+const bannerText = page => page.locator('.im-notice:has(.im-notice-word) .im-notice-text').allTextContents();   // the error notices of the app
 const sideways = page => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 const titles = page => page.locator('ul.im-activity-list li strong').allTextContents();
 
@@ -97,7 +103,7 @@ await test('the interval is used only when automatic sync is on', 'default', {},
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
   assert.equal(await interval.isDisabled(), false);
-  assert.equal(await row(page, 'Check').locator('small').count(), 0, 'no hint once it is used');
+  assert.equal(await row(page, 'Check').locator('small:not(.im-field-error)').count(), 0, 'no hint once it is used');
 });
 
 await test('an interval outside 1 to 1440 is refused where it enters, and the control is restored', 'stored-settings', {}, async app => {
@@ -107,7 +113,7 @@ await test('an interval outside 1 to 1440 is refused where it enters, and the co
   for (const bad of ['0', '1441', '5000', '-5', '1.5', 'abc']) {
     await interval.evaluate((el, value) => { el.add(new Option('Injected', value)); }, bad);
     await interval.selectOption(bad);
-    await page.locator('.im-banner[role=alert]').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
+    await page.locator('.im-setting-row').filter({ hasText: 'Check' }).locator('.im-field-error').getByText('The interval goes from 1 to 1440 minutes.').waitFor();
     assert.equal(await page.getByRole('combobox', { name: 'Check interval' }).inputValue(), '45', `${bad} is not kept`);
     assert.deepEqual(await saves(app), [], `${bad} was never sent`);
   }
@@ -176,7 +182,7 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await switchOf(page, AUTO).click();
-  await page.locator('.im-banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-notice-text').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await checked(page, AUTO), false, 'the switch is as it was');
   assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), AUTO, 'and keeps the focus');
   // A text box too: what was typed goes back to what is stored.
@@ -191,7 +197,7 @@ await test('a rejected save leaves the control as it was and shows the error', '
   await app.flags({ rejectSettings: false });
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
-  assert.deepEqual(await bannerText(page), [], 'the error is gone');
+  await page.locator('.im-notice-text').getByText('Saved.').waitFor();   // the failure stays as a notice until it is dismissed; the save that works says Saved.
 });
 
 await test('Python and the factory folder are saved when they are left, trimmed', 'default', {}, async app => {
@@ -214,7 +220,7 @@ await test('Python and the factory folder are saved when they are left, trimmed'
   // An empty Python is no value: it is refused where it enters and the stored one comes back.
   await python.fill('   ');
   await python.blur();
-  await page.locator('.im-banner[role=alert]').getByText('Enter the Python command or its full path.').waitFor();
+  await page.locator('.im-setting-row').filter({ hasText: 'Python' }).locator('.im-field-error').getByText('Enter the Python command or its full path.').waitFor();
   assert.equal((await saves(app)).length, 3, 'it was never sent');
   assert.equal(await python.inputValue(), 'C:/Tools/Python 3/python.exe');
 });
@@ -234,9 +240,10 @@ await test('a value that is not changed saves nothing', 'default', {}, async app
 await test('a settings save keeps the last plan: no new plan, the strip stays, Apply all still works', 'changes', {}, async app => {
   const { page } = app;
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
-  const meta = async n => page.locator('section.im-summary .im-summary-meta span').nth(n).textContent();
-  const [lastCheck, lastSync] = [await meta(0), await meta(1)];
+  await page.locator('#sync-state b', { hasText: '1 change ready to apply' }).waitFor();
+  const lastCheckOf = async () => (await page.locator('.im-status-text').textContent()).match(/Last check (.*?)(?: · |$)/)[1];
+  const lastSyncOf = async () => (await page.locator('.im-footer-text').textContent()).match(/last sync (.*?) · /)[1];
+  const [lastCheck, lastSync] = [await lastCheckOf(), await lastSyncOf()];
   const before = (await app.calls()).length;
   await openSettings(page);
   await switchOf(page, TRAY).click();
@@ -244,15 +251,15 @@ await test('a settings save keeps the last plan: no new plan, the strip stays, A
   await switchOf(page, AUTO).click();
   await waitSwitch(page, AUTO, true);
   assert.deepEqual((await app.calls()).slice(before).map(c => c.action), ['autostart', 'settings', 'settings'], 'no plan, no check, no snapshot after a save');
-  await tab(page, 'Sync').click();
-  await page.locator('section.im-summary strong', { hasText: '1 change ready to apply' }).waitFor();
-  assert.equal(await page.locator('section.im-summary button', { hasText: 'Apply all 1 change' }).count(), 1);
-  assert.match(await meta(2), /^Next check/, 'the strip reads the new setting');
-  assert.equal(await meta(0), lastCheck, 'Last check is as it was');
-  assert.equal(await meta(1), lastSync, 'and so is Last sync');
+  await goTab(page, 'Sync');
+  await page.locator('#sync-state b', { hasText: '1 change ready to apply' }).waitFor();
+  assert.equal(await page.locator('.im-actions button', { hasText: 'Apply all 1 change' }).count(), 1);
+  assert.match(await page.locator('.im-status-text').textContent(), /next check/, 'the status row reads the new setting');
+  assert.equal(await lastCheckOf(), lastCheck, 'Last check is as it was');
+  assert.equal(await lastSyncOf(), lastSync, 'and so is Last sync');
   await page.getByRole('button', { name: 'Apply all 1 change' }).click();
   await page.locator('[data-im-notices]').getByText('1 change applied.').waitFor();
-  assert.equal(await page.locator('section.im-summary strong').first().textContent(), 'Everything is in sync');
+  assert.equal(await page.locator('#sync-state b').first().textContent(), 'Everything is in sync');
 });
 
 await test('the first settings save of a session, with nothing checked yet, asks for no plan', 'default', {}, async app => {
@@ -306,7 +313,7 @@ await test('Verify and Clean up', 'default', {}, async app => {
   assert.equal((await calls(app, 'maintenance')).length, 1);
   assert.equal(await page.evaluate(() => document.activeElement?.textContent), 'Clean up…', 'the focus goes back to where the dialog opened');
   await page.getByRole('button', { name: 'Clean up…', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Clean up', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Delete unused builds', exact: true }).click();
   await page.locator('[role=status]', { hasText: 'Nothing to clean up' }).waitFor();
   assert.deepEqual((await calls(app, 'maintenance')).map(c => c.payload), [{ kind: 'verify' }, { kind: 'cleanup' }]);
   assert.equal(await page.locator('[role=status]', { hasText: 'Every stored build is intact' }).count(), 0, 'one result at a time');
@@ -381,6 +388,7 @@ await test('Activity: Cancel stops the adaptation, which stays in the list as ca
   const { page } = app;
   await openActivity(page);
   await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
   await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   assert.deepEqual((await calls(app, 'cancel_job')).map(c => c.payload), [{ id: 'job-1' }]);
   const first = page.locator('ul.im-activity-list li').first();
@@ -395,9 +403,10 @@ await test('Activity: the filters, and Problems shows only what failed or was ca
   // A failed check, and a cancelled adaptation, besides the two events that completed.
   await app.flags({ checkErrors: true });
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
-  await page.locator('.im-banner[data-im-tone="warn"]').waitFor();
+  await page.locator('.im-note[data-im-tone="warn"]').waitFor();
   await openActivity(page);
   await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
   await page.locator('article.im-task-card').waitFor({ state: 'detached' });
   const filter = page.getByRole('radiogroup', { name: 'Filter activity' });
   assert.deepEqual(await filter.locator('label').allTextContents(), ['All', 'Sync', 'AI adaptation', 'Problems']);
@@ -445,17 +454,18 @@ for (const scheme of ['dark', 'light']) {
     await openActivity(page);
     await page.screenshot({ path: `${shots}/activity-${scheme}-running.png`, clip: { x: 0, y: 0, width: 1280, height: 520 } });
     await app.flags({ checkErrors: true });
-    await tab(page, 'Sync').click();
+    await goTab(page, 'Sync');
     await page.getByRole('button', { name: 'Check now', exact: true }).click();
-    await page.locator('.im-banner[data-im-tone="warn"]').waitFor();
+    await page.locator('.im-note[data-im-tone="warn"]').waitFor();
     await openActivity(page);
     await page.locator('article.im-task-card').getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel adaptation', exact: true }).click();   // it cannot be undone: asked first (not run locally)
     await page.locator('article.im-task-card').waitFor({ state: 'detached' });
     await page.screenshot({ path: `${shots}/activity-${scheme}-full.png`, clip: { x: 0, y: 0, width: 1280, height: 700 } });
   });
 }
 
-for (const width of [1100, 760]) {
+for (const width of [1100, 500]) {
   await test(`no sideways scroll at ${width}px, in Settings and in Activity`, 'demo', { viewport: { width, height: 900 } }, async ({ page }) => {
     await openSettings(page);
     assert.ok(await sideways(page) <= 0, `Settings scrolls sideways at ${width}px`);
@@ -512,13 +522,13 @@ await test('AI: the engine is a radio group and a keyboard moves it; the API sho
   assert.equal(await row(page, KEY).locator('[role=status]').count(), 1, 'the answer is a status');
   // Set for the Muro process: the next visit says so.
   await app.flags({ envSet: ['MURO_API_KEY'] });
-  await tab(page, 'Sync').click();
+  await goTab(page, 'Sync');
   await openSettings(page);
   await page.getByText('MURO_API_KEY is set for Muro.', { exact: true }).waitFor();
   assert.equal(await row(page, KEY).locator('.im-text-ok').count(), 1);
   // A runtime that cannot answer is a line in the row, no banner.
   await app.flags({ noEnvCheck: true });
-  await tab(page, 'Sync').click();
+  await goTab(page, 'Sync');
   await openSettings(page);
   await page.getByText('Could not check whether MURO_API_KEY is set.', { exact: true }).waitFor();
   assert.deepEqual(await bannerText(page), []);
@@ -642,16 +652,16 @@ await test('AI: a save the service refuses puts the engine back and shows the se
   await openSettings(page);
   await app.flags({ rejectSettings: true });
   await useEngine(page, 'OpenAI-compatible API');
-  await page.locator('.im-banner[role=alert]').getByText('Version conflict: settings not saved').waitFor();
+  await page.locator('.im-notice-text').getByText('Version conflict: settings not saved').waitFor();
   assert.equal(await page.getByRole('radio', { name: 'Coding agent on this computer' }).isChecked(), true, 'the stored engine is shown');
   assert.equal(await page.getByRole('textbox', { name: 'Endpoint' }).count(), 0);
   await app.flags({ rejectSettings: false });
   await useEngine(page, 'OpenAI-compatible API');
   await page.getByRole('textbox', { name: 'Endpoint' }).waitFor();
-  assert.deepEqual(await bannerText(page), [], 'the error is gone');
+  await page.locator('.im-notice-text').getByText('Saved.').waitFor();
 });
 
-for (const width of [1100, 760]) {
+for (const width of [1100, 500]) {
   await test(`AI with the API: no sideways scroll at ${width}px`, 'default', { viewport: { width, height: 900 } }, async ({ page }) => {
     await openApi(page);
     assert.ok(await sideways(page) <= 0, `Settings scrolls sideways at ${width}px`);

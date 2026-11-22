@@ -57,10 +57,10 @@ test('Start with Windows is disabled until it is read and where it is not availa
 
 test('the interval is used only with automatic sync on, and a stored interval none of the options names stays selected', () => {
   const off = settings(viewState(snapshot()));
-  assert.match(off, /<select name="interval_minutes"[^>]* disabled>/);
+  assert.match(off, /<select class="im-select" name="interval_minutes"[^>]* disabled>/);
   assert.match(off, /Used when automatic sync is on\./);
   const on = settings(viewState(snapshot({}, { auto_sync: true, interval_minutes: 45 })));
-  assert.doesNotMatch(on, /<select name="interval_minutes"[^>]* disabled>/);
+  assert.doesNotMatch(on, /<select class="im-select" name="interval_minutes"[^>]* disabled>/);
   assert.match(on, /<option value="45" selected>Every 45 minutes<\/option>/);
 });
 
@@ -69,7 +69,7 @@ test('a stored coding agent that is not listed stays an option, so the select ne
 });
 
 test('the rule for plugins outside the list is the Sync page\'s own control, none chosen when harnesses differ', () => {
-  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
+  const group = (s: Snapshot) => settings(viewState(s)).match(/<div class="im-seg" role="radiogroup" aria-label="Plugins that are not in my list">.*?<\/div>/)![0];
   assert.ok(settings(viewState(snapshot())).includes(exclusiveSeg(snapshot().registry.targets)), 'one builder draws it on both pages');
   const keep = group(snapshot());
   assert.match(keep, /name="excl" value="keep" checked/);
@@ -110,6 +110,7 @@ async function session(aiOver: Partial<AiSettings> = {}) {
   const app = {
     state, request: fake.request, render: () => { renders++; },
     async run(label: string, work: () => Promise<unknown>, after?: (v: any) => unknown) { if (state.busy) return; state.busy = label; state.error = null; try { const value = await work(); await after?.(value); } catch (e) { state.error = e instanceof Error ? e.message : String(e); } finally { state.busy = null; } },
+    loading: <T>(_key: string, work: () => Promise<T>) => work(),
     notify: (text: string) => void toasts.push(text), adopt: (s: Snapshot) => { state.snapshot = s; },
   } as unknown as App;
   forgetLearned();
@@ -119,12 +120,12 @@ async function session(aiOver: Partial<AiSettings> = {}) {
 test('AI: the engine is a radio group; a coding agent shows its harness and its budget, and none of the API\'s fields', () => {
   forgetLearned();
   const html = settings(viewState(snapshot()));
-  const group = html.match(/<div class="im-seg im-seg--native" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
+  const group = html.match(/<div class="im-seg" role="radiogroup" aria-label="Use">.*?<\/div>/)![0];
   assert.deepEqual([...group.matchAll(/<input type="radio" name="ai_engine" value="(\w+)"([^>]*)><span>([^<]+)<\/span>/g)].map(m => {
     assert.match(m[2], /data-setting="ai_engine"/);
     return [m[1], /\bchecked\b/.test(m[2]), m[3]];
   }), [['harness', true, 'Coding agent on this computer'], ['api', false, 'OpenAI-compatible API']]);
-  const select = html.match(/<select name="ai_harness"[^>]*>.*?<\/select>/)![0];
+  const select = html.match(/<select class="im-select" name="ai_harness"[^>]*>.*?<\/select>/)![0];
   assert.match(select, /aria-label="Coding agent"/);
   assert.deepEqual([...select.matchAll(/<option value="([^"]+)" (selected)?>([^<]+)<\/option>/g)].map(m => [m[1], !!m[2], m[3]]), [['claude-code', true, 'Claude Code · dollar budget'], ['codex', false, 'Codex · no budget limit']]);
   const budget = control(html, 'ai_budget_usd');
@@ -334,7 +335,8 @@ test('AI: choosing the engine or the coding agent saves its field, and the API\'
   assert.equal(s.saves()[2].settings.agent, 'claude-code', 'the page sends the old agent as it is stored: the registry keeps it equal to ai.harness');
   for (const [setting, value, text] of [['ai_engine', 'cloud', 'That engine is not available.'], ['ai_harness', 'gemini', 'That agent is not available.']]) {
     assert.equal(edit(s.app, setting, value), true);
-    assert.equal(s.state.error, text);
+    assert.equal(s.state.error, null, 'not a page-wide error');
+    assert.equal(s.toasts.at(-1), text, 'a notice: there is no field to say it in');
   }
   assert.equal(s.saves().length, 3, 'a value the page does not list is never sent');
 });
@@ -430,6 +432,26 @@ test('Activity: a running adaptation has its card with phase, budget, log and Ca
   assert.match(html, /aria-label="Filter activity"/);
   assert.match(html, /<span class="im-chip" data-im-tone="err">Failed<\/span>/);
   assert.deepEqual([...html.matchAll(/<span>(All|Sync|AI adaptation|Problems)<\/span>/g)].map(m => m[1]), ['All', 'Sync', 'AI adaptation', 'Problems']);
+});
+
+test('Activity: Cancel adaptation names the plugin and the harness, and asks first with Keep running', () => {
+  const html = activity(viewState(snapshot({ jobs: [job()] })));
+  assert.match(html, /data-action="cancel-job"[^>]*aria-label="Cancel the adaptation of Docs &lt;b&gt;writer&lt;\/b&gt; for OpenCode"[^>]*><span>Cancel adaptation<\/span>/);
+  const asked: unknown[][] = [], state = viewState(snapshot({ jobs: [job()] })), calls: string[] = [];
+  const app = { state, confirm: (...a: unknown[]) => asked.push(a), request: async (action: string) => { calls.push(action); return snapshot(); }, run: async () => {}, adopt: () => {} } as unknown as App;
+  return import('../src/pages/activity.ts').then(m => {
+    m.actions['cancel-job'](app, { id: 'job-1' } as unknown as DOMStringMap, {} as HTMLElement);
+    assert.equal(asked.length, 1, 'it asks, and runs nothing yet');
+    assert.deepEqual([asked[0][0], asked[0][2], asked[0][4], asked[0][5]], ['Cancel adaptation?', 'Cancel adaptation', true, 'Keep running']);
+    assert.match(String(asked[0][1]), /Docs <b>writer<\/b> for OpenCode/);
+    assert.deepEqual(calls, []);
+  });
+});
+test('Settings: the confirming button of the clean up says what it does', async () => {
+  const asked: unknown[][] = [], app = { state: viewState(snapshot({})), confirm: (...a: unknown[]) => asked.push(a) } as unknown as App;
+  const m = await import('../src/pages/settings.ts');
+  await m.actions['maintenance-cleanup'](app, {} as DOMStringMap, {} as HTMLElement);
+  assert.equal(asked[0][2], 'Delete unused builds');
 });
 
 const START = 1700000500;

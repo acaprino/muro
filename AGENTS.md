@@ -3,13 +3,22 @@
 ## Desktop UI ownership
 
 Desktop UI and native window primitives come from `@acaprino/imago` and
-`imago-shell`. Read `docs/imago-migration.md` before changing the desktop UI.
-Extend Imago for every component, layout, style and UI behaviour, including the
-graph renderer and layout. Muro owns only domain data, operations and screen
-composition; no private components, SVG renderer or CSS rules belong here.
-Keep npm and Rust dependencies pinned to the same released Imago tag, with its
-immutable commit recorded in both lockfiles. Keep the shell body stable across
-renders while a modal is open.
+`imago-shell`. Extend Imago for every component, layout, style and UI behaviour,
+including the graph renderer and layout. Muro owns only domain data, operations
+and screen composition; no private components, SVG renderer or CSS rules belong
+here. Keep the shell body stable across renders while a modal is open.
+
+Before UI work, read node_modules/@acaprino/imago/docs/design-file.md and the component or style files it references.
+Apply its tokens and confirmed design choices within the requested scope.
+Use the package's im- classes and --im- tokens. Build a control of your own from the tokens, never from literal colours or sizes.
+Report conflicts and keep unresolved choices explicit.
+Run npx imago-check before you say UI work is done.
+
+Keep the npm and the Rust pins of Imago the same (`imago-check` reports a
+difference): a commit of Imago's `develop` while Muro waits for a release, the
+tag `v<x>` for a release of Muro, in `package.json`, `Cargo.toml` and both
+lockfiles (using-imago.md, section 1). `docs/imago-migration.md` records what
+Muro takes from Imago.
 
 ## Product contract
 

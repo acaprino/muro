@@ -46,11 +46,16 @@ export function installLine(state: ViewState, id: string): string {
   return `On ${plural(where, 'harness', 'harnesses')} · ${parts.join(' · ') || 'in sync'}`;
 }
 
+/** The changes waiting for this project's plugin on the managed harnesses: what "Review N changes" of the action bar is about. */
+export function waitingChanges(state: ViewState): number {
+  const s = state.snapshot, id = state.project?.id, plugin = id ? pluginOf(state, id) : undefined;
+  return s && plugin ? managed(state).filter(t => CHANGES.has(cellState(plugin, t, s, state.plan).kind)).length : 0;
+}
+
 /** Step 4. A switch per managed harness; what is waiting is reviewed in the sheet of Sync, which lists the whole plan (the service plans per harness or for all, never for one plugin). A harness whose build is older than the project file reads "Changed since it was installed: install again", with the button that does it.
  * A harness that holds a copy of the plugin that is not this project's build shows it installed (where the project is not switched on, the switch is on and cannot be switched off here: the copy is not this project's to remove), says whose it is, and offers to replace it with this project's build. */
 export function view(state: ViewState, info: ProjectInfo): string {
   const s = state.snapshot!, id = state.project!.id, plugin = pluginOf(state, id), targets = s.registry.targets;
-  const waiting = plugin ? managed(state).filter(t => CHANGES.has(cellState(plugin, t, s, state.plan).kind)).length : 0;
   const row = (t: typeof targets[number]) => {
     const times = s.sync.targets[t.id], on = !!plugin?.targets.includes(t.id), stale = on && !!plugin && changed(state, plugin, t), copy = t.enabled ? copyOf(state, id, plugin, t) : undefined;
     const status = !t.enabled ? ''
@@ -62,7 +67,7 @@ export function view(state: ViewState, info: ProjectInfo): string {
     return stackRowHtml({title:t.name,detail:`Checked ${stamp(times?.checked??null)} · last sync ${stamp(times?.synced??null)}`,leadingHtml:toggle+mark(t.harness),trailingHtml:status});
   };
   return toolbarHtml('<div><h2>Where it is installed</h2><small>Switch a harness on to install this project there. Nothing changes until you apply.</small></div>',
-    (waiting?button(`Review ${plural(waiting,'change')}`,'review',{primary:true}):'')+button('Open Sync','page',{id:'sync'}))
+    button('Open Sync','page',{id:'sync'}))
     + (targets.length ? stackListHtml(targets.map(row).join('')) : empty('No harness managed yet', 'Add one in Sync.', button('Open Sync', 'page', { id: 'sync', primary: true })));
 }
 

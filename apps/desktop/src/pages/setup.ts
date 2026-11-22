@@ -2,7 +2,8 @@ import type { ViewState, SetupState, Snapshot, Target, Discovered, InstalledPlug
 import type { App, Actions, TextBox } from '../context.ts';
 import { inList, listing, intervalOptions } from '../model.ts';
 import { esc, mark, sw, button, empty } from '../ui.ts';
-import { bannerHtml, choiceRowsHtml, enterWizardStep, fieldErrorHtml, loadingStateHtml, settingsGroupHtml, settingsRowHtml, wizardActionsHtml, wizardHeadingHtml, wizardHtml } from '@acaprino/imago/ui';
+import { loadingPanel } from '../panels.ts';
+import { noteHtml, choiceRowsHtml, enterWizardStep, fieldErrorHtml, settingsGroupHtml, settingsRowHtml, wizardActionsHtml, wizardHeadingHtml, wizardHtml } from '@acaprino/imago/ui';
 
 /** The first run: three steps in place of the tabs while Muro manages no harness, and while the person is still going through them.
  * Step 1 saves the chosen harnesses and scans them (Back keeps them), step 2 lists what is installed on them, step 3 asks for the two switches;
@@ -76,14 +77,15 @@ const headingDescription = (s: Held) => ['setup-step', ...(s.err ? ['setup-error
 function stepOne(state: ViewState, s: Held): string {
   const list = rows(state), nothing = !list.some(r => !r.why);
   const body = list.length ? choiceRowsHtml(list.map(r => ({name:'pick',value:r.harness,checked:picked(s,r),disabled:!!r.why||!!state.busy,leadingHtml:mark(r.harness),label:r.name,hintHtml:r.why?esc(r.why):`<code>${esc(r.root)}</code>`})))
-    : state.discovering ? loadingStateHtml('Looking for harnesses on this computer…')
+    : state.discovering ? loadingPanel(!!state.slow?.discovery)
     : empty('No harness found', 'Muro looks for the coding agents installed on this computer. Add one by hand from Sync, with its configuration folder.', button('Look again', 'setup-discover'));
+  const failed = state.discoveryError ? noteHtml({title:'Harness detection failed',message:state.discoveryError,tone:'err'}) : '';
   const later = nothing && !state.discovering ? button('Set up later', 'setup-later') : '';
-  return wizardHeadingHtml('Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.',{id:'setup-title',describedBy:headingDescription(s)}) + body + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(later, button('Continue', 'setup-next', { primary: true }));
+  return wizardHeadingHtml('Which coding agents does Muro manage?', 'Found on this computer. You can add or remove harnesses later.',{id:'setup-title',describedBy:headingDescription(s)}) + failed + body + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(later, button('Continue', 'setup-next', { primary: true }));
 }
 function stepTwo(state: ViewState, s: Held): string {
   const { items, unread } = installed(state, s);
-  const warn = unread.map(u => bannerHtml({title:`${u.name} cannot be read`,message:u.error,tone:'warn'})).join('');
+  const warn = unread.map(u => noteHtml({title:`${u.name} cannot be read`,message:u.error,tone:'warn'})).join('');
   const list = items.length ? choiceRowsHtml(items.map(i => ({name:'keep',value:i.key,checked:kept(s,i),disabled:!!i.why||!!state.busy,label:i.plugin.name,hint:`${i.target.name}${i.plugin.version?' '+i.plugin.version:''}${i.why?' · '+i.why:''}`})))
     : unread.length ? '' : empty('Nothing installed yet', 'Your list starts empty. Add plugins from Sync afterwards.');
   return wizardHeadingHtml('Start from what is installed', 'These plugins are already on the harnesses you picked. The ones you keep become your list.',{id:'setup-title',describedBy:headingDescription(s)}) + warn + list + fieldErrorHtml('setup-error',s.err,'p') + wizardActionsHtml(button('Back', 'setup-back'), button('Continue', 'setup-next', { primary: true }));
@@ -98,7 +100,7 @@ export const view = (state: ViewState): string => { const s = held(state) ?? fre
 
 // --- the actions ---------------------------------------------------------------------------------------------------------
 /** A new step starts at its heading, so a screen reader reads where the person is; the same step keeps the focus where it was. */
-const arrive = () => enterWizardStep(globalThis.document,'setup-title','main');
+const arrive = () => { enterWizardStep(globalThis.document,'setup-title'); globalThis.document?.querySelector('#main > .im-panel-body')?.scrollTo(0,0); };
 async function go(app: App, label: string, work: (s: Held) => Promise<void>) {
   const s = begin(app.state), before = s.step;
   await app.run(label, async () => { try { await work(s); s.err = ''; } catch (e) { s.err = message(e); } if (app.state.setup === s) remember(s); });
@@ -132,7 +134,7 @@ const finish = (app: App, s: Held) => go(app, 'Setting up Muro…', async () => 
   app.adopt(await app.request<Snapshot>('settings', { revision: revision(), settings: { ...app.state.snapshot!.registry.settings, auto_sync: s.auto } }));
   s.canAutostart ??= (await app.request<Autostart>('autostart')).supported;
   if (s.canAutostart) await app.request<Autostart>('set_autostart', { enabled: s.autostart });
-  close(app.state); app.state.page = 'sync'; app.notify('Muro is set up.', 'good');
+  close(app.state); app.state.page = 'sync'; app.notify('Muro is set up.');
 });
 const toggle = (key: 'auto' | 'autostart') => (app: App) => { const s = begin(app.state); s[key] = !s[key]; remember(s); app.render(); };
 

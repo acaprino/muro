@@ -1,13 +1,13 @@
 import type { ViewState, ProjectInfo } from '../../types.ts';
 import type { App, Actions, TextBox } from '../../context.ts';
 import { esc, plural, tag, button, empty } from '../../ui.ts';
-import { dlHead } from '../../sheets.ts';
+import { infoPanel } from '../../sheets.ts';
 import { harnessNames, obj, text, engineOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
 import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from './graph-model.ts';
 import type { Cap, Example, Outcome, Who } from './graph-model.ts';
 import { decisionScene } from './graph-scene.ts';
-import { graphLegendHtml, quoteHtml as quote, bulletListHtml as bullets } from '@acaprino/imago/ui';
+import { graphLegendHtml, noteHtml, quoteHtml as quote, bulletListHtml as bullets } from '@acaprino/imago/ui';
 export { decisionGraphOptions } from './graph-scene.ts';
 
 /** Step 3, the decision graph of the project's plugin and the simulator.
@@ -73,9 +73,9 @@ function stepList(o: Extract<Outcome, { kind: 'decision' }>): string {
   }).join('')}</ol>`;
 }
 function card(o: Outcome): string {
-  if (o.kind === 'failed') return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="alert"><div class="im-tag-row">${tag('Could not run', 'bad')}</div>${quote(o.asked)}<strong>The simulation could not run</strong><p class="im-wrap-text">${esc(o.message)}</p><small>Check the AI engine in ${settingsLink}.</small>${clear}</div>`;
-  if (o.kind === 'invalid') return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="status"><div class="im-tag-row">${tag('Invalid answer', 'bad')}</div>${quote(o.asked)}<strong>The AI's answer was not a valid decision</strong>${o.errors.length ? bullets(o.errors) : '<small>No reason was given.</small>'}<small>Nothing from it is shown on the graph.</small>${whoLine(o.who)}${clear}</div>`;
-  const status = o.status === 'selected' ? tag(plural(o.steps.length, 'step'), 'good') : tag(o.status === 'no_match' ? 'No match' : 'Needs clarification', 'warn');
+  if (o.kind === 'failed') return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="alert"><div class="im-tag-row">${tag('Could not run', 'err')}</div>${quote(o.asked)}<strong>The simulation could not run</strong><p class="im-wrap-text">${esc(o.message)}</p><small>Check the AI engine in ${settingsLink}.</small>${clear}</div>`;
+  if (o.kind === 'invalid') return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="status"><div class="im-tag-row">${tag('Invalid answer', 'err')}</div>${quote(o.asked)}<strong>The AI's answer was not a valid decision</strong>${o.errors.length ? bullets(o.errors) : '<small>No reason was given.</small>'}<small>Nothing from it is shown on the graph.</small>${whoLine(o.who)}${clear}</div>`;
+  const status = o.status === 'selected' ? tag(plural(o.steps.length, 'step'), 'ok') : tag(o.status === 'no_match' ? 'No match' : 'Needs clarification', 'warn');
   return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="status"><div class="im-tag-row">${status}${o.example !== null ? ' ' + tag('Documented example') : ''}${o.stack.length ? ` <small>With ${esc(o.stack.join(', '))}</small>` : ''}</div>${quote(o.asked)}${stepList(o)}<p class="im-wrap-text">${esc(o.reason)}</p>${bullets(o.questions)}${whoLine(o.who)}${clear}</div>`;
 }
 const shownOf = (sim: SimState, examples: Example[]): Outcome | null => sim.example !== null && examples[sim.example] ? outcomeOfExample(examples[sim.example]) : sim.result;
@@ -90,7 +90,7 @@ export function view(state: ViewState, info: ProjectInfo): string {
   const caps = capsOf(info), entries = entriesOf(info), examples = examplesOf(info);
   if (!caps.length) return empty('No decision graph', 'This project\'s plugin has no capabilities to choose between, so there is nothing to simulate.');
   const sim = state.project!.sim, engine = engineOf(state.snapshot?.registry.settings), shown = shownOf(sim, examples), lit = litOf(shown), running = sim.run !== null, explain = !told();
-  const box = `<textarea name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"${sim.error ? ' aria-invalid="true"' : ''} aria-describedby="err-simtask${explain ? ' sim-note' : ''}">${esc(sim.task)}</textarea>`;
+  const box = `<textarea class="im-textarea" name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"${sim.error ? ' aria-invalid="true"' : ''} aria-describedby="err-simtask${explain ? ' sim-note' : ''}">${esc(sim.task)}</textarea>`;
   const go = running ? button(`Asking ${asking(engine)}…`, 'graph-simulate', { busy: true, attrs: { 'aria-busy': 'true', 'aria-disabled': 'true' } }) : button('Simulate', 'graph-simulate', { icon: 'play' });
   const list = examples.length ? `<h3>Documented examples <span class="im-count">${examples.length}</span></h3><ul class="im-panel im-surface im-choice-list" data-im-surface="sheet">${examples.map((e, i) => `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${sim.example === i}"><strong>${esc(e.title)}</strong><small>${esc(e.task)}</small></button></li>`).join('')}</ul>` : '';
   const legend = graphLegendHtml([
@@ -102,7 +102,7 @@ export function view(state: ViewState, info: ProjectInfo): string {
   ], `${plural(entries.length, 'entry', 'entries')} · ${plural(caps.length, 'capability', 'capabilities')}`);
   return `<div class="im-aside-layout"><div class="im-stack-3"><div><h2>Simulate a request</h2><small>See which branch of the graph a request activates, and in what order.</small></div>`
     + `<div class="im-stack-2">${box}<small class="im-field-error" id="err-simtask" role="alert">${esc(sim.error)}</small><div class="im-action-row">${go}${running ? button('Cancel', 'graph-cancel') : ''}</div></div>`
-    + `${explain ? `<p class="im-callout" id="sim-note">${esc(noteText(engine))} Change this in ${settingsLink}.</p>` : ''}${shown ? card(shown) : ''}${list}</div>`
+    + `${explain ? `<div id="sim-note">${noteHtml({message:noteText(engine),actionsHtml:settingsLink,tone:'info'})}</div>` : ''}${shown ? card(shown) : ''}${list}</div>`
     + `<div class="im-panel im-surface im-graph-panel" data-im-surface="sheet">${legend}<div class="im-graph-host" data-project-graph></div></div></div>`;
 }
 
@@ -117,12 +117,12 @@ function sheet(info: ProjectInfo, c: Cap): string {
     ...c.needs.map(n => `<li><div><span>Runs <strong>${esc(n.capability)}</strong> first, on a condition</span>${n.label ? `<small>${esc(n.label)}</small>` : ''}</div></li>`),
     ...c.conflicts.map(id => `<li><div><span>Never together with <strong>${esc(id)}</strong></span></div></li>`),
   ];
-  return `<div class="im-form">${dlHead(c.id, c.title)}`
-    + `<dl class="im-definition-list"><dt>Role</dt><dd>${esc(c.role || '—')}</dd><dt>Entry</dt><dd class="im-stack">${entry ? `<span>${esc(entry.name)}</span>${entry.description ? `<small>${esc(entry.description)}</small>` : ''}` : '—'}</dd><dt>Comes from</dt><dd class="im-tag-row">${from.map(s => tag(s)).join('') || '—'}</dd></dl>`
+  return infoPanel(c.id, c.title,
+    `<dl class="im-definition-list"><dt>Role</dt><dd>${esc(c.role || '—')}</dd><dt>Entry</dt><dd class="im-stack">${entry ? `<span>${esc(entry.name)}</span>${entry.description ? `<small>${esc(entry.description)}</small>` : ''}` : '—'}</dd><dt>Comes from</dt><dd class="im-tag-row">${from.map(s => tag(s)).join('') || '—'}</dd></dl>`
     + (c.intents.length ? `<section class="im-operation-list"><h3>Activates when the request means</h3><ul>${c.intents.map(i => `<li><div><code>${esc(i.id)}</code>${i.description ? `<small>${esc(i.description)}</small>` : ''}${i.excludes ? `<small>Not for: ${esc(i.excludes)}</small>` : ''}</div></li>`).join('')}</ul></section>` : '')
     + (branches.length ? `<section class="im-operation-list"><h3>Branches</h3><ul>${branches.join('')}</ul></section>` : '')
     + (c.outputs.length ? `<section><h3>Produces</h3><div class="im-tag-row">${c.outputs.map(o => tag(o)).join('')}</div></section>` : '')
-    + `<footer><button type="button" class="im-btn" data-close autofocus>Close</button></footer></div>`;
+  );
 }
 
 // ---------- the actions ----------
@@ -190,11 +190,11 @@ export const actions: Actions = {
     boxOf(el)?.focus();
     app.render();
   },
-  'open-capability': (app, d) => {
+  'open-capability': (app, d, el) => {
     if (!d.id) return;
     const info = held(app), c = info && capsOf(info).find(x => x.id === d.id);
-    if (!info || !c) { app.notify('That capability is not in this project\'s graph.', 'bad'); return; }
-    app.openDialog(sheet(info, c), 'sheet');
+    if (!info || !c) { app.notify('That capability is not in this project\'s graph.','err'); return; }
+    app.openInspector(sheet(info, c), { opener: el });
   },
 };
 
