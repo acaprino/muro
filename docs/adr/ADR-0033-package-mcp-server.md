@@ -592,6 +592,18 @@ lost if it was wrong.
   alone" and does not know the tools of a server that stays registered, so it does
   not check that a tool name differs from them. The Harmonizer AI does both from
   the source, and the prompts say so.
+- The unattended steps, `muro agent` and so `muro absorb`, cannot write a package
+  server. The design said so only in the Harmonizer prompt ("With no owner to ask,
+  write no `package_server`"), which left model obedience as the one barrier before
+  tools on paid accounts. `muro/agent.py` now compares the `package_server` and
+  `server_choice` keys of the `delivery.json` a model returns, at the intake and
+  harmonize steps, with the file as it was before the step, and rejects the answer
+  before writing it when either differs (absent on both sides is equal). The
+  message names the key and says the owner must answer in an attended session; it
+  goes back to the model like any rejected answer, and the contract tells the model
+  that no owner can be asked. Python compares and never chooses; a package whose
+  file already holds both keys passes unchanged. This proves that no unattended
+  run changes the record, not that a record is the owner's consent (see the gate).
 - A child that no tool forwards to is refused at validation ("child X has no tool
   that forwards to it: remove it from children or forward a tool"). Claude Code
   registers the package server in its place, so the child would never be started

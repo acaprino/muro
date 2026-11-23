@@ -356,6 +356,13 @@ names is removed, so a misnamed file cannot poison every later validation. For i
 the prompt (per-file and total budgets; what is not inlined is listed so the
 model reports it as a gap instead of guessing).
 
+No owner can be asked in this run (ADR-0033), so an `intake` or `harmonize` answer whose
+`delivery.json` holds a `package_server` or a `server_choice` that differs from the file as it was
+before the step is rejected before anything is written, with the key named and the instruction that
+the owner answers in an attended session. A key absent on both sides is equal; a file that already
+holds both keys keeps them. The same message goes back to the model as any rejected answer does,
+within `--rounds`.
+
 ```sh
 export MURO_API_KEY=…   # or OPENAI_API_KEY
 muro agent intake ponytail --manifest pkg/ponytail/sources.json \
