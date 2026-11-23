@@ -7,6 +7,7 @@ import { ProjectProvider, useProject } from '../state/useProject.tsx';
 import { useNotify } from '../state/notices.tsx';
 import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
+import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
 
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
@@ -28,6 +29,8 @@ const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').to
 function ProjectsTab() {
   const { request } = useRegistry();
   const project = useProject();
+  // `settled` counts the jobs that ended: the list is read again when one does (a new project, a deleted one, a version moved).
+  const { settled } = useJobs();
   const sendRef = React.useRef(request);
   sendRef.current = request;
   const [list, setList] = React.useState<ProjectSummary[] | null>(null);
@@ -42,7 +45,7 @@ function ProjectsTab() {
       return rows;
     } catch (e) { setError(message(e)); return null; }
   }, []);
-  React.useEffect(() => { void loadList(); }, [loadList]);
+  React.useEffect(() => { void loadList(); }, [loadList, settled]);
   const openId = project.view?.id ?? null;
   // A project the list no longer holds (removed by another window, its file gone from the list) is closed.
   React.useEffect(() => { if (list && openId !== null && !list.some(p => p.id === openId)) project.close(); }, [list, openId]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -218,6 +221,7 @@ function Published({ snapshot }: { snapshot: Snapshot }) {
 function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | null }) {
   const { request } = useRegistry();
   const project = useProject();
+  const { settled } = useJobs();
   const sendRef = React.useRef(request);
   sendRef.current = request;
   const [attempt, setAttempt] = React.useState(0);
@@ -230,7 +234,7 @@ function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | nu
       e => { if (live) setRead({ info: null, error: message(e) }); },
     );
     return () => { live = false; };
-  }, [id, attempt]);
+  }, [id, attempt, settled]);
   const back = <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>;
   if (read.error) return (
     <div className="flex flex-col gap-4 p-6">
