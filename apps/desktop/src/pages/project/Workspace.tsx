@@ -20,18 +20,33 @@ import { ExamplesPanel } from './ExamplesPanel.tsx';
 import { InputsPanel } from './InputsPanel.tsx';
 import { RecordsPanel } from './RecordsPanel.tsx';
 import { RunsPanel } from './RunsPanel.tsx';
+import { busyReason, runningOn } from './write/jobs.ts';
+import { useJobs } from './write/useJobs.tsx';
+import { GatedButton, JobCard } from './write/JobCard.tsx';
+import { AddInputDialog } from './write/AddInputDialog.tsx';
+import { HarmonizeDialog } from './write/HarmonizeDialog.tsx';
+import { PinDialog } from './write/PinDialog.tsx';
+import { InstructionsDialog } from './write/InstructionsDialog.tsx';
+import { DetailsDialog } from './write/DetailsDialog.tsx';
 
 /** The workspace of an open project, in the frame of the window: the panel at the left (inputs, examples, records, runs), the decision graph at the centre, the details
  * of what is selected in the inspector, and the actions of the project at the foot. The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
  * is a panel over the end of the graph, and where the frame has no room for a sidebar (under 620px) the left panel opens as a drawer from a button.
  *
  * What lights the graph is the decision shown (a documented example, or the AI's answer to a free-text request: `sim`) or the input selected; what the inspector shows
- * is `selected`. The two are apart, so looking at a capability of a lit path keeps the path lit. The graph data is made in one place, `graphScene.ts`. */
+ * is `selected`. The two are apart, so looking at a capability of a lit path keeps the path lit. The graph data is made in one place, `graphScene.ts`.
+ *
+ * The changes of the project (write/): Add input and Harmonize again at the foot, Edit details in the header, Move pin, Remove and the instructions in the Inputs panel.
+ * Each opens a dialog the workspace holds, so it outlives the drawer the panel may be in. A change of the package is an AI run of the runtime, one at a time: while any
+ * run goes no other is offered, and the buttons and the foot say why; an edit by hand (the details) waits only for a run that changes this project. The run of this
+ * project is the card at the top (JobCard). Review decisions has no operation in the runtime yet, and installing comes with the Sync page: both stay off, saying so. */
 
 const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examples', records: 'Records', runs: 'Runs' };
-/** What the write side of a project will do, here and disabled until the editor exists. */
-const SOON = 'Coming with the editor';
-const ACTIONS = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…'];
+/** Why the two actions the runtime has no operation for here are off. */
+const NO_REVIEW = 'Coming with the review';
+const NO_INSTALL = 'Coming with the Sync page';
+/** The dialog open over the workspace, if any. */
+type Open = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details' | null;
 /** Whether the shell said it cannot open a folder ("Unknown ... open_folder"): then "Open folder" is gone, for every project, until the window is loaded again. */
 let noFolderShell = false;
 
@@ -43,6 +58,10 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const narrow = sidebar === 'drawer';
   const [drawer, setDrawer] = React.useState(false);
   const [noFolder, setNoFolder] = React.useState(noFolderShell);
+  const jobs = useJobs();
+  const [dialog, setDialog] = React.useState<Open>(null);
+  // The input of the pin dialog stays when it closes, so the dialog does not change while it goes.
+  const [pin, setPin] = React.useState({ input: '', remove: false });
   const data = React.useMemo(() => projectData(info), [info]);
   const view = project.view;
   const sim = view?.sim ?? null, selected = view?.selected ?? null;
@@ -96,6 +115,14 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
     else setCollapsed(now => now.includes(id) ? now.filter(x => x !== id) : [...now, id]);
   };
   const chosen = () => setDrawer(false);
+  // One AI run at a time, of any project or adaptation (the runtime's lock): while one goes, no change of the package is offered. An edit by hand waits only for a run of this project.
+  const busy = busyReason(jobs.running);
+  const mine = runningOn(jobs.jobs, view.id);
+  const editBusy = mine ? busyReason(mine) : null;
+  /** A dialog opens over the workspace; a drawer that holds the panel closes first, so no two modal surfaces are open at once. */
+  const show = (next: Exclude<Open, null>) => { setDrawer(false); setDialog(next); };
+  const showPin = (input: string, remove: boolean) => { setPin({ input, remove }); show('pin'); };
+  const closed = (open: boolean) => { if (!open) setDialog(null); };
   /** The file manager on the folder of the project's file (`open_folder {path}`, answered by the runtime for a listed project only). A shell that does not know the
    * request yet says so in the service's words: the button is then gone for the session, as "Open project file…" is when the shell has no file dialog. */
   async function openFolder(): Promise<void> {
@@ -108,7 +135,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   }
   const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);
   const summary = [plural(data.inputs.length, 'input'), plural(data.entries.length, 'entry', 'entries'), plural(data.caps.length, 'capability', 'capabilities'), plural(data.examples.length, 'example')].join(' · ');
-  const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} />;
+  const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} onPin={showPin} onInstructions={() => show('instructions')} />;
   const litLine = input ? `The entries that hold what ${input.id} became are open.`
     : shown?.kind === 'decision' && shown.steps.length ? (shown.example !== null ? `The steps of “${shown.example}” are numbered on the graph.` : 'The steps of the answer are numbered on the graph.') : '';
 
@@ -121,6 +148,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
           {version ? <span className="text-xs text-ink-mute tabular-nums">{version}</span> : null}
           {info.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
           <span className="min-w-0 flex-1 truncate text-xs text-ink-mute" title={summary}>{summary}</span>
+          <GatedButton off={editBusy} variant="outline" size="sm" onClick={() => show('details')}>Edit details…</GatedButton>
           {narrow ? <Button variant="outline" size="sm" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="sidebarOpen" />Project panel</Button> : null}
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-mute">
@@ -129,6 +157,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
           <span className="min-w-0 truncate" title={about}>{about}</span>
         </div>
       </header>
+      <JobCard projectId={view.id} className="mx-4 mt-3" />
       <div className="flex min-h-0 flex-1">
         {narrow ? (
           <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>
@@ -174,15 +203,23 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
         </Inspector>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-2">
-        {ACTIONS.map(label => <span key={label} title={SOON}><Button variant="outline" disabled title={SOON}>{label}</Button></span>)}
-        <span title={SOON}><Button disabled title={SOON}>Add input…</Button></span>
+        <span role="status" className="me-auto min-w-0 truncate text-xs text-ink-mute" title={busy ?? undefined}>{busy ?? ''}</span>
+        <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
+        <GatedButton off={busy} variant="outline" onClick={() => show('harmonize')}>Harmonize again…</GatedButton>
+        <GatedButton off={NO_INSTALL} variant="outline">Install on harnesses…</GatedButton>
+        <GatedButton off={busy} onClick={() => show('add')}>Add input…</GatedButton>
       </div>
+      <AddInputDialog id={view.id} info={info} open={dialog === 'add'} onOpenChange={closed} />
+      <HarmonizeDialog id={view.id} info={info} open={dialog === 'harmonize'} onOpenChange={closed} />
+      <PinDialog id={view.id} info={info} open={dialog === 'pin'} onOpenChange={closed} input={pin.input} remove={pin.remove} />
+      <InstructionsDialog id={view.id} info={info} open={dialog === 'instructions'} onOpenChange={closed} />
+      <DetailsDialog id={view.id} info={info} open={dialog === 'details'} onOpenChange={closed} />
     </div>
   );
 }
 
 /** The left panel: a segmented control of its four panels, and the panel chosen, which scrolls. */
-function LeftPanel({ data, panel, onPanel, onChosen }: { data: ProjectData; panel: Panel; onPanel(p: Panel): void; onChosen(): void }) {
+function LeftPanel({ data, panel, onPanel, onChosen, onPin, onInstructions }: { data: ProjectData; panel: Panel; onPanel(p: Panel): void; onChosen(): void; onPin(input: string, remove: boolean): void; onInstructions(): void }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="shrink-0 p-3">
@@ -191,7 +228,7 @@ function LeftPanel({ data, panel, onPanel, onChosen }: { data: ProjectData; pane
         </ToggleGroup>
       </div>
       <section aria-label={PANEL_LABELS[panel]} className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {panel === 'inputs' ? <InputsPanel data={data} onChosen={onChosen} />
+        {panel === 'inputs' ? <InputsPanel data={data} onChosen={onChosen} onPin={onPin} onInstructions={onInstructions} />
           : panel === 'examples' ? <ExamplesPanel data={data} onChosen={onChosen} />
           : panel === 'records' ? <RecordsPanel data={data} />
           : <RunsPanel data={data} />}
