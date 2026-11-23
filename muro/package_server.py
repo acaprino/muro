@@ -1,4 +1,4 @@
-"""The package server: one MCP server for a whole package, its tools declared as data (ADR-0032).
+"""The package server: one MCP server for a whole package, its tools declared as data (ADR-0033).
 
 It lists the tools `package-server.json` declares. A forwarded call goes to the absorbed server that
 owns the tool, started as a child on its first call; a `run` tool starts its declared command with no
