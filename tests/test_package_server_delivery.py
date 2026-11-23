@@ -50,7 +50,7 @@ FORWARD = {"name": "echo", "source": "demo", "description": "Echo, in the child'
            "input_schema": {"type": "object", "properties": {}}, "forward": {"server": "stub", "tool": "echo"}}
 RUN = {"name": "lookup", "source": "demo", "description": "Look up q.", "input_schema": TOOL_SCHEMA,
        "run": ["node", "<package_root>/scripts/demo/tool.js", "{q}"]}
-CHOICE = {"asked_on": "2026-11-23", "answer": "one server", "given_on": {"sources": {"demo": "abc1234"}, "shown": ["echo"]}}
+CHOICE = {"asked_on": "2026-11-23", "answer": "one server", "given_on": {"sources": {"demo": "abc1234"}, "shown": ["echo", "lookup"]}}
 
 
 def packaged(tools=(FORWARD, RUN), children=("stub",), **over):
@@ -340,6 +340,24 @@ def test_the_gate_reads_the_recorded_commit_whatever_its_case_and_asks_for_the_a
     assert package_server_gate_errors(document, []) == [
         "the package server needs the owner's recorded answer (server_choice)"]
     assert package_server_gate_errors(None, []) == []
+
+
+def test_the_gate_asks_again_for_a_tool_the_answer_did_not_show():
+    # A tool added at an unchanged commit would otherwise build with no question, for tools that act on accounts.
+    document = packaged()
+    document["server_choice"]["given_on"]["shown"] = ["echo"]
+    sources = [{"id": "demo", "commit": "abc1234" + "0" * 33}]
+    assert package_server_gate_errors(document, sources) == ["the owner's answer does not cover tool lookup: ask again"]
+
+
+def test_the_build_refuses_a_tool_the_answer_did_not_show(portable_project, tmp_path):
+    declare_packaged(portable_project)
+    path = portable_project / "delivery.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["server_choice"]["given_on"]["shown"] = ["echo"]
+    path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(ValueError, match="the owner's answer does not cover tool lookup: ask again"):
+        build(portable_project, tmp_path)
 
 
 def test_the_gate_asks_for_each_source_a_tool_or_a_child_uses():

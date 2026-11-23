@@ -169,9 +169,12 @@ def package_server_gate_errors(document: dict[str, Any] | None, sources: list[di
     used = {tool["source"] for tool in declaration["tools"]}
     used |= {server["source"] for server in mcp_servers(document) if server["name"] in declaration["children"]}
     errors = [f"the owner's answer does not cover source {source}" for source in sorted(used - recorded.keys())]
-    return errors + [f"the owner's answer was given on {source} at {commit}, now pinned at {pinned[source][:8]}: ask again"
-                     for source, commit in recorded.items()
-                     if source in pinned and not pinned[source].lower().startswith(commit.lower())]
+    errors += [f"the owner's answer was given on {source} at {commit}, now pinned at {pinned[source][:8]}: ask again"
+               for source, commit in recorded.items()
+               if source in pinned and not pinned[source].lower().startswith(commit.lower())]
+    shown = document["server_choice"]["given_on"]["shown"]   # a tool added at an unchanged commit needs the answer too
+    return errors + [f"the owner's answer does not cover tool {tool['name']}: ask again"
+                     for tool in declaration["tools"] if tool["name"] not in shown]
 
 
 def _text(value: Any) -> bool:
