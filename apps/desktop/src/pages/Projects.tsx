@@ -4,29 +4,26 @@ import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
 import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
 import { ProjectProvider, useProject } from '../state/useProject.tsx';
-import { NoticesProvider, useNotify } from '../state/notices.tsx';
-import { message, plural } from '../words.ts';
+import { useNotify } from '../state/notices.tsx';
+import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
+import { countsOf } from './project/lines.ts';
 
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
  * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). The open project is the
- * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. The write side (new project, harmonize, add an input) is a later plan. */
+ * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. The write side (new project, harmonize, add an input) is a later plan. Its notices
+ * are the window's one stack (`NoticesProvider`, mounted above the window in mount.tsx). */
 export function Projects() {
   return (
-    <NoticesProvider>
-      <ProjectProvider>
-        <ProjectsTab />
-      </ProjectProvider>
-    </NoticesProvider>
+    <ProjectProvider>
+      <ProjectsTab />
+    </ProjectProvider>
   );
 }
 
 const nameOf = (p: ProjectSummary): string => p.project?.name || p.plugin?.name || p.id;
 const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
 const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-const countOf = (n: number | undefined, one: string, many?: string): string => typeof n === 'number' ? plural(n, one, many) : '';
-/** A request only the shell answers, refused by a shell that does not know it yet: the service says "Unknown ... action: <name>". */
-const unknownTo = (e: unknown, action: string): boolean => /unknown/i.test(message(e)) && message(e).includes(action);
 
 function ProjectsTab() {
   const { request } = useRegistry();
@@ -161,7 +158,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
 /** One project file of the list: its name (which opens it), its version, whether Muro ships it, its file and what it holds; or, for a file that cannot be read, why.
  * "Remove from list" is on every project but the one Muro ships (`included`, which the runtime says: never a field of the file, which anyone can write). */
 function ProjectRow({ p, onOpen, onRemove }: { p: ProjectSummary; onOpen: () => void; onRemove: () => void }) {
-  const name = nameOf(p), counts = [countOf(p.inputs, 'input'), countOf(p.capabilities, 'capability', 'capabilities')].filter(Boolean).join(' · ');
+  const name = nameOf(p), counts = countsOf(p);
   return (
     <TableRow>
       <TableCell className="w-full max-w-0">

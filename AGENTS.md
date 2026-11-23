@@ -15,7 +15,9 @@ Sigrid is not on npm. `package.json` names its GitHub Release tarball,
 (first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
 in `docs/verification/`. Never a `file:` path to a checkout, and never a git
 dependency that runs `prepare`. The lockfile records the tarball's integrity;
-it is generated in CI (a throwaway workflow), never by an install here.
+it is generated in CI by a throwaway workflow, never by an install here. That
+workflow was removed once the lockfile was committed: for the next dependency
+change restore it with `git show 72dc3ac:.github/workflows/lockfile.yml`.
 
 Native window primitives (glass and native theme, caption controls, navigation
 guard) stay with the Rust crate `imago-shell`, pinned in
@@ -33,8 +35,9 @@ confirmed design choices within the requested scope. Use its components and
 tokens. Build a control of your own from the tokens, never from literal colours
 or sizes. Report conflicts and keep unresolved choices explicit.
 Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done: it
-reads files and builds nothing. It needs the Sigrid package installed, and no CI
-step runs it yet (ADR-0031); where it was not run, say so.
+reads files and builds nothing. It needs the Sigrid package installed; the Tests
+workflow runs it ("Design rules (Sigrid)"), not blocking until its first output
+has been read (ADR-0031); where it was not run, say so.
 
 ## Product contract
 

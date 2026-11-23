@@ -23,11 +23,11 @@ export function InputsPanel({ data, onChosen }: { data: ProjectData; onChosen():
         <p className="text-xs text-ink-mute">The plugins and skills this project absorbs, each pinned to a release or a commit. Choose one to see on the graph what it became.</p>
         {data.inputs.length ? (
           <ItemList aria-label="Inputs">
-            {data.inputs.map(input => {
+            {data.inputs.map((input, i) => {
               const pin = pinnedOf(input), parts = becameParts(input), source = input.url || 'Local source';
               return (
                 <ItemRow
-                  key={input.id}
+                  key={`${i}:${input.id}`}
                   current={selected?.kind === 'input' && selected.id === input.id}
                   onClick={() => choose(input.id)}
                   title={<span title={input.id}>{input.id}</span>}

@@ -12,9 +12,9 @@ export function RecordsPanel({ data }: { data: ProjectData }) {
       {data.records.length ? (
         <ul role="list" aria-label="Decision records" className="flex flex-col">
           {data.records.map((r, i) => {
-            const mine = r.author === 'you', subjects = Array.isArray(r.subjects) ? r.subjects.join(', ') : '';
+            const mine = r.author === 'you', subjects = r.subjects.join(', ');
             return (
-              <li key={r.id || i} className="flex flex-col gap-1 border-b border-line py-2">
+              <li key={`${i}:${r.id}`} className="flex flex-col gap-1 border-b border-line py-2">
                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="text-xs text-ink-mute tabular-nums">{r.date}</span>
                   {subjects ? <span className="min-w-0 truncate text-xs font-medium text-ink" title={subjects}>{subjects}</span> : null}

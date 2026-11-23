@@ -2,15 +2,19 @@ import * as React from 'react';
 import { Badge, Button, Empty, Icon, Inspector, Sheet, SheetContent, SheetTitle, ToggleGroup, ToggleGroupItem, useAppShell } from '@acaprino/sigrid';
 import { GraphCanvas } from '@acaprino/sigrid/graph';
 import type { ProjectInfo } from '../../types.ts';
+import { text } from '../../model.ts';
 import { PANELS, sameSelected } from '../../state/project.ts';
 import type { Panel, Selected } from '../../state/project.ts';
+import { useNotify } from '../../state/notices.tsx';
+import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
-import { plural } from '../../words.ts';
+import { message, plural, unknownTo } from '../../words.ts';
 import { litOf, outcomeOfExample } from './graph-model.ts';
 import type { Outcome } from './graph-model.ts';
-import { capNodeId, capabilityOf, graphScene } from './graphScene.ts';
+import { capNodeId, capabilityOf, drawnNodes, graphScene } from './graphScene.ts';
 import { projectData, targetsOf } from './data.ts';
 import type { ProjectData } from './data.ts';
+import { aboutLine } from './lines.ts';
 import { Details, TITLES, resolve } from './Details.tsx';
 import { ExamplesPanel } from './ExamplesPanel.tsx';
 import { InputsPanel } from './InputsPanel.tsx';
@@ -28,12 +32,17 @@ const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examp
 /** What the write side of a project will do, here and disabled until the editor exists. */
 const SOON = 'Coming with the editor';
 const ACTIONS = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…'];
+/** Whether the shell said it cannot open a folder ("Unknown ... open_folder"): then "Open folder" is gone, for every project, until the window is loaded again. */
+let noFolderShell = false;
 
 export function Workspace({ info, file }: { info: ProjectInfo; file: string | null }) {
   const project = useProject();
+  const { request } = useRegistry();
+  const notify = useNotify();
   const { sidebar } = useAppShell();
   const narrow = sidebar === 'drawer';
   const [drawer, setDrawer] = React.useState(false);
+  const [noFolder, setNoFolder] = React.useState(noFolderShell);
   const data = React.useMemo(() => projectData(info), [info]);
   const view = project.view;
   const sim = view?.sim ?? null, selected = view?.selected ?? null;
@@ -43,33 +52,34 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const input = selected?.kind === 'input' ? data.inputs.find(i => i.id === selected.id) ?? null : null;
   const pairs = input ? '[]' : JSON.stringify([...litOf(shown)]);
   const lit = React.useMemo(() => new Map<string, number[]>(JSON.parse(pairs)), [pairs]);
-  const scene = React.useMemo(() => graphScene(data.entries, data.caps, data.slug, lit), [data, lit]);
-  // The canvas draws every line as "hangs from": it gets the lines from an entry to its capabilities, and the rest (runs first, needs on a condition, never together) is said in words in the details.
-  const edges = React.useMemo(() => scene.edges.filter(e => e.kind === 'member'), [scene]);
   const targets = React.useMemo(() => input ? targetsOf(data.decisions, input.id) : [], [data, input]);
-  const wanted = React.useMemo(() => {
-    const reached = new Set(targets), open = new Set(edges.filter(e => reached.has(capabilityOf(e.to) ?? '')).map(e => e.from));
-    return scene.closed.filter(id => !open.has(id));
-  }, [scene, edges, targets]);
+  // What the canvas draws, and which entries start closed, is the scene's (graphScene.ts): the lines from an entry to its capabilities (`drawn`), and every entry
+  // closed that holds nothing lit and nothing the chosen input went to.
+  const scene = React.useMemo(() => graphScene(data.entries, data.caps, data.slug, lit, targets), [data, lit, targets]);
   const litKey = input ? `input:${input.id}` : pairs === '[]' ? '' : `steps:${pairs}`;
-  // The entries are closed until opened. A new light opens the entries that hold what it lights and closes the others; when the light goes, what is open stays open.
-  const [canvas, setCanvas] = React.useState({ key: litKey, collapsed: wanted });
-  let collapsed = canvas.collapsed;
+  // The entries are closed until opened. A new light opens the entries that hold what it lights and closes the others, and the canvas is made again (`fit` is its key):
+  // Sigrid's canvas fits the view to what is open when it is made and has no prop that fits it again, so a lit step in an entry just opened is never out of sight.
+  // When the light goes, what is open stays open and the view stays where it is.
+  const [canvas, setCanvas] = React.useState({ key: litKey, collapsed: scene.closed, fit: 0 });
+  let collapsed = canvas.collapsed, fit = canvas.fit;
   if (canvas.key !== litKey) {
-    collapsed = litKey ? wanted : canvas.collapsed;
-    setCanvas({ key: litKey, collapsed });
+    collapsed = litKey ? scene.closed : canvas.collapsed;
+    fit = litKey ? canvas.fit + 1 : canvas.fit;
+    setCanvas({ key: litKey, collapsed, fit });
   }
   // A capability chosen from the details (a step, a branch, what an input went to) may sit in a closed entry: its entry opens, so the canvas shows what the inspector shows.
   const chosenCap = selected?.kind === 'capability' ? selected.id : null;
   const [opened, setOpened] = React.useState<string | null>(null);
   if (opened !== chosenCap) {
     setOpened(chosenCap);
-    const holders = chosenCap === null ? [] : edges.filter(e => e.to === capNodeId(chosenCap)).map(e => e.from);
+    const holders = chosenCap === null ? [] : scene.drawn.filter(e => e.to === capNodeId(chosenCap)).map(e => e.from);
     if (holders.some(id => collapsed.includes(id))) {
       collapsed = collapsed.filter(id => !holders.includes(id));
       setCanvas(c => ({ ...c, collapsed: c.collapsed.filter(id => !holders.includes(id)) }));
     }
   }
+  // An open entry says its "Use when" sentence under its name, a closed one only its name.
+  const nodes = React.useMemo(() => drawnNodes(scene, collapsed), [scene, collapsed]);
   const setCollapsed = (next: string[] | ((now: string[]) => string[])) => setCanvas(c => ({ ...c, collapsed: typeof next === 'function' ? next(c.collapsed) : next }));
 
   if (!view || !sim) return null;
@@ -85,7 +95,17 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
     else setCollapsed(now => now.includes(id) ? now.filter(x => x !== id) : [...now, id]);
   };
   const chosen = () => setDrawer(false);
-  const name = info.project?.name || info.plugin?.name || view.id, version = info.plugin?.version ?? '';
+  /** The file manager on the folder of the project's file (`open_folder {path}`, answered by the runtime for a listed project only). A shell that does not know the
+   * request yet says so in the service's words: the button is then gone for the session, as "Open project file…" is when the shell has no file dialog. */
+  async function openFolder(): Promise<void> {
+    if (!file) return;
+    try { await request('open_folder', { path: file }); }
+    catch (e) {
+      if (unknownTo(e, 'open_folder')) { noFolderShell = true; setNoFolder(true); notify('This version of Muro cannot open folders yet.', 'error'); }
+      else notify(message(e), 'error');
+    }
+  }
+  const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);
   const summary = [plural(data.inputs.length, 'input'), plural(data.entries.length, 'entry', 'entries'), plural(data.caps.length, 'capability', 'capabilities'), plural(data.examples.length, 'example')].join(' · ');
   const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} />;
   const litLine = input ? `The entries that hold what ${input.id} became are open.`
@@ -93,13 +113,20 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-4 py-2">
-        <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>
-        <h1 className="min-w-0 truncate text-base font-semibold text-ink" title={name}>{name}</h1>
-        {version ? <span className="text-xs text-ink-mute tabular-nums">{version}</span> : null}
-        {info.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
-        <span className="min-w-0 flex-1 truncate text-xs text-ink-mute" title={file ? `${summary} · ${file}` : summary}>{summary}{file ? ` · ${file}` : ''}</span>
-        {narrow ? <Button variant="outline" size="sm" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="sidebarOpen" />Project panel</Button> : null}
+      <header className="flex shrink-0 flex-col gap-1 border-b border-line px-4 py-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>
+          <h1 className="min-w-0 truncate text-base font-semibold text-ink" title={name}>{name}</h1>
+          {version ? <span className="text-xs text-ink-mute tabular-nums">{version}</span> : null}
+          {info.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-mute" title={summary}>{summary}</span>
+          {narrow ? <Button variant="outline" size="sm" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="sidebarOpen" />Project panel</Button> : null}
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-mute">
+          {file ? <span className="min-w-0 truncate font-mono" title={file}>{file}</span> : null}
+          {file && !noFolder ? <Button variant="outline" size="sm" onClick={() => void openFolder()}>Open folder</Button> : null}
+          <span className="min-w-0 truncate" title={about}>{about}</span>
+        </div>
       </header>
       <div className="flex min-h-0 flex-1">
         {narrow ? (
@@ -123,9 +150,10 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
               {data.entries.length ? null : <p className="px-4 pt-1 text-xs text-ink-mute">No entry groups these capabilities: each stands on its own.</p>}
               <div className="relative min-h-96 flex-1">
                 <GraphCanvas
+                  key={fit}
                   aria-label={`Decision graph of ${name}`}
-                  nodes={scene.nodes}
-                  edges={edges}
+                  nodes={nodes}
+                  edges={scene.drawn}
                   selected={selected?.kind === 'capability' ? capNodeId(selected.id) : null}
                   onSelect={onNode}
                   collapsed={collapsed}

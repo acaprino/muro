@@ -3,14 +3,16 @@
 // The pages that are not in the new window yet say so (pages/Moved.tsx); the window opens on Sync, as before.
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
-  AppShell, Button, CommandPalette, Empty, Icon, NARROW, TitleBar, Toasts, Toolbar, ToolbarBrand, ToolbarButton, ToolbarSpacer,
+  AppShell, Button, CommandPalette, Empty, Icon, NARROW, TitleBar, Toolbar, ToolbarBrand, ToolbarButton, ToolbarSpacer,
   ToolbarTab, ToolbarTabs, WindowControls, useCommandKey, useMedia,
-  type Command, type IconName, type TitleBarDragProps, type ToastItem,
+  type Command, type IconName, type TitleBarDragProps,
 } from '@acaprino/sigrid';
 import type { Page, Snapshot } from './types.ts';
 import { nextCheck, stamp, syncHeadline, type SyncHeadline } from './model.ts';
 import { plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
+import { useNotify } from './state/notices.tsx';
+import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
 import { THEME_LABELS, otherChoices } from './theme.ts';
@@ -28,8 +30,6 @@ const PAGES: readonly { id: Page; label: string; icon: IconName }[] = [
 const DRAG: TitleBarDragProps = { 'data-tauri-drag-region': '' };
 /** Sigrid draws a window button only for an action it is given; the click is the window glue's (window.ts), so these do nothing. */
 const inert = (): void => {};
-
-let noticeNumber = 0;
 
 /** What the status row leads with: the state of the sync in plain words. */
 function headline(h: SyncHeadline): string {
@@ -84,17 +84,15 @@ export function App() {
   const { choice, resolved, set: setChoice } = useScheme();
   const [page, setPage] = useState<Page>('sync');
   const [palette, setPalette] = useState(false);
-  const [notices, setNotices] = useState<ToastItem[]>([]);
   const bar = useRef<HTMLElement>(null);
   // Under 860px (Sigrid's `NARROW`) the bar has no room for the tabs beside the brand and the palette's button: they go
   // to the row under it, across the whole window, with their words.
   const narrow = useMedia(NARROW);
 
-  const notify = useCallback((text: string) => {
-    setNotices(list => [...list, { id: `notice-${++noticeNumber}`, text, kind: 'error' }]);
-  }, []);
-  const dismiss = useCallback((id: string) => { setNotices(list => list.filter(n => n.id !== id)); }, []);
-  const frame = useWindowFrame(bar, notify);
+  // What the window glue could not do (a button, the zoom) is an error in the window's one stack of notices (mount.tsx).
+  const notify = useNotify();
+  const windowError = useCallback((text: string) => notify(text, 'error'), [notify]);
+  const frame = useWindowFrame(bar, windowError);
   useWindowTheme(choice, resolved);
   // Before the frame is painted: the page never shows another theme first.
   useLayoutEffect(() => { paintScheme(document.documentElement, resolved); }, [resolved]);
@@ -140,16 +138,18 @@ export function App() {
       status={<StatusLine snapshot={snapshot} error={error} />}
       footer={<FooterLine snapshot={snapshot} />}
     >
-      {!snapshot && error ? (
-        <Empty
-          className="h-full px-4 py-6"
-          title="Registry not available"
-          description={error}
-          action={<Button onClick={() => { void reload(); }}>Try again</Button>}
-        />
-      ) : current.id === 'projects' ? <Projects /> : <Moved page={current.label} />}
+      {/* A page that fails while it is drawn says so in its own place; the frame, the palette and the notices stay. Another tab starts it afresh. */}
+      <ErrorBoundary key={current.id}>
+        {!snapshot && error ? (
+          <Empty
+            className="h-full px-4 py-6"
+            title="Registry not available"
+            description={error}
+            action={<Button onClick={() => { void reload(); }}>Try again</Button>}
+          />
+        ) : current.id === 'projects' ? <Projects /> : <Moved page={current.label} />}
+      </ErrorBoundary>
       <CommandPalette open={palette} onOpenChange={setPalette} commands={commands} label="Search commands" />
-      <Toasts items={notices} onDismiss={dismiss} />
     </AppShell>
   );
 }

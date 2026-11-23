@@ -20,6 +20,9 @@
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
 //                                `simulate` needs the `run` the page names; `cancel_simulation {run}` ends a delayed one ("The simulation was cancelled") and refuses one that is not running.
 //             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name, and 26 documented examples (set it before opening the project)
+//             emptyGraph         the next `project` has no capability, no entry and no example; noEntries: its capabilities and examples, and no entry
+//             oddNames           the next `project` has a second example titled "A letter", and one whose title, intent id and output hold <, & and quotes (ODD_TITLE and the rest, below)
+//             objectFields       the next `project` holds an object where its first record has its text and its newest run its changelog, as a file written by hand may
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
@@ -94,6 +97,22 @@ function withBigGraph(info) {
   const generated = Array.from({ length: 24 }, (_, k) => example(`Generated example ${String(k + 3).padStart(2, '0')}`, [ids[(k * 5 + 1) % 37], ids[(k * 11 + 19) % 37]]));
   return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]]), ...generated] } };
 }
+// flags.oddNames: what a project file from elsewhere may name its things. React writes text, never markup; these prove it, and that two examples with one title stay two.
+export const ODD_TITLE = '<b>Odd</b> & "quoted" \'title\'', ODD_TASK = 'Make a <i>PDF</i> & "send" it', ODD_INTENT = '<i>pdf</i> & "intent"', ODD_OUTPUT = '<u>file</u> & "pdf"';
+function withOddNames(info) {
+  const capabilities = info.graph.capabilities.map(c => c.id === 'office-pdf' ? { ...c, outputs: [ODD_OUTPUT] } : c);
+  const examples = [
+    ...info.graph.examples,
+    { id: 'ex-3', title: 'A letter', task: 'Write a second letter', stack_tokens: [], status: 'selected', selections: [{ capability: 'office-docs', intent: 'office-docs-intent', reason: 'Another Word file.' }], reason: 'A second document.', questions: [], path: ['office-docs'], steps: [{ step: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent' }] },
+    { id: 'ex-4', title: ODD_TITLE, task: ODD_TASK, stack_tokens: [], status: 'selected', selections: [{ capability: 'office-pdf', intent: ODD_INTENT, reason: 'It makes the "PDF" <file>.' }], reason: 'One & only.', questions: [], path: ['office-pdf'], steps: [{ step: 'office-pdf', capability: 'office-pdf', intent: ODD_INTENT }] },
+  ];
+  return { ...info, graph: { ...info.graph, capabilities, examples } };
+}
+// flags.objectFields: the first record's text and the newest run's changelog are objects, where the file should hold text.
+function withObjectFields(info) {
+  const [first, ...records] = info.records, [newest, ...history] = info.history;
+  return { ...info, records: [{ ...first, text: { en: first.text } }, ...records], history: [{ ...newest, changelog: { en: newest.changelog } }, ...history] };
+}
 const summaryOf = (id, path, info, included = false) => ({ id, path, included, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
 function scenarioData(scenario) {
@@ -138,7 +157,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, emptyGraph: false, noEntries: false, oddNames: false, objectFields: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -287,7 +306,16 @@ export function createTransport(scenario = 'default') {
       }
       case 'apply': return apply(payload);
       case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info, !!p.included));
-      case 'project': return structuredClone({ ...(flags.bigGraph ? withBigGraph(projectOf(payload.id).info) : projectOf(payload.id).info), included: !!projectOf(payload.id).included });
+      case 'project': {
+        const held = projectOf(payload.id);
+        let info = structuredClone(held.info);
+        if (flags.bigGraph) info = withBigGraph(info);
+        if (flags.emptyGraph) info = { ...info, graph: { entries: [], capabilities: [], examples: [] } };
+        if (flags.noEntries) info = { ...info, graph: { ...info.graph, entries: [] } };
+        if (flags.oddNames) info = withOddNames(info);
+        if (flags.objectFields) info = withObjectFields(info);
+        return { ...info, included: !!held.included };
+      }
       case 'open_project': {
         if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
         const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();

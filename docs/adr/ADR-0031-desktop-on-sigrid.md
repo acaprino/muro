@@ -18,8 +18,8 @@ accepted_on: null
 # ADR-0031 — The desktop window moves from Imago to React on Sigrid
 
 Date: 2026-11-23. Status: records the owner's decision of the same day. Nothing
-of it was built or run when this record was written (see "What was not
-verified"); the explanatory text and the implementation choices have not been
+of it was built or run when this record was written (see "What was verified and
+what was not"); the explanatory text and the implementation choices have not been
 separately approved.
 
 ## Context
@@ -68,7 +68,8 @@ owner chose "sostituzione sul posto".
 2. **The package is the release tarball.** `package.json` names
    `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
    (first `v3.3.9`), and the SHA-256 of `manifest.json` is recorded in
-   `docs/verification/` and appears as the lockfile's `integrity`. Never a
+   `docs/verification/`; the lockfile's `integrity` is npm's sha512 of the same
+   tarball. Never a
    `file:` path to a checkout, and never a git dependency that runs `prepare`
    (AGENTS.md, "Nothing is compiled on this machine").
 
@@ -102,18 +103,22 @@ owner chose "sostituzione sul posto".
    removed with this record: it needs the Imago package the window no longer
    uses. Sigrid's `sigrid-check` reads files and builds nothing; its launcher
    and the bundled tool it starts import only Node's own modules, and both ship
-   in the release package, so it needs no dependency beyond Sigrid itself. It
-   cannot run on `develop` yet, because the package is not installed there.
-   Until it is, no CI step checks the design rules. Once the package is
-   installed the step is `npx --no sigrid-check apps/desktop/src`, run from the
-   folder whose `package.json` lists Sigrid; it needs a decision on whether to
-   gate on it (it exits 1 on a finding) and a `sigrid-check.config.json` for
-   any accepted exception.
+   in the release package, so it needs no dependency beyond Sigrid itself.
+   *Amended on 2026-11-23 (the final review of plan R0): CI installs the
+   package (`npm ci`), so the desktop job of the Tests workflow runs it, in the
+   step "Design rules (Sigrid)" after the frontend build: `npx --no
+   sigrid-check apps/desktop/src`, from the repository root, whose
+   `package.json` lists Sigrid. The step does not block (`continue-on-error`)
+   until its first output has been read; then the owner decides whether it
+   gates (it exits 1 on a finding) and which exceptions, if any, go in a
+   `sigrid-check.config.json`.*
 
 ## What is lost
 
 - The ONI look and the Smooth/ONI setting. Settings → Appearance will offer
   the theme (System, Light, Dark), as today, and Sigrid's density.
+- The translucent ground over the acrylic: the page paints Sigrid's opaque
+  ground, so the Windows 11 material of `imago-shell` no longer shows through.
 - Imago's design file as the reference for the window, and `imago-check`
   together with what it compared: the Imago rules, the equality of the npm and
   Rust pins, the app icons against the package.
@@ -142,8 +147,21 @@ owner chose "sostituzione sul posto".
   the window in that time.
 - **`develop` is not merged into `main` meanwhile**: every merge into `main` is
   a release (AGENTS.md, "Git"), and it would ship a window without Sync.
-- Muro's colour (hue 170) becomes a Sigrid theme; the accent of the window is
-  what that theme computes.
+- Muro's colour (hue 170) becomes a Sigrid theme; the accent is Muro's own
+  (oklch 0.82/0.47, C 0.12/0.13, h 170), put over `colorTheme`'s
+  (`apps/desktop/src/sigridTheme.ts`).
+- The graph entry, `@acaprino/sigrid/graph`, is read from Sigrid's source, not
+  its bundle: an alias in `apps/desktop/vite.config.ts` points it at
+  `src/graph.ts` of the package, because the 3.3.9 `dist/graph.js` inlines
+  the React Compiler runtime with a CommonJS `__require("react")` that the
+  dev server cannot run in a browser. Its types still come from
+  `dist/graph.d.ts`. The source brings copies of its own: the build has two
+  `motion-impl` chunks, and the graph's tooltips read the source's own
+  `PortalContainer` and mount on `<body>`, not in the overlay layer of
+  `AppShell` under the title bar (a `WordsProvider` above the window would not
+  reach the canvas either). The alias needs `src/graph.ts` and the `src` folder
+  in the package (the `@source` lines of `styles.css` need that folder too). It
+  goes when Sigrid's graph bundle no longer requires `react` that way.
 - Dependencies change in `package.json` and its lockfile. The lockfile cannot
   be regenerated on this machine, which installs nothing: the first CI run
   after the change says what is missing.
@@ -159,7 +177,9 @@ workspace, against the fake service, including a graph of 37 capabilities in 15 
 
 Not verified: the window in Tauri with the real registry (the first run of the desktop with this front-end has not happened); that
 `imago-shell` works with a page that mounts Imago's window glue on Sigrid's title bar (the overlay of Snap Layouts, the caption
-buttons); the project file of the owner opened in this window; `sigrid-check` (it is not run by any CI step yet). Seen on the CI
-screenshots: with 15 closed entries the graph is a narrow column whose names are drawn at about 8 px (scale 0.59), and with two
-entries the canvas leaves a node cut at its right edge; both are asked of Sigrid, which also cannot draw an edge's kind or number
-several marked things (see the plan R0 report).
+buttons); the project file of the owner opened in this window; `sigrid-check` (a non-blocking CI step runs it since the final review
+of plan R0, and its first output has not been read yet). Seen on the CI screenshots: with 15 closed entries the graph is a narrow
+column whose names are drawn at about 8 px (scale 0.59), and with two entries the canvas leaves a node cut at its right edge; both
+are asked of Sigrid, which also cannot draw an edge's kind or number several marked things (see the plan R0 report). Since the
+final review a closed entry has no second line, which makes that column shorter; the scale it is drawn at now is in the CI log,
+and the browser test only holds it at 0.5 or more.

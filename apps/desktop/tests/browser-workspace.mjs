@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { open } from './browser-helper.mjs';
+import { ODD_INTENT, ODD_OUTPUT, ODD_TASK, ODD_TITLE } from './fake-transport.js';
 
 const shots = 'apps/desktop/tests/artifacts';
 await mkdir(shots, { recursive: true });
@@ -51,6 +52,15 @@ const sideways = page => page.evaluate(() => {
   return Math.max(document.documentElement.scrollWidth - window.innerWidth, main ? main.scrollWidth - main.clientWidth : 0);
 });
 const frames = page => page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+/** Waits until the thing `id` is drawn whole inside the visible box of the canvas. */
+const inSight = (page, id) => page.waitForFunction(id => {
+  const n = [...document.querySelectorAll('[data-slot="graph-node"]')].find(e => e.getAttribute('data-node-id') === id), tree = n?.closest('[role=tree]');
+  if (!n || !tree) return false;
+  const box = n.getBoundingClientRect(), view = tree.getBoundingClientRect();
+  return box.width > 0 && box.left >= view.left - 0.5 && box.right <= view.right + 0.5 && box.top >= view.top - 0.5 && box.bottom <= view.bottom + 0.5;
+}, id);
+/** The bar of the window: the title bar with its three buttons. */
+const frameButtons = page => page.locator('[data-slot="title-bar"] [data-slot="window-controls"] button');
 /** Every control and field of the window that has no name. */
 const unnamed = page => page.evaluate(() => [...document.querySelectorAll('button, [role=switch], [role=tab], [role=treeitem], textarea, input:not([type=hidden])')].filter(e => {
   const by = e.getAttribute('aria-labelledby');
@@ -139,7 +149,7 @@ await test('the graph opens with every entry closed, each saying how many it hid
   assert.match(await inspector(page).textContent(), /Produces\s*design-brief/);
 });
 
-await test('a graph the size of Marionette (37 capabilities, 15 entries): every entry closed, uncut and in sight at first (its scale is logged); an example opens the entries of its steps and numbers them', 'projects', {}, async app => {
+await test('a graph the size of Marionette (37 capabilities, 15 entries): every entry closed, uncut and in sight at first (its scale is logged, and not under 0.5); an example opens the entries of its steps, numbers them and brings them in sight', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ bigGraph: true });
   await openMarionette(page);
@@ -157,9 +167,12 @@ await test('a graph the size of Marionette (37 capabilities, 15 entries): every 
     assert.equal(e.clipped, false, `${e.name}: its name is not cut`);
     assert.equal(e.inside, true, `${e.name}: in sight inside the canvas`);
   }
-  // How large the first view draws a thing: Sigrid fits the whole graph (15 entries in one rank, never above 1). Logged, not asserted: the app cannot choose the fit.
+  // How large the first view draws a thing: Sigrid fits the whole graph (15 entries in one rank, never above 1), and a closed entry is its name alone (graphScene.ts),
+  // so the column is as short as the app can make it. The app cannot choose the fit: legibility at 15 entries (a smallest fit with scrolling, or the roots in several
+  // columns) is an open request to Sigrid, not solved here. The floor only catches a regression: the review measured 0.59 when closed entries still had a second line.
   const scale = await page.locator('[data-slot="graph-node"]').first().evaluate(n => n.getBoundingClientRect().width / 208);
   console.log(`bigGraph, first view at 1512x982: scale ${scale.toFixed(2)}, a 14px name drawn at ${(14 * scale).toFixed(1)}px`);
+  assert.ok(scale >= 0.5, `the first view is drawn at ${scale.toFixed(2)}, under 0.5`);
   await page.screenshot({ path: shots + '/workspace-graph-large.png' });
   const long = 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30);
   await row(page, 'Two of many').click();
@@ -168,7 +181,9 @@ await test('a graph the size of Marionette (37 capabilities, 15 entries): every 
   await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph-node"][aria-expanded="true"]').length === 2);
   assert.equal(await node(page, 'entry:5:marionette-group-6').getAttribute('aria-expanded'), 'true', 'the entry of step 1 is open');
   assert.equal(await node(page, 'entry:6:marionette-group-7').getAttribute('aria-expanded'), 'true', 'the entry of step 2 is open');
-  await canvas(page).getByRole('button', { name: 'Fit the view' }).click();
+  // No press on "Fit the view": a new light makes the canvas again, fitted to what is now open (Workspace.tsx), so the numbered steps are in sight by themselves.
+  await inSight(page, `cap:${long}`);
+  await inSight(page, 'cap:capability-37-design-system');
   await node(page, `cap:${long}`).getByText('step 1', { exact: true }).waitFor();
   await node(page, 'cap:capability-37-design-system').getByText('step 2', { exact: true }).waitFor();
   assert.ok(await sideways(page) <= 0, 'nothing widens the page');
@@ -307,6 +322,96 @@ await test('Records and Runs are the read-only views of the harmonization', 'pro
   for (const fact of ['0.5.0', 'current', 'marionette-v0.5.0', 'Moved taste-skill to v1.2.0.', 'Built and validated', '$2.00', 'Claude Code']) assert.ok(newest.includes(fact), `the newest run says ${fact}`);
   assert.match(await runs.nth(1).textContent(), /0\.4\.0.*First harmonization\..*Budget\s*—.*Engine\s*—/);
   await page.screenshot({ path: shots + '/workspace-runs.png' });
+});
+
+await test('the project names its file, with Open folder, and its repository, author and creation date; a shell that cannot open folders loses the button for the session', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  const head = page.locator('main header').first();
+  await head.getByText('Repository github.com/acaprino/marionette · main · by acaprino · created 2026-11-10', { exact: true }).waitFor();
+  await head.getByText('D:/Muro/data/projects/marionette.mp', { exact: true }).waitFor();
+  const folder = head.getByRole('button', { name: 'Open folder', exact: true });
+  assert.equal(await folder.getAttribute('data-variant'), 'outline', 'not the solid action of the window');
+  await folder.click();
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'open_folder'));
+  assert.deepEqual((await callsOf(app, 'open_folder')).map(c => c.payload), [{ path: 'D:/Muro/data/projects/marionette.mp' }]);
+  await app.flags({ noShellActions: true });
+  await folder.click();
+  await notice(page, 'This version of Muro cannot open folders yet.').waitFor();
+  await folder.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
+  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Open folder', exact: true }).count(), 0, 'gone for the session, not only for this page');
+});
+
+// ---------- what a project file may hold ----------
+await test('a project with no capability says so where the graph would be and in its examples, and nothing fails', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ emptyGraph: true });
+  await openMarionette(page);
+  await graphPane(page).getByText('No decision graph', { exact: true }).waitFor();
+  await graphPane(page).getByText('This project\'s plugin has no capabilities to choose between, so there is nothing to draw or to simulate.', { exact: true }).waitFor();
+  assert.match(await graphPane(page).textContent(), /0 entries · 0 capabilities/);
+  assert.equal(await canvas(page).count(), 0, 'no canvas to draw nothing on');
+  await panelOf(page).getByText('No decision graph', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('textbox', { name: 'Request to simulate' }).count(), 0, 'nothing to simulate');
+  assert.equal(await frameButtons(page).count(), 3, 'the frame is whole');
+});
+
+await test('capabilities that no entry groups are all on the graph, each one reachable, and an example still numbers its steps', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ noEntries: true });
+  await openMarionette(page);
+  await graphPane(page).getByText('No entry groups these capabilities: each stands on its own.', { exact: true }).waitFor();
+  await canvas(page).waitFor();
+  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph-node"][data-node-id^="cap:"]').length === 4);
+  assert.equal(await page.locator('[data-slot="graph-node"][data-node-id^="entry:"]').count(), 0);
+  for (const id of ['design-taste', 'design-review', 'office-docs', 'office-pdf']) {
+    await inSight(page, `cap:${id}`);
+    await node(page, `cap:${id}`).click();
+    await inspector(page).getByRole('heading', { name: id, level: 3 }).waitFor();
+  }
+  await row(page, 'A landing page').click();
+  await node(page, 'cap:design-taste').getByText('step 1', { exact: true }).waitFor();
+  await node(page, 'cap:design-review').getByText('step 2', { exact: true }).waitFor();
+});
+
+await test('two examples with one title are two rows, each chosen on its own; a title, an intent and an output with <, & and quotes are text, not markup', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ oddNames: true });
+  await openMarionette(page);
+  const letters = row(page, 'A letter');
+  assert.equal(await letters.count(), 2);
+  await letters.nth(1).click();
+  await inspector(page).getByText('“Write a second letter”', { exact: true }).waitFor();
+  assert.deepEqual([await letters.nth(0).getAttribute('aria-current'), await letters.nth(1).getAttribute('aria-current')], [null, 'true'], 'the second one, not the first');
+  await node(page, 'cap:office-docs').getByText('step 1', { exact: true }).waitFor();
+  await letters.nth(0).click();
+  await inspector(page).getByText('“Write a letter as a Word file”', { exact: true }).waitFor();
+  assert.deepEqual([await letters.nth(0).getAttribute('aria-current'), await letters.nth(1).getAttribute('aria-current')], ['true', null]);
+  await node(page, 'cap:office-docs').getByText('step 2', { exact: true }).waitFor();
+  const odd = row(page, ODD_TITLE);
+  assert.deepEqual(await texts(odd.locator('[data-slot="item-row-description"] > span')), [ODD_TASK, `Intent ${ODD_INTENT}`, `Output ${ODD_OUTPUT}`]);
+  await odd.click();
+  await inspector(page).getByRole('heading', { name: ODD_TITLE, level: 3 }).waitFor();
+  await inspector(page).getByText(ODD_INTENT, { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('main b, main i, main u')].filter(e => /Odd|PDF|pdf|file/.test(e.textContent)).length), 0, 'what the file says is text, not markup');
+  await graphPane(page).getByText(`The steps of “${ODD_TITLE}” are numbered on the graph.`, { exact: true }).waitFor();
+});
+
+await test('a record or a run holding an object where the file should hold text is shown as text, and the window stays whole', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ objectFields: true });
+  await openMarionette(page);
+  await segment(page, 'Records').click();
+  const records = page.getByRole('list', { name: 'Decision records' });
+  assert.deepEqual(await texts(records.locator(':scope > li p')), ['{"en":"One owner per output."}', 'Documents keep the source\'s limits.']);
+  await segment(page, 'Runs').click();
+  assert.match(await page.getByRole('list', { name: 'Runs' }).locator(':scope > li').first().textContent(), /\{"en":"Moved taste-skill to v1\.2\.0\."\}/);
+  assert.equal(await frameButtons(page).count(), 3, 'the title bar and its three buttons are there');
+  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  assert.equal(await page.getByText('This page could not be shown').count(), 0, 'the page itself did not fail');
 });
 
 // ---------- what the session keeps ----------

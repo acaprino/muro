@@ -20,3 +20,5 @@ export function at(iso: string): string {
 export const day = (iso: string): string => /^\d{4}-\d{2}-\d{2}/.exec(iso)?.[0] ?? iso;
 /** The words of an error, whatever was thrown. */
 export const message = (e: unknown): string => String(e instanceof Error ? e.message : e);
+/** A request only the shell answers (a file dialog, a folder), refused by a shell that does not know it yet: the service says "Unknown ... action: <name>". */
+export const unknownTo = (e: unknown, action: string): boolean => /unknown/i.test(message(e)) && message(e).includes(action);

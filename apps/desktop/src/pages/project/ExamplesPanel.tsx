@@ -1,35 +1,22 @@
 import * as React from 'react';
 import { Badge, Button, Count, Empty, FormField, Icon, ItemList, ItemRow, Textarea } from '@acaprino/sigrid';
-import { engineOf, harnessNames } from '../../model.ts';
-import type { Engine } from '../../model.ts';
+import { engineOf } from '../../model.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
 import { useNotify } from '../../state/notices.tsx';
 import { noteTold, tellNote } from '../../state/project.ts';
-import { message, money, plural, took } from '../../words.ts';
+import { message, plural } from '../../words.ts';
 import { outputsOf, readAnswer } from './graph-model.ts';
-import type { Outcome, Who } from './graph-model.ts';
+import type { Outcome } from './graph-model.ts';
 import { Heading, StepList } from './Details.tsx';
 import type { ProjectData } from './data.ts';
+import { asking, noteText, whoLine } from './lines.ts';
 
 /** The examples panel: a request to simulate, and the project's documented examples. What lights the graph is one of three things, and the page decides none of them:
  * a documented example (its own decision, resolved by the factory: no call), the AI's decision for a free-text request (`simulate {id, task, run}`, validated by the
  * factory with the runtime's rules, stopped with `cancel_simulation {run}`), or the reason there is none. Nothing is matched by words. */
 
-// ---------- the engine, in the words of the interface ----------
-const asking = (e: Engine): string => e.api ? e.model || 'the API' : harnessNames[e.harness] || e.harness;
-/** What the first free-text request will use and may cost. Documented examples run no AI. */
-export function noteText(e: Engine): string {
-  if (e.api) return `Free-text requests are sent to ${e.model || 'the model set in Settings'} through ${e.base || 'the endpoint set in Settings'} and billed by your API provider. Documented examples run no AI.`;
-  const name = harnessNames[e.harness] || e.harness;
-  const cost = e.harness === 'codex' ? ` Muro sets no budget for ${name}.` : e.budget !== null ? ` Each costs up to ${money(e.budget)} a request.` : '';
-  return `Free-text requests use ${name} on this computer, with its own credentials.${cost} Documented examples run no AI.`;
-}
-function whoLine(w: Who | null): string {
-  if (!w) return '';
-  const name = w.engine === 'api' ? w.model || 'the API' : harnessNames[w.harness ?? ''] || w.harness || w.engine;
-  return [`Asked ${name}`, w.cost_usd !== null ? money(w.cost_usd) : '', w.duration_ms !== null ? took(w.duration_ms) : ''].filter(Boolean).join(' · ');
-}
+// The engine in the words of the interface (what a free-text request uses and may cost, who answered it) is lines.ts, pure, so its branches are tested under Node.
 /** A name for a run, as the runtime lets one be named (letters, digits, `-` and `_`, 64 at most): unique, so a run left over from an earlier page is never taken for this one. */
 const newRun = (): string => globalThis.crypto?.randomUUID?.() ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ProjectInfo } from '../src/types.ts';
 import { capsOf, entriesOf, examplesOf, outcomeOfExample, litOf } from '../src/pages/project/graph-model.ts';
-import { graphScene, capNodeId, capabilityOf } from '../src/pages/project/graphScene.ts';
+import { graphScene, capNodeId, capabilityOf, drawnNodes } from '../src/pages/project/graphScene.ts';
 import type { Scene } from '../src/pages/project/graphScene.ts';
 import { createTransport } from './fake-transport.js';
 
@@ -35,7 +35,7 @@ const info = (graphOver: Record<string, unknown> = {}): ProjectInfo => ({
   graph: { entries: ENTRIES, capabilities: CAPS, examples: EXAMPLES, ...graphOver }, files: [], digest: 'sha256:a',
 } as unknown as ProjectInfo);
 
-const sceneOf = (lit: Map<string, number[]> = new Map(), held = info(), slug = 'marionette') => graphScene(entriesOf(held), capsOf(held), slug, lit);
+const sceneOf = (lit: Map<string, number[]> = new Map(), held = info(), slug = 'marionette', reached: string[] = []) => graphScene(entriesOf(held), capsOf(held), slug, lit, reached);
 /** A thing by its label (labels are unique in these fixtures). */
 const thing = (scene: Scene, label: string) => {
   const found = scene.nodes.find(n => n.label === label);
@@ -54,9 +54,13 @@ test('one thing per entry and one per capability, entries first, every id its ow
   assert.equal(new Set(scene.nodes.map(n => n.id)).size, 7);
 });
 
-test('an entry says its "Use when" first sentence under its name, and a capability says nothing until a step lights it', () => {
+test('a closed entry is its name alone; its "Use when" first sentence is kept, and is its second line once it is open; a capability says nothing until a step lights it', () => {
   const scene = sceneOf();
-  assert.equal(thing(scene, 'design').detail, 'Use when designing', 'a description with no full stop is taken whole');
+  assert.equal(thing(scene, 'design').about, 'Use when designing', 'a description with no full stop is taken whole');
+  assert.equal('detail' in thing(scene, 'design'), false, 'closed: no second line, so a column of closed entries is drawn larger');
+  const opened = sceneOf(litOf(outcomeOfExample(examplesOf(info())[0])));
+  assert.equal(thing(opened, 'design').detail, 'Use when designing', 'open, the entry says it under its name');
+  assert.equal('detail' in thing(opened, 'office'), false, 'the entry left closed does not');
   const held = info({ entries: [
     { name: 'marionette-a', description: 'Use when designing pages. Also for decks and notes.', capabilities: [] },
     { name: 'marionette-b', description: 'Use when\n  making files (e.g. a letter). Not for code!', capabilities: [] },
@@ -64,9 +68,24 @@ test('an entry says its "Use when" first sentence under its name, and a capabili
     { name: 'marionette-d', description: '   ', capabilities: [] },
   ] });
   const entries = entriesOfScene(sceneOf(new Map(), held));
-  assert.deepEqual(entries.map(n => n.detail), ['Use when designing pages.', 'Use when making files (e.g. a letter).', 'Is it a page?', undefined]);
-  assert.equal('detail' in entries[3], false, 'no empty second line');
+  assert.deepEqual(entries.map(n => n.about), ['Use when designing pages.', 'Use when making files (e.g. a letter).', 'Is it a page?', undefined]);
+  assert.equal('about' in entries[3], false, 'no empty sentence');
+  assert.ok(entries.every(n => !('detail' in n)), 'all closed, none has a second line');
+  assert.deepEqual(drawnNodes(sceneOf(new Map(), held), []).filter(n => n.kind === 'entry').map(n => n.detail), ['Use when designing pages.', 'Use when making files (e.g. a letter).', 'Is it a page?', undefined], 'opened, each says its sentence');
   assert.ok(capabilitiesOfScene(scene).every(n => n.detail === undefined));
+});
+
+test('the things as the canvas draws them: an entry the person opens gets its second line, one the person closes loses it, and a capability is as the scene made it', () => {
+  const scene = sceneOf(), design = thing(scene, 'design').id, office = thing(scene, 'office').id;
+  const drawn = drawnNodes(scene, [office]), byId = (id: string) => drawn.find(n => n.id === id)!;
+  assert.equal(byId(design).detail, 'Use when designing', 'opened by hand');
+  assert.equal('detail' in byId(office), false);
+  assert.equal(byId(design).about, 'Use when designing', 'the sentence stays with the entry');
+  const lit = sceneOf(new Map([['design-taste', [1]]]));
+  assert.equal(thing(lit, 'design').detail, 'Use when designing');
+  assert.equal('detail' in drawnNodes(lit, [design, office]).find(n => n.id === design)!, false, 'closed by hand, it is its name alone');
+  assert.deepEqual(drawnNodes(lit, []).filter(n => n.kind === 'capability'), capabilitiesOfScene(lit), 'the capabilities, with their steps, untouched');
+  assert.deepEqual(drawnNodes(scene, scene.closed), scene.nodes, 'with the scene\'s own closed entries, the things are the scene\'s');
 });
 
 test('prefix shortening affects only entry labels, never identity or an unrelated name', () => {
@@ -89,7 +108,7 @@ test('a repeated capability id is one thing, the first one decides, and an id th
 });
 
 test('a project with no capability and no entry is an empty scene, and nothing throws', () => {
-  assert.deepEqual(sceneOf(new Map(), info({ capabilities: [], entries: [], examples: [] })), { nodes: [], edges: [], closed: [] });
+  assert.deepEqual(sceneOf(new Map(), info({ capabilities: [], entries: [], examples: [] })), { nodes: [], edges: [], drawn: [], closed: [] });
   const noEntry = sceneOf(new Map(), info({ entries: [] }));
   assert.equal(noEntry.nodes.length, 5);
   assert.deepEqual(noEntry.closed, []);
@@ -128,6 +147,15 @@ test('an example with no match lights nothing, and a step that names a capabilit
   assert.ok(lost.nodes.every(n => n.steps === undefined));
 });
 
+test('the capabilities an input went to open the entries that hold them, unnumbered, and no other entry; one the graph lacks opens nothing', () => {
+  const scene = sceneOf(new Map(), info(), 'marionette', ['office-docs']);
+  assert.deepEqual(scene.closed, [thing(scene, 'design').id]);
+  assert.equal(thing(scene, 'office').detail, 'Use when making files', 'open, it says its sentence');
+  assert.ok(capabilitiesOfScene(scene).every(n => n.steps === undefined), 'reached is not lit: nothing is numbered');
+  assert.equal(sceneOf(new Map(), info(), 'marionette', ['gone']).closed.length, 2);
+  assert.deepEqual(sceneOf(new Map([['design-taste', [1]]]), info(), 'marionette', ['office-pdf']).closed, [], 'what is lit and what is reached both open their entries');
+});
+
 test('a capability run twice carries both numbers, said in words', () => {
   const twice = sceneOf(new Map([['design-taste', [1, 3]], ['office-docs', [1, 2, 4]]]));
   assert.deepEqual(thing(twice, 'design-taste').steps, [1, 3]);
@@ -144,9 +172,10 @@ test('the steps a scene carries are its own copy: changing them changes nothing 
 });
 
 // ---------- lines ----------
-test('each entry has a line to the capabilities it lists, and nothing else lists them', () => {
+test('each entry has a line to the capabilities it lists, and nothing else lists them; those are the lines the canvas draws', () => {
   const scene = sceneOf(), members = scene.edges.filter(e => e.kind === 'member');
   assert.equal(members.length, 5);
+  assert.deepEqual(scene.drawn, members, 'the canvas draws every line the same: the relations between capabilities are said in the details, not drawn');
   assert.deepEqual(members.filter(e => e.from === thing(scene, 'design').id).map(e => e.to), [capNodeId('design-taste'), capNodeId('design-review')]);
   assert.deepEqual(members.filter(e => e.from === thing(scene, 'office').id).map(e => e.to), [capNodeId('office-docs'), capNodeId('office-pdf'), capNodeId('office-fonts')]);
 });
@@ -233,6 +262,8 @@ test('37 capabilities in 15 entries are 52 things with every entry closed, and t
   const entryIds = new Set(entriesOfScene(scene).map(n => n.id));
   assert.ok(scene.closed.every(id => entryIds.has(id)));
   assert.equal(scene.edges.filter(e => e.kind === 'member').length, 37, 'every capability hangs from the one entry that lists it');
+  assert.equal(scene.drawn.length, 37, 'and those are the lines drawn');
+  assert.ok(entriesOfScene(scene).every(n => !('detail' in n)), 'the first view: fifteen closed entries, each its name alone');
   assert.ok(scene.edges.some(e => e.kind === 'needs'));
   assert.ok(scene.edges.some(e => e.kind === 'conflicts'));
   const pairs = scene.edges.map(e => e.from + '>' + e.to);
