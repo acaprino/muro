@@ -59,12 +59,13 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const litKey = input ? `input:${input.id}` : pairs === '[]' ? '' : `steps:${pairs}`;
   // The entries are closed until opened. A new light opens the entries that hold what it lights and closes the others, and the canvas is made again (`fit` is its key):
   // Sigrid's canvas fits the view to what is open when it is made and has no prop that fits it again, so a lit step in an entry just opened is never out of sight.
-  // When the light goes, what is open stays open and the view stays where it is.
+  // When the light goes, what is open stays open, and the canvas is made again too: Sigrid's canvas does not redraw a node whose text changed while the
+  // set of open entries did not, so a step number would stay on a node after its example was put out.
   const [canvas, setCanvas] = React.useState({ key: litKey, collapsed: scene.closed, fit: 0 });
   let collapsed = canvas.collapsed, fit = canvas.fit;
   if (canvas.key !== litKey) {
     collapsed = litKey ? scene.closed : canvas.collapsed;
-    fit = litKey ? canvas.fit + 1 : canvas.fit;
+    fit = canvas.fit + 1;
     setCanvas({ key: litKey, collapsed, fit });
   }
   // A capability chosen from the details (a step, a branch, what an input went to) may sit in a closed entry: its entry opens, so the canvas shows what the inspector shows.

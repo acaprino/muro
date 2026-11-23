@@ -16,8 +16,8 @@ export const THEME_LABELS: Readonly<Record<ThemeChoice, string>> = { system: 'Fo
 /** Muro's hue on the OKLCH wheel, the one Imago gave the app ("One accent per app" of Imago's design file). */
 export const MURO_HUE = 170;
 /**
- * Muro's accent in each scheme as OKLCH lightness, chroma and hue: the accent Imago computed from the hue, dark
- * `oklch(0.82 0.12 170)` and light `oklch(0.47 0.13 170)`, kept through the move to Sigrid (plan R0).
+ * Muro's accent in each scheme as OKLCH lightness, chroma and hue: the accent Imago computed from the hue (dark 0.82 0.12, light 0.47 0.13,
+ * hue 170), kept through the move to Sigrid (plan R0). The values are the numbers below, not a colour function.
  */
 export const MURO_ACCENT: Readonly<Record<Scheme, { readonly L: number; readonly C: number; readonly h: number }>> = {
   dark: { L: 0.82, C: 0.12, h: MURO_HUE },
