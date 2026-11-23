@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const files = ['browser-shell.mjs', 'browser-workspace.mjs', 'browser-write-ai.mjs', 'browser-write-edit.mjs', 'browser-write-new.mjs'];
+const files = ['browser-shell.mjs', 'browser-sync.mjs', 'browser-sync-dialogs.mjs', 'browser-sync-harness.mjs', 'browser-workspace.mjs', 'browser-write-ai.mjs', 'browser-write-edit.mjs', 'browser-write-new.mjs'];
 const failed = [];
 for (const file of files) {
   console.log(`--- ${file}`);

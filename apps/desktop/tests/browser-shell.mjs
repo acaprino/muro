@@ -79,9 +79,8 @@ await test('the window opens on Sync; the four tabs are in the title bar in orde
   assert.deepEqual(await texts(titleBar(page).locator('[data-slot="toolbar-tab"]')), PAGES, 'at 1512px the tabs are in the bar');
   assert.deepEqual(await texts(currentTab(page)), ['Sync'], 'the window opens on Sync');
   assert.equal(await content(page).getAttribute('aria-label'), 'Sync');
-  await content(page).getByText('Sync is moving to the new window').waitFor();
   await page.screenshot({ path: shots + '/shell-sync.png' });
-  for (const name of ['Activity', 'Settings', 'Sync']) {
+  for (const name of ['Activity', 'Settings']) {
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name], `${name} is the current tab`);
     assert.equal(await content(page).getAttribute('aria-label'), name, 'the content is named after the page');
@@ -89,6 +88,9 @@ await test('the window opens on Sync; the four tabs are in the title bar in orde
     assert.equal(await content(page).getByText(/is moving to the new window/).count(), 1, 'one page at a time');
   }
   await content(page).getByText('the background worker goes on checking your registry; with automatic sync on it also applies the changes').waitFor();
+  await tab(page, 'Sync').click();
+  assert.deepEqual(await texts(currentTab(page)), ['Sync'], 'Sync is a page of its own now (browser-sync.mjs tests it)');
+  assert.equal(await content(page).getByText(/is moving to the new window/).count(), 0, 'and no longer says it is moving');
 });
 
 await test('the title bar names the product and its buttons: the palette, and the three window buttons at its end', 'default', {}, async app => {
@@ -171,7 +173,7 @@ await test('the palette opens with Ctrl+K and from the bar; it goes to a page, a
   await page.keyboard.press('Control+k');
   await options(page).first().waitFor();
   assert.deepEqual(await texts(options(page)), ['Check now', ...PAGES, 'Light theme', 'Dark theme'], 'Follow Windows is the choice in use: the two others are offered');
-  assert.equal(await options(page).filter({ hasText: 'Check now' }).getAttribute('aria-disabled'), 'true', 'Check now comes back with the Sync page');
+  assert.notEqual(await options(page).filter({ hasText: 'Check now' }).getAttribute('aria-disabled'), 'true', 'Check now works since the Sync page is there');
   await page.screenshot({ path: shots + '/shell-palette.png' });
   await options(page).filter({ hasText: 'Light theme' }).click();
   await palette(page).waitFor({ state: 'detached' });
