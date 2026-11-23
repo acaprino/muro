@@ -28,6 +28,10 @@ class ChildError(RuntimeError):
     """A child server could not start, refused a call, stopped, or did not answer in time."""
 
 
+class ChildTimeout(ChildError):
+    """A child server did not answer within the time a caller allowed."""
+
+
 def kill_tree(process: subprocess.Popen) -> None:
     """Kill `process` and what it started; on POSIX it must have been started in its own session."""
     if sys.platform == "win32":
@@ -58,18 +62,21 @@ class ChildServer:
         # On POSIX poll() lags behind an exit while the watcher waits; _stopped is set before a caller sees the error.
         return self._process is not None and not self._stopped and self._process.poll() is None
 
-    def start(self) -> None:
+    def start(self, timeout: float | None = None) -> None:
         command = self._launch["command"]
-        try:
-            self._process = subprocess.Popen(
-                [command, *self._launch["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                text=True, encoding="utf-8", errors="replace", cwd=self._cwd,
-                env={**os.environ, **self._launch["env"]}, start_new_session=True)  # ignored on Windows
-        except FileNotFoundError:
-            raise ChildError(f"{self.name}: program not found: {command}") from None
-        except OSError as exc:
-            raise ChildError(f"{self.name}: cannot start {command}: {exc}") from None
-        self._stopped = False
+        with self._lock:  # a close() comes before the process, which then never starts, or after it, and stops it
+            if self._closed:
+                raise ChildError(f"{self.name}: the server stopped")
+            try:
+                self._process = subprocess.Popen(
+                    [command, *self._launch["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    text=True, encoding="utf-8", errors="replace", cwd=self._cwd,
+                    env={**os.environ, **self._launch["env"]}, start_new_session=True)  # ignored on Windows
+            except FileNotFoundError:
+                raise ChildError(f"{self.name}: program not found: {command}") from None
+            except OSError as exc:
+                raise ChildError(f"{self.name}: cannot start {command}: {exc}") from None
+            self._stopped = False
         self._reader = threading.Thread(target=self._read, args=(self._process.stdout,), daemon=True)
         self._reader.start()
         # A grandchild that keeps the output pipe open would hide the child's exit from the reader.
@@ -77,7 +84,7 @@ class ChildServer:
         try:
             self._request("initialize", {
                 "protocolVersion": PROTOCOL_VERSION, "capabilities": {},
-                "clientInfo": {"name": "muro-package-server", "version": __version__}})
+                "clientInfo": {"name": "muro-package-server", "version": __version__}}, timeout=timeout)
             # A child that already stopped is reported by the first call, not here.
             with contextlib.suppress(ChildError):
                 self._send({"jsonrpc": "2.0", "method": "notifications/initialized"})
@@ -85,12 +92,13 @@ class ChildServer:
             self.close()
             raise
 
-    def tools(self) -> list[dict[str, Any]]:
+    def tools(self, timeout: float | None = None) -> list[dict[str, Any]]:
         if self._tools is None:
             tools: list[dict[str, Any]] = []
             params: dict[str, Any] = {}
             while True:
-                page = self._request("tools/list", params)
+                # shortcut: each page gets the whole timeout, upgrade if a child pages its list slowly
+                page = self._request("tools/list", params, timeout=timeout)
                 tools += page.get("tools", [])
                 if not page.get("nextCursor"):
                     break
@@ -115,10 +123,11 @@ class ChildServer:
                             "params": {"requestId": msg_id}})
 
     def close(self) -> None:
-        process = self._process
-        if process is None or self._closed:
+        with self._lock:
+            process, was_closed = self._process, self._closed
+            self._closed = True
+        if process is None or was_closed:
             return
-        self._closed = True
         # A write blocked on a child that reads nothing holds this lock and the stream's own: closing
         # stdin would wait behind it, so a busy child is killed first and stdin is closed afterwards.
         idle = self._write_lock.acquire(blocking=False)
@@ -155,7 +164,7 @@ class ChildServer:
             try:
                 reply = waiter.get(timeout=timeout)
             except queue.Empty:
-                raise ChildError(f"{self.name}: no answer after {timeout:g} seconds") from None
+                raise ChildTimeout(f"{self.name}: no answer after {timeout:g} seconds") from None
         finally:
             with self._lock:
                 self._waiters.pop(msg_id, None)
@@ -171,6 +180,7 @@ class ChildServer:
         try:
             write_message(message, self._process.stdin, self._write_lock)
         except (OSError, ValueError):  # the pipe is broken or already closed
+            self._stop()  # so `alive` is false when the caller sees the error
             raise ChildError(f"{self.name}: the server stopped") from None
 
     def _read(self, stdout) -> None:

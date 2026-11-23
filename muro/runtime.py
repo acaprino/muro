@@ -16,7 +16,8 @@ from typing import Any
 import uuid
 
 from .core import CHECK_STATUSES, parse_capability, parse_router, validate_capabilities_and_router
-from .delivery import allows_empty_catalog, load_delivery, validate_delivery, unregistered_active_hooks
+from .delivery import (PACKAGE_SERVER_ACTION, allows_empty_catalog, load_delivery, validate_delivery,
+                       unregistered_active_hooks)
 from .entries import load_entries
 from .routing import (
     catalog_entries,
@@ -953,7 +954,7 @@ def runtime_main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     parser.add_argument("action", choices=("plan", "resume", "record", "check", "complete", "step", "unlock",
-                                           "session-context"))
+                                           "session-context", PACKAGE_SERVER_ACTION))
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--project", type=Path, default=Path.cwd())
     parser.add_argument("--task", default="")
@@ -985,6 +986,9 @@ def runtime_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hook-event", choices=("SessionStart", "SubagentStart"),
                         help="session-context: emit Codex's JSON context envelope for this hook event")
     args = parser.parse_args(argv)
+    if args.action == PACKAGE_SERVER_ACTION:
+        from .package_server import serve
+        return serve(args.package)  # before any catalog is loaded: the server reads only its own file
     if args.hook_event and args.action != "session-context":
         parser.error("--hook-event requires session-context")
     if args.action == "session-context":

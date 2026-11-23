@@ -1,13 +1,10 @@
 """A client that runs an absorbed MCP server as a child process (ADR-0030).
 
-The child here is a stub written into `tmp_path`: it speaks only what the tests need and
-names no real server. Every wait on a child is bounded: a watchdog closes a child that is
-still running after `WATCHDOG` seconds, which turns a hung test into a failure.
+The child is the stub of `mcp_stub`: it speaks only what the tests need and names no real server.
+Every wait on a child is bounded: a watchdog closes a child that is still running after `WATCHDOG`
+seconds, which turns a hung test into a failure.
 """
-import contextlib
 import json
-import os
-import signal
 import subprocess
 import sys
 import threading
@@ -15,142 +12,12 @@ import time
 
 import pytest
 
+from mcp_stub import SLEEPERS, WATCHDOG, stub, wait_until  # noqa: F401  (stub is a fixture)
 from muro import __version__, mcp_client
 from muro.jsonrpc import METHOD_NOT_FOUND, PROTOCOL_VERSION
-from muro.mcp_client import ChildError, ChildServer, kill_tree
+from muro.mcp_client import ChildError, ChildServer, ChildTimeout, kill_tree
 
-WATCHDOG = 10
 WAIT = 10  # seconds a call may take in a test before it counts as hung
-SLEEPERS = "sleepers"  # file in tmp_path where the stub's long-lived processes write their pids
-
-STUB = r'''
-import json
-import subprocess
-import sys
-import threading
-
-mode = sys.argv[1]
-sys.stdin.reconfigure(encoding="utf-8")
-sys.stdout.reconfigure(encoding="utf-8")
-out = threading.Lock()
-stops = {}          # request id -> Event set by notifications/cancelled
-asked = threading.Event()
-asked_answer = {}   # the client's answer to the request the stub made
-SLEEPER = "import os, sys, time\nopen(sys.argv[1], 'a').write(str(os.getpid()) + chr(10))\ntime.sleep(12)\n"
-SPAWNER = ("import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]], "
-           "stdin=subprocess.DEVNULL, start_new_session=True)\n")
-HEARTBEAT = "import sys, time\nfor n in range(300):\n    open(sys.argv[1], 'w').write(str(n))\n    time.sleep(0.05)\n"
-
-
-def send(message):
-    with out:
-        sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
-        sys.stdout.flush()
-
-
-def reply(msg_id, result):
-    send({"jsonrpc": "2.0", "id": msg_id, "result": result})
-
-
-def text_result(text):
-    return {"content": [{"type": "text", "text": text}], "isError": False}
-
-
-def tool_call(msg_id, params):
-    arguments = params["arguments"]
-    if arguments.get("progress"):
-        send({"jsonrpc": "2.0", "method": "notifications/progress",
-              "params": {"progressToken": "t", "progress": 1}})
-    if arguments.get("ask"):
-        send({"jsonrpc": "2.0", "id": "ask-1", "method": "sampling/createMessage", "params": {}})
-        asked.wait(5)
-        text = json.dumps(asked_answer.get("error"))
-    elif arguments.get("show_meta"):
-        text = json.dumps(params.get("_meta"))
-    elif stops[msg_id].wait(arguments.get("wait", 0)):
-        send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "cancelled"}})
-        return
-    else:
-        text = json.dumps(arguments, ensure_ascii=False)
-    reply(msg_id, text_result(text))
-
-
-banner = mode == "echo"
-for line in sys.stdin:
-    message = json.loads(line)
-    method, msg_id = message.get("method"), message.get("id")
-    if method is None and msg_id == "ask-1":
-        asked_answer.update(message)
-        asked.set()
-    elif method == "notifications/cancelled":
-        stops[message["params"]["requestId"]].set()
-    elif msg_id is None:
-        continue
-    elif method == "initialize":
-        if banner:
-            print("banner, not json", flush=True)
-            banner = False
-        if mode == "spawns":
-            subprocess.Popen([sys.executable, "-c", HEARTBEAT, sys.argv[2]], stdin=subprocess.DEVNULL)
-        if mode == "orphans":  # a process that keeps the output pipe open after the stub is gone
-            subprocess.Popen([sys.executable, "-c", SLEEPER, sys.argv[2]], stdin=subprocess.DEVNULL)
-        if mode == "escapes":  # the same, in a process the stub's tree no longer reaches
-            subprocess.run([sys.executable, "-c", SPAWNER, SLEEPER, sys.argv[2]], stdin=subprocess.DEVNULL)
-        reply(msg_id, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
-                       "serverInfo": {"name": "stub", "version": "0"}})
-        if mode == "dies":
-            sys.exit(0)
-        if mode == "deaf":
-            threading.Event().wait(20)  # busy: reads nothing for a while
-    elif method == "tools/list":
-        cursor = message.get("params", {}).get("cursor")
-        if mode == "paged":
-            page = {"tools": [{"name": "two"}]} if cursor else {"tools": [{"name": "one"}], "nextCursor": "next"}
-            reply(msg_id, page)
-        else:
-            reply(msg_id, {"tools": [{"name": "echo", "inputSchema": {"type": "object"}}]})
-    elif method == "tools/call" and mode == "orphans":
-        sys.exit(0)  # stops without answering
-    elif method == "tools/call" and mode == "rpc-error":
-        send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "refused"}})
-    elif method == "tools/call":
-        stops[msg_id] = threading.Event()
-        threading.Thread(target=tool_call, args=(msg_id, message["params"]), daemon=True).start()
-
-if mode in ("spawns", "escapes"):
-    threading.Event().wait(60)  # a server that does not stop when its input ends
-'''
-
-
-@pytest.fixture
-def stub(tmp_path):
-    path = tmp_path / "stub_server.py"
-    path.write_text(STUB, encoding="utf-8")
-    started = []
-
-    def make(mode="echo", *extra):
-        child = ChildServer("stub", {"command": sys.executable, "args": [str(path), mode, *extra], "env": {}})
-        watchdog = threading.Timer(WATCHDOG, child.close)
-        watchdog.daemon = True
-        watchdog.start()
-        started.append((child, watchdog))
-        return child
-
-    yield make
-    for child, watchdog in started:
-        watchdog.cancel()
-        child.close()
-    sleepers = tmp_path / SLEEPERS
-    for pid in sleepers.read_text().split() if sleepers.exists() else []:
-        with contextlib.suppress(OSError):
-            os.kill(int(pid), signal.SIGTERM)
-
-
-def wait_until(condition, seconds=5):
-    deadline = time.monotonic() + seconds
-    while not condition():
-        assert time.monotonic() < deadline, "the condition did not hold in time"
-        time.sleep(0.02)
 
 
 def test_a_call_returns_the_childs_result_unchanged(stub):
@@ -417,3 +284,35 @@ def test_close_does_not_wait_for_a_write_the_child_does_not_read(stub):
     assert not child.alive
     writer.join(2)
     assert outcome == ["stub: the server stopped"]
+
+
+def test_a_failed_write_marks_the_child_stopped_before_the_error_is_seen(stub):
+    child = stub("deaf")
+    child.start()
+    child._process.stdin.close()  # the child is still running, so only the failed write can tell
+    with pytest.raises(ChildError, match="stub: the server stopped"):
+        child.call("echo", {}, timeout=WAIT)
+    assert not child.alive
+
+
+def test_start_gives_up_on_a_child_that_never_answers_the_handshake(stub):
+    child = stub("mute")
+    with pytest.raises(ChildTimeout, match="stub: no answer after 0.3 seconds"):
+        child.start(timeout=0.3)
+    assert not child.alive
+
+
+def test_the_first_tool_list_gives_up_on_a_child_that_never_answers_it(stub):
+    child = stub("no-list")
+    child.start()
+    with pytest.raises(ChildTimeout, match="stub: no answer after 0.3 seconds"):
+        child.tools(timeout=0.3)
+
+
+def test_a_child_closed_before_it_starts_never_starts(stub, tmp_path):
+    child = stub()
+    child.close()
+    with pytest.raises(ChildError, match="stub: the server stopped"):
+        child.start()
+    assert not child.alive
+    assert not (tmp_path / "started").exists()  # the stub writes this when it runs
