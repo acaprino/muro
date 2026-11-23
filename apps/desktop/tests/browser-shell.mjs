@@ -67,7 +67,7 @@ await test('the window opens on Sync; the four tabs are in the title bar in orde
   assert.equal(await content(page).getAttribute('aria-label'), 'Sync');
   await content(page).getByText('Sync is moving to the new window').waitFor();
   await page.screenshot({ path: shots + '/shell-sync.png' });
-  for (const name of ['Projects', 'Activity', 'Settings', 'Sync']) {
+  for (const name of ['Activity', 'Settings', 'Sync']) {
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name], `${name} is the current tab`);
     assert.equal(await content(page).getAttribute('aria-label'), name, 'the content is named after the page');
@@ -109,7 +109,7 @@ await test('from 500px up nothing sticks out sideways: the tabs go under the bar
   }
   await page.setViewportSize({ width: 500, height: 800 });
   await page.locator('[data-slot="app-shell-tabs"] [data-slot="toolbar-tab"]').first().waitFor();
-  for (const name of ['Settings', 'Projects']) {
+  for (const name of ['Settings', 'Activity']) {
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name]);
     await content(page).getByText(`${name} is moving to the new window`).waitFor();

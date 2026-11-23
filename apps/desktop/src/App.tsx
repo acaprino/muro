@@ -12,6 +12,7 @@ import { nextCheck, stamp, syncHeadline, type SyncHeadline } from './model.ts';
 import { plural } from './ui.ts';
 import { useRegistry } from './state/registry.tsx';
 import { Moved } from './pages/Moved.tsx';
+import { Projects } from './pages/Projects.tsx';
 import { THEME_LABELS, otherChoices } from './theme.ts';
 import { paintScheme, useScheme } from './sigridTheme.ts';
 import { useWindowFrame, useWindowTheme } from './window.ts';
@@ -146,7 +147,7 @@ export function App() {
           description={error}
           action={<Button onClick={() => { void reload(); }}>Try again</Button>}
         />
-      ) : <Moved page={current.label} />}
+      ) : current.id === 'projects' ? <Projects /> : <Moved page={current.label} />}
       <CommandPalette open={palette} onOpenChange={setPalette} commands={commands} label="Search commands" />
       <Toasts items={notices} onDismiss={dismiss} />
     </AppShell>
