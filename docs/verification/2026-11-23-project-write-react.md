@@ -59,7 +59,7 @@ The steps Rust tests (`cargo test --locked -p muro-registry -p muro-desktop-runt
 -p muro-desktop`) run too, over Rust this work did not change. The job `tests` (Python, `-m "not marionette"`) runs no
 desktop code.
 
-CI run: <to be filled by the controller>
+CI run: Tests, run 45214604983 on f93eac4, green: the Rust and Python tests (the project jobs of the runtime and the factory commands included), the unit tests, the type check, the build, `sigrid-check` (41 files, 0 errors) and the browser tests of the shell, the workspace and the write side.
 
 ## Not run
 
