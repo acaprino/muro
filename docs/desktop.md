@@ -54,10 +54,15 @@ project's AI run, while there is one to say, and then three regions side by side
   [below](#the-simulator-and-its-engines)), **Records** (the decision records, which you add, edit and delete by hand) and
   **Runs** (one row per harmonization, newest first, with its version, changelog, result, budget and engine);
 - the decision graph in the middle: the discovery entries, closed until opened, with their capabilities under them. A closed
-  entry shows its name only, an open one also the first sentence of its "Use when". Choosing an example or an input opens the
-  entries that hold what it lights, and the view is fitted again to what is open. The canvas draws one kind of line, from an entry to its
-  capabilities, so what the plugin declares between capabilities (runs first, needs on a condition, never together) is said
-  in words in the details of the capability;
+  entry shows its name only, an open one also the first sentence of its "Use when". What the plugin declares between two
+  capabilities is a line of its own kind, told by its dash and its words: *runs first* solid with an arrowhead, the AI's
+  label of the condition dashed (needs, on a condition), *never together* dotted with no arrowhead. The words show while
+  one of the two is chosen or on the lit path, and a screen reader hears them always. Choosing a capability opens the
+  entries of what it is joined to, so its lines are drawn. A documented example or the AI's answer is a numbered path:
+  each step's number in a dot on its capability, the line between two steps in the accent, the rest dimmed. Choosing an
+  input marks the capabilities it went to. Either opens the entries that hold what it lights and brings that into the
+  view. The view is never drawn smaller than a name can be read (about 11 px); a graph too large for that, such as
+  fifteen closed entries, starts at its first entry, and the rest is a pan, the small map or the find field away;
 - the details of what is selected (an example, an input or a capability) in the inspector at the right: docked from 1000 px,
   and a panel over the end of the graph under it. Under 620 px the left panel becomes a drawer, opened by a button.
 
@@ -221,7 +226,7 @@ window, and none on a Windows window: see [the verification record](verification
 
 ## The simulator and its engines
 
-The graph shows the discovery entries, closed until opened, and under each its capabilities; a capability opens in the inspector with its role, intents, branches (the conditions, conflicts and order the plugin declares, said in words) and outputs. The simulator, in the Examples view, shows which branch of the graph a request activates, and in what order, in two ways.
+The graph shows the discovery entries, closed until opened, and under each its capabilities, with the lines the plugin declares between them (the order, the conditions and the conflicts); a capability opens in the inspector with its role, intents and outputs. The simulator, in the Examples view, shows which branch of the graph a request activates, and in what order, in two ways.
 
 - **A documented example** of the project is chosen from the list, and its own recorded decision is shown. It runs no AI and costs nothing. Each example in the list shows its request, the intents of its steps and what they produce, so the list can be read without a click.
 - **A free-text request** is classified by the AI, never by matching words, and the answer is validated with the runtime's own rules before it is shown: a decision (the ordered steps with the reason of each; a prerequisite the plugin adds is marked as one), no match, a question, or an answer that is not a valid decision with what the validator said. The result says who answered, what it cost and how long it took. **Cancel** stops waiting for the answer and asks the runtime to end the process; the request holds nothing else of the window, which goes on meanwhile.

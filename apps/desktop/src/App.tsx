@@ -131,9 +131,9 @@ function AppFrame() {
   const tabsRow = narrow ? <Toolbar aria-label="Views" className="overflow-x-auto"><PageTabs page={page} go={go} /></Toolbar> : undefined;
 
   return (
+    // As tall as the window by itself (Sigrid 4.3's `--app-height`): nothing sets a height around it.
     <AppShell
       desktop
-      className="h-dvh"
       contentLabel={current.label}
       titleBar={titleBar}
       tabs={tabsRow}

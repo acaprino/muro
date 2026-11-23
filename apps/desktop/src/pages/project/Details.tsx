@@ -9,7 +9,8 @@ import { becameParts, pinnedOf, sourcesOf, targetsOf } from './data.ts';
 import type { ProjectData } from './data.ts';
 
 /** The inspector of the workspace: the documented example, the capability or the input that is selected, read only. What it says is the project's data as it is:
- * an example's own steps and reasons, a capability's role, intents, branches and outputs, and which inputs it comes from (the decisions that target it). */
+ * an example's own steps and reasons, a capability's role, intents and outputs, and which inputs it comes from (the decisions that target it). What a capability is
+ * joined to (runs first, needs on a condition, never together) and its step on a lit path are drawn on the canvas (graphScene.ts), not said again here. */
 
 /** What the selection names in this project, or null when it names nothing the project has (a selection kept from before the project changed). */
 export type Shown =
@@ -35,16 +36,14 @@ export const TITLES: Record<Shown['kind'], string> = { example: 'Documented exam
 export interface DetailsProps {
   shown: Shown;
   data: ProjectData;
-  /** The capabilities the lit decision activates, with the numbers of their steps. */
-  lit: Map<string, number[]>;
   onSelect(next: Selected): void;
 }
 
-export function Details({ shown, data, lit, onSelect }: DetailsProps) {
+export function Details({ shown, data, onSelect }: DetailsProps) {
   const known = React.useMemo(() => new Set(data.caps.map(c => c.id)), [data]);
   const toCap = (id: string) => onSelect({ kind: 'capability', id });
   if (shown.kind === 'example') return <ExampleDetails example={shown.example} data={data} known={known} onCapability={toCap} />;
-  if (shown.kind === 'capability') return <CapabilityDetails cap={shown.cap} data={data} lit={lit} known={known} onSelect={onSelect} />;
+  if (shown.kind === 'capability') return <CapabilityDetails cap={shown.cap} data={data} onSelect={onSelect} />;
   return <InputDetails input={shown.input} data={data} known={known} onCapability={toCap} />;
 }
 
@@ -115,26 +114,16 @@ function ExampleDetails({ example: e, data, known, onCapability }: { example: Ex
   );
 }
 
-const stepWords = (n: number[]): string => n.length === 1 ? `Step ${n[0]} of the decision on the graph` : `Steps ${n.slice(0, -1).join(', ')} and ${n.at(-1)} of the decision on the graph`;
-
-/** A capability as the old window's sheet told it: role, entry, which inputs it comes from (the decisions that name it), the intents it answers, its branches and what it produces.
- * The branches are said in words: the canvas draws every line the same, so a line between two capabilities would not tell "runs first" from "never together". */
-function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; data: ProjectData; lit: Map<string, number[]>; known: Set<string>; onSelect(next: Selected): void }) {
-  const entry = data.entries.find(e => e.capabilities.includes(c.id)), from = sourcesOf(data.decisions, c.id), steps = lit.get(c.id) ?? [];
-  const toCap = (id: string) => onSelect({ kind: 'capability', id }), toInput = (id: string) => onSelect({ kind: 'input', id });
-  const other = (id: string) => known.has(id) ? <ItemLink id={id} onPress={toCap} /> : <strong className="font-medium">{id}</strong>;
-  const branches: React.ReactNode[] = [
-    // A list may name the same capability twice (a file written by hand): each line has a key of its own.
-    ...c.after.map((id, i) => <li key={`a:${i}:${id}`}>Always runs {other(id)} first</li>),
-    ...c.needs.map((n, i) => <li key={`n:${i}:${n.capability}`}>Runs {other(n.capability)} first, on a condition{n.label ? <span className="block text-xs text-ink-mute">{n.label}</span> : null}</li>),
-    ...c.conflicts.map((id, i) => <li key={`c:${i}:${id}`}>Never together with {other(id)}</li>),
-  ];
+/** A capability as the old window's sheet told it: role, entry, which inputs it comes from (the decisions that name it), the intents it answers and what it produces.
+ * Its branches are the canvas's lines (graphScene.ts): choosing it opens the entries of what it is joined to (Workspace.tsx), and the words of its lines are drawn and read there. */
+function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: ProjectData; onSelect(next: Selected): void }) {
+  const entry = data.entries.find(e => e.capabilities.includes(c.id)), from = sourcesOf(data.decisions, c.id);
+  const toInput = (id: string) => onSelect({ kind: 'input', id });
   return (
     <div className="flex flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-1">
         <h3 className="truncate text-base font-semibold text-ink" title={c.id}>{c.id}</h3>
         {c.title && c.title !== c.id ? <p className="text-sm text-ink-soft">{c.title}</p> : null}
-        {steps.length ? <p className="text-xs font-medium text-ink">{stepWords(steps)}</p> : null}
       </div>
       <dl className="flex flex-col gap-2">
         <Fact name="Role">{c.role || none}</Fact>
@@ -153,12 +142,6 @@ function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; d
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
-      {branches.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="structure">Branches</Heading>
-          <ul className="flex flex-col gap-1 text-sm text-ink-soft">{branches}</ul>
         </section>
       ) : null}
       {c.outputs.length ? (

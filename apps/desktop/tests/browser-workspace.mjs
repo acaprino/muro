@@ -59,6 +59,16 @@ const inSight = (page, id) => page.waitForFunction(id => {
   const box = n.getBoundingClientRect(), view = tree.getBoundingClientRect();
   return box.width > 0 && box.left >= view.left - 0.5 && box.right <= view.right + 0.5 && box.top >= view.top - 0.5 && box.bottom <= view.bottom + 0.5;
 }, id);
+/** What a screen reader hears after a thing's name: the description Sigrid ties to it (`aria-describedby`), which says each of its lines with its words and the other end. */
+const described = (page, id) => node(page, id).evaluate(n => (n.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean).map(x => document.getElementById(x)?.textContent ?? '').join(' '));
+/** The lines of the canvas that carry Sigrid's class for a dash, a tone or the path (`sigrid-graph-dashed`, `-dotted`, `-accent`, `-path`), each the element of one line. */
+const drawnLines = (page, ...classes) => page.locator('[data-slot="graph"]').locator(classes.map(c => `.sigrid-graph-${c}`).join(''));
+/** Waits until the canvas numbers the capability `id` as step `step` of the lit path: the name a screen reader hears says it ("design-taste, step 1", Sigrid's
+ * `graph.onPath`), and so do the dots on the thing. */
+const numbered = async (page, id, step) => {
+  await page.waitForFunction(([id, name]) => [...document.querySelectorAll('[data-slot="graph-node"]')].find(e => e.getAttribute('data-node-id') === id)?.getAttribute('aria-label') === name, [`cap:${id}`, `${id}, step ${step}`]);
+  assert.equal(await node(page, `cap:${id}`).locator('[data-slot="graph-steps"]').textContent(), String(step));
+};
 /** The bar of the window: the title bar with its three buttons. */
 const frameButtons = page => page.locator('[data-slot="title-bar"] [data-slot="window-controls"] button');
 /** Every control and field of the window that has no name. */
@@ -141,50 +151,74 @@ await test('the graph opens with every entry closed, each saying how many it hid
   await node(page, 'cap:design-review').click();
   await inspector(page).getByRole('heading', { name: 'Capability', level: 2 }).waitFor();
   const details = await inspector(page).textContent();
-  for (const fact of ['design-review', 'worker', 'marionette-design', 'Activates when the request means', 'Review a finished design', 'Not for: Building one', 'Runs design-taste first, on a condition', 'A design exists']) assert.ok(details.includes(fact), `the details say ${fact}`);
-  await inspector(page).getByRole('button', { name: 'design-taste', exact: true }).click();
+  for (const fact of ['design-review', 'worker', 'marionette-design', 'Activates when the request means', 'Review a finished design', 'Not for: Building one']) assert.ok(details.includes(fact), `the details say ${fact}`);
+  // What it needs is a line of the canvas, no longer words of the details: dashed, with the AI's label of the condition drawn while one of its ends is chosen, and heard.
+  assert.equal(details.includes('on a condition'), false, 'the details no longer write the lines out');
+  await drawnLines(page, 'dashed').filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
+  assert.match(await described(page, 'cap:design-review'), /A design exists, from design-taste/);
+  // Choosing it brought in sight what it is joined to: office-docs, which never goes with it, sits in the office entry, which opened, and the dotted line between them is drawn.
+  await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', OFFICE);
+  await drawnLines(page, 'dotted').filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
+  assert.match(await described(page, 'cap:design-review'), /never together, with office-docs/);
+  await node(page, 'cap:design-taste').click();
   await inspector(page).getByRole('heading', { name: 'design-taste', level: 3 }).waitFor();
   assert.match(await inspector(page).textContent(), /Comes from\s*taste-skill/);
   assert.match(await inspector(page).textContent(), /Produces\s*design-brief/);
 });
 
-await test('a graph the size of Marionette (37 capabilities, 15 entries): every entry closed, uncut and in sight at first (its scale is logged, and not under 0.5); an example opens the entries of its steps, numbers them and brings them in sight', 'projects', {}, async app => {
+await test('a graph the size of Marionette (37 capabilities, 15 entries): the first view keeps names readable, starts at the first entry and cuts none at its edge; an example opens the entries of its steps, numbers them and brings them in sight', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ bigGraph: true });
   await openMarionette(page);
   await canvas(page).waitFor();
-  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph-node"]').length === 15);
+  const first = 'entry:0:marionette-group-1';
+  // Visible: Sigrid shows the canvas only once its first view is fitted.
+  await node(page, first).waitFor();
+  await frames(page);
+  // Only what is in the view is drawn (React Flow's onlyRenderVisibleElements, Sigrid's choice): the 15 are counted by graph-scene.test.ts, not here.
   const entries = await page.locator('[data-slot="graph-node"]').evaluateAll(nodes => nodes.map(n => {
     const label = n.querySelector('.truncate'), box = n.getBoundingClientRect(), tree = n.closest('[role=tree]').getBoundingClientRect();
-    return { id: n.getAttribute('data-node-id'), name: n.getAttribute('aria-label'), expanded: n.getAttribute('aria-expanded'), clipped: label.scrollWidth > label.clientWidth + 0.5, inside: box.left >= tree.left - 0.5 && box.right <= tree.right + 0.5 && box.top >= tree.top - 0.5 && box.bottom <= tree.bottom + 0.5 };
+    const inside = box.left >= tree.left - 0.5 && box.right <= tree.right + 0.5 && box.top >= tree.top - 0.5 && box.bottom <= tree.bottom + 0.5;
+    const outside = box.bottom <= tree.top + 0.5 || box.top >= tree.bottom - 0.5 || box.right <= tree.left + 0.5 || box.left >= tree.right - 0.5;
+    return { id: n.getAttribute('data-node-id'), name: n.getAttribute('aria-label'), expanded: n.getAttribute('aria-expanded'), clipped: label.scrollWidth > label.clientWidth + 0.5, inside, outside };
   }));
-  assert.equal(entries.length, 15);
+  assert.ok(entries.length > 0 && entries.length <= 15);
   for (const e of entries) {
     const n = Number(/^group-(\d+),/.exec(e.name)?.[1]);
     assert.equal(e.name, `group-${n}, closed, hides ${n <= 7 ? 3 : 2}`, 'closed, with the number of its own capabilities');
     assert.equal(e.expanded, 'false');
     assert.equal(e.clipped, false, `${e.name}: its name is not cut`);
-    assert.equal(e.inside, true, `${e.name}: in sight inside the canvas`);
+    // Sigrid places the edges of the view between things wherever the layout leaves a gap, as a column of entries 16px apart does: none is drawn cut.
+    assert.ok(e.inside || e.outside, `${e.name}: cut by the edge of the canvas`);
   }
-  // How large the first view draws a thing: Sigrid fits the whole graph (15 entries in one rank, never above 1), and a closed entry is its name alone (graphScene.ts),
-  // so the column is as short as the app can make it. The app cannot choose the fit: legibility at 15 entries (a smallest fit with scrolling, or the roots in several
-  // columns) is an open request to Sigrid, not solved here. The floor only catches a regression: the review measured 0.59 when closed entries still had a second line.
-  const scale = await page.locator('[data-slot="graph-node"]').first().evaluate(n => n.getBoundingClientRect().width / 208);
-  console.log(`bigGraph, first view at 1512x982: scale ${scale.toFixed(2)}, a 14px name drawn at ${(14 * scale).toFixed(1)}px`);
-  assert.ok(scale >= 0.5, `the first view is drawn at ${scale.toFixed(2)}, under 0.5`);
+  assert.equal(entries.find(e => e.id === first)?.inside, true, 'a graph too large for a readable fit starts at its first thing, whole and in sight');
+  // How large the first view draws a name. Sigrid's readable fit (GraphCanvas `minFitZoom`, 0.8 by default) promises that the first view, a change of size, the fit
+  // button and `focus` never draw the graph smaller than 0.8: "names of 14 px stay about 11 px". A graph too large for that starts at its top left, and the rest is a pan,
+  // the map or the find field away. Fifteen closed entries in one column need about 0.7 to fit at 1512x982, so this one starts at the top (the review measured 0.59 for
+  // the whole column, names at 8.3px, under Sigrid 3.3.9).
+  const { scale, name } = await node(page, first).evaluate(n => {
+    const s = n.getBoundingClientRect().width / 208;
+    return { scale: s, name: parseFloat(getComputedStyle(n.querySelector('.truncate')).fontSize) * s };
+  });
+  console.log(`bigGraph, first view at 1512x982: scale ${scale.toFixed(2)}, its names drawn at ${name.toFixed(1)}px, ${entries.filter(e => e.inside).length} of 15 entries in sight`);
+  assert.ok(scale >= 0.8 - 0.005, `the first view is drawn at ${scale.toFixed(2)}, under Sigrid's floor of 0.8`);
+  assert.ok(name >= 11, `a name is drawn at ${name.toFixed(1)}px, under the 11px Sigrid's readable fit keeps`);
   await page.screenshot({ path: shots + '/workspace-graph-large.png' });
   const long = 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30);
   await row(page, 'Two of many').click();
   await inspector(page).getByRole('heading', { name: 'Two of many', level: 3 }).waitFor();
   assert.deepEqual(await texts(inspector(page).locator('ol[aria-label="Steps, in order"] > li').locator('xpath=./div/div/*[1]')), [long, 'capability-37-design-system']);
-  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph-node"][aria-expanded="true"]').length === 2);
-  assert.equal(await node(page, 'entry:5:marionette-group-6').getAttribute('aria-expanded'), 'true', 'the entry of step 1 is open');
-  assert.equal(await node(page, 'entry:6:marionette-group-7').getAttribute('aria-expanded'), 'true', 'the entry of step 2 is open');
-  // No press on "Fit the view": a new light makes the canvas again, fitted to what is now open (Workspace.tsx), so the numbered steps are in sight by themselves.
+  // No press on "Fit the view": a new light opens the entries of its steps and asks the canvas to bring them into the view (Workspace.tsx, Sigrid's `focus`).
   await inSight(page, `cap:${long}`);
   await inSight(page, 'cap:capability-37-design-system');
-  await node(page, `cap:${long}`).getByText('step 1', { exact: true }).waitFor();
-  await node(page, 'cap:capability-37-design-system').getByText('step 2', { exact: true }).waitFor();
+  for (const id of ['entry:5:marionette-group-6', 'entry:6:marionette-group-7']) await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', id);
+  // The canvas numbers the path: the step in dots and in the name a screen reader hears.
+  assert.equal(await node(page, `cap:${long}`).getAttribute('aria-label'), `${long}, step 1`);
+  assert.equal(await node(page, 'cap:capability-37-design-system').getAttribute('aria-label'), 'capability-37-design-system, step 2');
+  assert.equal(await node(page, `cap:${long}`).locator('[data-slot="graph-steps"]').textContent(), '1');
+  assert.equal(await node(page, 'cap:capability-37-design-system').locator('[data-slot="graph-steps"]').textContent(), '2');
+  const drawn = await page.locator(`[data-node-id="cap:${long}"]`).evaluate(n => n.getBoundingClientRect().width / 208);
+  assert.ok(drawn >= 0.8 - 0.005, `the steps are brought in sight at ${drawn.toFixed(2)}, under 0.8`);
   assert.ok(await sideways(page) <= 0, 'nothing widens the page');
   await page.screenshot({ path: shots + '/workspace-graph-large-example.png' });
 });
@@ -205,8 +239,11 @@ await test('each example says its request, its intents and its outputs; a click 
   assert.deepEqual(await texts(steps), ['1design-tastedesign-taste-intentIt designs a page.', '2design-reviewdesign-review-intentA finished design is checked.']);
   assert.match(await inspector(page).textContent(), /Produces\s*design-brief/);
   assert.match(await inspector(page).textContent(), /Design first, then review\./);
-  await node(page, 'cap:design-taste').getByText('step 1', { exact: true }).waitFor();
-  await node(page, 'cap:design-review').getByText('step 2', { exact: true }).waitFor();
+  await numbered(page, 'design-taste', 1);
+  await numbered(page, 'design-review', 2);
+  // The line between the two steps is the path's, in the accent: here the dashed line of the need, its words drawn on the path.
+  await drawnLines(page, 'path', 'accent', 'dashed').filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
+  assert.equal(await drawnLines(page, 'path').count(), 1, 'one line between the two steps');
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'true', 'the entry of the path is open');
   assert.equal(await node(page, OFFICE).getAttribute('aria-expanded'), 'false', 'the others stay closed');
   await graphPane(page).getByText('The steps of “A landing page” are numbered on the graph.', { exact: true }).waitFor();
@@ -214,27 +251,35 @@ await test('each example says its request, its intents and its outputs; a click 
   // A step of the details shows its capability, and the path stays lit.
   await inspector(page).getByRole('button', { name: 'Step 2: design-review', exact: true }).click();
   await inspector(page).getByRole('heading', { name: 'design-review', level: 3 }).waitFor();
-  await inspector(page).getByText('Step 2 of the decision on the graph', { exact: true }).waitFor();
   assert.equal(await landing.getAttribute('aria-current'), 'true', 'looking at a capability keeps the example lit');
-  await node(page, 'cap:design-taste').getByText('step 1', { exact: true }).waitFor();
+  await numbered(page, 'design-review', 2);
+  await numbered(page, 'design-taste', 1);
   // Another example replaces it; the same one again, while it is shown, puts it out.
   await letter.click();
-  await node(page, 'cap:office-docs').getByText('step 2', { exact: true }).waitFor();
+  await numbered(page, 'office-pdf', 1);
+  await numbered(page, 'office-docs', 2);
+  await drawnLines(page, 'path', 'accent').filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'false', 'the entries of the old path close');
   assert.equal(await landing.getAttribute('aria-current'), null);
   await letter.click();
   await inspector(page).waitFor({ state: 'detached' }).catch(() => inspector(page).waitFor({ state: 'hidden' }));
   assert.equal(await letter.getAttribute('aria-current'), null);
-  assert.equal(await node(page, 'cap:office-docs').getByText('step 2', { exact: true }).count(), 0, 'nothing is numbered any more');
-  // A capability reached from the details opens its entry, so the graph shows what the inspector shows.
+  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph"] [data-slot="graph-steps"], [data-slot="graph"] .sigrid-graph-path').length === 0);
+  assert.equal(await node(page, 'cap:office-docs').getAttribute('aria-label'), 'office-docs', 'nothing is numbered any more, and no line is the path\'s');
+  // A capability chosen on the canvas is drawn with its lines: what it is joined to in a closed entry comes in sight (design-review, in the design entry), and the
+  // words of its lines are drawn and heard. The details no longer write them out.
   await node(page, 'cap:office-docs').click();
   await inspector(page).getByRole('heading', { name: 'office-docs', level: 3 }).waitFor();
-  assert.match(await inspector(page).textContent(), /Always runs office-pdf first.*Never together with design-review/);
-  assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'false');
-  await inspector(page).getByRole('button', { name: 'design-review', exact: true }).click();
-  await inspector(page).getByRole('heading', { name: 'design-review', level: 3 }).waitFor();
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', DESIGN);
-  await node(page, 'cap:design-review').waitFor();
+  await inSight(page, 'cap:design-review');
+  await drawnLines(page, 'near').filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
+  await drawnLines(page, 'near', 'dotted').filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
+  const heard = await described(page, 'cap:office-docs');
+  assert.match(heard, /runs first, from office-pdf/);
+  assert.match(heard, /never together, with design-review/);
+  assert.doesNotMatch(await inspector(page).textContent(), /Never together|runs office-pdf first/i);
+  await node(page, 'cap:design-review').click();
+  await inspector(page).getByRole('heading', { name: 'design-review', level: 3 }).waitFor();
   await page.screenshot({ path: shots + '/workspace-example.png' });
 });
 
@@ -258,8 +303,8 @@ await test('the simulator: an empty request is refused in place, the note names 
   await result.getByText('Asked Claude Code · $0.12 · 4.2 s', { exact: true }).waitFor();
   const sent = (await callsOf(app, 'simulate')).at(-1).payload;
   assert.equal(sent.id, 'marionette'); assert.equal(sent.task, 'Write a letter'); assert.match(sent.run, /^[A-Za-z0-9_-]{1,64}$/);
-  await node(page, 'cap:office-pdf').getByText('step 1', { exact: true }).waitFor();
-  await node(page, 'cap:office-docs').getByText('step 2', { exact: true }).waitFor();
+  await numbered(page, 'office-pdf', 1);
+  await numbered(page, 'office-docs', 2);
   assert.equal(await note.count(), 0, 'the note is said once in a session');
   await page.screenshot({ path: shots + '/workspace-simulation.png' });
   await app.flags({ simulateDelay: 20000 });
@@ -284,7 +329,7 @@ await test('the simulator: an empty request is refused in place, the note names 
 });
 
 // ---------- the inputs ----------
-await test('choosing an input shows it and opens the entries of the capabilities its decisions target', 'projects', {}, async app => {
+await test('choosing an input shows it, and opens the entries of the capabilities its decisions target and marks those capabilities on the graph', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   await segment(page, 'Inputs').click();
@@ -297,13 +342,17 @@ await test('choosing an input shows it and opens the entries of the capabilities
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', OFFICE);
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'false');
   await node(page, 'cap:office-docs').waitFor();
-  await graphPane(page).getByText('The entries that hold what genoffice became are open.', { exact: true }).waitFor();
+  await graphPane(page).getByText('The capabilities genoffice became are marked on the graph.', { exact: true }).waitFor();
+  // Marked as chosen together (Sigrid's several chosen): its one capability here is the choice a screen reader hears.
+  assert.equal(await node(page, 'cap:office-docs').getAttribute('aria-selected'), 'true');
   await row(page, 'taste-skill').click();
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', DESIGN);
   assert.equal(await node(page, OFFICE).getAttribute('aria-expanded'), 'false', 'another input opens its own entries and closes the others');
   await row(page, 'superpowers').click();
   await inspector(page).getByText('None: no choice of this input went to a capability.', { exact: true }).waitFor();
+  await graphPane(page).getByText('superpowers became no capability on the graph.', { exact: true }).waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="graph-node"][data-node-id^="entry:"]')].every(n => n.getAttribute('aria-expanded') === 'false'));
+  assert.equal(await page.locator('[data-slot="graph-node"][aria-selected="true"]').count(), 0, 'nothing is marked');
   await page.screenshot({ path: shots + '/workspace-inputs.png' });
 });
 
@@ -372,8 +421,8 @@ await test('capabilities that no entry groups are all on the graph, each one rea
     await inspector(page).getByRole('heading', { name: id, level: 3 }).waitFor();
   }
   await row(page, 'A landing page').click();
-  await node(page, 'cap:design-taste').getByText('step 1', { exact: true }).waitFor();
-  await node(page, 'cap:design-review').getByText('step 2', { exact: true }).waitFor();
+  await numbered(page, 'design-taste', 1);
+  await numbered(page, 'design-review', 2);
 });
 
 await test('two examples with one title are two rows, each chosen on its own; a title, an intent and an output with <, & and quotes are text, not markup', 'projects', {}, async app => {
@@ -385,11 +434,11 @@ await test('two examples with one title are two rows, each chosen on its own; a 
   await letters.nth(1).click();
   await inspector(page).getByText('“Write a second letter”', { exact: true }).waitFor();
   assert.deepEqual([await letters.nth(0).getAttribute('aria-current'), await letters.nth(1).getAttribute('aria-current')], [null, 'true'], 'the second one, not the first');
-  await node(page, 'cap:office-docs').getByText('step 1', { exact: true }).waitFor();
+  await numbered(page, 'office-docs', 1);
   await letters.nth(0).click();
   await inspector(page).getByText('“Write a letter as a Word file”', { exact: true }).waitFor();
   assert.deepEqual([await letters.nth(0).getAttribute('aria-current'), await letters.nth(1).getAttribute('aria-current')], ['true', null]);
-  await node(page, 'cap:office-docs').getByText('step 2', { exact: true }).waitFor();
+  await numbered(page, 'office-docs', 2);
   const odd = row(page, ODD_TITLE);
   assert.deepEqual(await texts(odd.locator('[data-slot="item-row-description"] > span')), [ODD_TASK, `Intent ${ODD_INTENT}`, `Output ${ODD_OUTPUT}`]);
   await odd.click();

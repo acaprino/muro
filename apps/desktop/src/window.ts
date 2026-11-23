@@ -2,6 +2,11 @@
 // drives it from outside); the glue stays Imago's (plan R0, decision of the controller): `@acaprino/imago/shell` with
 // its Tauri adapter on this side, the imago-shell crate on the Rust side. Nothing here runs without Tauri: the browser
 // tests and the screenshots draw the buttons, which then do nothing.
+// Sigrid 4.x has a Tauri entry of its own (`@acaprino/sigrid/tauri`: `useWindowControls`, `useSnapLayouts`, `useZoom`,
+// with `useDesktopGuard` in its main entry) whose commands, event and payloads are the crate's, read on 2026-11-23. It is
+// not used yet: nothing of it has run against imago-shell, and its `useWindowTheme` sends only when the scheme drawn
+// changes, while `set_window_theme` is also told the choice (System to Dark under the same scheme), so `useWindowTheme`
+// below stays Muro's in any case (ADR-0031, the note on Sigrid 4.3.1).
 //
 // What the crate needs from the page, read in Imago v0.4.1 (ts/shell/window-controls.ts, ts/tauri.ts):
 // - the buttons marked `data-im-window="minimize" | "maximize" | "close"` in the title bar. Sigrid's `WindowControls`

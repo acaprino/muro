@@ -183,3 +183,56 @@ column whose names are drawn at about 8 px (scale 0.59), and with two entries th
 are asked of Sigrid, which also cannot draw an edge's kind or number several marked things (see the plan R0 report). Since the
 final review a closed entry has no second line, which makes that column shorter; the scale it is drawn at now is in the CI log,
 and the browser test only holds it at 0.5 or more.
+
+## Note of 2026-11-23: Sigrid 4.3.1
+
+Written by Claude Code from the Sigrid sources at the tag `v4.3.1` and its release tarball; nothing was built or run here,
+and the CI run on the commit that makes the move is the first check of it. The record of the pin is
+`docs/verification/2026-11-23-sigrid-pin.md`.
+
+- **The pin.** `package.json` names the 4.3.1 tarball (SHA-256 `aa7a0ed7…89c3`, the manifest's, recomputed on the
+  download). Sigrid 4.0.0 to 4.3.1 grew the graph canvas for this window (its release notes: kinds of line, a numbered
+  path, a readable fitted view; the app's places, sizes, routes and `layoutKey`; one screen that fits; IME guards).
+- **What broke, and how it was fixed.** Of what Muro imports, one thing: `GraphEdge` now has a `kind` of its own
+  (`'child' | 'link'`), which made Muro's `kind` (`member`, `after`, `needs`, `conflicts`) a contradiction for the type
+  check, and an edge whose `kind` is not `link` hangs, so every relation would have been drawn as a branch of the tree.
+  Muro's field is now `relation`, and Sigrid's `kind` says how the line is read. The other changes are additions
+  (`CommandPalette`'s `open` and `onOpenChange` are now both or neither, as Muro passes them; F6 is the frame's round and
+  the notices' own key is Alt+T; tabs and segments keep one width), and `AppShell` is as tall as the window by itself
+  (`--app-height`), so the `h-dvh` the window set on it is gone.
+- **The alias is gone.** Every entry of `dist` is an ES module that takes `react` and `react/compiler-runtime` from the
+  app (since 4.1.0), so `@acaprino/sigrid/graph` is read from the bundle, as the main entry is, and shares its chunks
+  and contexts: the consequence above about the alias, the two `motion-impl` chunks and the tooltips on `<body>` no
+  longer holds. The `@source` lines of `styles.css` still read Sigrid's `src` folder, for its classes.
+- **What the graph draws now** (`apps/desktop/src/pages/project/graphScene.ts`, `Workspace.tsx`):
+  - an entry's capabilities hang from it (the tree: it opens, closes and says how many it hides);
+  - what the plugin declares between two capabilities is a line that hangs nothing, told by its dash and its words:
+    «runs first» solid with an arrowhead (`after`), the AI's own label of the condition dashed (`needs`), «never
+    together» dotted with no arrowhead (`conflicts`); the words show while one end is chosen or has the focus, or on
+    the path, and screen readers hear them always. The inspector no longer writes these out in words, and choosing a
+    capability opens the entries of what it is joined to and brings them into the view, so its lines are drawn;
+  - a documented example or the validated answer is the canvas's numbered path (`steps`): the step in dots and in the
+    name screen readers hear, the line between two steps in the accent, the rest dimmed; the "step N" second line and
+    the inspector's "Step N of the decision" are gone;
+  - an input marks the capabilities its decisions went to as chosen together (several `selected`), as well as opening
+    their entries;
+  - the view is never fitted smaller than names can be read (`minFitZoom` 0.8: a 14px name at about 11px); a graph too
+    large for that, as fifteen closed entries are, starts at its first entry and the rest is a pan, the map or the
+    find field away. A new light asks the canvas to bring what it lights into the view (its handle's `focus`), which
+    replaces the remount (`key={fit}`) of plan R0. The app's places, sizes and routes are not used: they would be a
+    layout of Muro's own.
+  The ADR-0003 rule holds: only a documented example or the validated answer numbers a path, and an input marks what its
+  decisions target.
+- **Still missing.** A view of the whole of a fifteen-entry graph at a readable size at once (Sigrid now keeps names
+  readable and the rest is a pan away; several columns of roots is not asked for yet); the link lines of a capability are
+  drawn only while both ends are in sight, which is why choosing it opens the entries of its partners. A relation to a
+  capability the graph lacks has no line and is no longer said in the inspector (the factory's validation refuses such a
+  reference). The first Tauri run of this window is still to come.
+- **The window glue.** Sigrid 4.x has a Tauri entry, `@acaprino/sigrid/tauri` (`useWindowControls`, `useSnapLayouts`,
+  `useZoom`, with `useDesktopGuard` in the main entry), whose command (`window_caption_maximize`), event
+  (`caption-maximize`), payloads, zoom storage and permissions match `imago-shell` and `capabilities/main.json` on
+  reading. It is not used yet, so decision 4's amendment stands, without its reason that Sigrid has no Tauri side:
+  nothing of it has run against the crate, and its `useWindowTheme` sends only when the scheme changes, while
+  `set_window_theme` is told the choice too (System and Dark draw the same scheme), so that call stays Muro's whatever
+  happens. Moving the controls, Snap Layouts, the zoom and the guard to it would let `@acaprino/imago` leave
+  `package.json` and its lockfile; it waits for a run of the window in Tauri.

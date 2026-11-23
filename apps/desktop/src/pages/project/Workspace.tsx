@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Badge, Button, Empty, Icon, Inspector, Sheet, SheetContent, SheetTitle, ToggleGroup, ToggleGroupItem, useAppShell } from '@acaprino/sigrid';
-import { GraphCanvas } from '@acaprino/sigrid/graph';
+import { GraphCanvas, type GraphCanvasHandle } from '@acaprino/sigrid/graph';
 import type { ProjectInfo } from '../../types.ts';
 import { text } from '../../model.ts';
 import { PANELS, sameSelected } from '../../state/project.ts';
@@ -11,7 +11,7 @@ import { useProject } from '../../state/useProject.tsx';
 import { message, plural, unknownTo } from '../../words.ts';
 import { litOf, outcomeOfExample } from './graph-model.ts';
 import type { Outcome } from './graph-model.ts';
-import { capNodeId, capabilityOf, drawnNodes, graphScene } from './graphScene.ts';
+import { around, capNodeId, capabilityOf, drawnNodes, graphScene, openingFor } from './graphScene.ts';
 import { projectData, targetsOf } from './data.ts';
 import type { ProjectData } from './data.ts';
 import { aboutLine } from './lines.ts';
@@ -33,8 +33,9 @@ import { DetailsDialog } from './write/DetailsDialog.tsx';
  * of what is selected in the inspector, and the actions of the project at the foot. The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
  * is a panel over the end of the graph, and where the frame has no room for a sidebar (under 620px) the left panel opens as a drawer from a button.
  *
- * What lights the graph is the decision shown (a documented example, or the AI's answer to a free-text request: `sim`) or the input selected; what the inspector shows
- * is `selected`. The two are apart, so looking at a capability of a lit path keeps the path lit. The graph data is made in one place, `graphScene.ts`.
+ * What lights the graph is the decision shown (a documented example, or the AI's answer to a free-text request: `sim`), whose steps the canvas numbers as its path, or
+ * the input selected, whose capabilities (what its decisions went to) the canvas marks as chosen together; what the inspector shows is `selected`. The two are apart, so
+ * looking at a capability of a lit path keeps the path lit. The graph data is made in one place, `graphScene.ts`.
  *
  * The changes of the project (write/): Add input and Harmonize again at the foot, Edit details in the header, Move pin, Remove and the instructions in the Inputs panel.
  * Each opens a dialog the workspace holds, so it outlives the drawer the panel may be in. A change of the package is an AI run of the runtime, one at a time: while any
@@ -72,35 +73,43 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const pairs = input ? '[]' : JSON.stringify([...litOf(shown)]);
   const lit = React.useMemo(() => new Map<string, number[]>(JSON.parse(pairs)), [pairs]);
   const targets = React.useMemo(() => input ? targetsOf(data.decisions, input.id) : [], [data, input]);
-  // What the canvas draws, and which entries start closed, is the scene's (graphScene.ts): the lines from an entry to its capabilities (`drawn`), and every entry
-  // closed that holds nothing lit and nothing the chosen input went to.
+  // What the canvas draws, its numbered path and which entries start closed are the scene's (graphScene.ts): every line, each kind with its dash and its words, and
+  // every entry closed that holds nothing lit and nothing the chosen input went to.
   const scene = React.useMemo(() => graphScene(data.entries, data.caps, data.slug, lit, targets), [data, lit, targets]);
+  // The things of the capabilities the chosen input went to, which the canvas marks as chosen together (one of them is the choice screen readers hear, the others are
+  // "chosen with" it); those the graph lacks are left out.
+  const marked = React.useMemo(() => targets.map(capNodeId).filter(id => scene.nodes.some(n => n.id === id)), [targets, scene]);
   const litKey = input ? `input:${input.id}` : pairs === '[]' ? '' : `steps:${pairs}`;
-  // The entries are closed until opened. A new light opens the entries that hold what it lights and closes the others, and the canvas is made again (`fit` is its key):
-  // Sigrid's canvas fits the view to what is open when it is made and has no prop that fits it again, so a lit step in an entry just opened is never out of sight.
-  // When the light goes, what is open stays open, and the canvas is made again too: Sigrid's canvas does not redraw a node whose text changed while the
-  // set of open entries did not, so a step number would stay on a node after its example was put out.
-  const [canvas, setCanvas] = React.useState({ key: litKey, collapsed: scene.closed, fit: 0 });
-  let collapsed = canvas.collapsed, fit = canvas.fit;
+  // The entries are closed until opened. A new light opens the entries that hold what it lights and closes the others, and asks the canvas to bring what it lights into
+  // the view (`aim`, which the effect below hands to the canvas's `focus`): Sigrid's canvas fits its first view on the path, and after that only on a change of size,
+  // its own button or its handle, so a lit step in an entry just opened would otherwise stay where the view is not. When the light goes, what is open stays open
+  // and the view stays. `aim.n` counts the requests; 0 is none, so the first view is Sigrid's own.
+  const [canvas, setCanvas] = React.useState({ key: litKey, collapsed: scene.closed, aim: { ids: [] as readonly string[], n: 0 } });
+  let collapsed = canvas.collapsed;
   if (canvas.key !== litKey) {
     collapsed = litKey ? scene.closed : canvas.collapsed;
-    fit = canvas.fit + 1;
-    setCanvas({ key: litKey, collapsed, fit });
+    const ids = input ? marked : [...scene.steps.keys()];
+    setCanvas({ key: litKey, collapsed, aim: litKey && ids.length ? { ids, n: canvas.aim.n + 1 } : canvas.aim });
   }
-  // A capability chosen from the details (a step, a branch, what an input went to) may sit in a closed entry: its entry opens, so the canvas shows what the inspector shows.
+  // A capability chosen (on the canvas, or from the details: a step, what an input went to) is drawn with its lines, which Sigrid draws while both ends are in sight:
+  // when it or one it is joined to sits in a closed entry, that entry opens and the canvas is asked to bring them all into the view. The entries open here, in the
+  // same draw, so the view is fitted on the places they have with their second line.
   const chosenCap = selected?.kind === 'capability' ? selected.id : null;
-  const [opened, setOpened] = React.useState<string | null>(null);
-  if (opened !== chosenCap) {
-    setOpened(chosenCap);
-    const holders = chosenCap === null ? [] : scene.drawn.filter(e => e.to === capNodeId(chosenCap)).map(e => e.from);
-    if (holders.some(id => collapsed.includes(id))) {
-      collapsed = collapsed.filter(id => !holders.includes(id));
-      setCanvas(c => ({ ...c, collapsed: c.collapsed.filter(id => !holders.includes(id)) }));
+  const [looked, setLooked] = React.useState<string | null>(null);
+  if (looked !== chosenCap) {
+    setLooked(chosenCap);
+    const ids = chosenCap === null ? [] : around(scene, chosenCap), opening = openingFor(scene, ids, collapsed);
+    if (opening.length) {
+      collapsed = collapsed.filter(id => !opening.includes(id));
+      setCanvas(c => ({ ...c, collapsed: c.collapsed.filter(id => !opening.includes(id)), aim: { ids, n: c.aim.n + 1 } }));
     }
   }
+  const graph = React.useRef<GraphCanvasHandle>(null);
+  const aim = canvas.aim;
+  React.useEffect(() => { if (aim.n > 0) graph.current?.focus(aim.ids); }, [aim]);
   // An open entry says its "Use when" sentence under its name, a closed one only its name.
   const nodes = React.useMemo(() => drawnNodes(scene, collapsed), [scene, collapsed]);
-  const setCollapsed = (next: string[] | ((now: string[]) => string[])) => setCanvas(c => ({ ...c, collapsed: typeof next === 'function' ? next(c.collapsed) : next }));
+  const setCollapsed = (next: string[] | ((now: readonly string[]) => string[])) => setCanvas(c => ({ ...c, collapsed: typeof next === 'function' ? next(c.collapsed) : next }));
 
   if (!view || !sim) return null;
   const detail = resolve(selected, data);
@@ -136,7 +145,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);
   const summary = [plural(data.inputs.length, 'input'), plural(data.entries.length, 'entry', 'entries'), plural(data.caps.length, 'capability', 'capabilities'), plural(data.examples.length, 'example')].join(' · ');
   const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} onPin={showPin} onInstructions={() => show('instructions')} />;
-  const litLine = input ? `The entries that hold what ${input.id} became are open.`
+  const litLine = input ? (marked.length ? `The capabilities ${input.id} became are marked on the graph.` : `${input.id} became no capability on the graph.`)
     : shown?.kind === 'decision' && shown.steps.length ? (shown.example !== null ? `The steps of “${shown.example}” are numbered on the graph.` : 'The steps of the answer are numbered on the graph.') : '';
 
   return (
@@ -179,12 +188,15 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
             <>
               {data.entries.length ? null : <p className="px-4 pt-1 text-xs text-ink-mute">No entry groups these capabilities: each stands on its own.</p>}
               <div className="relative min-h-96 flex-1">
+                {/* The first view, a change of size and the fit button keep names readable (Sigrid's `minFitZoom`, 0.8 by default: a 14px name at about 11px);
+                    a graph too large for that starts at its first entry, and the rest is a pan, the map or the find field away. */}
                 <GraphCanvas
-                  key={fit}
+                  ref={graph}
                   aria-label={`Decision graph of ${name}`}
                   nodes={nodes}
-                  edges={scene.drawn}
-                  selected={selected?.kind === 'capability' ? capNodeId(selected.id) : null}
+                  edges={scene.edges}
+                  steps={scene.steps}
+                  selected={input ? marked : chosenCap !== null ? capNodeId(chosenCap) : null}
                   onSelect={onNode}
                   collapsed={collapsed}
                   onCollapsedChange={ids => setCollapsed(ids)}
@@ -199,7 +211,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
           )}
         </section>
         <Inspector title={detail ? TITLES[detail.kind] : 'Details'} open={detail !== null} onOpenChange={open => { if (!open) closeDetails(); }}>
-          {detail ? <Details shown={detail} data={data} lit={lit} onSelect={select} /> : null}
+          {detail ? <Details shown={detail} data={data} onSelect={select} /> : null}
         </Inspector>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-2">
