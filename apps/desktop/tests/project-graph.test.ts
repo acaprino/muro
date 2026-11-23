@@ -259,7 +259,7 @@ it('an example whose steps are prerequisites only has no Intent line, and one wi
   assert.match(show(opened()), /<strong>A letter<\/strong><small>Write a letter<\/small><small>Intent <code>office-docs-intent<\/code><\/small><\/button>/, 'one intent, no arrow, and no Output line: its capabilities produce nothing');
   const only = show(opened({}, info({}, { examples: [{ ...EXAMPLES[1], steps: [{ step: 'office-fonts', capability: 'office-fonts', intent: null }] }] })));
   assert.match(only, /<strong>A letter<\/strong><small>Write a letter<\/small><\/button>/);
-  assert.doesNotMatch(only, /Intent /);
+  assert.doesNotMatch(only.match(/<button[^>]*data-action="graph-example"[\s\S]*?<\/button>/)![0], /Intent /, 'the example\'s own button, not the page');
 });
 it('intent, output and stack are escaped', () => {
   const example = { title: 't', task: 't', stack_tokens: ['stack:<b>'], status: 'selected', selections: [], reason: '', questions: [], path: [], steps: [{ step: 'a', capability: 'a', intent: 'a&b' }] };
@@ -327,7 +327,7 @@ it('a documented example is shown as it was written: its steps in order, why eac
   assert.equal(graph.sceneFor(opened({ example: 1 }), info()).nodes.find(n => n.id === 'cap:office-fonts')?.ariaLabel, 'Capability office-fonts, entry office, step 1');
 });
 it('an example with a stack says it, and one with no match says so and has no steps', () => {
-  assert.match(words(show(opened({ example: 0 }))), /With stack:react/);
+  assert.match(show(opened({ example: 0 })), /<small>With stack:react<\/small>/, 'the card says it, apart from the list, which writes it after the request');
   const none = show(opened({ example: 2 }));
   assert.match(words(none), /No match/);
   assert.match(words(none), /Nothing to build\./);

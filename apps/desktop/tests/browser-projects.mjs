@@ -820,6 +820,8 @@ await test('A graph the size of Marionette (37 capabilities, 15 entries) fits in
   const widths = await page.locator('[data-im-node^="cap:"] .im-graph-node').evaluateAll(b => b.map(x => Math.round(x.getBoundingClientRect().width)));
   assert.ok(Math.max(...widths) - Math.min(...widths) <= 2, 'the column is as wide as its longest name: the estimate of the width holds');
   assert.match(await squash(page.locator('.im-graph-legend')), /15 entries · 37 capabilities$/);
+  assert.equal(await page.locator('.im-choice-list button').count(), 26, 'the list holds every documented example');
+  assert.equal(await page.locator('.im-choice-list button').evaluateAll(b => b.every(x => x.scrollWidth <= x.clientWidth + 1)), true, 'every example row fits its width');
   await page.locator('[data-im-node^="cap:"] .im-graph-node').last().focus();
   assert.ok(await page.locator('.im-graph-pane').evaluate(p => { const node = document.activeElement.getBoundingClientRect(), box = p.getBoundingClientRect(); return node.top >= box.top - 1 && node.bottom <= box.bottom + 1; }), 'Imago pans the focused node into view');
   await page.locator('.im-choice-list button', { hasText: 'Two of many' }).click();
@@ -872,6 +874,8 @@ await test('The simulator at 500px: one column, the graph uses its own viewport,
   await graphTab(page);
   assert.equal(await page.locator('.im-aside-layout').evaluate(t => getComputedStyle(t).gridTemplateColumns.split(' ').length), 1);
   assert.ok(await sideways(page) <= 0, 'the step');
+  assert.equal(await page.locator('.im-choice-list button').count(), 26, 'the list holds every documented example');
+  assert.equal(await page.locator('.im-choice-list button').evaluateAll(b => b.every(x => x.scrollWidth <= x.clientWidth + 1)), true, 'every example row fits its width');
   await page.locator('.im-choice-list button', { hasText: 'Another two' }).click();
   assert.ok(await sideways(page) <= 0, 'an example lit');
   await requestBox(page).fill('Write a letter');

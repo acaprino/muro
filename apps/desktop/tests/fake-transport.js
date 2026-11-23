@@ -19,7 +19,7 @@
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
 //                                `simulate` needs the `run` the page names; `cancel_simulation {run}` ends a delayed one ("The simulation was cancelled") and refuses one that is not running.
-//             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name (set it before opening the project)
+//             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name, and 26 documented examples (set it before opening the project)
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
@@ -83,14 +83,16 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     digest: 'sha256:' + slug.padEnd(8, '0'),
   };
 }
-// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and two documented examples.
+// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and 26 documented examples (two named, 24 generated).
 function withBigGraph(info) {
   const ids = Array.from({ length: 37 }, (_, i) => i === 5 ? 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30) : `capability-${String(i + 1).padStart(2, '0')}-design-system`);
   const entries = Array.from({ length: 15 }, (_, e) => ({ name: `${info.plugin.slug}-group-${e + 1}`, description: `Use when group ${e + 1} applies.`, capabilities: ids.filter((_, i) => i % 15 === e) }));
   const capabilities = ids.map((id, i) => ({ id, title: `Capability ${i + 1}`, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: `Capability ${i + 1}`, excludes: '' }], needs: i % 7 === 1 ? [{ capability: ids[i - 1], label: 'It reads the first', when: 'It reads the first', reason: 'Because.' }] : [], conflicts: i % 11 === 3 ? [ids[i + 1]] : [] }));
   const pick = id => ({ capability: id, intent: id + '-intent', reason: 'Fits.' });
   const example = (title, chosen) => ({ id: title, title, task: title, stack_tokens: [], status: 'selected', selections: chosen.map(pick), reason: 'Both.', questions: [], path: chosen, steps: chosen.map(id => ({ step: id, capability: id, intent: id + '-intent' })) });
-  return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]])] } };
+  // 24 more, so the list holds the 26 that Marionette's does. Each picks two capabilities spread across the whole of `ids` (the steps 5 and 11 apart, mod 37: never the same pair twice in a row, and the long name comes up in one).
+  const generated = Array.from({ length: 24 }, (_, k) => example(`Generated example ${String(k + 3).padStart(2, '0')}`, [ids[(k * 5 + 1) % 37], ids[(k * 11 + 19) % 37]]));
+  return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]]), ...generated] } };
 }
 const summaryOf = (id, path, info, included = false) => ({ id, path, included, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 

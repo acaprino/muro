@@ -82,7 +82,7 @@ const shownOf = (sim: SimState, examples: Example[]): Outcome | null => sim.exam
 /** A documented example in the list: its title, its request (with the stack it names), the intents its steps answer in order and what its capabilities produce. A prerequisite has no intent, and a line with nothing to say is not written. */
 function exampleItem(e: Example, i: number, pressed: boolean, caps: Cap[]): string {
   const intents = e.steps.map(s => s.intent).filter((x): x is string => !!x), outs = outputsOf(e, caps);
-  return `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${pressed}"><strong>${esc(e.title)}</strong><small>${esc(e.task)}${e.stack.length ? ` · With ${esc(e.stack.join(', '))}` : ''}</small>`
+  return `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${pressed}"><strong>${esc(e.title)}</strong><small>${[esc(e.task), e.stack.length ? `With ${esc(e.stack.join(', '))}` : ''].filter(Boolean).join(' · ')}</small>`
     + `${intents.length ? `<small>Intent ${intents.map(x => `<code>${esc(x)}</code>`).join(' → ')}</small>` : ''}${outs.length ? `<small>Output ${esc(outs.join(', '))}</small>` : ''}</button></li>`;
 }
 
