@@ -17,7 +17,8 @@ export interface JobsApi {
   jobs: Job[];
   /** The run in progress, whatever it is: one goes at a time, so while there is one no page offers another change. Null when none goes. */
   running: Job | null;
-  /** Counts the project runs that ended while this window watched. A page that shows what a run writes (the list of projects, the open project) reads it again when this changes. */
+  /** Counts the project runs that ended while this window watched, and the times a page asked for the projects to be read again (`refresh`). A page that shows what a run or an edit writes (the list of
+   * projects, the open project) reads it again when this changes. */
   settled: number;
   /** The ids of the runs asked to stop that are still going: the runtime ends them a moment later. */
   cancelling: readonly string[];
@@ -27,6 +28,8 @@ export interface JobsApi {
   start(action: WriteAction, payload: Record<string, unknown>): Promise<void>;
   /** Asks the runtime to stop a run. Rejects with the runtime's words. */
   cancel(id: string): Promise<void>;
+  /** Asks for the list of projects and the open project to be read again: what a change by hand (an edit that is no AI run) wrote is not told by any run that ends. It moves `settled`. */
+  refresh(): void;
 }
 
 const JobsContext = React.createContext<JobsApi | null>(null);
@@ -111,8 +114,10 @@ export function ProjectJobsProvider({ children }: { children?: React.ReactNode }
     await read();
   }, [read]);
 
+  const refresh = React.useCallback((): void => setSettled(n => n + 1), []);
+
   const running = React.useMemo(() => runningJob(jobs), [jobs]);
-  const api = React.useMemo<JobsApi>(() => ({ jobs, running, settled, cancelling: asked, error, start, cancel }), [jobs, running, settled, asked, error, start, cancel]);
+  const api = React.useMemo<JobsApi>(() => ({ jobs, running, settled, cancelling: asked, error, start, cancel, refresh }), [jobs, running, settled, asked, error, start, cancel, refresh]);
   return <JobsContext.Provider value={api}>{children}</JobsContext.Provider>;
 }
 
