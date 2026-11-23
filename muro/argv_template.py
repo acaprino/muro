@@ -11,8 +11,8 @@ _PLACEHOLDER = re.compile(r"\{([a-z][a-z0-9_]*)\}")
 _PACKAGE_ROOT = "<package_root>"
 _TYPES = ("string", "integer", "number", "boolean")
 _TYPE_NAMES = {"string": "a string", "integer": "an integer", "number": "a number", "boolean": "a boolean"}
-_SCHEMA_KEYS = ("type", "properties", "required")
-_PROPERTY_KEYS = ("type", "enum", "allow_leading_dash")
+_SCHEMA_KEYS = ("type", "description", "properties", "required")
+_PROPERTY_KEYS = ("type", "description", "enum", "allow_leading_dash")
 _GROUPS = ({"if", "args"}, {"unless", "args"})
 
 
@@ -26,6 +26,10 @@ def _is_type(value: Any, kind: str) -> bool:
     if kind == "integer":
         return isinstance(value, int)
     return isinstance(value, (int, float)) and (not isinstance(value, float) or math.isfinite(value))
+
+
+def _is_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _placeholder(item: Any) -> str | None:
@@ -48,6 +52,8 @@ def _schema_errors(schema: Any) -> list[str]:
         return ['schema must be {"type": "object", "properties": {...}, "required": [...]}']
     errors = [f"schema key {key} is outside the enforced subset ({', '.join(_SCHEMA_KEYS)})"
               for key in schema if key not in _SCHEMA_KEYS]
+    if "description" in schema and not _is_text(schema["description"]):
+        errors.append("schema description must be nonempty text")
     required = schema.get("required", [])
     if not isinstance(required, list) or any(not isinstance(name, str) for name in required):
         errors.append("schema required must be a list of property names")
@@ -60,6 +66,8 @@ def _schema_errors(schema: Any) -> list[str]:
             continue
         errors += [f"property {name}: key {key} is outside the enforced subset ({', '.join(_PROPERTY_KEYS)})"
                    for key in prop if key not in _PROPERTY_KEYS]
+        if "description" in prop and not _is_text(prop["description"]):
+            errors.append(f"property {name}: description must be nonempty text")
         kind = prop.get("type")
         if kind not in _TYPES:
             errors.append(f"property {name}: type must be one of {', '.join(_TYPES)}")
@@ -79,7 +87,7 @@ def template_errors(run: Any, schema: Any, label: str) -> list[str]:
     properties = schema["properties"]
     required = schema.get("required") if isinstance(schema.get("required"), list) else []
 
-    def part_errors(part: Any, where: str, in_group: bool) -> list[str]:
+    def part_errors(part: Any, where: str, group: dict | None) -> list[str]:
         if isinstance(part, dict):  # only a group's args can reach here with a dict
             return [f"{where} is a group inside a group: groups are not nested"]
         if not isinstance(part, str) or not part:
@@ -92,8 +100,10 @@ def template_errors(run: Any, schema: Any, label: str) -> list[str]:
         found = []
         if isinstance(properties[name], dict) and properties[name].get("type") == "boolean":
             found.append(f"{where}: placeholder {name}: a boolean is only a group's condition")
-        if not in_group and name not in required:
+        if group is None and name not in required:
             found.append(f"{where}: placeholder {name} outside a group must be a required property")
+        elif group is not None and name not in required and name != group.get("if"):
+            found.append(f"{where}: placeholder {name} inside a group must be the group's own property or a required one")
         return found
 
     if not isinstance(run, list) or not run:
@@ -103,7 +113,7 @@ def template_errors(run: Any, schema: Any, label: str) -> list[str]:
     for index, item in enumerate(run):
         where = f"item {index}"
         if not isinstance(item, dict):
-            errors += part_errors(item, where, False)
+            errors += part_errors(item, where, None)
             continue
         if set(item) not in _GROUPS:
             errors.append(f"{where}: a group has exactly one of if and unless, and args")
@@ -115,7 +125,7 @@ def template_errors(run: Any, schema: Any, label: str) -> list[str]:
             errors.append(f"{where}: args must be a nonempty list of strings")
             continue
         for number, part in enumerate(item["args"]):
-            errors += part_errors(part, f"{where} args {number}", True)
+            errors += part_errors(part, f"{where} args {number}", item)
     return [f"{label}: {error}" for error in errors]
 
 
@@ -138,8 +148,6 @@ def argument_errors(arguments: Any, schema: dict) -> list[str]:
 
 
 def _argument(name: str, arguments: dict, schema: dict) -> str:
-    if name not in arguments:  # a placeholder in a group may name another optional property
-        raise ValueError(f"{name} is used by the command and was not given")
     value = arguments[name]
     if not isinstance(value, str):
         return json.dumps(value)

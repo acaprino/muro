@@ -71,11 +71,36 @@ def test_a_number_is_passed_in_its_json_form_and_a_non_finite_one_is_refused():
     assert argument_errors({"ratio": float("nan")}, schema) == ["ratio must be a number"]
     assert argument_errors({"ratio": True}, schema) == ["ratio must be a number"]
 
-def test_a_placeholder_in_a_group_for_another_absent_property_is_refused_not_a_crash():
-    run = ["node", {"if": "limit", "args": ["{note}"]}]
-    assert template_errors(run, SCHEMA, "tool t") == []
-    with pytest.raises(ValueError, match="note is used by the command and was not given"):
-        build_argv(run, {"account": "a", "limit": 1}, SCHEMA, "/r")
+@pytest.mark.parametrize("run, ok", [
+    (["node", {"if": "limit", "args": ["{limit}"]}], True),
+    (["node", {"if": "limit", "args": ["{account}"]}], True),
+    (["node", {"unless": "limit", "args": ["{account}"]}], True),
+    (["node", {"if": "limit", "args": ["{note}"]}], False),
+    (["node", {"unless": "limit", "args": ["{limit}"]}], False),
+    (["node", {"unless": "note", "args": ["{note}"]}], False),
+])
+def test_a_placeholder_in_a_group_is_the_groups_own_property_or_a_required_one(run, ok):
+    errors = template_errors(run, SCHEMA, "tool t")
+    assert (errors == []) if ok else any("inside a group must be the group's own property or a required one" in e
+                                         for e in errors)
+
+DESCRIBED = {"type": "object", "description": "List the campaigns of one account.", "required": ["account"],
+             "properties": {"account": {"type": "string", "description": "The account id, act_ and digits."},
+                            "limit": {"type": "integer", "description": "How many rows."}}}
+
+def test_descriptions_are_allowed_and_change_nothing_in_the_argv():
+    run = ["node", "list", "{account}", {"if": "limit", "args": ["--limit", "{limit}"]}]
+    assert template_errors(run, DESCRIBED, "tool t") == []
+    assert build_argv(run, {"account": "act_1", "limit": 3}, DESCRIBED, "/r") == ["node", "list", "act_1", "--limit", "3"]
+
+@pytest.mark.parametrize("schema, message", [
+    ({"type": "object", "description": "", "properties": {}}, "schema description must be nonempty text"),
+    ({"type": "object", "description": 5, "properties": {}}, "schema description must be nonempty text"),
+    ({"type": "object", "properties": {"a": {"type": "string", "description": ""}}}, "property a: description must be nonempty text"),
+    ({"type": "object", "properties": {"a": {"type": "string", "description": ["x"]}}}, "property a: description must be nonempty text"),
+])
+def test_a_description_must_be_nonempty_text(schema, message):
+    assert any(message in e for e in template_errors(["node"], schema, "tool t"))
 
 @pytest.mark.parametrize("schema, message", [
     ({"type": "object"}, "schema must be"),
