@@ -15,10 +15,12 @@ async function files(directory: string): Promise<string[]> {
   return result;
 }
 
-test('desktop appearance is imported from Imago, with no application stylesheet rules', async () => {
+test('desktop appearance is imported from Sigrid, with no application stylesheet rules (ADR-0031)', async () => {
   const styles = (await files(source)).filter(path => path.endsWith('.css'));
   assert.equal(styles.length, 1);
-  assert.equal((await readFile(styles[0], 'utf8')).trim(), '@import "@acaprino/imago/css/imago.css";');
+  const css = await readFile(styles[0], 'utf8');
+  assert.match(css, /@import "@acaprino\/sigrid\/theme\.css";/);
+  assert.doesNotMatch(css, /[{}]/, 'the entry imports and declares sources: it holds no rule of its own');
 });
 
 test('the application has no private SVG renderer, inline style or UI implementation shim', async () => {
