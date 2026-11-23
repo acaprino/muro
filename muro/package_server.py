@@ -1,8 +1,9 @@
 """The package server: one MCP server for a whole package, its tools declared as data (ADR-0032).
 
-It lists the tools `package-server.json` declares and forwards each call to the absorbed server that
-owns the tool, started as a child on its first call. A call runs on its own thread, so the read loop
-never waits for one: `ping` and a cancellation are answered while a call is in a child.
+It lists the tools `package-server.json` declares. A forwarded call goes to the absorbed server that
+owns the tool, started as a child on its first call; a `run` tool starts its declared command with no
+shell. A call runs on its own thread, so the read loop never waits for one: `ping` and a cancellation
+are answered while a call is in a child or a command runs.
 """
 from __future__ import annotations
 
@@ -10,24 +11,34 @@ import contextlib
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import IO, Any, Callable
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
 from . import __version__
-from .delivery import PACKAGE_SERVER_FILE, server_launch, server_section_errors
+from .argv_template import build_argv, is_batch_program
+from .delivery import _PACKAGE_ROOT, PACKAGE_SERVER_FILE, server_launch, server_section_errors
 from .jsonrpc import (INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
                       PROTOCOL_VERSION, error, read_messages, result, tool_result, write_message)
-from .mcp_client import ChildError, ChildServer, ChildTimeout
+from .mcp_client import DRAIN_WAIT, KILL_WAIT, ChildError, ChildServer, ChildTimeout, kill_tree
 
 START_WAIT = 30   # seconds a child gets to start and list its tools
 ROOTS_WAIT = 5    # seconds the host gets to answer roots/list
 JOIN_WAIT = 10    # seconds a call gets to finish once the server closes
 ROOTS_ID = "roots-1"  # the id of the one request this server makes
+DEFAULT_TIMEOUT = 120    # seconds a command gets when its tool declares none
+OUTPUT_LIMIT = 100_000   # characters of a command's output that reach the host
+POLL = 0.05              # seconds between two looks at a running command
+STOP_NOTE = "The effect of this command is unknown: read the current state before any retry."
+CANCELLED = f"Cancelled by the host. {STOP_NOTE}"
+# Bytes of a stream that are kept: four for each character that may be returned, and one to know it is cut.
+_KEEP = OUTPUT_LIMIT * 4 + 1
 
 
 class _Slot:
@@ -55,6 +66,65 @@ def _root_directory(uri: str) -> str | None:
     return path if os.path.isdir(path) else None
 
 
+def _text(raw: bytes) -> str:
+    text = raw.decode("utf-8", errors="replace")
+    return (text[:OUTPUT_LIMIT] + f"\n[output cut at {OUTPUT_LIMIT} characters]") if len(text) > OUTPUT_LIMIT else text
+
+
+def _drain(pipe: IO[bytes], kept: bytearray) -> None:
+    """Read `pipe` to its end, so the command never waits on a full one, and keep the first `_KEEP` bytes of it."""
+    try:
+        while chunk := pipe.read1(65536):
+            kept += chunk[:_KEEP - len(kept)]
+    except (OSError, ValueError):
+        pass  # the pipe was closed under the reader
+    finally:
+        with contextlib.suppress(OSError, ValueError):
+            pipe.close()
+
+
+def run_command(argv: list[str], cwd: str | None, env: dict[str, str], timeout: int,
+                cancelled: threading.Event) -> dict[str, Any]:
+    """Run `argv` with no shell and no input until it exits, `timeout` seconds pass or `cancelled` is set.
+
+    The answer is a tool result. A command that was stopped has its process tree killed, and its answer says
+    that its effect is unknown."""
+    if cancelled.is_set():  # a call that was cancelled, or that came while the server closes, starts nothing
+        return tool_result(CANCELLED, True)
+    try:
+        process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   cwd=cwd, env=env, start_new_session=True)  # ignored on Windows
+    except OSError as exc:
+        return tool_result(f"Cannot start {argv[0]}: {exc}", True)
+    kept = (bytearray(), bytearray())
+    readers = [threading.Thread(target=_drain, args=(pipe, sink), daemon=True)
+               for pipe, sink in zip((process.stdout, process.stderr), kept)]
+    for reader in readers:
+        reader.start()
+    deadline = time.monotonic() + timeout
+    killed = False
+    # shortcut: the exit is noticed by polling every POLL seconds, upgrade if that latency ever matters
+    while process.poll() is None:
+        if cancelled.is_set() or time.monotonic() >= deadline:
+            killed = True
+            kill_tree(process)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(KILL_WAIT)
+            break
+        cancelled.wait(POLL)
+    drained = time.monotonic() + DRAIN_WAIT  # a grandchild that keeps a pipe open must not hold the answer back
+    for reader in readers:
+        reader.join(max(drained - time.monotonic(), 0))
+    out, err = (_text(bytes(sink)) for sink in kept)
+    if not killed:
+        if process.returncode == 0:
+            return tool_result(out)
+        return tool_result(f"exit {process.returncode}\n{err}\n{out}", True)
+    if cancelled.is_set():
+        return tool_result(CANCELLED, True)
+    return tool_result(f"Stopped after {timeout} seconds. {STOP_NOTE}\n{out}", True)
+
+
 class PackageServer:
     def __init__(self, package: Path, sections: dict[str, Any], send: Callable[[dict[str, Any]], None]) -> None:
         self._package = package
@@ -65,9 +135,10 @@ class PackageServer:
         self._entries = ({s["name"]: s for s in servers if isinstance(s, dict) and "name" in s}
                          if isinstance(servers, list) else {})
         self._slots = {tool["forward"]["server"]: _Slot() for tool in self._tools.values() if "forward" in tool}
-        self._lock = threading.Lock()  # guards _workers, _calls, _closed and every slot's server and listing
+        self._lock = threading.Lock()  # guards _workers, _calls, _commands, _closed and every slot's server and listing
         self._workers: set[threading.Thread] = set()
-        self._calls: dict[Any, tuple[ChildServer, int]] = {}  # host request id -> its child and the child's id
+        self._calls: dict[Any, Callable[[], None]] = {}  # host request id of a running call -> how to cancel it
+        self._commands: set[threading.Event] = set()  # the stop of each running command: close() sets them all
         self._closed = False
         self._roots_wanted = False
         self._roots_deadline: float | None = None
@@ -94,7 +165,7 @@ class PackageServer:
         elif msg_id is None:
             if method == "notifications/cancelled":
                 request_id = _params(message).get("requestId")
-                if isinstance(request_id, (str, int)):
+                if isinstance(request_id, (str, int)) and not isinstance(request_id, bool):  # True == 1
                     self._spawn(self._cancel, request_id)
             elif method == "notifications/initialized" and self._roots_wanted:
                 self._roots_deadline = time.monotonic() + ROOTS_WAIT
@@ -131,15 +202,18 @@ class PackageServer:
     def _cancel(self, request_id: Any) -> None:
         """Cancel the call the host numbered `request_id`; one that is not pending needs nothing."""
         with self._lock:
-            pending = self._calls.get(request_id)
-        if pending is not None:
-            pending[0].cancel(pending[1])
+            cancel = self._calls.get(request_id)
+        if cancel is not None:
+            cancel()
 
     def close(self) -> None:
-        """Stop every child, which wakes the calls waiting on one, and wait for the calls and cancellations to end."""
+        """Stop every command and child, which wakes the calls waiting on one, and wait for the calls to end."""
         with self._lock:
             self._closed = True
             workers = list(self._workers)
+            commands = list(self._commands)
+        for stop in commands:
+            stop.set()  # the call of each command kills its process tree
         for server in self._servers():
             server.close()
         deadline = time.monotonic() + JOIN_WAIT
@@ -200,9 +274,37 @@ class PackageServer:
         elif not isinstance(arguments, dict):
             return tool_result(f"The arguments of the tool {name} must be an object", True)
         if "run" in tool:
-            return tool_result("This server does not run commands yet", True)
+            return self._run(tool, arguments, request_id)
         meta = params.get("_meta")
         return self._forward(tool, arguments, meta if isinstance(meta, dict) else None, request_id)
+
+    def _run(self, tool: dict[str, Any], arguments: dict[str, Any], request_id: Any) -> dict[str, Any]:
+        stop = threading.Event()  # set by a cancellation of this call and by close()
+        with self._lock:
+            if self._closed:
+                stop.set()
+            self._calls[request_id] = stop.set
+            self._commands.add(stop)
+        try:
+            root = str(self._package)
+            try:
+                argv = build_argv(tool["run"], arguments, tool["input_schema"], root)
+            except ValueError as exc:
+                return tool_result(str(exc), True)
+            found = shutil.which(argv[0])
+            if found is None:
+                return tool_result(f"Program not found on this machine: {argv[0]}", True)
+            if is_batch_program(found):
+                return tool_result(f"{argv[0]} is a batch file, which Windows runs through cmd.exe: declare the "
+                                   "executable and its script instead", True)
+            declared = tool.get("env", {})
+            env = {**os.environ, **{name: value.replace(_PACKAGE_ROOT, root) for name, value in declared.items()}}
+            return run_command([found, *argv[1:]], self._working_directory(), env,  # the file that was checked runs
+                               tool.get("timeout", DEFAULT_TIMEOUT), stop)
+        finally:
+            with self._lock:
+                self._calls.pop(request_id, None)
+                self._commands.discard(stop)
 
     def _forward(self, declared: dict[str, Any], arguments: dict[str, Any], meta: dict[str, Any] | None,
                  request_id: Any) -> dict[str, Any]:
@@ -210,8 +312,9 @@ class PackageServer:
         slot = self._slots[child]
         try:
             with slot.lock:
-                if slot.server is None or not slot.server.alive:
-                    self._drop(slot, slot.server)
+                current = slot.server  # one look: another worker's drop may clear it at any moment
+                if current is None or not current.alive:
+                    self._drop(slot, current)
                     self._start(slot, child)
                 with self._lock:  # a failing call of another worker may clear both at once
                     server, listing = slot.server, slot.listing
@@ -230,7 +333,7 @@ class PackageServer:
 
         def known(child_id: int) -> None:
             with self._lock:
-                self._calls[request_id] = (server, child_id)
+                self._calls[request_id] = lambda: server.cancel(child_id)
 
         try:
             return server.call(tool, arguments, relay if token is not None else None, meta=meta, on_id=known)

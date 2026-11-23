@@ -29,6 +29,8 @@ from pathlib import Path
 mode = sys.argv[1]
 with Path(__file__).with_name("started").open("a") as marker:
     marker.write("x")  # one letter for each start of the stub
+with Path(__file__).with_name("pids").open("a") as pids:
+    pids.write(f"{os.getpid()}\n")  # for a test that checks no start is left running
 DIED = Path(__file__).with_name("died")  # dies-once: the first process to be asked for a call leaves it
 sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")

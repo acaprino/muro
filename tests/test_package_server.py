@@ -1,6 +1,7 @@
-"""The package server: it lists the declared tools and forwards calls to the children it starts (ADR-0030).
+"""The package server: it lists the declared tools, forwards calls to its children and runs commands (ADR-0030).
 
-The package is built in `tmp_path`; its one child is the stub of `mcp_stub`, which names no real server.
+The package is built in `tmp_path`; its one child is the stub of `mcp_stub`, which names no real server,
+and its commands are the stub `TOOL`, which names no real program.
 `Host` runs the server as a subprocess, as a host does; `Local` calls `PackageServer` in this process,
 for what needs a monkeypatched wait. Every wait on the server is bounded by `WAIT`.
 """
@@ -10,6 +11,7 @@ import itertools
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import threading
@@ -32,9 +34,81 @@ SCHEMA = {"type": "object"}  # what the stub lists as the input schema of its on
 ECHO = {"name": "echo", "source": "demo", "description": "Echo, in the child's words.",
         "input_schema": SCHEMA, "forward": {"server": "stub", "tool": "echo"}}
 GONE = {**ECHO, "name": "gone", "forward": {"server": "stub", "tool": "gone"}}
-LOOKUP = {"name": "lookup", "source": "demo", "description": "Look up q.",
-          "input_schema": {"type": "object", "properties": {"q": {"type": "string"}}, "required": ["q"]},
-          "run": ["python", "<package_root>/scripts/demo/stub.py", "{q}"]}
+STOP_NOTE = "The effect of this command is unknown: read the current state before any retry."
+CANCELLED = f"Cancelled by the host. {STOP_NOTE}"
+CUT = "\n[output cut at 100000 characters]"
+# The stub command: it leaves a file `ran-<pid>` first, then does what its first argument says.
+TOOL = r'''
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+here = Path(__file__).parent
+GRANDCHILD = "import os, sys, time\nopen(sys.argv[1] + str(os.getpid()), 'w').close()\ntime.sleep(30)\n"
+sys.stdout.reconfigure(encoding="utf-8", newline="\n")  # no CRLF and no code page, whatever the console
+
+
+def say(text):
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+
+def grandchild():
+    subprocess.Popen([sys.executable, "-c", GRANDCHILD, str(here / "ran-")], stdin=subprocess.DEVNULL)
+
+
+(here / f"ran-{os.getpid()}").touch()  # the proof that it ran, and a pid for the test to see gone; one file each
+mode = sys.argv[1] if len(sys.argv) > 1 else ""
+if mode == "fail":
+    sys.stderr.write("boom")
+    sys.exit(3)
+elif mode == "noise":
+    sys.stderr.write("e" * 1_000_000)  # more than a pipe holds, before anything on stdout
+    say("out")
+elif mode == "big":
+    say("x" * 150_000)
+elif mode == "wide":
+    say("\U0001F600" * 150_000)  # four bytes each: more than the output may keep of them
+elif mode == "latin":
+    say("caf")
+    sys.stdout.buffer.write(b"\xe9")  # not UTF-8
+elif mode == "leak":  # exits at once, leaving a grandchild that holds this command's output open
+    grandchild()
+    say("out")
+elif mode in ("sleep", "tree"):
+    if mode == "tree":  # which a kill of this process alone would leave
+        grandchild()
+    say("started")
+    time.sleep(30)
+elif mode == "nap":
+    time.sleep(1)
+    say("done")
+elif mode == "env":
+    say(json.dumps([os.environ.get("DEMO_VAR"), "PATH" in os.environ]))
+elif mode == "cwd":
+    say(os.getcwd())
+elif mode == "stdin":
+    say("eof:" + sys.stdin.read())  # blocks for good where the command shares the server's input
+else:
+    say(json.dumps(sys.argv[1:], ensure_ascii=False))
+'''
+
+
+def run_tool(name, run, properties=None, required=(), **extra):
+    """A tool that runs the stub command with the arguments `run`."""
+    schema = {"type": "object", "properties": properties or {}, "required": list(required)}
+    return {"name": name, "source": "demo", "description": f"Run {name}.", "input_schema": schema,
+            "run": ["python", "<package_root>/scripts/demo/tool.py", *run], **extra}
+
+
+MODE = {"mode": {"type": "string"}}
+LIST = run_tool("list_items", ["list", "--account", "{account}"], {"account": {"type": "string"}}, ["account"])
+RUN = run_tool("run_mode", ["{mode}"], MODE, ["mode"])
+SHORT = run_tool("run_short", ["{mode}"], MODE, ["mode"], timeout=1)
+NOISY = run_tool("run_noisy", ["{mode}"], MODE, ["mode"], timeout=5)  # a regression answers in seconds, not at WAIT
 SERVE = "from pathlib import Path; from muro.package_server import serve; raise SystemExit(serve(Path(r'{package}')))"
 STOPPED = "the tool {tool} is not what this package declares (missing, or its schema changed)"
 
@@ -43,6 +117,7 @@ def build_package(tmp_path, tools=(ECHO,), mode="echo", entry=None):
     package = tmp_path / "pack"
     (package / "scripts" / "demo").mkdir(parents=True)
     (package / "scripts" / "demo" / "stub.py").write_text(STUB, encoding="utf-8")
+    (package / "scripts" / "demo" / "tool.py").write_text(TOOL, encoding="utf-8")
     sections = {"package_server": {"name": "pack", "children": ["stub"], "tools": list(tools)},
                 "mcp_servers": [entry or {"name": "stub", "source": "demo",
                                           "run": ["python", "<package_root>/scripts/demo/stub.py", mode]}]}
@@ -54,6 +129,52 @@ def build_package(tmp_path, tools=(ECHO,), mode="echo", entry=None):
 
 def marker(package, name):
     return package / "scripts" / "demo" / name
+
+
+def command_pids(package):
+    """The pids of the stub command and of what it started; each one's file is its own, so no write races another."""
+    return [int(path.name.removeprefix("ran-")) for path in (package / "scripts" / "demo").glob("ran-*")]
+
+
+def child_pids(package):
+    path = marker(package, "pids")
+    return [int(pid) for pid in path.read_text().split()] if path.exists() else []
+
+
+def pid_alive(pid):
+    """Whether process `pid` runs; `os.kill(pid, 0)` would terminate it on Windows."""
+    if os.name == "nt":
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    try:  # a zombie that nothing reaped answers kill 0, and is gone
+        return Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[0] != "Z"
+    except OSError:
+        return True
+
+
+def started(package, count=1):
+    """The pids the stub command and what it started have recorded, once there are `count`; they run."""
+    wait_until(lambda: len(command_pids(package)) >= count, WAIT)  # interpreters that start at once may be slow
+    pids = command_pids(package)
+    assert all(pid_alive(pid) for pid in pids)  # a check that finds nothing alive proves nothing gone
+    return pids
+
+
+def gone(pids):
+    wait_until(lambda: not any(pid_alive(pid) for pid in pids))
 
 
 class Peer:
@@ -311,9 +432,194 @@ def test_a_line_that_is_not_json_is_a_parse_error(host):
     assert error == {"code": PARSE_ERROR, "message": "Parse error"}
 
 
-def test_a_command_tool_is_not_run_yet(host_with):
-    host = host_with(tools=[ECHO, LOOKUP])
-    assert host.call("lookup", {"q": "a"}) == tool_result("This server does not run commands yet", True)
+def test_a_run_tool_receives_its_arguments_as_argv(host_with):
+    host = host_with(tools=[LIST])
+    result = host.call("list_items", {"account": 'a b&c%d "è"'})  # nothing a shell reads, and nothing it would change
+    assert text_of(result) == '["list", "--account", "a b&c%d \\"è\\""]'
+    assert result["isError"] is False
+
+
+def test_an_undeclared_argument_runs_nothing(host_with):
+    host = host_with(tools=[LIST])
+    result = host.call("list_items", {"account": "a", "extra": 1})
+    assert result == tool_result("extra is not an argument of this tool", True)
+    assert not command_pids(host.package)
+    host.call("list_items", {"account": "a"})  # the pid file is how a run shows
+    assert command_pids(host.package)
+
+
+def test_a_leading_dash_value_is_refused(host_with):
+    host = host_with(tools=[LIST])
+    result = host.call("list_items", {"account": "--delete"})
+    assert result["isError"] is True and "begins with -" in text_of(result)
+    assert not command_pids(host.package)
+
+
+def test_a_nonzero_exit_is_an_error_with_stderr(host_with):
+    host = host_with(tools=[RUN])
+    assert host.call("run_mode", {"mode": "fail"}) == tool_result("exit 3\nboom\n", True)
+
+
+def test_long_output_is_cut_with_a_notice(host_with):
+    host = host_with(tools=[RUN])
+    text = text_of(host.call("run_mode", {"mode": "big"}))
+    assert len(text) == 100000 + len(CUT)
+    assert text == "x" * 100000 + CUT
+
+
+def test_output_beyond_what_the_server_keeps_is_still_cut_at_the_limit(host_with):
+    host = host_with(tools=[RUN])  # 150,000 characters of four bytes: the server keeps no more than 100,000 of them
+    assert text_of(host.call("run_mode", {"mode": "wide"})) == "\U0001F600" * 100000 + CUT
+
+
+def test_output_that_is_not_utf8_is_decoded_with_replacement(host_with):
+    host = host_with(tools=[RUN])
+    assert host.call("run_mode", {"mode": "latin"}) == tool_result("caf�")
+
+
+def test_a_command_that_fills_stderr_before_writing_stdout_does_not_hang(host_with):
+    host = host_with(tools=[NOISY])
+    assert host.call("run_noisy", {"mode": "noise"}) == tool_result("out")
+
+
+def test_a_command_has_no_input(host_with):
+    host = host_with(tools=[NOISY])  # the server's own input is the host's: a command must not read it
+    assert host.call("run_noisy", {"mode": "stdin"}) == tool_result("eof:")
+
+
+def test_a_timeout_says_the_effect_is_unknown(host_with):
+    host = host_with(tools=[SHORT])
+    result = host.call("run_short", {"mode": "sleep"})
+    assert result["isError"] is True
+    assert text_of(result).startswith(f"Stopped after 1 seconds. {STOP_NOTE}")
+    pids = command_pids(host.package)
+    assert pids
+    gone(pids)
+
+
+def test_a_timeout_returns_what_the_command_had_written(tmp_path):
+    package = build_package(tmp_path, tools=[RUN])
+    argv = [sys.executable, str(marker(package, "tool.py")), "sleep"]
+    result = package_server.run_command(argv, None, dict(os.environ), 2, threading.Event())
+    assert result == tool_result(f"Stopped after 2 seconds. {STOP_NOTE}\nstarted", True)
+    gone(command_pids(package))
+
+
+def test_a_missing_program_is_named(host_with):
+    host = host_with(tools=[{**run_tool("missing", []), "run": ["no-such-program-xyz"]}])
+    assert host.call("missing") == tool_result("Program not found on this machine: no-such-program-xyz", True)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="only Windows runs a .cmd file through cmd.exe")
+def test_a_batch_program_is_refused(host_with, monkeypatch, tmp_path):
+    programs = tmp_path / "programs"
+    programs.mkdir()
+    (programs / "demo-tool.cmd").write_text(f'@echo ran>"{tmp_path / "batch-ran"}"\r\n')
+    monkeypatch.setenv("PATH", f"{programs}{os.pathsep}{os.environ['PATH']}")  # before the server inherits it
+    host = host_with(tools=[{**run_tool("batch", []), "run": ["demo-tool"]}])
+    assert host.call("batch") == tool_result("demo-tool is a batch file, which Windows runs through cmd.exe: "
+                                             "declare the executable and its script instead", True)
+    assert not (tmp_path / "batch-ran").exists()
+
+
+def test_the_declared_env_is_added_to_the_servers_with_the_package_root_in_place(host_with):
+    host = host_with(tools=[run_tool("show_env", ["env"], env={"DEMO_VAR": "<package_root>/x"})])
+    assert json.loads(text_of(host.call("show_env"))) == [f"{host.package}/x", True]  # and PATH is still there
+
+
+def test_cancellation_stops_a_running_command(host_with):
+    host = host_with(tools=[RUN])
+    call = host.call_request("run_mode", {"mode": "sleep"})
+    pids = started(host.package)
+    host.notify("notifications/cancelled", {"requestId": call})
+    assert host.answer(call)["result"] == tool_result(CANCELLED, True)
+    gone(pids)
+
+
+def test_cancellation_stops_what_the_command_started(host_with):
+    host = host_with(tools=[RUN])
+    call = host.call_request("run_mode", {"mode": "tree"})
+    pids = started(host.package, 2)  # the command and its grandchild
+    host.notify("notifications/cancelled", {"requestId": call})
+    assert host.answer(call)["result"] == tool_result(CANCELLED, True)
+    gone(pids)
+
+
+def test_cancelling_one_command_leaves_the_others(host_with):
+    host = host_with(tools=[RUN])
+    slow = host.call_request("run_mode", {"mode": "sleep"})
+    short = host.call_request("run_mode", {"mode": "nap"})
+    pids = started(host.package, 2)
+    host.notify("notifications/cancelled", {"requestId": slow})
+    assert host.answer(slow)["result"] == tool_result(CANCELLED, True)
+    assert host.answer(short)["result"] == tool_result("done")
+    gone(pids)
+
+
+def test_a_command_that_leaves_something_holding_its_output_is_answered_when_it_exits(host_with):
+    host = host_with(tools=[RUN])
+    try:  # without a bound on the wait for the pipe, the answer would come when the grandchild ends, at 30 seconds
+        assert host.call("run_mode", {"mode": "leak"}) == tool_result("out")
+    finally:
+        wait_until(lambda: len(command_pids(host.package)) == 2)
+        for pid in command_pids(host.package):
+            if pid_alive(pid):  # the grandchild: the command itself has exited
+                os.kill(pid, signal.SIGTERM)  # on Windows this terminates it, as it does here
+
+
+def test_closing_stdin_stops_running_commands_and_children(host_with):
+    host = host_with(tools=[ECHO, RUN])
+    host.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "p"})
+    host.wait(lambda m: m.get("method") == "notifications/progress", "progress")  # the call is in the child
+    host.call_request("run_mode", {"mode": "sleep"})
+    pids = started(host.package) + child_pids(host.package)
+    assert len(pids) == 2 and all(pid_alive(pid) for pid in pids)
+    host.process.stdin.close()
+    assert host.process.wait(5) == 0
+    gone(pids)
+
+
+def test_a_command_is_not_started_once_the_server_is_closing(local):
+    peer = local(tools=[RUN])
+    peer.server.close()
+    assert peer.call("run_mode", {"mode": "sleep"}) == tool_result(CANCELLED, True)
+    assert not command_pids(peer.package)
+
+
+class Flickering(package_server._Slot):
+    """A slot whose server is gone from its second look on: what another worker's drop does between two looks."""
+
+    looks = 0
+
+    @property
+    def server(self):
+        self.looks += 1
+        return self._server if self.looks == 1 else None
+
+    @server.setter
+    def server(self, value):
+        self._server = value
+
+
+def test_a_slot_that_changes_between_two_looks_is_read_once_and_reported(local):
+    peer = local()
+    peer.call("echo")  # the child is up
+    live = peer.server._slots["stub"]
+    flickering = Flickering()
+    flickering.server, flickering.listing = live.server, live.listing
+    peer.server._slots["stub"] = flickering
+    try:
+        assert peer.call("echo") == tool_result("stub: the server stopped", True)
+    finally:
+        peer.server._slots["stub"] = live  # close() reaches the child through it
+
+
+def test_a_request_id_that_is_a_boolean_names_no_call(host):
+    call = host.call_request("echo", {"wait": 1.5, "progress": 1}, meta={"progressToken": "p"})
+    assert call == 1  # True == 1: a cancellation of `true` must not reach this call
+    host.wait(lambda m: m.get("method") == "notifications/progress", "progress")  # the call is in the child
+    host.notify("notifications/cancelled", {"requestId": True})
+    assert host.answer(call)["result"] == tool_result('{"wait": 1.5, "progress": 1}')
 
 
 def test_the_progress_of_a_call_reaches_the_host_unchanged_and_once(host):
@@ -416,6 +722,14 @@ def test_the_first_file_root_is_where_children_work(local, tmp_path):
     peer = local()
     roots(peer, [{"uri": "https://example.invalid/x"}, {"uri": work.as_uri()}, {"uri": tmp_path.as_uri()}])
     assert working_directory(peer).samefile(work)
+
+
+def test_a_command_runs_in_the_first_file_root(local, tmp_path):
+    work = tmp_path / "work dir"
+    work.mkdir()
+    peer = local(tools=[run_tool("show_cwd", ["cwd"])])
+    roots(peer, [{"uri": work.as_uri()}])
+    assert Path(text_of(peer.call("show_cwd"))).samefile(work)
 
 
 @pytest.mark.parametrize("answer", [None, [], [{"uri": "https://example.invalid/x"}], [{"uri": "file://["}],
