@@ -9,12 +9,13 @@ stdin/stdout, one message per line.
 """
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any, Callable
 
 from . import __version__
+from .jsonrpc import (METHOD_NOT_FOUND, PARSE_ERROR, PROTOCOL_VERSION, error, read_messages,
+                      result, tool_result, write_message)
 
 _PREPARED = ("Read PROMPT.md and the evidence it names in the returned directory, do the "
              "judgment yourself, write the resulting files into the package directory with "
@@ -166,22 +167,11 @@ def call_tool(name: str, arguments: dict[str, Any], default_manifest: Path,
     return 1, f"Unknown tool: {name}"
 
 
-def _write(message: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(message, ensure_ascii=False) + "\n")
-    sys.stdout.flush()
-
-
 def serve(default_manifest: Path, tools: frozenset[str] | None = None) -> int:
     """Serve MCP on stdio until stdin closes: every tool, or only `tools` (listed and callable alike)."""
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            message = json.loads(line)
-        except json.JSONDecodeError:
-            _write({"jsonrpc": "2.0", "id": None,
-                    "error": {"code": -32700, "message": "Parse error"}})
+    for message in read_messages(sys.stdin):
+        if message is None:
+            write_message(error(None, PARSE_ERROR, "Parse error"))
             continue
         method = message.get("method")
         msg_id = message.get("id")
@@ -189,17 +179,17 @@ def serve(default_manifest: Path, tools: frozenset[str] | None = None) -> int:
             continue
         if method == "initialize":
             params = message.get("params") or {}
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {
-                "protocolVersion": params.get("protocolVersion") or "2024-11-05",
+            write_message(result(msg_id, {
+                "protocolVersion": params.get("protocolVersion") or PROTOCOL_VERSION,
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "muro", "version": __version__},
-            }})
+            }))
             continue
         if method == "ping":
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {}})
+            write_message(result(msg_id, {}))
             continue
         if method == "tools/list":
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": tool_definitions(tools)}})
+            write_message(result(msg_id, {"tools": tool_definitions(tools)}))
             continue
         if method == "tools/call":
             params = message.get("params") or {}
@@ -209,12 +199,8 @@ def serve(default_manifest: Path, tools: frozenset[str] | None = None) -> int:
                 code, text = call_tool(name, arguments, default_manifest, tools)
             except Exception as exc:  # a tool bug must not kill the server
                 code, text = 1, f"{type(exc).__name__}: {exc}"
-            _write({"jsonrpc": "2.0", "id": msg_id, "result": {
-                "content": [{"type": "text", "text": text or f"exit {code}"}],
-                "isError": code != 0,
-            }})
+            write_message(result(msg_id, tool_result(text or f"exit {code}", code != 0)))
             continue
         if msg_id is not None:
-            _write({"jsonrpc": "2.0", "id": msg_id,
-                    "error": {"code": -32601, "message": f"Method not found: {method}"}})
+            write_message(error(msg_id, METHOD_NOT_FOUND, f"Method not found: {method}"))
     return 0
