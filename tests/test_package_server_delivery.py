@@ -203,6 +203,15 @@ def test_a_run_tool_may_carry_timeout_env_and_annotations():
     assert errors_for(document) == []
 
 
+def test_a_child_no_tool_forwards_to_is_refused():
+    # Claude Code registers only the package server, so a child no tool forwards to would never be started.
+    document = packaged(children=("stub", "other"))
+    document["mcp_servers"].append({**SERVER, "name": "other"})
+    assert errors_for(document) == ["child other has no tool that forwards to it: remove it from children or forward a tool"]
+    tool(document, "echo")["forward"]["server"] = "other"
+    assert errors_for(document) == ["child stub has no tool that forwards to it: remove it from children or forward a tool"]
+
+
 def test_a_forwarded_tool_may_be_renamed_when_two_tools_would_share_a_name():
     # A run tool already named `echo`: the child's `echo` cannot keep its name, and any unique one is accepted.
     document = packaged()

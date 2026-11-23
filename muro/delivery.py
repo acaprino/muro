@@ -340,7 +340,11 @@ def server_section_errors(sections: Any) -> list[str]:
         errors.append(f"package_server name {name} shares its name with a registered server")
     if not isinstance(tools, list) or not tools:
         return errors + ["package_server tools must be a nonempty list of tool declarations"]
-    return errors + _tool_errors(tools, children, declared)
+    errors += _tool_errors(tools, children, declared)
+    forwarded = {tool["forward"].get("server") for tool in tools
+                 if isinstance(tool, dict) and isinstance(tool.get("forward"), dict)}
+    return errors + [f"child {child} has no tool that forwards to it: remove it from children or forward a tool"
+                     for child in dict.fromkeys(children) if child not in forwarded]
 
 
 def _tool_reference_errors(document: dict[str, Any], source_ids: set[str], tool_sources: set[str]) -> list[str]:

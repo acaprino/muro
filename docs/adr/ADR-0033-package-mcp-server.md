@@ -592,6 +592,12 @@ lost if it was wrong.
   alone" and does not know the tools of a server that stays registered, so it does
   not check that a tool name differs from them. The Harmonizer AI does both from
   the source, and the prompts say so.
+- A child that no tool forwards to is refused at validation ("child X has no tool
+  that forwards to it: remove it from children or forward a tool"). Claude Code
+  registers the package server in its place, so the child would never be started
+  while its `mcp-server` decision still said its tools exist. The design did not
+  state this check; it is a reference check, and a source's part is not dropped
+  without a decision.
 - `PACKAGE_SERVER_HOSTS` holds Claude Code although no live session has run, which
   differs from the constraint that a host joins the list after it was run live. The
   live run of section 6 can only happen on a build that registers the server, and

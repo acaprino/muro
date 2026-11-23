@@ -118,7 +118,8 @@ def build_package(tmp_path, tools=(ECHO,), mode="echo", entry=None):
     (package / "scripts" / "demo").mkdir(parents=True)
     (package / "scripts" / "demo" / "stub.py").write_text(STUB, encoding="utf-8")
     (package / "scripts" / "demo" / "tool.py").write_text(TOOL, encoding="utf-8")
-    sections = {"package_server": {"name": "pack", "children": ["stub"], "tools": list(tools)},
+    children = ["stub"] if any("forward" in tool for tool in tools) else []  # a child no tool forwards to is refused
+    sections = {"package_server": {"name": "pack", "children": children, "tools": list(tools)},
                 "mcp_servers": [entry or {"name": "stub", "source": "demo",
                                           "run": ["python", "<package_root>/scripts/demo/stub.py", mode]}]}
     if entry is None:  # a fixture that cannot pass the server's own check proves nothing
