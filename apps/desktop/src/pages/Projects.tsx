@@ -7,13 +7,17 @@ import { ProjectProvider, useProject } from '../state/useProject.tsx';
 import { useNotify } from '../state/notices.tsx';
 import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
+import { DeleteDialog, atRevision, nameOf } from './project/write/DeleteDialog.tsx';
+import { JobCard } from './project/write/JobCard.tsx';
+import { busyReason, runningOn } from './project/write/jobs.ts';
+import { NewProjectDialog } from './project/write/NewProjectDialog.tsx';
 import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
 
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
- * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). The open project is the
- * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. The write side (new project, harmonize, add an input) is a later plan. Its notices
- * are the window's one stack (`NoticesProvider`, mounted above the window in mount.tsx). */
+ * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). A new project is made by an AI run
+ * (`NewProjectDialog`, followed by the job card above the list) and a project is deleted, file and all, after asking (`DeleteDialog`). The open project is the
+ * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. Its notices are the window's one stack (`NoticesProvider`, mounted above the window in mount.tsx). */
 export function Projects() {
   return (
     <ProjectProvider>
@@ -22,7 +26,6 @@ export function Projects() {
   );
 }
 
-const nameOf = (p: ProjectSummary): string => p.project?.name || p.plugin?.name || p.id;
 const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
 const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
@@ -59,12 +62,18 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const { request, snapshot, adopt } = useRegistry();
   const project = useProject();
   const notify = useNotify();
+  const { jobs, running } = useJobs();
   const [noPicker, setNoPicker] = React.useState(false);
   const [opening, setOpening] = React.useState(false);
+  const [making, setMaking] = React.useState(false);
   const [removal, setRemoval] = React.useState<{ open: boolean; target: ProjectSummary | null }>({ open: false, target: null });
   const [removing, setRemoving] = React.useState(false);
+  const [deletion, setDeletion] = React.useState<{ open: boolean; target: ProjectSummary | null }>({ open: false, target: null });
+  const newButton = React.useRef<HTMLButtonElement>(null);
   const latest = React.useRef(snapshot);
   latest.current = snapshot;
+  // One AI run goes at a time: while one does, a new project is not offered, and the button says why.
+  const busy = busyReason(running);
 
   async function openFile(): Promise<void> {
     let picked: { path: string | null } | null;
@@ -90,17 +99,8 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
    * project Muro ships is refused by the service, whatever the page shows. */
   async function remove(p: ProjectSummary): Promise<void> {
     setRemoving(true);
-    const send = (revision: number) => request<Snapshot>('remove_project', { id: p.id, revision });
     try {
-      const revision = latest.current?.registry.revision ?? (await request<Snapshot>('snapshot')).registry.revision;
-      let saved: Snapshot;
-      try { saved = await send(revision); }
-      catch (e) {
-        if (!/Registry revision changed/.test(message(e))) throw e;
-        const read = await request<Snapshot>('snapshot');
-        adopt(read);
-        saved = await send(read.registry.revision);
-      }
+      const saved = await atRevision(request, latest.current, adopt, revision => request<Snapshot>('remove_project', { id: p.id, revision }));
       setRemoval(r => ({ ...r, open: false }));
       adopt(saved);
       await loadList();
@@ -111,11 +111,12 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
     } finally { setRemoving(false); }
   }
 
-  const openButton = noPicker ? null : <Button loading={opening} loadingText="Opening the project file…" onClick={() => void openFile()}>Open project file…</Button>;
+  // The one solid button of the list is New project; opening a file is the other way in, so it is an outline.
+  const openButton = noPicker ? null : <Button variant="outline" loading={opening} loadingText="Opening the project file…" onClick={() => void openFile()}>Open project file…</Button>;
   let body: React.ReactNode;
   if (list === null && error) body = <Empty title="Projects could not be read" description={error} action={<Button variant="outline" onClick={() => void loadList()}>Try again</Button>} />;
   else if (list === null) body = <p role="status" className="text-sm text-ink-mute">Reading the projects…</p>;
-  else if (!list.length) body = <Empty title="No project yet" description="Open a project file to add it here." action={openButton} />;
+  else if (!list.length) body = <Empty title="No project yet" description="Make one from the plugins and skills you want in it, or open a project file to add it here." action={openButton} />;
   else body = (
     <Table aria-label="Projects">
       <TableHeader>
@@ -125,7 +126,16 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
         </TableRow>
       </TableHeader>
       <TableBody>
-        {list.map(p => <ProjectRow key={p.id} p={p} onOpen={() => project.open(p.id)} onRemove={() => setRemoval({ open: true, target: p })} />)}
+        {list.map(p => (
+          <ProjectRow
+            key={p.id}
+            p={p}
+            deleteReason={busyReason(runningOn(jobs, p.id))}
+            onOpen={() => project.open(p.id)}
+            onRemove={() => setRemoval({ open: true, target: p })}
+            onDelete={() => setDeletion({ open: true, target: p })}
+          />
+        ))}
       </TableBody>
     </Table>
   );
@@ -138,10 +148,17 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
           <h1 className="text-xl font-semibold text-ink">Projects</h1>
           <p className="text-sm text-ink-mute">A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.</p>
         </div>
-        {list && !list.length ? null : openButton}
+        <div className="flex flex-wrap items-center gap-2">
+          <span title={busy ?? undefined}>
+            <Button ref={newButton} disabled={busy !== null} onClick={() => setMaking(true)}><Icon name="plus" />New project…</Button>
+          </span>
+          {list && !list.length ? null : openButton}
+        </div>
       </header>
+      <JobCard projectId={null} />
       {body}
       {snapshot ? <Published snapshot={snapshot} /> : null}
+      <NewProjectDialog open={making} onOpenChange={setMaking} listed={list ?? []} restoreFocusTo={newButton} />
       <Dialog
         open={removal.open}
         onOpenChange={open => { if (!open && !removing) setRemoval(r => ({ ...r, open: false })); }}
@@ -154,13 +171,22 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
           </>
         ) : null}
       />
+      {deletion.target ? (
+        <DeleteDialog
+          project={deletion.target}
+          open={deletion.open}
+          onOpenChange={open => setDeletion(d => ({ ...d, open }))}
+          onDeleted={() => loadList()}
+        />
+      ) : null}
     </div>
   );
 }
 
 /** One project file of the list: its name (which opens it), its version, whether Muro ships it, its file and what it holds; or, for a file that cannot be read, why.
- * "Remove from list" is on every project but the one Muro ships (`included`, which the runtime says: never a field of the file, which anyone can write). */
-function ProjectRow({ p, onOpen, onRemove }: { p: ProjectSummary; onOpen: () => void; onRemove: () => void }) {
+ * "Remove from list" and "Delete…" are on every project but the one Muro ships (`included`, which the runtime says: never a field of the file, which anyone can write).
+ * "Delete…" is off while an AI run is changing the project (`deleteReason` says why). */
+function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: ProjectSummary; deleteReason: string | null; onOpen: () => void; onRemove: () => void; onDelete: () => void }) {
   const name = nameOf(p), counts = countsOf(p);
   return (
     <TableRow>
@@ -179,7 +205,14 @@ function ProjectRow({ p, onOpen, onRemove }: { p: ProjectSummary; onOpen: () => 
         </div>
       </TableCell>
       <TableCell className="text-end">
-        {p.included ? null : <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>}
+        {p.included ? null : (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>
+            <span title={deleteReason ?? undefined}>
+              <Button variant="outline" size="sm" aria-label={`Delete ${name}…`} disabled={deleteReason !== null} onClick={onDelete}>Delete…</Button>
+            </span>
+          </div>
+        )}
       </TableCell>
     </TableRow>
   );
