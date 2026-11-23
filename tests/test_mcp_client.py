@@ -188,6 +188,14 @@ def test_a_missing_program_is_named():
         child.start()
 
 
+def test_a_file_that_cannot_run_is_named(tmp_path):
+    not_a_program = tmp_path / "notes.txt"
+    not_a_program.write_text("not a program", encoding="utf-8")
+    child = ChildServer("stub", {"command": str(not_a_program), "args": [], "env": {}})
+    with pytest.raises(ChildError, match="stub: cannot start .*notes.txt"):
+        child.start()
+
+
 def test_close_stops_the_process(stub):
     child = stub()
     child.start()
