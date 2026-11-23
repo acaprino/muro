@@ -29,6 +29,12 @@ export interface Discovered { harness:string; name:string; executable:string; ve
 export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean }
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
 export interface CheckResult { snapshot:Snapshot; plan:Plan; errors:{plugin_id:string;message:string}[] }
+/** A source the last check could not resolve, with the service's words. */
+export type CheckError = CheckResult['errors'][number];
+/** The review sheet that is open: a plan, and the harness it was made for (null for the whole plan). A one-harness plan is never the plan the note and the table read. */
+export interface Review { plan:Plan; target_id:string|null }
+/** An apply under way: the plan, how many operations it runs (the removals it leaves out are not counted) and the names of their plugins, for the note and the sheet. */
+export interface ApplyProgress { plan_id:string; total:number; names:string }
 export interface Autostart { supported:boolean; enabled:boolean; current:boolean }
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;

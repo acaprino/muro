@@ -7,13 +7,15 @@ import {
   ToolbarTab, ToolbarTabs, WindowControls, useCommandKey, useMedia,
   type Command, type IconName, type TitleBarDragProps,
 } from '@acaprino/sigrid';
-import type { Page, Snapshot } from './types.ts';
-import { nextCheck, stamp, syncHeadline, type SyncHeadline } from './model.ts';
+import type { Page, Plan, Snapshot } from './types.ts';
+import { stamp, syncHeadline } from './model.ts';
 import { plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
 import { useNotify } from './state/notices.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
 import { ProjectJobsProvider } from './pages/project/write/useJobs.tsx';
+import { SyncProvider, useSync } from './pages/sync/useSync.tsx';
+import { checkedLine, chipOf } from './pages/sync/words.ts';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
 import { THEME_LABELS, otherChoices } from './theme.ts';
@@ -32,27 +34,14 @@ const DRAG: TitleBarDragProps = { 'data-tauri-drag-region': '' };
 /** Sigrid draws a window button only for an action it is given; the click is the window glue's (window.ts), so these do nothing. */
 const inert = (): void => {};
 
-/** What the status row leads with: the state of the sync in plain words. */
-function headline(h: SyncHeadline): string {
-  switch (h.kind) {
-    case 'no-harness': return 'No harness';
-    case 'not-checked': return 'Not checked yet';
-    case 'changes': return `${plural(h.operations, 'change')} waiting`;
-    case 'blocked': return 'Needs attention';
-    case 'unreadable': return 'A harness cannot be read';
-    case 'sources': return 'Sources not checked';
-    case 'ok': return 'In sync';
-  }
-}
-
-/** The status row: the state of the sync, when it was checked and when it is next (the record the service keeps), and how many harnesses are managed. */
-function StatusLine({ snapshot, error }: { snapshot: Snapshot | null; error: string | null }) {
+/** The status row: the state of the sync in a few words (the chip of the Imago window), when it was checked and when it is next (the record the service keeps), and how many harnesses are managed.
+ * `plan` is the plan this window made (useSync): it counts only for the registry revision it was made for, and with none the state is what the service recorded. */
+function StatusLine({ snapshot, error, plan }: { snapshot: Snapshot | null; error: string | null; plan: Plan | null }) {
   if (!snapshot) return <span>{error ? 'Registry not available' : 'Reading your registry…'}</span>;
-  const next = nextCheck(snapshot);
-  const checked = `Last check ${stamp(snapshot.sync.last_check)}${next ? ` · next check ${next}` : ''}`;
+  const checked = checkedLine(snapshot);
   return (
     <>
-      <span className="shrink-0 font-medium text-ink-soft">{headline(syncHeadline(snapshot, null))}</span>
+      <span className="shrink-0 font-medium text-ink-soft">{chipOf(syncHeadline(snapshot, plan)).text}</span>
       <span className="min-w-0 truncate" title={checked}>{checked}</span>
       <span className="flex-1" />
       <span className="shrink-0">{plural(snapshot.registry.targets.length, 'harness', 'harnesses')}</span>
@@ -83,6 +72,7 @@ function PageTabs({ page, go }: { page: Page; go: (value: string) => void }) {
 /** The window: the frame, the page of the tab and the surfaces over it. */
 function AppFrame() {
   const { snapshot, error, reload } = useRegistry();
+  const { plan } = useSync();
   const { choice, resolved, set: setChoice } = useScheme();
   const [page, setPage] = useState<Page>('sync');
   const [palette, setPalette] = useState(false);
@@ -137,7 +127,7 @@ function AppFrame() {
       contentLabel={current.label}
       titleBar={titleBar}
       tabs={tabsRow}
-      status={<StatusLine snapshot={snapshot} error={error} />}
+      status={<StatusLine snapshot={snapshot} error={error} plan={plan} />}
       footer={<FooterLine snapshot={snapshot} />}
     >
       {/* A page that fails while it is drawn says so in its own place; the frame, the palette and the notices stay. Another tab starts it afresh. */}
@@ -156,7 +146,7 @@ function AppFrame() {
   );
 }
 
-/** The window, with the AI runs of the runtime (`useJobs`) available to every page of it. */
+/** The window, with the sync state (`useSync`) and the AI runs of the runtime (`useJobs`) available to every page of it. */
 export function App() {
-  return <ProjectJobsProvider><AppFrame /></ProjectJobsProvider>;
+  return <SyncProvider><ProjectJobsProvider><AppFrame /></ProjectJobsProvider></SyncProvider>;
 }
