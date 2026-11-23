@@ -151,13 +151,15 @@ owner chose "sostituzione sul posto".
   (the project workspace); the order of the others is the plans', not this
   record's.
 
-## What was not verified
+## What was verified and what was not
 
-Nothing was built or run: not the install of the Sigrid tarball, not the build
-with Vite and Tailwind, not `sigrid-check`, not the window, not a test. What is
-said about Sigrid is read from its repository and its release listing
-(`gh release view`, `gh release list`). The SHA-256 of the release has not been
-read. That `imago-shell` works with a page that no longer uses
-`@acaprino/imago/shell` (the overlay of Snap Layouts, the caption drawn by the
-page) is not checked. That `GraphCanvas` is legible for Marionette's graph is
-read from its description, not seen.
+Verified on CI (the Tests workflow, run on commit c531936): the install of the Sigrid tarball with the lockfile on Windows, the
+type check, the build with Vite and Tailwind, the unit tests, and the browser tests of the React window (the shell and the project
+workspace, against the fake service, including a graph of 37 capabilities in 15 entries). Nothing of this was run on this machine.
+
+Not verified: the window in Tauri with the real registry (the first run of the desktop with this front-end has not happened); that
+`imago-shell` works with a page that mounts Imago's window glue on Sigrid's title bar (the overlay of Snap Layouts, the caption
+buttons); the project file of the owner opened in this window; `sigrid-check` (it is not run by any CI step yet). Seen on the CI
+screenshots: with 15 closed entries the graph is a narrow column whose names are drawn at about 8 px (scale 0.59), and with two
+entries the canvas leaves a node cut at its right edge; both are asked of Sigrid, which also cannot draw an edge's kind or number
+several marked things (see the plan R0 report).

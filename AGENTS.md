@@ -14,8 +14,8 @@ Sigrid is not on npm. `package.json` names its GitHub Release tarball,
 `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
 (first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
 in `docs/verification/`. Never a `file:` path to a checkout, and never a git
-dependency that runs `prepare`. `package.json` changes in the commit that
-installs it; until then it still names Imago.
+dependency that runs `prepare`. The lockfile records the tarball's integrity;
+it is generated in CI (a throwaway workflow), never by an install here.
 
 Native window primitives (glass and native theme, caption controls, navigation
 guard) stay with the Rust crate `imago-shell`, pinned in
