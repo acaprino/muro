@@ -51,6 +51,7 @@ _TOOL_KEYS = {"name", "source", "description", "input_schema"}
 _TOOL_OPTIONAL = {"annotations", "timeout", "env"}
 _TOOL_COMMANDS = {"forward", "run"}
 _TOOL_NAME = re.compile(r"[a-z][a-z0-9_]{0,39}")
+_FORWARDED_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")   # a forwarded tool keeps the child's name, whatever its spelling
 _CHOICE_KEYS = {"asked_on", "answer", "given_on"}
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 _COMMIT = re.compile(r"[0-9a-fA-F]{7,}")
@@ -211,8 +212,9 @@ def _tool_errors(tools: list, children: list[str], declared: dict[str, Any]) -> 
             continue
         name = tool["name"]
         label = f"package_server tool {name}"
-        if not isinstance(name, str) or not _TOOL_NAME.fullmatch(name):
-            errors.append(f"package_server tool name must match [a-z][a-z0-9_]{{0,39}}: {name}")
+        spelling = _FORWARDED_NAME if "forward" in tool else _TOOL_NAME
+        if not isinstance(name, str) or not spelling.fullmatch(name):
+            errors.append(f"package_server tool name must match {spelling.pattern}: {name}")
         elif name in seen:
             errors.append(f"{label} is declared twice")
         else:

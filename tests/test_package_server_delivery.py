@@ -130,7 +130,8 @@ def _own_name(document):
     (lambda d: d["package_server"].update(children=["ghost"]), "children names a server that is not declared: ghost"),
     (_own_name, "shares its name with a registered server"),
     (_two_echoes, "tool echo is declared twice"),
-    (_set("echo", "name", "Bad-Name"), "tool name must match"),
+    (_set("lookup", "name", "Bad-Name"), "tool name must match"),
+    (_set("echo", "name", "bad name"), "tool name must match"),
     (_both, "exactly one of forward and run"),
     (lambda d: tool(d, "echo")["forward"].update(server="other"), "forwards to a server that is not a child"),
     (_renamed, "keeps the child's tool name"),
@@ -198,6 +199,18 @@ def test_a_forwarded_tool_may_be_renamed_when_two_tools_would_share_a_name():
     tool(document, "lookup")["name"] = "echo"
     tool(document, "echo")["name"] = "echo2"
     assert errors_for(document) == []
+
+
+def test_a_forwarded_tool_keeps_the_childs_name_whatever_its_spelling():
+    document = packaged()
+    tool(document, "echo").update(name="getThing-2", forward={"server": "stub", "tool": "getThing-2"})
+    assert errors_for(document) == []
+
+
+def test_a_run_tool_keeps_the_strict_name():
+    document = packaged()
+    tool(document, "lookup")["name"] = "getThing"
+    assert any("tool name must match [a-z][a-z0-9_]{0,39}: getThing" in e for e in errors_for(document))
 
 
 def test_a_forwarded_tool_takes_the_source_of_its_child():
