@@ -6,13 +6,20 @@ child or a form. The servers and tools here are stubs; no real source is named.
 """
 import copy
 import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 
 from muro import build_release
-from muro.delivery import (FORMS, package_server_gate_errors, server_section_errors, server_sections,
+from muro.delivery import (FORMS, claude_code_mcp, package_server_gate_errors, server_section_errors, server_sections,
                            validate_delivery)
 from muro.guide import _I18N
+from muro.jsonrpc import tool_result
+from test_package_server import Host
 
 
 class Cap:
@@ -407,3 +414,101 @@ def test_a_release_without_a_package_server_writes_no_such_file(portable_project
     release = build(portable_project, tmp_path)
     assert not (release / "package-server.json").exists()
     assert not (release / "adapters/claude-code/skills/muro/package-server.json").exists()
+
+
+# --- The installed plugin end to end, and what INSTALL.md says ------------------------------------------------
+
+SCRIPT = "<package_root>/scripts/demo/tool.py"   # packaged by `scripted_project`: it prints its arguments as JSON
+LIVE = "the package server `pack` is registered only on hosts where it was run live (Claude Code)."
+
+
+@pytest.fixture
+def scripted_project(portable_project):
+    """The shared fixture project, whose source also packages `tool.py`."""
+    path = portable_project / "sources.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    source = manifest["sources"][0]
+    repo = Path(source["repo_path"])
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    (repo / "tool.py").write_text("import json, sys\nsys.stdout.write(json.dumps(sys.argv[1:]))\n", encoding="utf-8")
+    git("add", "tool.py")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "tool")
+    source["commit"] = git("rev-parse", "HEAD")
+    source["selected_paths"] = ["SKILL.md", "tool.py"]
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    return portable_project
+
+
+def test_the_emitted_entry_serves_a_run_tool_from_a_root_with_spaces(scripted_project, tmp_path):
+    declare_packaged(scripted_project, children=[], tools=({**RUN, "run": ["python", SCRIPT, "{q}"]},))
+    release = build(scripted_project, tmp_path)
+    root = tmp_path / "plugin root è & 100%"
+    shutil.copytree(release / "adapters/claude-code", root)
+    entry = json.loads((root / ".mcp.json").read_text(encoding="utf-8"))["mcpServers"]["pack"]
+    assert entry["command"] == "python"
+
+    def expand(text):  # as the host does, before it starts the entry
+        return text.replace("${CLAUDE_PLUGIN_ROOT}", str(root))
+
+    env = {**os.environ, **{name: expand(value) for name, value in entry["env"].items()}}
+    host = Host([sys.executable, *map(expand, entry["args"])], tmp_path, env)   # this interpreter stands for `python`
+    try:
+        assert host.ask("initialize", {"capabilities": {}})["result"]["serverInfo"]["name"] == "pack"
+        assert [tool["name"] for tool in host.ask("tools/list")["result"]["tools"]] == ["lookup"]
+        assert host.call("lookup", {"q": "two words"}) == tool_result('["two words"]')
+    finally:
+        host.close()
+
+
+def test_the_entry_starts_the_launcher_of_the_commands_skill_folder():
+    entry = claude_code_mcp(packaged(), "crane")["mcpServers"]["pack"]
+    assert entry["args"] == ["${CLAUDE_PLUGIN_ROOT}/skills/crane/muro.py", "tools-server"]
+
+
+def test_install_notes_say_where_the_package_server_is_registered(portable_project, tmp_path):
+    declare_packaged(portable_project)
+    release = build(portable_project, tmp_path)
+    claude = (release / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
+    assert "MCP server `pack`" in claude and "starts `stub` itself" in claude
+    assert ("Tools appear under the server `pack`. Their ids changed with the server's name: a permission rule "
+            "saved for the old ids no longer matches.") in claude
+    for host in ("codex", "pi", "opencode", "hermes"):
+        note = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+        assert f"This host registers the absorbed servers as they are: {LIVE}" in note
+        assert "MCP server `stub`" in note and "Their ids changed" not in note
+
+
+def test_the_other_hosts_register_none_of_the_package_server(portable_project, tmp_path):
+    declare_packaged(portable_project)
+    release = build(portable_project, tmp_path)
+    for path in ("adapters/pi/extensions/mcp.js", "adapters/opencode/index.js"):
+        text = (release / path).read_text(encoding="utf-8")
+        assert '"stub"' in text and '"pack"' not in text
+    for path in ("adapters/codex/mcp.json", "adapters/hermes-mcp/mcp.json"):
+        assert list(json.loads((release / path).read_text(encoding="utf-8"))["mcpServers"]) == ["stub"]
+
+
+def test_a_package_server_with_no_absorbed_server_is_still_named_in_the_notes(portable_project, tmp_path):
+    document = declare_packaged(portable_project, children=[], tools=({**RUN, "run": ["python", PACKAGED, "{q}"]},))
+    document["decisions"] = [item for item in document["decisions"] if item["form"] != "mcp-server"]
+    del document["mcp_servers"]
+    (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    release = build(portable_project, tmp_path)
+    claude = (release / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
+    assert "MCP server `pack`" in claude
+    assert "The package server `pack` serves the commands this package declares. Tools appear under" in claude
+    assert "Their ids changed" not in claude    # no child, so no tool had other ids before
+    assert list(json.loads((release / "adapters/claude-code/.mcp.json").read_text(encoding="utf-8"))["mcpServers"]) == ["pack"]
+    for host in ("codex", "pi", "opencode", "hermes"):
+        note = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+        assert f"This host registers no server of this package: {LIVE}" in note and "MCP server" not in note
+
+
+def test_without_a_package_server_install_notes_are_what_they_were(portable_project, tmp_path):
+    declare(portable_project)
+    release = build(portable_project, tmp_path)
+    for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
+        assert "package server" not in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")

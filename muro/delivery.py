@@ -604,17 +604,39 @@ _SERVER_CHANNELS = {
 }
 
 
+def _package_server_note(declaration: dict[str, Any], host: str, absorbed: bool) -> str:
+    """Where the package server is registered: on the host it was run live on, and on no other."""
+    name = declaration["name"]
+    if host not in PACKAGE_SERVER_HOSTS:
+        lead = "This host registers the absorbed servers as they are" if absorbed \
+            else "This host registers no server of this package"
+        return f"{lead}: the package server `{name}` is registered only on hosts where it was run live (Claude Code)."
+    children = ", ".join(f"`{child}`" for child in declaration["children"])
+    served = (f"starts {children} itself, on the first call that needs it, and serves the tools this package declares"
+              if children else "serves the commands this package declares")
+    moved = (" Their ids changed with the server's name: a permission rule saved for the old ids no longer matches."
+             if children else "")
+    return f"The package server `{name}` {served}. Tools appear under the server `{name}`.{moved}"
+
+
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
     """What this host's adapter registers by itself, and what it does not."""
-    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document)):
+    declaration = package_server(document)
+    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document) or declaration):
         return ""
     notes = []
     channel = _SERVER_CHANNELS.get(host)
-    if mcp_servers(document) and channel:
-        names = ", ".join(f"`{server['name']}`" for server in mcp_servers(document))
-        notes.append(f"MCP server {names}: registered automatically through {channel}, and started from this "
-                     "package's own files. If a server with the same tools is already configured on this host "
-                     "(the original this package absorbed), remove it: two copies offer the same tools twice.")
+    servers = registered_servers(document, host)
+    server_note = ""
+    if servers and channel:
+        names = ", ".join(f"`{server['name']}`" for server in servers)
+        server_note = (f"MCP server {names}: registered automatically through {channel}, and started from this "
+                       "package's own files. If a server with the same tools is already configured on this host "
+                       "(the original this package absorbed), remove it: two copies offer the same tools twice.")
+    if declaration:
+        server_note = f"{server_note} {_package_server_note(declaration, host, bool(mcp_servers(document)))}".strip()
+    if server_note:
+        notes.append(server_note)
     if session_text(document):
         channels = {
             "claude-code": "a native `prompt.compose` module in `hooks/hooks.json`, adding a system-prompt section while preserving the host's other sections. Requires Claude Code mods (2.1.287+) enabled",
