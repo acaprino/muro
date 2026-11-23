@@ -83,7 +83,7 @@ Registry writes are revision-checked and atomic; native operations have a journa
 
 The graph shows every capability as a button under its discovery entry, with the conditions (*needs*) and conflicts the plugin declares; a capability opens in the panel at the right with its role, intents, branches and outputs. The simulator shows which branch of the graph a request activates, and in what order, in two ways.
 
-- **A documented example** of the project is chosen from the list, and its own recorded decision is shown. It runs no AI and costs nothing.
+- **A documented example** of the project is chosen from the list, and its own recorded decision is shown. It runs no AI and costs nothing. Each example in the list shows its request, the intents of its steps and what they produce, so the list can be read without a click.
 - **A free-text request** is classified by the AI, never by matching words, and the answer is validated with the runtime's own rules before it is shown: a decision (the ordered steps with the reason of each; a prerequisite the plugin adds is marked as one), no match, a question, or an answer that is not a valid decision with what the validator said. The result says who answered, what it cost and how long it took. **Cancel** stops waiting for the answer and asks the runtime to end the process; the request holds nothing else of the window, which goes on meanwhile.
 
 Settings → AI chooses the engine for every free-text request:
