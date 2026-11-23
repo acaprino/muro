@@ -30,7 +30,9 @@
 //             runEnds            '' (default): an AI run (create_project, project_job) goes on until a test ends it with behind.finish(); 'completed', 'failed', 'cancelled' or 'interrupted':
 //                                it ends by itself runDelay ms after it starts (default 0: on the next turn of the event loop, after the answer that started it)
 //             runMessage         what a run that failed says (default "The AI run failed (exit code: 1); see output.log"); the file "was not changed" follows, as the runtime says it
-//             cancelHolds        cancel_job answers as the runtime does and the run goes on until behind.finish() (a run that is slow to stop)
+//             cancelHolds        cancel_job answers as the runtime does and the run goes on until behind.finish() (a run that is slow to stop). A project run in the phase "Building and saving the project" ignores
+//                                a cancel whatever the flag says, as the runtime does once the commit started; a cancel before that ends the run as `cancelled`, with the words of the phase it was in (below)
+//             staleDeletes (n)   the next n delete_project requests are refused as the registry refuses a stale revision, and the registry has moved on (its revision is one higher), so the page's retry carries a new one
 //             updatesError       project_updates fails with this message (an upstream that cannot be reached)
 //             A run is a job of kind "project" (jobs, snapshot.jobs): the runtime's fields (project_id, operation, title, file, phase, budget_usd, log_path, message, time in epoch seconds). One goes at a time,
 //             and an adaptation counts. When a run completes it does what the factory's commit does and nothing about meaning: a new project is listed (and its file exists); a change moves the version by its
@@ -41,7 +43,10 @@
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
 //   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision;
 //   behind.finish(status, message) ends the AI runs that go (status completed, failed, cancelled or interrupted; the message defaults to the runtime's own), behind.phase(text) says the phase they are in,
-//   behind.touch(id) writes a project's file (another window, a sync: the page's digest is stale), behind.digest(id) is the digest of its file now.
+//   behind.touch(id) writes a project's file (another window, a sync: the page's digest is stale), behind.digest(id) is the digest of its file now,
+//   behind.adapt(plugin, harness) starts an AI adaptation as another client would, and the page is not told: its next request is refused ("Another AI run is in progress").
+//   What a run says when it is cancelled depends on where it was, as the runtime's does: during the agent ("The AI run cancelled or exceeded <n>-minute deadline; inspect output.log. The project file was
+//   not changed", phase "AI intake and harmonization") and between the steps of the run ("Job cancelled. The project file was not changed").
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
 // installed outside the list), removals (an exclusive harness: one plugin to install, one outside the list to uninstall and one record whose files are gone,
 // `present: false`, to clear), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
@@ -188,7 +193,7 @@ export function createTransport(scenario = 'default') {
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
-  Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '' });   // the knobs of the project writes
+  Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '', staleDeletes: 0 });   // the knobs of the project writes
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
@@ -279,6 +284,8 @@ export function createTransport(scenario = 'default') {
   // with its refusals in its own words and in its own order, each checked here by its own copy (never by the page's: the fake is the other side of the wire). A change of the package is an AI run, a job of kind
   // "project" that goes on until a test ends it (behind.finish) or a flag makes it end by itself (flags.runEnds); what a run did is mechanical, as the factory's commit is. The fake judges nothing.
   const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
+  // The phases of a project run that the runtime's cancel and the page depend on (project_jobs.rs), and the limit of a project run (jobs::run).
+  const AGENT_PHASE = 'AI intake and harmonization', SAVING_PHASE = 'Building and saving the project', PROJECT_RUN_MINUTES = 120;
   const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
   const OPERATIONS = ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions'];
   const isControl = c => /\p{Cc}/u.test(c);
@@ -434,7 +441,8 @@ export function createTransport(scenario = 'default') {
     const said = {
       completed: !project ? 'Adapter validated and added to registry; review a new sync plan to install' : created ? 'The project was created and added to your list. Install it from its Install step' : 'The project was saved. Install it again from its Install step to bring the change to the harnesses',
       failed: `${flags.runMessage || 'The AI run failed (exit code: 1); see output.log'}${project ? '. The project file was not changed' : ''}`,
-      cancelled: project ? 'Job cancelled. The project file was not changed' : 'Job cancelled',
+      // The runtime's own words: the agent's step says it was cancelled or timed out (it cannot tell which), the others that the job was cancelled.
+      cancelled: project ? (job.phase === AGENT_PHASE ? `The AI run cancelled or exceeded ${PROJECT_RUN_MINUTES}-minute deadline; inspect output.log. The project file was not changed` : 'Job cancelled. The project file was not changed') : 'Job cancelled',
       interrupted: 'Previous desktop session ended; inspect log and retry. No automatic installation.',
     };
     if (status === 'completed') {
@@ -552,6 +560,7 @@ export function createTransport(scenario = 'default') {
     if (p.id === 'marionette') throw new Error('The project Muro ships cannot be deleted');
     const entry = listedFile(p.id);
     if (runningOn(p.id)) throw new Error('An AI run is changing this project: wait for it to finish, or cancel it');
+    if (flags.staleDeletes > 0) { flags.staleDeletes--; reg.revision++; throw new Error(STALE); }   // the registry moved behind the page's back
     if (p.revision !== reg.revision) throw new Error(STALE);
     projects.splice(projects.indexOf(entry), 1);
     flags.existingFiles = flags.existingFiles.filter(f => sameFile(f) !== sameFile(entry.path));
@@ -567,7 +576,8 @@ export function createTransport(scenario = 'default') {
   function cancelJob({ id }) {
     const job = jobs.find(j => j.id === id);
     if (!job) throw new Error('Job not found');
-    if (!flags.cancelHolds) settle(job, 'cancelled');
+    const saving = job.kind === 'project' && job.phase === SAVING_PHASE;   // the commit cannot be taken back half way: the runtime ignores a cancel from here on
+    if (!flags.cancelHolds && !saving) settle(job, 'cancelled');
     return { message: 'Cancellation requested; registry remains unchanged until validation completes' };
   }
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
@@ -612,6 +622,12 @@ export function createTransport(scenario = 'default') {
     if (payload.allow_blocked) result.left_out = plan.blockers;
     result.skipped_removals = skip ? removals : 0;
     return result;
+  }
+  // An AI adaptation of a plugin: a job with no kind, no title and no project.
+  function startAdaptation({ id, harness, budget_usd }) {
+    const job = { id: 'job-' + (jobs.length + 1), plugin_id: id, harness, status: 'running', phase: 'harmonization', budget_usd, log_path: 'D:/isolated/data/jobs/log.txt', message: 'Started', time: ago(0) };
+    jobs.push(job);
+    return structuredClone(job);
   }
   const request = async (action, payload = {}) => {
     calls.push({ action, payload: structuredClone(payload) });
@@ -697,7 +713,7 @@ export function createTransport(scenario = 'default') {
         return bump();
       }
       case 'resolve': { const p = reg.plugins.find(p => p.id === payload.id); if (p) p.last_checked = ago(0); return bump(); }
-      case 'adapt': { const job = { id: 'job-' + (jobs.length + 1), plugin_id: payload.id, harness: payload.harness, status: 'running', phase: 'harmonization', budget_usd: payload.budget_usd, log_path: 'D:/isolated/data/jobs/log.txt', message: 'Started', time: ago(0) }; jobs.push(job); return structuredClone(job); }
+      case 'adapt': return startAdaptation(payload);
       case 'cancel_job': return cancelJob(payload);
       case 'open_custom_instructions': case 'custom_instructions': return structuredClone(instructions().find(i => i.plugin_id === payload.id));
       case 'maintenance': return { message: payload.kind === 'verify' ? 'Every stored build is intact' : 'Nothing to clean up', details: [] };
@@ -726,6 +742,8 @@ export function createTransport(scenario = 'default') {
     phase(text) { for (const job of jobs.filter(j => j.status === 'running')) job.phase = text; },
     /** A project's file is written by someone else (another window, a sync): the digest the page read is stale. */
     touch(id) { rewrite(listedFile(id)); },
+    /** An AI adaptation another client started: the registry the page holds does not show it until the page reads again, and its own request is refused meanwhile. */
+    adapt(plugin = 'docs-writer', harness = 'opencode') { startAdaptation({ id: plugin, harness, budget_usd: 2 }); },
     /** The digest of a project's file now. */
     digest(id) { return listedFile(id).info.digest; },
   };

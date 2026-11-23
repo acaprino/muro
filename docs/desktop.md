@@ -137,7 +137,8 @@ AI that runs.
 
 **An AI run** changes the package itself: its inputs, how they fit together, its instructions. The runtime runs Claude Code
 on this computer, with its own credentials, in a work folder of the job, and the factory commits the result. The page sends
-`create_project` for a new project and `project_job` (with an `operation`) for a change of one:
+`create_project` for a new project and `project_job` (with an `operation`) for a change of one. [What a run can reach and
+what it costs](#what-an-ai-run-can-reach-and-what-it-costs) is said below, and in every dialog that starts one.
 
 - **New project…** (the list): a name, a plugin id (it follows the name until you type one), an author, a folder (the file is
   `<plugin id>.mp` in it; **Choose folder…** opens the shell's folder dialog, `pick_folder`, and is gone for the session where
@@ -147,8 +148,9 @@ on this computer, with its own credentials, in a work folder of the job, and the
 - **Harmonize again…** (the foot): the AI reads the inputs and the decision records again and fixes what no longer holds.
 - **Move pin…** and **Remove…** on each input (Inputs panel). Move pin offers **Check for updates**, which asks
   `project_updates` (read only) how the pin stands against its upstream and fills the field with a newer release it
-  reports; the field empty means the newest release. It is not offered for a frozen (`static`) pin. Removing asks first, with
-  the focus on Cancel, and is not offered for the only input.
+  reports; the field empty means the newest release. For a frozen (`static`) pin the button is there and off, and says why
+  (the input is held at the commit that was reviewed). Removing asks first, with the focus on Cancel, and is not offered for
+  the only input.
 - **Instructions…** (Inputs panel): the Markdown files of the project's own instructions, added, edited or removed. Only the
   files that changed are sent.
 
@@ -162,14 +164,27 @@ typed. When the agent chosen in Settings → AI is not Claude Code the page says
 Settings page that changes it is not in the window yet. Every change of an existing project carries the digest of the file
 the page shows: when the file changed since, the runtime refuses it (*The project file changed since it was opened…*).
 
-**The card of the run.** While a run goes its card shows the title, the phase, the time, the most it may cost, its log file
-and **Cancel** (the card says *Stopping* until the runtime ends the run): above the list for a new project, under the head
-of the project for a change. The runs are the runtime's, not the page's. The window reads them (`jobs`) when it opens, after
+**The card of the run.** While a run goes its card shows the title, the phase, the time, the most it may cost, when the
+runtime stops it (*Stops after 120 min* for a project run, 30 for an adaptation), its log file and **Cancel** (the card says
+*Stopping* until the runtime ends the run): above the list for a new project, under the head of the project for a change.
+The runs are the runtime's, not the page's. The window reads them (`jobs`) when it opens, after
 a start or a cancel, every 2 seconds while one goes and when the registry it reads shows one it did not know, so the card is
 there again after leaving the project or the tab, or after a reload. When a run ends the list and the open project are read
 again and the outcome is notified in the runtime's words. A run that failed, was cancelled or was interrupted stays on the
 card, with its log, until **Dismiss**; a run that succeeded is said once, if this window saw it going. One AI run goes at a
-time, adaptations included (the runtime's lock): while one does, no other AI run is offered and the buttons say why.
+time, adaptations included (the runtime's lock): while one does, no other AI run is offered and the buttons say why. The card
+of that run is on the Projects page whatever it is (the run of another project, the adaptation of a plugin: the window has no
+Activity page yet), saying whose it is, so it can be stopped from there. A request the runtime refuses because another run
+goes (one that `muroctl` or another client started) makes the window read the runs again, and the card shows.
+
+**Cancel, and the saving phase.** A Cancel before the factory builds the project leaves the file as it was: between the steps
+of the run the card says *Job cancelled. The project file was not changed*, and during the agent's step *The AI run cancelled
+or exceeded …-minute deadline; inspect output.log. The project file was not changed* (the runtime cannot tell a Cancel from
+its limit, and says both). Once the factory has started to build and save the project (the phase *Building and saving the
+project*) the runtime ignores a Cancel, because a build that replaces the file cannot be stopped half way: the card then
+shows no Cancel and says *The project is being saved: it cannot be cancelled now*. The run ends as it would have, with the
+file replaced or not.
+
 
 **An edit by hand** changes what no AI judges and runs none (`edit_project`, offline): **Edit details…** (name, author, the
 repository the project is published from, which can be taken away, and its changelog) and, in the Records panel, **Add
@@ -185,6 +200,25 @@ registry moved meanwhile). The project Muro ships has no such button.
 **Not in the window yet.** **Install on harnesses…** and **Review decisions…** (above), the Activity page, where ADR-0032
 decision 7 has the filter *AI runs*, and the pages of the plans R1 to R3. No change was run with a real Claude Code from this
 window, and none on a Windows window: see [the verification record](verification/2026-11-23-project-write-react.md).
+
+### What an AI run can reach, and what it costs
+
+- **It is not confined to its work folder.** The agent works in a folder of the job (the unpacked project, its inputs and
+  `custom-instructions/`), and the prompt asks it to work only there, but Claude Code runs with `Bash` allowed under
+  `acceptEdits`. It can read and write what you can, run the factory, and reach the network; the prompt is the only guard.
+  What a source says is data for the AI, never an order, and a source can still steer the agent (ADR-0032, decision 2).
+- **Nothing of the project configures it.** The run starts Claude Code with `--setting-sources user --strict-mcp-config`, so
+  the settings, hooks, `.mcp.json` and `CLAUDE.md` that a project file or its inputs carry (a `.mp` from elsewhere is untrusted)
+  load nothing. `muro project unpack` also refuses a member that is outside the layout of the format.
+- **Your own Claude Code still loads.** The `user` setting source is kept, because it holds the sign-in and the provider: your
+  plugins, hooks and global instructions go into every turn. A run therefore costs more per turn than a bare one, and a small
+  budget (the default is 5 USD, and the dialogs say so beside the field) can run out before the work is done; the run then ends
+  without saving, and the file is as it was. The budget is checked between turns, so a run can end slightly above it.
+- **It stops after 120 minutes.** A project run has its own limit, 120 minutes; the adaptation of a plugin keeps 30. A run past
+  it ends *failed*, with a message that names the limit, and its work folder stays for the log to be read against.
+- **What the factory takes from the AI's folder.** `muro project commit` takes the project's identity, its history and its
+  changelog from the project as the desktop holds it, never from the folder the agent wrote in, and refuses a run that changes
+  a record of yours or adds a binding record: the AI writes the package and its own records, not the owner's rules.
 
 ## The simulator and its engines
 
@@ -237,7 +271,7 @@ Portable distributions contain `portable.marker` and keep state under `data/` be
 
 **The window beside the worker.** The worker and the tray's **Pause** change the registry while the window is open or hidden. The window reads the registry again when it gets the focus (it is shown again from the tray, or clicked back to) and every 30 seconds while it has the focus, and only when no request of yours is waiting; an open dialog and the text being typed are kept, since React does not paint over them. It asks for no plan on the way: the recorded check says what changed. A project taken off the list (`remove_project`) that the registry refuses because it moved (*Registry revision changed*) is sent once more with the revision read again; only a second refusal reaches you. The Settings page of the earlier window retried its save the same way, over what the worker saved; it is not in the React window yet (plan R2).
 
-**Waiting for the registry.** The registry takes its writer lock without waiting and refuses a second request, and a check of sources that answer slowly holds it for as long as they take. The desktop shell does the waiting for every page, in one place: a request of the window waits for the sync in progress (10 minutes at most), then tries a busy registry again every 250 ms for 15 seconds before it returns the error. The tray and the worker read the lock-free `status` instead of a snapshot. A launch while another process holds the registry waits for it too. Inside the window the page sends its requests one after another, except `discover`, `simulate`, `cancel_simulation`, `jobs` and `cancel_job` (`ALONE` in `apps/desktop/src/queue.ts`): a simulation holds no registry lock while the AI works and can last minutes, so nothing else in the window waits for it and **Cancel** reaches the runtime while the run it stops is still going. The same holds for the AI runs of a project: `jobs`, which follows a run, and `cancel_job` do not wait behind a long `project_updates` or `edit_project` that the page sent before them. The shell holds a `simulate` back while a sync is in progress, like any request that reads the registry, and lets `cancel_simulation`, `env_present`, `discover` and `status` through.
+**Waiting for the registry.** The registry takes its writer lock without waiting and refuses a second request, and a check of sources that answer slowly holds it for as long as they take. The desktop shell does the waiting for every page, in one place: a request of the window waits for the sync in progress (10 minutes at most), then tries a busy registry again every 250 ms for 15 seconds before it returns the error. The tray and the worker read the lock-free `status` instead of a snapshot. A launch while another process holds the registry waits for it too. Inside the window the page sends its requests one after another, except `discover`, `simulate`, `cancel_simulation`, `jobs` and `cancel_job` (`ALONE` in `apps/desktop/src/queue.ts`): a simulation holds no registry lock while the AI works and can last minutes, so nothing else in the window waits for it and **Cancel** reaches the runtime while the run it stops is still going. The same holds for the AI runs of a project: `jobs`, which follows a run, and `cancel_job` do not wait behind a long `project_updates` or `edit_project` that the page sent before them. The shell holds a `simulate` back while a sync is in progress, like any request that reads the registry, and lets `cancel_simulation`, `env_present`, `discover`, `status`, `jobs` and `cancel_job` through (`WITHOUT_THE_LOCK` in `apps/desktop/src-tauri/src/main.rs`: the AI runs live in files of their own and take no registry lock).
 
 - **Automatic sync on:** it then applies the plan without a review step, except its removals. Blockers do not stop it: it applies what is ready and leaves the blocked items out, and the event says what was left out (Activity: *Automatic sync*, failed when blockers remain). The worker never uninstalls, whatever the rule for plugins outside your list says: it applies with `skip_removals`, and the removals stay in the sync state as pending until you confirm them in the review sheet. Its message then ends with how many wait (*31 removals wait for your confirmation*, or *1 removal waits for your confirmation*), after the changes it applied when it applied any; a plan of removals only makes no `apply` call.
 - **Automatic sync off:** it only checks. Nothing is installed or removed; the tray says how many changes are waiting (Activity: *Background check*).
@@ -248,7 +282,7 @@ For diagnostics, `Muro.exe --request ACTION '<json>'` runs one request through t
 
 Claude Code, Codex, OpenCode, Pi and Hermes have separate installation contracts. DeepSeek is discoverable through Mukade but has no Muro plugin adapter. An unavailable command or failed inventory is shown as incomplete, never as an empty installation. Existing host permissions remain authoritative.
 
-AI adaptation currently requires Claude Code for its budgeted execution. Codex does not expose an equivalent dollar-budget flag, so the app does not pretend to enforce one. Claude's budget is checked by the host between turns, not a strict prepaid ceiling. Jobs also have a 30-minute deadline. On Windows their subprocess trees are attached to a kill-on-close job object. Cancellation leaves the registry unchanged unless validated output has already been recorded. Native install commands can have host-specific effects; inspect the plan and resulting activity.
+AI adaptation currently requires Claude Code for its budgeted execution. Codex does not expose an equivalent dollar-budget flag, so the app does not pretend to enforce one. Claude's budget is checked by the host between turns, not a strict prepaid ceiling. Adaptation jobs have a 30-minute deadline; the AI runs of a project have their own, 120 minutes. On Windows their subprocess trees are attached to a kill-on-close job object. Cancellation leaves the registry unchanged unless validated output has already been recorded. Native install commands can have host-specific effects; inspect the plan and resulting activity.
 
 ## Verification
 

@@ -70,6 +70,8 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const [removing, setRemoving] = React.useState(false);
   const [deletion, setDeletion] = React.useState<{ open: boolean; target: ProjectSummary | null }>({ open: false, target: null });
   const newButton = React.useRef<HTMLButtonElement>(null);
+  /** The heading of the page: where focus goes when the button it was on is gone (a project deleted) or off (a run started). */
+  const heading = React.useRef<HTMLHeadingElement>(null);
   const latest = React.useRef(snapshot);
   latest.current = snapshot;
   // One AI run goes at a time: while one does, a new project is not offered, and the button says why.
@@ -145,7 +147,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-xl font-semibold text-ink">Projects</h1>
+          <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold text-ink outline-none">Projects</h1>
           <p className="text-sm text-ink-mute">A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -158,7 +160,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
       <JobCard projectId={null} />
       {body}
       {snapshot ? <Published snapshot={snapshot} /> : null}
-      <NewProjectDialog open={making} onOpenChange={setMaking} listed={list ?? []} restoreFocusTo={newButton} />
+      <NewProjectDialog open={making} onOpenChange={setMaking} listed={list ?? []} restoreFocusTo={newButton} focusAfterStart={heading} />
       <Dialog
         open={removal.open}
         onOpenChange={open => { if (!open && !removing) setRemoval(r => ({ ...r, open: false })); }}
@@ -177,6 +179,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
           open={deletion.open}
           onOpenChange={open => setDeletion(d => ({ ...d, open }))}
           onDeleted={() => loadList()}
+          focusAfter={heading}
         />
       ) : null}
     </div>

@@ -4,7 +4,7 @@ import type { ButtonProps } from '@acaprino/sigrid';
 import type { Job } from '../../../types.ts';
 import { useNotify } from '../../../state/notices.tsx';
 import { message, money } from '../../../words.ts';
-import { isRunning, lastOver, outcomeOf, runningOn, startedAt } from './jobs.ts';
+import { NOT_CANCELLABLE, canCancel, isRunning, jobTitle, lastOver, outcomeOf, runLimit, runningOn, startedAt } from './jobs.ts';
 import { useJobs } from './useJobs.tsx';
 
 /** The AI run of a project (mockup board 3): while it goes, its title, phase, time, budget and log, and Cancel; once it is over, what came of it in the runtime's words, until
@@ -48,52 +48,61 @@ export interface JobCardProps {
   className?: string | undefined;
 }
 
-/** The card of a project's run: the one going, else the last one over while it is to be said. Nothing when there is neither. */
+/** The card of a project's run: the one going, else the last one over while it is to be said. Nothing when there is neither.
+ * One AI run goes at a time, so a run that is not this page's (another project's, the adaptation of a plugin) is why the changes are off, and its card, with its Cancel, is here too: the
+ * window has no other place to stop it. It follows the outcome of this page's own last run, which is still said until it is put away. */
 export function JobCard({ projectId, className }: JobCardProps) {
   const jobs = useJobs();
   const notify = useNotify();
   const [, put] = React.useState(0);
   const mine = about(projectId);
-  const running = projectId === null ? jobs.jobs.find(j => isRunning(j) && mine(j)) ?? null : runningOn(jobs.jobs, projectId);
-  if (running) {
-    seen.add(running.id);
-    const cancel = (): void => { jobs.cancel(running.id).catch(e => notify(message(e), 'error')); };
-    return <RunningCard job={running} cancelling={jobs.cancelling.includes(running.id)} onCancel={cancel} className={className} />;
-  }
-  const last = projectId === null ? [...jobs.jobs].filter(j => !isRunning(j) && mine(j)).sort((a, b) => startedAt(b) - startedAt(a))[0] ?? null : lastOver(jobs.jobs, projectId);
-  if (!last || dismissed.has(last.id) || (last.status === 'completed' && !seen.has(last.id))) return null;
-  const outcome = outcomeOf(last);
-  if (!outcome) return null;
-  const dismiss = (): void => { dismissed.add(last.id); put(n => n + 1); };
+  const own = projectId === null ? jobs.jobs.find(j => isRunning(j) && mine(j)) ?? null : runningOn(jobs.jobs, projectId);
+  const running = own ?? jobs.running;
+  if (running) seen.add(running.id);
+  const last = own ? null : projectId === null ? [...jobs.jobs].filter(j => !isRunning(j) && mine(j)).sort((a, b) => startedAt(b) - startedAt(a))[0] ?? null : lastOver(jobs.jobs, projectId);
+  const said = last && !dismissed.has(last.id) && !(last.status === 'completed' && !seen.has(last.id)) ? outcomeOf(last) : null;
+  if (!running && !said) return null;
+  const cancel = (): void => { if (running) jobs.cancel(running.id).catch(e => notify(message(e), 'error')); };
+  const dismiss = (): void => { if (last) { dismissed.add(last.id); put(n => n + 1); } };
   return (
-    <section aria-label="AI run" className={cn(CARD, 'gap-x-4 gap-y-2', className)}>
-      <div role={outcome.error ? 'alert' : 'status'} className="flex min-w-0 flex-1 flex-col gap-1">
-        <div><Badge variant={outcome.error ? 'destructive' : 'secondary'}>{ENDED[last.status] ?? last.status}</Badge></div>
-        <p className="text-sm text-ink">{outcome.text}</p>
-        {last.status !== 'completed' && last.log_path ? <p className="break-all font-mono text-xs text-ink-mute select-text">Log: {last.log_path}</p> : null}
-      </div>
-      <Button variant="ghost" size="sm" onClick={dismiss}>Dismiss</Button>
-    </section>
+    <>
+      {last && said ? (
+        <section aria-label="AI run" className={cn(CARD, 'gap-x-4 gap-y-2', className)}>
+          <div role={said.error ? 'alert' : 'status'} className="flex min-w-0 flex-1 flex-col gap-1">
+            <div><Badge variant={said.error ? 'destructive' : 'secondary'}>{ENDED[last.status] ?? last.status}</Badge></div>
+            <p className="text-sm text-ink">{said.text}</p>
+            {last.status !== 'completed' && last.log_path ? <p className="break-all font-mono text-xs text-ink-mute select-text">Log: {last.log_path}</p> : null}
+          </div>
+          <Button variant="ghost" size="sm" onClick={dismiss}>Dismiss</Button>
+        </section>
+      ) : null}
+      {running ? <RunningCard job={running} elsewhere={!own} cancelling={jobs.cancelling.includes(running.id)} onCancel={cancel} className={className} /> : null}
+    </>
   );
 }
 
-/** A run that goes: what it is, where it is, for how long, at most what it costs, where it writes its log, and Cancel. The agent reports no fraction, so the bar says only
- * that it is in progress, and the phase is the runtime's. A run asked to stop says so until the runtime ends it. */
-export function RunningCard({ job, cancelling, onCancel, className }: { job: Job; cancelling: boolean; onCancel(): void; className?: string | undefined }) {
+/** A run that goes: what it is, where it is, for how long, at most what it costs, when the runtime stops it, where it writes its log, and Cancel. The agent reports no fraction, so the bar
+ * says only that it is in progress, and the phase is the runtime's. A run asked to stop says so until the runtime ends it. In the phase where the project is built and saved the runtime
+ * ignores a Cancel, so the card offers none and says why. `elsewhere` is a run that is not this page's own (another project's, an adaptation): the card says whose it is. */
+export function RunningCard({ job, cancelling, onCancel, elsewhere = false, className }: { job: Job; cancelling: boolean; onCancel(): void; elsewhere?: boolean | undefined; className?: string | undefined }) {
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const title = job.title || 'Changing the project', began = startedAt(job);
+  const title = jobTitle(job), began = startedAt(job), saving = !canCancel(job), ofProject = job.kind === 'project';
   const budget = typeof job.budget_usd === 'number' && Number.isFinite(job.budget_usd) ? `up to ${money(job.budget_usd)}` : '';
+  const whose = !elsewhere ? '' : ofProject ? (job.operation === 'create' ? '' : job.project_id ?? '') : job.plugin_id ? `${job.plugin_id}${job.harness ? ` for ${job.harness}` : ''}` : '';
+  const row = (name: string, value: React.ReactNode, extra?: string) => (
+    <div className="flex min-w-0 gap-3"><dt className="w-16 shrink-0 text-ink-mute">{name}</dt><dd className={cn('min-w-0 text-ink', extra)}>{value}</dd></div>
+  );
   return (
     <section aria-label="AI run" className={cn(CARD, 'gap-x-8 gap-y-3', className)}>
       <div className="flex min-w-0 flex-1 basis-80 flex-col gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Icon name="ai" />
           <h2 className="min-w-0 truncate text-sm font-semibold text-ink" title={title}>{title}</h2>
-          <Badge variant="secondary">{cancelling ? 'Stopping' : 'Running'}</Badge>
+          <Badge variant="secondary">{cancelling && !saving ? 'Stopping' : 'Running'}</Badge>
         </div>
         <p role="status" className="text-sm text-ink-soft">{job.phase}</p>
         <Progress value={null} size="sm" aria-label={`${title}: in progress`} />
@@ -101,13 +110,17 @@ export function RunningCard({ job, cancelling, onCancel, className }: { job: Job
       </div>
       <div className="flex min-w-0 basis-72 flex-col gap-2">
         <dl className="flex flex-col gap-1 text-sm">
-          <div className="flex min-w-0 gap-3"><dt className="w-16 shrink-0 text-ink-mute">Agent</dt><dd className="min-w-0 text-ink">Claude Code</dd></div>
-          {budget ? <div className="flex min-w-0 gap-3"><dt className="w-16 shrink-0 text-ink-mute">Budget</dt><dd className="min-w-0 text-ink tabular-nums">{budget}</dd></div> : null}
-          {began ? <div className="flex min-w-0 gap-3"><dt className="w-16 shrink-0 text-ink-mute">Time</dt><dd className="min-w-0 text-ink tabular-nums">{since(now / 1000 - began)}</dd></div> : null}
-          {job.log_path ? <div className="flex min-w-0 gap-3"><dt className="w-16 shrink-0 text-ink-mute">Log</dt><dd className="min-w-0 break-all font-mono text-xs text-ink select-text">{job.log_path}</dd></div> : null}
+          {ofProject ? row('Agent', 'Claude Code') : null}
+          {whose ? row(ofProject ? 'Project' : 'Plugin', whose, 'break-all') : null}
+          {budget ? row('Budget', budget, 'tabular-nums') : null}
+          {began ? row('Time', since(now / 1000 - began), 'tabular-nums') : null}
+          {row('Limit', `Stops after ${runLimit(job)} min`, 'tabular-nums')}
+          {job.log_path ? row('Log', job.log_path, 'break-all font-mono text-xs select-text') : null}
         </dl>
         <div>
-          <Button variant="outline" loading={cancelling} loadingText="Stopping…" onClick={onCancel}><Icon name="stop" />Cancel</Button>
+          {saving
+            ? <p className="text-sm text-ink-soft">{NOT_CANCELLABLE}</p>
+            : <Button variant="outline" loading={cancelling} loadingText="Stopping…" onClick={onCancel}><Icon name="stop" />Cancel</Button>}
         </div>
       </div>
     </section>

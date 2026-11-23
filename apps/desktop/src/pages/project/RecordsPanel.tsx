@@ -14,9 +14,11 @@ export function RecordsPanel({ data }: { data: ProjectData }) {
   const id = project.view?.id ?? '';
   const blocked = useBlocked(id);
   const [target, setTarget] = React.useState<RecordTarget | null>(null);
+  /** The heading of the panel: where focus goes when the record whose Delete was pressed is gone. */
+  const heading = React.useRef<HTMLHeadingElement>(null);
   return (
     <section aria-labelledby={`${ids}-records`} className="flex flex-col gap-2">
-      <h3 id={`${ids}-records`} className="flex items-center gap-2 text-sm font-semibold text-ink"><Icon name="archive" />Decision records <Count value={data.records.length} label={data.records.length === 1 ? 'record' : 'records'} /></h3>
+      <h3 ref={heading} tabIndex={-1} id={`${ids}-records`} className="flex items-center gap-2 text-sm font-semibold text-ink outline-none"><Icon name="archive" />Decision records <Count value={data.records.length} label={data.records.length === 1 ? 'record' : 'records'} /></h3>
       <p className="text-xs text-ink-mute">Why the project is the way it is. Muro writes a record when a harmonization takes a decision that shapes the project. A binding record is a rule the next harmonization has to follow.</p>
       <div className="flex flex-wrap items-center gap-2">
         <span title={blocked ?? undefined}><Button variant="outline" size="sm" disabled={blocked !== null || !id} onClick={() => setTarget({ kind: 'add' })}><Icon name="plus" />Add record…</Button></span>
@@ -44,7 +46,7 @@ export function RecordsPanel({ data }: { data: ProjectData }) {
           })}
         </ul>
       ) : <Empty title="No record yet" description="The first harmonization writes them; you can add your own." />}
-      <RecordsEditor id={id} info={data.info} records={data.records} target={target} onClose={() => setTarget(null)} />
+      <RecordsEditor id={id} info={data.info} records={data.records} target={target} onClose={() => setTarget(null)} focusAfterDelete={heading} />
     </section>
   );
 }

@@ -25,6 +25,8 @@ const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only 
 const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
 const SAVED = 'The project was saved. Install it again from its Install step to bring the change to the harnesses';
 const busyWith = title => `${title} is running: one AI run goes at a time. Wait for it to finish, or cancel it.`;
+const FROZEN_PIN = 'A frozen commit is held at the commit that was reviewed: its pin is not moved from here.';
+const NOT_CANCELLABLE = 'The project is being saved: it cannot be cancelled now';
 
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action).map(c => c.payload);
 /** The window has read the registry once: the footer says what it holds. */
@@ -102,7 +104,7 @@ await test('Add input: an address that is no input and a request that is too lon
   const title = 'Add the input https://github.com/example/x';
   await card(page).getByRole('heading', { name: title }).waitFor();
   const facts = await card(page).textContent();
-  for (const fact of ['Running', 'Opening the project', 'Claude Code', 'up to $2.50', 'output.log']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
+  for (const fact of ['Running', 'Opening the project', 'Claude Code', 'up to $2.50', 'Stops after 120 min', 'output.log']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
   assert.equal(await button(card(page), 'Cancel').count(), 1);
   assert.equal(await button(page, 'Add input…').isDisabled(), true, 'no second run while this one goes');
   assert.equal(await button(page, 'Add input…').getAttribute('title'), busyWith(title));
@@ -166,24 +168,117 @@ await test('Harmonize again: the request and the step go to the run; while it ru
 });
 
 // ---------- Cancel ----------
-await test('Cancel: the run is asked to stop and the card says it is stopping until the runtime ends it, then that it was cancelled and the file was not changed; the project stays at its version', 'projects', {}, async app => {
+await test('Cancel during the agent: the run is asked to stop and the card says it is stopping until the runtime ends it, then that it was cancelled or timed out and the file was not changed; the project stays at its version', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   await app.flags({ cancelHolds: true });
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
   await dialog(page).waitFor({ state: 'detached' });
+  await page.evaluate(() => window.behind.phase('AI intake and harmonization'));
+  await card(page).getByText('AI intake and harmonization', { exact: true }).waitFor();
   await button(card(page), 'Cancel').click();
   await card(page).locator('button[aria-busy="true"]').getByText('Stopping…').waitFor();
   const [asked] = await callsOf(app, 'cancel_job');
   assert.match(asked.id, /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'the run of the card is the one asked to stop');
   assert.equal(await button(page, 'Harmonize again…').isDisabled(), true, 'nothing else starts while it still goes');
   await finish(page, 'cancelled');
-  const said = 'Harmonize again was cancelled: Job cancelled. The project file was not changed';
-  await card(page).getByText(said, { exact: true }).waitFor();
+  // In the agent's step the runtime cannot tell a Cancel from its limit, and says both (the number of minutes is the runtime's).
+  await card(page).getByText(/^Harmonize again was cancelled: The AI run cancelled or exceeded \d+-minute deadline; inspect output\.log\. The project file was not changed$/).waitFor();
   await card(page).getByText('Cancelled', { exact: true }).waitFor();
   await until(() => button(page, 'Harmonize again…').isEnabled(), 'the changes come back');
   await versionShown(page, '0.5.0');
+});
+
+await test('Cancel between the steps of a run: the job was cancelled and the file was not changed', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  await app.flags({ cancelHolds: true });
+  await button(page, 'Harmonize again…').click();
+  await button(dialog(page), 'Harmonize').click();
+  await dialog(page).waitFor({ state: 'detached' });
+  await card(page).getByText('Opening the project', { exact: true }).waitFor();
+  await button(card(page), 'Cancel').click();
+  await card(page).locator('button[aria-busy="true"]').getByText('Stopping…').waitFor();
+  await finish(page, 'cancelled');
+  await card(page).getByText('Harmonize again was cancelled: Job cancelled. The project file was not changed', { exact: true }).waitFor();
+  await until(() => button(page, 'Harmonize again…').isEnabled(), 'the changes come back');
+  await versionShown(page, '0.5.0');
+});
+
+await test('Saving: while the project is built and saved the card offers no Cancel and says why, and the run ends as it would have', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  await button(page, 'Harmonize again…').click();
+  await button(dialog(page), 'Harmonize').click();
+  await dialog(page).waitFor({ state: 'detached' });
+  await button(card(page), 'Cancel').waitFor();
+  assert.equal(await card(page).getByText(NOT_CANCELLABLE, { exact: true }).count(), 0, 'before the saving phase it can be cancelled');
+  await page.evaluate(() => window.behind.phase('Building and saving the project'));
+  await card(page).getByText(NOT_CANCELLABLE, { exact: true }).waitFor();
+  await card(page).getByText('Building and saving the project', { exact: true }).waitFor();
+  assert.equal(await button(card(page), 'Cancel').count(), 0, 'no Cancel while the project is saved');
+  assert.equal(await card(page).getByText('Stopping', { exact: true }).count(), 0);
+  await page.screenshot({ path: shots + '/write-saving.png' });
+  await finish(page);
+  await versionShown(page, '0.5.1');
+  await card(page).getByText(`Harmonize again: ${SAVED}`, { exact: true }).waitFor();
+});
+
+// ---------- a run that is not this page's ----------
+await test('A run of another project or an adaptation: its card, with Cancel, is on the Projects page, since it is why no change is offered', 'projects', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await tab(page, 'Projects').click();
+  await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor();
+  assert.equal(await card(page).count(), 0);
+  await page.evaluate(() => window.behind.adapt('docs-writer', 'opencode'));
+  await page.evaluate(() => window.shown?.());
+  await card(page).getByRole('heading', { name: 'The adaptation of docs-writer' }).waitFor();
+  const facts = await card(page).textContent();
+  for (const fact of ['Running', 'harmonization', 'docs-writer for opencode', 'up to $2.00', 'Stops after 30 min']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
+  assert.equal(await page.getByRole('button', { name: 'New project…', exact: true }).isDisabled(), true, 'no other run while it goes');
+  await button(card(page), 'Cancel').click();
+  await card(page).waitFor({ state: 'detached' });
+  await until(() => page.getByRole('button', { name: 'New project…', exact: true }).isEnabled(), 'New project… comes back');
+});
+
+await test('A run another client started: the refusal is shown, and the page reads the runs again, so its card shows and the dialog cannot start another', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  await page.evaluate(() => window.behind.adapt('docs-writer', 'opencode'));
+  assert.equal(await card(page).count(), 0, 'the page was not told');
+  await button(page, 'Harmonize again…').click();
+  const dlg = dialog(page);
+  await button(dlg, 'Harmonize').click();
+  await dlg.getByRole('alert').getByText(/^Another AI run is in progress \(/).waitFor();
+  await until(() => button(dlg, 'Harmonize').isDisabled(), 'the dialog knows a run goes');
+  await button(dlg, 'Cancel').click();
+  await dlg.waitFor({ state: 'detached' });
+  await card(page).getByRole('heading', { name: 'The adaptation of docs-writer' }).waitFor();
+  assert.equal(await button(page, 'Add input…').isDisabled(), true, 'no change is offered while it goes');
+  assert.equal(await button(page, 'Add input…').getAttribute('title'), busyWith('The adaptation of docs-writer'));
+});
+
+// ---------- the records wait for a run ----------
+await test('Records: while a run changes the project the panel offers no edit, Add record, Edit and Delete say why, and they come back when the run ends', 'projects', {}, async app => {
+  const { page } = app;
+  await openMarionette(page);
+  await button(page, 'Harmonize again…').click();
+  await button(dialog(page), 'Harmonize').click();
+  await dialog(page).waitFor({ state: 'detached' });
+  await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
+  await segment(page, 'Records').click();
+  const reason = busyWith('Harmonize again');
+  const names = ['Add record…', 'Edit the record of 2026-11-10 about design-taste', 'Delete the record of 2026-11-10 about design-taste', 'Edit the record of 2026-11-12 about office-docs', 'Delete the record of 2026-11-12 about office-docs'];
+  for (const name of names) {
+    assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);
+    assert.equal(await button(page, name).locator('xpath=..').getAttribute('title'), reason, `${name} says why`);
+  }
+  await page.getByRole('status').filter({ hasText: reason }).first().waitFor();
+  await finish(page);
+  await versionShown(page, '0.5.1');
+  for (const name of names) await until(() => button(page, name).isEnabled(), `${name} comes back`);
 });
 
 // ---------- a failed run ----------
@@ -213,12 +308,15 @@ await test('A run that failed is said on the project page with its reason and it
 });
 
 // ---------- Move pin and Remove ----------
-await test('Inputs: Move pin checks for updates first and starts from the release it reports; a frozen pin has no Move pin; Remove asks with the focus on Cancel, names its input, and goes on the file the first run left', 'projects', {}, async app => {
+await test('Inputs: Move pin checks for updates first and starts from the release it reports; a frozen pin has Move pin off, with the reason; Remove asks with the focus on Cancel, names its input, and goes on the file the first run left', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   const read = await digest(page);
   await segment(page, 'Inputs').click();
-  assert.equal(await button(page, 'Move pin of superpowers').count(), 0, 'a frozen commit has no Move pin');
+  const frozen = button(page, 'Move pin of superpowers');
+  assert.equal(await frozen.count(), 1, 'a frozen commit has its Move pin too');
+  assert.equal(await frozen.isDisabled(), true, 'but off');
+  assert.equal(await frozen.getAttribute('title'), FROZEN_PIN, 'and it says why');
   await button(page, 'Move pin of taste-skill').click();
   const dlg = dialog(page);
   await dlg.getByRole('heading', { name: 'Move the pin of taste-skill' }).waitFor();

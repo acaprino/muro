@@ -29,11 +29,13 @@ export interface DeleteDialogProps {
   onOpenChange(open: boolean): void;
   /** Called after the runtime deleted the project: the page that holds the list reads it again. */
   onDeleted?: () => unknown;
+  /** Where focus goes when the window closes after a deletion: the button that opened it is gone with the project's row. A Cancel gives focus back to that button as usual. */
+  focusAfter?: React.RefObject<HTMLElement | null> | undefined;
 }
 
 /** Delete project: it leaves the list and its file is deleted (`delete_project`). This cannot be taken back, so it asks first, names the file and says what stays. The project Muro ships
  * cannot be deleted: the dialog says so and offers nothing to confirm (the runtime refuses it as well, whatever the page shows). Focus starts on Cancel. */
-export function DeleteDialog({ project, open, onOpenChange, onDeleted }: DeleteDialogProps) {
+export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfter }: DeleteDialogProps) {
   const { request, snapshot, adopt } = useRegistry();
   const notify = useNotify();
   const latest = React.useRef(snapshot);
@@ -42,9 +44,11 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted }: DeleteD
   const [failure, setFailure] = React.useState<string | null>(null);
   // A dialog that opens has not failed yet.
   const [was, setWas] = React.useState(open);
+  /** The project was deleted in this opening: the window closes onto `focusAfter`, not onto the button of a row that is gone. */
+  const gone = React.useRef(false);
   if (open !== was) {
     setWas(open);
-    if (open) setFailure(null);
+    if (open) { setFailure(null); gone.current = false; }
   }
   const name = nameOf(project);
   const shipped = project.included === true || project.id === SHIPPED_ID;
@@ -55,6 +59,7 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted }: DeleteD
     try {
       const saved = await atRevision(request, latest.current, adopt, revision => request<Snapshot>('delete_project', deletePayload(project.id, revision)));
       adopt(saved);
+      gone.current = true;
       onOpenChange(false);
       await onDeleted?.();
       notify(`${name} deleted.`);
@@ -66,6 +71,7 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted }: DeleteD
     <Dialog
       open={open}
       onOpenChange={next => { if (!next && deleting) return; onOpenChange(next); }}
+      onCloseAutoFocus={event => { if (gone.current) { event.preventDefault(); focusAfter?.current?.focus(); } }}
       title={shipped ? `${name} cannot be deleted` : `Delete ${name}?`}
       description={shipped ? 'The default project stays in the list' : 'The project leaves your list and its file is deleted. This cannot be undone. Its plugin stays installed where it is, as it is.'}
       footer={shipped ? (

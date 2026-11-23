@@ -3,13 +3,14 @@ import { Count, Empty, Icon, ItemList, ItemRow } from '@acaprino/sigrid';
 import { useProject } from '../../state/useProject.tsx';
 import { becameParts, instructionsOf, pinnedOf } from './data.ts';
 import type { ProjectData } from './data.ts';
-import { busyReason } from './write/jobs.ts';
+import { FROZEN_PIN, busyReason } from './write/jobs.ts';
 import { useJobs } from './write/useJobs.tsx';
 import { GatedButton } from './write/JobCard.tsx';
 
 /** The inputs panel: what goes in (each input with its pin, its license and what it became) and the custom instructions the file holds. Choosing an input shows it in the
  * inspector and opens, on the graph, the entries that hold the capabilities its decisions target (`decisions` whose `source` is the input: their `targets`), never by name.
- * Each input can have its pin moved (not a frozen commit) or be removed (not the only one: the runtime refuses it), and the instructions can be edited: each is an AI run,
+ * Each input can have its pin moved (for a frozen commit the button is there, off, and says why: it is held at the commit that was reviewed) or be removed (not the only one: the
+ * runtime refuses it), and the instructions can be edited: each is an AI run,
  * whose dialog the workspace holds (`onPin`, `onInstructions`), so it stays open when a drawer that holds this panel closes. While a run goes, none of them is offered,
  * and the buttons say why: one AI run goes at a time. */
 export interface InputsPanelProps {
@@ -40,7 +41,7 @@ export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPan
           <ItemList aria-label="Inputs">
             {data.inputs.map((input, i) => {
               const pin = pinnedOf(input), parts = becameParts(input), source = input.url || 'Local source';
-              const movable = input.pin !== 'static', removable = data.inputs.length > 1;
+              const frozen = input.pin === 'static', removable = data.inputs.length > 1;
               return (
                 <React.Fragment key={`${i}:${input.id}`}>
                   <ItemRow
@@ -55,12 +56,10 @@ export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPan
                       </>
                     )}
                   />
-                  {movable || removable ? (
-                    <li className="flex flex-wrap gap-2 px-3 pb-2">
-                      {movable ? <GatedButton off={busy} variant="outline" size="xs" aria-label={`Move pin of ${input.id}`} onClick={() => onPin(input.id, false)}>Move pin…</GatedButton> : null}
-                      {removable ? <GatedButton off={busy} variant="outline" size="xs" aria-label={`Remove ${input.id}`} onClick={() => onPin(input.id, true)}>Remove…</GatedButton> : null}
-                    </li>
-                  ) : null}
+                  <li className="flex flex-wrap gap-2 px-3 pb-2">
+                    <GatedButton off={busy ?? (frozen ? FROZEN_PIN : null)} variant="outline" size="xs" aria-label={`Move pin of ${input.id}`} onClick={() => onPin(input.id, false)}>Move pin…</GatedButton>
+                    {removable ? <GatedButton off={busy} variant="outline" size="xs" aria-label={`Remove ${input.id}`} onClick={() => onPin(input.id, true)}>Remove…</GatedButton> : null}
+                  </li>
                 </React.Fragment>
               );
             })}

@@ -103,10 +103,16 @@ export function ProjectJobsProvider({ children }: { children?: React.ReactNode }
   }, [fromRegistry, read]);
 
   const start = React.useCallback(async (action: WriteAction, payload: Record<string, unknown>): Promise<void> => {
-    const job = await send.current<Job>(action, payload);
+    let job: Job;
+    try { job = await send.current<Job>(action, payload); }
+    catch (e) {
+      // A refusal may be that another run goes (one started by `muroctl` or by another client, which this window has not read yet): the runs are read again, so the card shows and the buttons say why.
+      void read();
+      throw e;
+    }
     // The runtime answers with the run as it began: it is on the page now, and the poll follows it.
     if (live.current && job && typeof job.id === 'string') take(upsertJob(held.current, job));
-  }, [take]);
+  }, [take, read]);
 
   const cancel = React.useCallback(async (id: string): Promise<void> => {
     await send.current('cancel_job', { id });

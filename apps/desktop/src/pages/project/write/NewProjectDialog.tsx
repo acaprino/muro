@@ -67,9 +67,11 @@ export interface NewProjectDialogProps {
   listed: readonly ProjectSummary[];
   /** The button that opened the dialog, where focus goes when it closes. */
   restoreFocusTo?: React.RefObject<HTMLElement | null>;
+  /** Where focus goes when it closes because the run started: that button is then off (one AI run goes at a time), and focus cannot rest on it. */
+  focusAfterStart?: React.RefObject<HTMLElement | null> | undefined;
 }
 
-export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo }: NewProjectDialogProps) {
+export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, focusAfterStart }: NewProjectDialogProps) {
   const { request, snapshot } = useRegistry();
   const { running, start } = useJobs();
   const notify = useNotify();
@@ -85,9 +87,11 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo }:
   const [noPicker, setNoPicker] = React.useState(noFolderShell);
   // A dialog that opens is a new form: what was typed in the last one is not kept.
   const [was, setWas] = React.useState(open);
+  /** The run of this opening started: the dialog closes onto `focusAfterStart`. */
+  const started = React.useRef(false);
   if (open !== was) {
     setWas(open);
-    if (open) { setForm(blank()); setTouched(new Set()); setSubmitted(false); setFailure(null); }
+    if (open) { setForm(blank()); setTouched(new Set()); setSubmitted(false); setFailure(null); started.current = false; }
   }
 
   const words = operationWords('create');
@@ -133,6 +137,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo }:
     setSending(true);
     try {
       await start('create_project', newProjectPayload({ name: form.name, slug: form.slug, author: form.author, folder: form.folder, inputs: form.inputs, request: form.request, repository: form.repository, budget: form.budget }));
+      started.current = true;
       onOpenChange(false);
     } catch (e) { setFailure(message(e)); }
     finally { setSending(false); }
@@ -146,6 +151,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo }:
       title={words.title}
       description={words.about}
       restoreFocusTo={restoreFocusTo}
+      onCloseAutoFocus={event => { if (started.current) { event.preventDefault(); focusAfterStart?.current?.focus(); } }}
       footer={(
         <>
           <Button variant="outline" disabled={sending} onClick={() => onOpenChange(false)}>Cancel</Button>

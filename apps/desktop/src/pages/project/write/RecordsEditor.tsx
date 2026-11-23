@@ -21,6 +21,8 @@ interface Props {
   records: readonly ProjectRecord[];
   target: RecordTarget | null;
   onClose(): void;
+  /** Where focus goes when the window of a deletion closes: the Delete button of the record goes with the record. */
+  focusAfterDelete?: React.RefObject<HTMLElement | null> | undefined;
 }
 
 export function RecordsEditor(props: Props) {
@@ -134,7 +136,7 @@ function RecordDialog({ id, info, records, target, open, onClose }: Props & { op
 /** The first words of a record's text, for the sentence that names it. */
 const excerpt = (text: string): string => { const flat = text.replace(/\s+/g, ' ').trim(); return flat.length > 80 ? `${flat.slice(0, 80)}…` : flat; };
 
-function DeleteDialog({ id, info, records, target, open, onClose }: Props & { open: boolean }) {
+function DeleteDialog({ id, info, records, target, open, onClose, focusAfterDelete }: Props & { open: boolean }) {
   const edit = useEdit(id, info);
   const notify = useNotify();
   // The record is the one the window opened on: while the page reads the file again after the deletion the record is no longer in the list, and the window must not say so.
@@ -146,17 +148,21 @@ function DeleteDialog({ id, info, records, target, open, onClose }: Props & { op
   }
   const forget = edit.reset;
   React.useEffect(() => { if (open) forget(); }, [open, forget]);
+  /** The record was deleted in this opening: the window closes onto `focusAfterDelete`. */
+  const gone = React.useRef(false);
+  if (open && !kept.open) gone.current = false;
   const record = session.record;
   const subjects = record?.subjects.join(', ') ?? '';
   const saving = edit.sending || edit.settling;
   function remove(): void {
     if (!record || saving || edit.blocked !== null) return;
-    edit.save({ records: records.filter(r => r.id !== record.id) }, () => { notify('Record deleted.'); onClose(); });
+    edit.save({ records: records.filter(r => r.id !== record.id) }, () => { notify('Record deleted.'); gone.current = true; onClose(); });
   }
   return (
     <Dialog
       open={open}
       onOpenChange={next => { if (!next && !edit.sending) onClose(); }}
+      onCloseAutoFocus={event => { if (gone.current) { event.preventDefault(); focusAfterDelete?.current?.focus(); } }}
       title={record ? `Delete the record of ${record.date}?` : 'Delete this record?'}
       description={record ? `The record${subjects ? ` about ${subjects}` : ''} (“${excerpt(record.text)}”) leaves the project file. This cannot be undone: Muro keeps no copy. The other records stay as they are.` : 'This record is no longer in the project.'}
       footer={(

@@ -393,7 +393,10 @@ release's `sources.json` plugin slug and version and its capability ids must equ
 built from it" and what differs; a project with no release has nothing to disagree with. The desktop runs it
 before it installs a project's plugin.
 
-`unpack` writes into a new (or empty) folder only, all or nothing. A `.mp` from elsewhere is untrusted input:
+`unpack` writes into a new (or empty) folder only, all or nothing. It also refuses a member that is outside the layout above (the
+package files and folders, `project.json`, `records.json`, `history.json`, `CHANGELOG.md`, `inputs/` and `release/`): a `.mp` that
+carries `.claude/settings.json`, `.mcp.json` or a `CLAUDE.md` at its root is refused, because the folder it writes is where an AI run
+works and a coding agent reads its own configuration from there. A `.mp` from elsewhere is untrusted input:
 a member with an absolute path, a drive letter, `..`, a backslash, a colon, a control character, one of
 `< > " | ? *`, a name ending in a dot or space, a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`,
 `LPT1`-`LPT9`, with or without an extension), or that is a link, a device or encrypted is refused before
@@ -463,7 +466,10 @@ otherwise "The project file changed since it was opened: open it again and repea
 
 `commit` turns a work folder into the project file, after the AI changed an unpacked project (`--expect-digest` of the file it
 was unpacked from) or wrote a new one (`--create`: refused where a file is). It refuses a folder without `sources.json` or
-`project.json`, and a plugin id that changed. The version moves by `--step` from the file's (default `patch`; a new project
+`project.json`, and a plugin id that changed. What the project is (`project.json`'s identity), its history and its changelog are the
+desktop's, not the folder's: `commit` takes them from the project as the desktop holds it (the file it replaces), so an agent that
+rewrote them changes nothing. It refuses a folder whose `records.json` changes or removes a record of the owner's (`author: you`) or
+adds a record that is `binding`: the AI writes its own records (`author: muro`), never the owner's rules. The version moves by `--step` from the file's (default `patch`; a new project
 keeps its own). It builds the package with `build_release` (identity, catalog, router, delivery, prompts, intake goals,
 entries, the license and coverage gates of every source, every adapter), then appends the run to `history.json` (`{id:
 <slug>-v<version>, time, version, status: completed, budget_usd, engine, operation, pins: {source id: commit}, changelog}`), sets

@@ -5,10 +5,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Job } from '../src/types.ts';
 import {
-  AI_RUN_NOTE, CHANGED, CHANGE_OPERATIONS, DEFAULT_BUDGET, MAX_BUDGET, NEEDS_CLAUDE, REFUSALS, REPOSITORY_FIELDS, SHIPPED_ID, VERSION_STEPS,
-  agentRefusal, busyReason, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
-  creating, defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, lastFailure, lastOver, newProjectPayload, newRecordId,
-  operationWords, outcomeOf, parseBudget, repositoryOf, runningJob, runningOn, slugOf, startedAt, upsertJob,
+  ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, PROJECT_RUN_MINUTES, REPOSITORY_FIELDS, SAVING_PHASE,
+  SHIPPED_ID, VERSION_STEPS,
+  agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
+  defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
+  operationWords, outcomeOf, parseBudget, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
 } from '../src/pages/project/write/jobs.ts';
 import { createTransport } from './fake-transport.js';
 
@@ -16,6 +17,8 @@ const BAD_BUDGET = 'The AI budget must be above 0 and at most 100 USD';
 const BAD_SLUG = 'The plugin id is lowercase letters and digits joined by dashes, such as my-plugin';
 const NOT_A_SOURCE = 'An input is an https:// address or the full path of a folder on this computer';
 const keys = (value: object): string[] => Object.keys(value).sort();
+/** The changes of an existing project, in the order a menu lists them. */
+const CHANGE_OPERATIONS = ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions'] as const;
 const DIGEST = 'a'.repeat(64);
 
 // ---------- what a person types ----------
@@ -26,8 +29,12 @@ test('the constants are the runtime\'s: the shipped project, the default and the
   assert.equal(NEEDS_CLAUDE, 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.');
   assert.equal(CHANGED, 'The project file changed since it was opened: open it again and repeat the change');
   assert.deepEqual(VERSION_STEPS.map(s => s.value), ['patch', 'minor', 'major']);
-  assert.deepEqual(CHANGE_OPERATIONS, ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions']);
-  assert.match(AI_RUN_NOTE, /Claude Code does it on this computer/);
+  assert.match(AI_RUN_NOTE, /^Claude Code does it on this computer with its own credentials, and spends at most the budget below\./);
+  assert.match(AI_RUN_NOTE, /stops after 120 minutes/, 'the note says the limit of a project run');
+  assert.match(AI_RUN_NOTE, /read and write whatever you can/, 'and what the run can reach');
+  assert.match(BUDGET_HINT, /settings \(plugins, hooks, instructions\) load into every turn/, 'the budget says what loads into every turn');
+  assert.deepEqual([PROJECT_RUN_MINUTES, ADAPTATION_RUN_MINUTES], [120, 30]);
+  assert.equal(SAVING_PHASE, 'Building and saving the project');
 });
 
 test('a plugin id is kebab-case, not the shipped project\'s, and not one already listed, in the runtime\'s words', () => {
@@ -159,7 +166,7 @@ test('decision records are what the factory takes: a unique id, a real date, sub
   assert.equal(newRecordId('2026-11-21', [{ id: 'you-2026-11-21-1' }, { id: 'you-2026-11-21-2' }, { id: 'r1' }]), 'you-2026-11-21-3');
 });
 
-test('the words of each operation, its default version step, the agent refusal and the list of refusals', () => {
+test('the words of each operation, its default version step and the agent refusal', () => {
   assert.deepEqual(['create', ...CHANGE_OPERATIONS].map(o => operationWords(o as any).submit), ['Create project', 'Harmonize', 'Add input', 'Remove input', 'Move pin', 'Save and harmonize']);
   assert.deepEqual(['create', ...CHANGE_OPERATIONS].map(o => operationWords(o as any).title), ['New project', 'Harmonize again', 'Add an input', 'Remove an input', 'Move a pin', 'Your instructions']);
   for (const operation of ['create', ...CHANGE_OPERATIONS]) {
@@ -172,10 +179,6 @@ test('the words of each operation, its default version step, the agent refusal a
   assert.equal(agentRefusal({ ai: { harness: 'claude-code' }, agent: 'claude-code' }), null);
   assert.equal(agentRefusal({}), null);
   assert.equal(agentRefusal(undefined), null);
-  assert.equal(new Set(REFUSALS.map(r => r.id)).size, REFUSALS.length, 'one line for each rule');
-  assert.ok(REFUSALS.every(r => r.applies.length && r.rule && r.says));
-  assert.equal(REFUSALS.find(r => r.id === 'agent')?.says, NEEDS_CLAUDE);
-  assert.equal(REFUSALS.find(r => r.id === 'digest-stale')?.says, CHANGED);
 });
 
 // ---------- the requests ----------
@@ -239,27 +242,34 @@ test('an edit carries the digest and only what changes; null takes the repositor
 // ---------- the runs the runtime holds ----------
 const run = (over: Partial<Job> = {}): Job => ({ id: 'j1', kind: 'project', project_id: 'demo', operation: 'harmonize', title: 'Harmonize again', status: 'running', phase: 'Opening the project', budget_usd: 5, log_path: 'D:/log/output.log', message: '', time: 100, ...over });
 
-test('which run goes, on which project, and which new project is being made', () => {
+test('which run goes and on which project, how a run is called, when the runtime stops it and when it cannot be cancelled', () => {
   const adaptation = run({ id: 'a1', kind: undefined, title: undefined, project_id: undefined, operation: undefined, plugin_id: 'p1', harness: 'codex', phase: 'harmonization' });
   assert.equal(runningJob([]), null);
   assert.equal(runningJob([run({ status: 'completed' })]), null);
   assert.equal(runningJob([run({ id: 'x', status: 'failed' }), adaptation, run()])?.id, 'a1', 'an adaptation counts: one run goes at a time');
   assert.equal(runningOn([adaptation, run({ id: 'j2', project_id: 'other' })], 'demo'), null);
   assert.equal(runningOn([adaptation, run()], 'demo')?.id, 'j1');
-  assert.deepEqual(creating([run({ id: 'c1', operation: 'create', project_id: 'new-one' }), run(), run({ id: 'c2', operation: 'create', status: 'failed' })]).map(j => j.id), ['c1']);
   assert.equal(busyReason(null), null);
   assert.equal(busyReason(run()), 'Harmonize again is running: one AI run goes at a time. Wait for it to finish, or cancel it.');
   assert.equal(busyReason(adaptation), 'The adaptation of p1 is running: one AI run goes at a time. Wait for it to finish, or cancel it.');
+  assert.deepEqual([jobTitle(run()), jobTitle(run({ title: undefined })), jobTitle(adaptation), jobTitle({ ...adaptation, plugin_id: undefined })], ['Harmonize again', 'Changing the project', 'The adaptation of p1', 'An adaptation']);
+  assert.deepEqual([runLimit(run()), runLimit(adaptation)], [120, 30], 'a project run has its own limit, an adaptation keeps 30 minutes');
+  // Once the project is being built and saved the runtime ignores a Cancel: the card offers none. An adaptation has no such phase.
+  assert.equal(canCancel(run()), true);
+  assert.equal(canCancel(run({ phase: 'AI intake and harmonization' })), true);
+  assert.equal(canCancel(run({ phase: SAVING_PHASE })), false);
+  assert.equal(canCancel({ ...adaptation, phase: SAVING_PHASE }), true);
+  assert.equal(NOT_CANCELLABLE, 'The project is being saved: it cannot be cancelled now');
+  assert.match(FROZEN_PIN, /^A frozen commit is held at the commit that was reviewed/);
 });
 
-test('the last run of a project that is over, newest first; the page says so when it did not succeed', () => {
+test('the last run of a project that is over, newest first, whatever came of it', () => {
   const jobs = [
     run({ id: 'old-failed', status: 'failed', time: 100 }), run({ id: 'other', project_id: 'other', status: 'failed', time: 500 }),
     run({ id: 'newest', status: 'cancelled', time: '300' as any }), run({ id: 'mid', status: 'completed', time: 200 }), run({ id: 'going', time: 400 }),
   ];
   assert.equal(lastOver(jobs, 'demo')?.id, 'newest');
-  assert.equal(lastFailure(jobs, 'demo')?.id, 'newest');
-  assert.equal(lastFailure([...jobs, run({ id: 'later', status: 'completed', time: 600 })], 'demo'), null, 'a run that succeeded after it clears it');
+  assert.equal(lastOver([...jobs, run({ id: 'later', status: 'completed', time: 600 })], 'demo')?.id, 'later', 'a later run that succeeded is the last one over');
   assert.equal(lastOver(jobs, 'nothing'), null);
   assert.equal(startedAt(run({ time: 1700000000 })), 1700000000);
   assert.equal(startedAt(run({ time: '1700000000' })), 1700000000, 'a text of digits is read the same');
@@ -454,6 +464,56 @@ test('a run is cancelled as the runtime does: the request says so at once and th
   assert.equal((await jobsOf(fake))[0].status, 'running', 'it goes on until it ends');
   fake.behind.finish('cancelled');
   assert.equal((await jobsOf(fake))[0].status, 'cancelled');
+});
+
+test('a cancelled run says it in the words of the phase it was in, and in the phase where the project is saved the cancel is ignored', async () => {
+  const fake = createTransport('projects');
+  const digest = fake.behind.digest('marionette');
+  const cancel = async (phase: string | null) => {
+    const started: any = await fake.request('project_job', harmonize(fake));
+    if (phase) fake.behind.phase(phase);
+    await fake.request('cancel_job', { id: started.id });
+    return (await jobsOf(fake)).find(j => j.id === started.id);
+  };
+  // Between the steps of the run (opening the project): the job was cancelled.
+  let job = await cancel(null);
+  assert.deepEqual([job.status, job.phase, job.message], ['cancelled', 'Finished', 'Job cancelled. The project file was not changed']);
+  // During the agent: the runtime cannot tell a cancel from the limit, and says both.
+  job = await cancel('AI intake and harmonization');
+  assert.deepEqual([job.status, job.phase], ['cancelled', 'Finished']);
+  assert.match(job.message, /^The AI run cancelled or exceeded \d+-minute deadline; inspect output\.log\. The project file was not changed$/);
+  // While the project is built and saved the run goes on, and ends as it would have.
+  const started: any = await fake.request('project_job', harmonize(fake));
+  fake.behind.phase(SAVING_PHASE);
+  assert.deepEqual(await fake.request('cancel_job', { id: started.id }), { message: 'Cancellation requested; registry remains unchanged until validation completes' });
+  const [saving] = await jobsOf(fake);
+  assert.deepEqual([saving.status, saving.phase], ['running', SAVING_PHASE], 'the cancel was ignored');
+  fake.behind.finish();
+  assert.equal((await jobsOf(fake))[0].status, 'completed');
+  assert.notEqual(fake.behind.digest('marionette'), digest);
+  // An adaptation another client started: the page is not told, its own request is refused, and it says "Job cancelled" whatever it was doing.
+  fake.behind.adapt('docs-writer', 'opencode');
+  const [adaptation] = await jobsOf(fake);
+  assert.deepEqual([adaptation.kind, adaptation.plugin_id, adaptation.harness, adaptation.status], [undefined, 'docs-writer', 'opencode', 'running']);
+  await assert.rejects(fake.request('project_job', harmonize(fake)), { message: /^Another AI run is in progress \(/ });
+  await fake.request('cancel_job', { id: adaptation.id });
+  const [over] = await jobsOf(fake);
+  assert.deepEqual([over.status, over.message], ['cancelled', 'Job cancelled']);
+});
+
+test('a delete refused as stale moves the registry on, so a second request carries the revision read again', async () => {
+  const fake = createTransport('projects');
+  await fake.request('open_project', { path: 'D:/Notes/Notes.mp' });
+  const revision = ((await fake.request('snapshot')) as any).registry.revision;
+  fake.flags.staleDeletes = 1;
+  await assert.rejects(fake.request('delete_project', { id: 'notes', revision }), { message: 'Registry revision changed; refresh before saving' });
+  assert.deepEqual(await ids(fake), ['marionette', 'notes'], 'a refused delete deletes nothing');
+  const read = ((await fake.request('snapshot')) as any).registry.revision;
+  assert.equal(read, revision + 1);
+  assert.equal(fake.flags.staleDeletes, 0);
+  const saved: any = await fake.request('delete_project', { id: 'notes', revision: read });
+  assert.equal(saved.registry.revision, read + 1);
+  assert.deepEqual(await ids(fake), ['marionette']);
 });
 
 test('the runs are listed newest first, whatever their kind', async () => {

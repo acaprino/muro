@@ -42,8 +42,10 @@ export interface RunForm {
   setRequest(value: string): void;
   /** The dialog's own `onOpenChange`: a close is refused while the request is on its way. */
   onOpenChange(open: boolean): void;
-  /** Checks the common fields and starts the run with what the dialog adds (`own`), or only shows what is wrong when `own` is null (a field of the dialog's own is wrong, and it says so itself). */
-  run(own: Partial<ChangeForm> | null): Promise<void>;
+  /** Checks the common fields and starts the run with what the dialog adds (`own`), or only shows what is wrong when `own` is null (a field of the dialog's own is wrong, and it says so itself).
+   * The run is asked on the file the page shows now (`info.digest`), unless the dialog names the digest it was made from: a form built from the file as it was when the dialog opened (the
+   * instruction files) is sent with that digest, so the runtime refuses it, in the words of `CHANGED`, when the file changed since. */
+  run(own: Partial<ChangeForm> | null, digest?: string): Promise<void>;
 }
 
 /** The common state of a dialog of the change `operation`. `reset` puts the dialog's own fields back to their first values: it is called in the render where the dialog opens. */
@@ -77,7 +79,7 @@ export function useRunForm({ id, info, open, onOpenChange }: ChangeDialogProps, 
   const stop = refusal ?? (busy || sent.current ? null : busyReason(jobs.running));
 
   const focusInvalid = () => requestAnimationFrame(() => document.getElementById(formId)?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-  async function run(own: Partial<ChangeForm> | null): Promise<void> {
+  async function run(own: Partial<ChangeForm> | null, digest: string = info.digest): Promise<void> {
     if (pending.current) return;
     const bad = { budget: checkBudget(budget) ?? undefined, request: checkText(request, 'The request', true) ?? undefined };
     setErrors(bad);
@@ -87,7 +89,7 @@ export function useRunForm({ id, info, open, onOpenChange }: ChangeDialogProps, 
     setBusy(true);
     setFailure(null);
     try {
-      await jobs.start('project_job', changePayload(id, info.digest, operation, { ...own, budget, step, request }));
+      await jobs.start('project_job', changePayload(id, digest, operation, { ...own, budget, step, request }));
       sent.current = true;
       onOpenChange(false);
     } catch (e) {

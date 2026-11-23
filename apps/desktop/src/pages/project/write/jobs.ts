@@ -3,8 +3,8 @@ import type {
 } from '../../../types.ts';
 
 /** The write side of a project, as plain data (ADR-0032): the shapes of the requests the runtime reads (`crates/muro-desktop-runtime/src/project_jobs.rs`), the checks of what a person typed
- * that the runtime makes again, and the wording of its refusals and of the operations. Pure (no React, no toolkit), so it is tested under Node and the dialogs, the job card and the
- * hook share one copy of every rule.
+ * that the runtime makes again, and the words of the operations and of the runs. Pure (no React, no toolkit), so it is tested under Node and the dialogs, the job card and the
+ * hook share one copy of every rule. The runtime's own refusals are not repeated here: a dialog shows the sentence the runtime sends.
  *
  * The runtime is the authority: a check here only lets a dialog say what is wrong before the request leaves, with the runtime's own words. What the runtime cannot be asked without
  * paying for a run (that a folder or a file is there) is not checked here; the runtime says it after the dialog is submitted, and the dialog shows that text as it is.
@@ -30,10 +30,15 @@ const MAX_INSTRUCTION = 256 * 1024;
 const MAX_INSTRUCTION_FILES = 50;
 const MAX_RECORD = 20_000;
 
-/** One sentence under every dialog that starts an AI run: who does it, with what, at most what it costs, and what it does not do. */
-export const AI_RUN_NOTE = 'Claude Code does it on this computer with its own credentials, and spends at most the budget below. The project file is replaced only when the build succeeds; nothing is installed until you install it.';
-/** The hint under the budget field. */
-export const BUDGET_HINT = 'Checked between turns: the run can end slightly above it.';
+/** How long the runtime lets an AI run go before it stops it (`jobs::run`): a run of a project 120 minutes, the adaptation of a plugin 30. The page only says the numbers; the runtime keeps them. */
+export const PROJECT_RUN_MINUTES = 120;
+export const ADAPTATION_RUN_MINUTES = 30;
+/** What a dialog that starts an AI run says under its fields: who does it, with what, at most what it costs, how long it may last, what it can reach, and what it does not do. */
+export const AI_RUN_NOTE = `Claude Code does it on this computer with its own credentials, and spends at most the budget below. It works in a folder of its own, but it can read and write whatever you can, and it stops after ${PROJECT_RUN_MINUTES} minutes. The project file is replaced only when the build succeeds; nothing is installed until you install it.`;
+/** The hint under the budget field: what the budget counts, and what a small one runs into. */
+export const BUDGET_HINT = 'Checked between turns: the run can end slightly above it. Your Claude Code settings (plugins, hooks, instructions) load into every turn, so a small budget can run out before the work is done.';
+/** Why Move pin is off for an input pinned to a frozen commit (`static`): it is held at the commit that was reviewed, on purpose. */
+export const FROZEN_PIN = 'A frozen commit is held at the commit that was reviewed: its pin is not moved from here.';
 /** The hint under the version step: why it matters. */
 export const STEP_HINT = 'Harnesses update an installed plugin by its version.';
 /** The steps the version can move by, with the label of each. */
@@ -47,9 +52,6 @@ export const REPOSITORY_FIELDS: readonly { key: keyof ProjectRepository; label: 
   { key: 'branch', label: 'Branch', placeholder: 'main', initial: 'main', hint: 'Empty means main.' },
   { key: 'tag_prefix', label: 'Release tag prefix', placeholder: 'my-plugin-v', initial: '', hint: 'Releases are tagged with this prefix and the version.' },
 ];
-
-/** The changes of an existing project that an AI run makes, in the order a menu lists them. */
-export const CHANGE_OPERATIONS: readonly ChangeOperation[] = ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions'];
 
 export interface OperationWords {
   /** The heading of the dialog. */
@@ -74,38 +76,6 @@ export const operationWords = (operation: ProjectOperation): OperationWords => W
 
 /** How the version moves when the person does not say: an input added or removed is a minor step, the rest a patch (the runtime's own defaults). */
 export const defaultStep = (operation: ChangeOperation): VersionStep => (operation === 'add_input' || operation === 'remove_input' ? 'minor' : 'patch');
-
-/** What the runtime refuses before an AI run is paid for (`create`, `change`) or an edit or a deletion is made, one line each: `id` names the rule, `applies` the requests it is made on,
- * `rule` says what it checks and `says` is the start of the runtime's own sentence (a dialog shows the runtime's whole text, never this one). The checks that need nothing but what the person typed
- * are `check*` below; the others (the file the page read, a run in progress, the agent) are known only to the runtime and are said when the request is refused. */
-export interface Refusal { id: string; applies: readonly ('create' | 'change' | 'edit' | 'delete')[]; rule: string; says: string }
-export const REFUSALS: readonly Refusal[] = [
-  { id: 'agent', applies: ['create', 'change'], rule: 'The coding agent of Settings → AI is not Claude Code (a dollar budget holds only that one).', says: NEEDS_CLAUDE },
-  { id: 'operation', applies: ['change'], rule: 'The change is not one of harmonize, add_input, remove_input, move_pin, instructions.', says: 'Unknown change' },
-  { id: 'listed', applies: ['change', 'edit', 'delete'], rule: 'The project is not in the list.', says: 'That project is not in your list' },
-  { id: 'digest-missing', applies: ['change', 'edit'], rule: 'The request carries no digest (64 hexadecimal digits) of the file the page read.', says: 'Open the project again' },
-  { id: 'digest-stale', applies: ['change', 'edit'], rule: 'The file is no longer the one the digest names (another window, the tray or a run changed it).', says: CHANGED },
-  { id: 'name', applies: ['create', 'edit'], rule: 'The project name or the author is empty, has a line break or a control character, or is over 200 characters.', says: 'The project name is required' },
-  { id: 'slug', applies: ['create'], rule: 'The plugin id is not kebab-case (lowercase letters and digits joined by single dashes), or is over 64 characters.', says: BAD_SLUG },
-  { id: 'shipped', applies: ['create'], rule: 'The plugin id is the project Muro ships.', says: 'The plugin id marionette is the project Muro ships' },
-  { id: 'folder', applies: ['create'], rule: 'The folder is not a full path, or is not there.', says: 'Choose the folder with its full path' },
-  { id: 'file-exists', applies: ['create'], rule: 'A file named <plugin id>.mp is already in the folder: a new project is never written over a file.', says: 'already exists: choose another folder or plugin id' },
-  { id: 'id-listed', applies: ['create'], rule: 'A project, or a plugin, with that id is already in the list.', says: 'A project for <id> is already in your list' },
-  { id: 'inputs', applies: ['create'], rule: 'No input, more than 20, one named twice, or one that is neither an https:// address without spaces nor the full path of a folder that is there.', says: 'Add at least one input' },
-  { id: 'request', applies: ['create', 'change'], rule: 'The request in words is over 4000 characters, or holds a control character other than a line break or a tab.', says: 'The request must be at most 4000 characters' },
-  { id: 'repository', applies: ['create', 'edit'], rule: 'The repository address is not an https:// address without spaces (or the branch or the tag prefix is not one line).', says: 'The repository address must be an https:// address' },
-  { id: 'budget', applies: ['create', 'change'], rule: 'The budget is not above 0 and at most 100 USD.', says: BAD_BUDGET },
-  { id: 'step', applies: ['change'], rule: 'The version step is not patch, minor or major.', says: 'The version step must be patch, minor or major' },
-  { id: 'idle', applies: ['create', 'change'], rule: 'Another AI run is in progress, of a project or of an adaptation: one at a time.', says: 'Another AI run is in progress' },
-  { id: 'input-known', applies: ['change'], rule: 'A removal or a pin names an input the project does not have.', says: 'This project has no input' },
-  { id: 'last-input', applies: ['change'], rule: 'The only input of a project is removed.', says: 'A project needs at least one input' },
-  { id: 'instructions', applies: ['change'], rule: 'The instruction edits are empty, more than 50, name something that is not Markdown under plain names, name a file twice, or hold a file over 256 KiB.', says: 'Change at least one instruction file' },
-  { id: 'busy', applies: ['edit', 'delete'], rule: 'An AI run is changing this project.', says: 'An AI run is changing this project' },
-  { id: 'nothing', applies: ['edit'], rule: 'The edit changes nothing.', says: 'Nothing to change' },
-  { id: 'records', applies: ['edit'], rule: 'A record has no unique id, a real date, a text, an author of muro or you, or a true or false binding.', says: 'The records must be a list' },
-  { id: 'shipped-delete', applies: ['delete'], rule: 'The project Muro ships cannot be deleted.', says: 'The project Muro ships cannot be deleted' },
-  { id: 'revision', applies: ['delete'], rule: 'The registry moved since the page read it (the revision is no longer the one sent).', says: 'Registry revision changed; refresh before saving' },
-];
 
 /** What the runtime says when the agent is not Claude Code, or null: from `snapshot.registry.settings` (the harness of `ai`, else the old `agent`, else Claude Code, as the runtime reads it). */
 export function agentRefusal(settings: { ai?: { harness?: string } | undefined; agent?: string | undefined } | null | undefined): string | null {
@@ -362,21 +332,24 @@ const newestFirst = (jobs: readonly Job[]): Job[] => [...jobs].sort((a, b) => st
 export const runningJob = (jobs: readonly Job[]): Job | null => jobs.find(isRunning) ?? null;
 /** The run that is changing this project. */
 export const runningOn = (jobs: readonly Job[], projectId: string): Job | null => jobs.find(j => isRunning(j) && isProject(j) && j.project_id === projectId) ?? null;
-/** The runs that are making a new project. */
-export const creating = (jobs: readonly Job[]): Job[] => jobs.filter(j => isRunning(j) && isProject(j) && j.operation === 'create');
 /** The newest run of this project that is over, whatever came of it. */
 export const lastOver = (jobs: readonly Job[], projectId: string): Job | null => newestFirst(jobs.filter(j => !isRunning(j) && isProject(j) && j.project_id === projectId))[0] ?? null;
-/** The newest run of this project that is over, when it did not succeed: the page says so until a later run succeeds. */
-export function lastFailure(jobs: readonly Job[], projectId: string): Job | null {
-  const last = lastOver(jobs, projectId);
-  return last && last.status !== 'completed' ? last : null;
-}
-/** Why the page offers no other change while a run goes, in its words, or null when none does. */
+/** What a run is called: its own title (a project run has one), else the plugin an adaptation adapts. */
+export const jobTitle = (job: Job): string => job.title || (isProject(job) ? 'Changing the project' : job.plugin_id ? `The adaptation of ${job.plugin_id}` : 'An adaptation');
+/** Why the page offers no other change while a run goes, in its words, or null when none does. The card of that run, with its Cancel, is on the Projects page (`JobCard`). */
 export function busyReason(running: Job | null): string | null {
   if (!running) return null;
-  const what = running.title || (isProject(running) ? running.phase : '') || (running.plugin_id ? `The adaptation of ${running.plugin_id}` : 'An adaptation');
-  return `${what} is running: one AI run goes at a time. Wait for it to finish, or cancel it.`;
+  return `${jobTitle(running)} is running: one AI run goes at a time. Wait for it to finish, or cancel it.`;
 }
+
+/** The phase the runtime says while the factory builds and saves a project run (`project_jobs.rs`). From there on the runtime ignores a Cancel: a build that replaces the file cannot be stopped half way. */
+export const SAVING_PHASE = 'Building and saving the project';
+/** What the card says instead of Cancel in that phase. */
+export const NOT_CANCELLABLE = 'The project is being saved: it cannot be cancelled now';
+/** Whether the page offers Cancel for this run: every run, but a project run that is being saved. */
+export const canCancel = (job: Job): boolean => !(isProject(job) && job.phase === SAVING_PHASE);
+/** After how many minutes the runtime stops this run. */
+export const runLimit = (job: Job): number => (isProject(job) ? PROJECT_RUN_MINUTES : ADAPTATION_RUN_MINUTES);
 
 /** The project runs that were running in `before` and are over in `after`: what a reading of the jobs tells that the one before did not. */
 export function endedBetween(before: readonly Job[], after: readonly Job[]): Job[] {

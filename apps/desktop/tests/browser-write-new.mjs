@@ -60,6 +60,8 @@ const sideways = page => page.evaluate(() => {
   return Math.max(document.documentElement.scrollWidth - window.innerWidth, main ? main.scrollWidth - main.clientWidth : 0);
 });
 const finish = (page, status = 'completed', text) => page.evaluate(([s, t]) => window.behind.finish(s, t), [status, text]);
+/** Focus is on the heading of the list, where it goes when the button it was on is gone or off (a button that is not there cannot take it back). */
+const onHeading = page => page.waitForFunction(() => document.activeElement?.tagName === 'H1' && document.activeElement.textContent === 'Projects');
 const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
 
 // ---------- the dialog ----------
@@ -200,6 +202,7 @@ await test('New project: the payload is what was typed; the run shows above the 
   await page.screenshot({ path: shots + '/write-new-project.png' });
   await create(drawer).click();
   await drawer.waitFor({ state: 'detached' });
+  await onHeading(page);
   assert.deepEqual((await callsOf(app, 'create_project')).map(c => c.payload), [{
     name: 'Docs Kit', slug: 'docs-kit', author: 'me', folder: 'D:/Projects',
     inputs: [{ source: 'https://github.com/example/docs' }, { source: 'D:\\Skills Folder\\writing' }],
@@ -339,6 +342,7 @@ await test('Delete project: asks first, names the file and says it goes too; the
   await dialog.getByRole('button', { name: `Delete ${odd}`, exact: true }).click();
   await notice(page, `${odd} deleted.`).waitFor();
   await page.getByRole('button', { name: odd, exact: true }).waitFor({ state: 'detached' });
+  await onHeading(page);
   const asked = await callsOf(app, 'delete_project');
   assert.equal(asked.length, 1);
   assert.equal(asked[0].payload.id, odd.toLowerCase());
@@ -348,19 +352,22 @@ await test('Delete project: asks first, names the file and says it goes too; the
   assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 0);
 });
 
-await test('Delete project: a registry that moved since the page read it is read again and the request goes once more', 'projects', {}, async app => {
+await test('Delete project: a registry that moved since the page read it is read again and the request goes once more, with the new revision', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ pickPath: 'D:/Notes/Notes.mp' });
   await goProjects(page);
   await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
   await notice(page, 'Notes added to your list.').waitFor();
-  await page.evaluate(() => window.behind.bump());
+  // The registry moves on as the first request reaches it: it refuses the revision the page read.
+  await app.flags({ staleDeletes: 1 });
   await page.getByRole('button', { name: 'Delete Notes…', exact: true }).click();
   await dialogOf(page).getByRole('button', { name: 'Delete Notes', exact: true }).click();
   await notice(page, 'Notes deleted.').waitFor();
   const asked = await callsOf(app, 'delete_project');
-  assert.ok(asked.length >= 1 && asked.length <= 2);
-  if (asked.length === 2) assert.ok(asked[1].payload.revision > asked[0].payload.revision, 'the second request carries the revision read again');
+  assert.equal(asked.length, 2, 'refused once, then sent again');
+  assert.ok(asked[1].payload.revision > asked[0].payload.revision, 'the second request carries the revision read again');
+  const all = (await app.calls()).map(c => c.action), [first, second] = [all.indexOf('delete_project'), all.lastIndexOf('delete_project')];
+  assert.ok(all.slice(first + 1, second).includes('snapshot'), 'the registry was read again between the two');
   assert.equal(await page.getByRole('button', { name: 'Notes', exact: true }).count(), 0);
 });
 

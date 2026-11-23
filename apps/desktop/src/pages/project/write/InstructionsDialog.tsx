@@ -23,11 +23,14 @@ export function InstructionsDialog(props: ChangeDialogProps) {
   const made = React.useRef(0);
   const rowsOf = (): Row[] => held.map(f => ({ key: ++made.current, path: f.path, text: f.text }));
   const [rows, setRows] = React.useState<Row[]>(rowsOf);
+  /** The file the rows were made from: its files and its digest, as they were when the dialog opened. The project may be read again while the dialog is open (a run of another client ended); the
+   * changes are still those of these rows, against these files, so they are sent with this digest and the runtime refuses them if the file is no longer this one. */
+  const [opened, setOpened] = React.useState({ held, digest: props.info.digest });
   const [error, setError] = React.useState<string | undefined>(undefined);
   /** A row just added, whose name takes the focus; or -1, the button that adds one (after a row was removed). */
   const [focus, setFocus] = React.useState<number | null>(null);
   const add = React.useRef<HTMLButtonElement | null>(null);
-  const form = useRunForm(props, 'instructions', () => { setRows(rowsOf()); setError(undefined); setFocus(null); });
+  const form = useRunForm(props, 'instructions', () => { setRows(rowsOf()); setOpened({ held, digest: props.info.digest }); setError(undefined); setFocus(null); });
   const words = operationWords('instructions');
 
   React.useEffect(() => {
@@ -50,10 +53,10 @@ export function InstructionsDialog(props: ChangeDialogProps) {
     setFocus(-1);
   }
   function submit(): void {
-    const edits = instructionDiff(held, rows.map(r => ({ path: r.path, text: r.text })));
+    const edits = instructionDiff(opened.held, rows.map(r => ({ path: r.path, text: r.text })));
     const bad = edits.length ? checkInstructions(edits) : NOTHING;
     setError(bad ?? undefined);
-    void form.run(bad ? null : { instructions: edits });
+    void form.run(bad ? null : { instructions: edits }, opened.digest);
   }
 
   return (

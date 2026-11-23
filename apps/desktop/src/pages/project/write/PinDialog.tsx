@@ -11,7 +11,8 @@ import type { ChangeDialogProps } from './HarmonizeDialog.tsx';
 /** One input of the project, changed by an AI run: its pin moved (`move_pin`), or the input removed (`remove_input`, `remove`). Moving a pin starts from what the person
  * asks: "Check for updates" reads how the pin stands against its upstream (`project_updates`, read-only, for the file the page shows), and a newer release it reports fills
  * the field; the person may type another release or commit, or leave it empty for the newest one. Removing asks first, with the focus on Cancel: what only this input
- * brought leaves the project. The Inputs panel offers no Move pin for a frozen commit and no Remove for the only input, as the runtime refuses it. */
+ * brought leaves the project. The Inputs panel shows Move pin off for a frozen commit (the window does not move a reviewed commit) and offers no Remove for the only input, as the
+ * runtime refuses it. */
 export interface PinDialogProps extends ChangeDialogProps {
   /** The id of the input. */
   input: string;

@@ -6,13 +6,15 @@ The factory commands (`muro project new`, `edit`, `commit`) and the runtime acti
 screens of that record (`write.ts` and the Imago pages) were not part of it: the move to React on Sigrid (ADR-0031) replaced
 them. This record is about the screens written again in the React window (plan W), on top of `5c4a6bf`.
 
-Nothing in `muro/`, `crates/` or `apps/desktop/src-tauri/` was changed: every commit below touches `apps/desktop/` only
-(the documents of this task come after them). Nothing was compiled, linted or run on this machine (AGENTS.md, "Nothing is compiled on this machine"); the
-first run of everything below is the CI run named under "CI run".
+Nothing in `muro/` or `crates/` was changed by the commits below. One of them, `f3794ad`, changed the shell:
+`apps/desktop/src-tauri/src/main.rs` lists `jobs` and `cancel_job` in `WITHOUT_THE_LOCK`, so a Cancel and the poll of a run are
+not held back behind a sync. That steps outside the plan's constraint (the shell stays as it is unless CI proves a defect); the
+commit's own message gives the reason. Nothing was compiled, linted or run on this machine (AGENTS.md, "Nothing is compiled on
+this machine"); the first run of everything below is the CI run named under "CI run".
 
 ## What was built
 
-`git log --oneline 5c4a6bf..HEAD` (at `114178a`):
+`git log --oneline 5c4a6bf..079f2bc`:
 
 | Commit | What |
 | --- | --- |
@@ -22,6 +24,10 @@ first run of everything below is the CI run named under "CI run".
 | `fb23cb8` | New project and delete project in the list (task 4): `write/NewProjectDialog.tsx`, `write/DeleteDialog.tsx`, `pages/Projects.tsx`, `tests/browser-write-new.mjs` |
 | `cd1ceea` | The AI dialogs, the job card and the action bar (task 2): `write/HarmonizeDialog.tsx` (with what every dialog of a change shares), `write/AddInputDialog.tsx`, `write/PinDialog.tsx` (move a pin and remove an input), `write/InstructionsDialog.tsx`, `write/JobCard.tsx`, `Workspace.tsx`, `InputsPanel.tsx`, `tests/browser-write-ai.mjs` |
 | `114178a` | The workspace test follows the live buttons; the three write-side browser files are registered in `tests/browser.mjs` |
+| `bffcdc8` | The documents of the write side (plan W, task 5): `docs/desktop.md` "Changing a project", the README, the ADR's note, this record |
+| `f3794ad` | `jobs` and `cancel_job` are not held back behind a sync: `WITHOUT_THE_LOCK` of `apps/desktop/src-tauri/src/main.rs` (the one change outside `apps/desktop/src`), and the write actions in `docs/desktop-cli.md` |
+| `f93eac4` | The refusal tests read the error's message, and the details form opens on its first field (what the first CI run found) |
+| `079f2bc` | The CI run, below |
 
 What the window can do after them: make a project (New project…), add an input, harmonize again, move a pin (with Check for
 updates), remove an input, edit the custom instructions, edit the details (name, author, repository, changelog) and the
@@ -31,10 +37,11 @@ that reviews a project's decisions). [docs/desktop.md](../desktop.md#changing-a-
 
 ## What the tests are, and what they cannot prove
 
-- `tests/project-write.test.ts` (Node, 31 tests as written): the request builders, the checks of the plugin id, the sources,
-  the budget, the repository, the instructions and the records, the wording of the refusals, and the refusals of the fake
-  service's write actions.
-- `tests/browser-write-ai.mjs` (8 tests), `browser-write-edit.mjs` (6) and `browser-write-new.mjs` (11), written from the old
+- `tests/project-write.test.ts` (Node, 33 tests as written after the final review; 31 when the run below was made): the request
+  builders, the checks of the plugin id, the sources, the budget, the repository, the instructions and the records, the words
+  of the runs, and the refusals of the fake service's write actions.
+- `tests/browser-write-ai.mjs` (13 tests after the final review; 8 when the run below was made), `browser-write-edit.mjs` (6) and
+  `browser-write-new.mjs` (11), written from the old
   Imago file's list (`git show 8f70786:apps/desktop/tests/browser-project-write.mjs`) and the plan: the dialogs against the
   fake service in headless Edge.
 - The fake service (`tests/fake-transport.js`) repeats the runtime's rules by its own code (read from
@@ -59,26 +66,30 @@ The steps Rust tests (`cargo test --locked -p muro-registry -p muro-desktop-runt
 -p muro-desktop`) run too, over Rust this work did not change. The job `tests` (Python, `-m "not marionette"`) runs no
 desktop code.
 
-CI run: Tests, run 45214604983 on f93eac4, green: the Rust and Python tests (the project jobs of the runtime and the factory commands included), the unit tests, the type check, the build, `sigrid-check` (41 files, 0 errors) and the browser tests of the shell, the workspace and the write side.
+CI run: Tests, run 45214604983 on `f93eac4`, green: the Rust and Python tests (the project jobs of the runtime and the factory commands included), the unit tests, the type check, the build, `sigrid-check` (41 files, 0 errors) and the browser tests of the shell, the workspace and the write side. It is the run of the six commits of plan W and of the three that followed; it does not cover the commit of the final review's fixes (below), whose first run is its own.
 
 ## Not run
 
-- No `cargo`, `npm`, `npx`, `node`, `tsc`, `vite`, test runner, `sigrid-check` or `imago-check` on this machine (owner's rule):
-  the unit tests, the type check, the build and the browser tests of the six commits have not run at the time of writing, and
-  no CI run had been read yet. The test files were written from the Sigrid sources (tag `v3.3.9`) and the plan, not from a run:
-  a red there is first a wrong guess about a selector, a focus or a timing, and not necessarily a defect.
+- No `cargo`, `npm`, `npx`, `node`, `tsc`, `vite`, test runner, `sigrid-check` or `imago-check` on this machine (owner's rule).
+  The unit tests, the type check, the build, `sigrid-check` and the browser tests of the commits up to `f93eac4` ran in CI
+  (run 45214604983, green), where `f93eac4` repaired what the first run found. The files of the final review's fixes
+  (below) have not run anywhere yet: the test files were written from the Sigrid sources (tag `v3.3.9`) and the plan, not from
+  a run, and a red there is first a wrong guess about a selector, a focus or a timing, and not necessarily a defect.
+  `imago-check` (CLAUDE.md) has not run for this work, on this machine or in CI.
 - No operation was run with a real Claude Code: the cost, the duration and the quality of a harmonization, an input added, a
   pin moved or a project made from this window are unknown. The runtime and the factory they call were tested on their own
   ([2026-11-21-projects-write-side.md](2026-11-21-projects-write-side.md)), never driven from this window.
 - No Windows window: the page was not opened in the shell, the folder dialog (`pick_folder`) was never opened, and no
   screenshot of the new screens was looked at.
 - `project_updates` was not run against real upstreams from this window.
-- `sigrid-check` did not run: the new files were read by eye for literal colours and sizes, a `div` with `onClick` and
-  `dangerouslySetInnerHTML`, and none was found.
+- `sigrid-check` ran in CI on `f93eac4` (41 files, 0 errors, `continue-on-error`); it has not run on the files of the final
+  review's fixes, which were read by eye for literal colours and sizes, a `div` with `onClick` and `dangerouslySetInnerHTML`,
+  and none was found.
 
-## What CI will test first
+## What CI settled, and what is still a doubt
 
-Doubts the authors of the tasks left, to read first in a red run:
+The doubts the authors of the tasks left were all exercised by the browser tests of run 45214604983, which was green; each
+could still break with a Sigrid upgrade, so a red run reads them first. They were:
 
 - Initial focus in Sigrid's drawer and dialog: the details drawer expects focus on the Name field without `autoFocus`; the new
   project drawer relies on `autoFocus` winning over the drawer's own focus; Remove expects focus on Cancel; the folder button
@@ -89,9 +100,34 @@ Doubts the authors of the tasks left, to read first in a red run:
 - The toast of the Add input test (it lasts 6 seconds) and the poll timing of the card.
 - `tests/browser-workspace.mjs` was changed to follow the live buttons; its other assertions were not touched.
 
+## The final review of plan W (2026-11-23)
+
+A single reviewer read the whole write side (the screens, the runtime and the factory commands taken over) at `f93eac4`. Its
+findings, and what became of them, in the words of its ids:
+
+- **Done in the screens and the documents** (the commit after `079f2bc`, which touches `apps/desktop/src` and `apps/desktop/tests`
+  and `docs/` only): the budget note and the limit (I3, I4: the dialogs and `docs/desktop.md` say what a run reaches, what it loads
+  and that it stops after 120 minutes, and the card says *Stops after 120 min*); no Cancel in the saving phase, and the fake's
+  cancel words by phase (I2's page part, Minor 12); the instructions dialog sends the digest and the files it opened on (Minor 5);
+  a refused start reads the runs again (Minor 6); the card of any running job, with its Cancel (Minor 7); Move pin shown off for a
+  frozen pin, with the reason (Minor 8); focus after a deletion and after a project is started (Minor 10); the dead exports of
+  `jobs.ts`, `REFUSALS` among them, removed (Minor 11); the delete retry proved by the fake refusing the first request, and the
+  Records buttons off during a run (Minor 13); `docs/desktop-cli.md` (Minor 14); this record (Minor 15); ADR-0032 and
+  `docs/desktop.md` (Minor 16).
+- **Not in that commit:** C1, I1, I2's runtime part, I5 and the minors 1 to 4 and 17 to 19 are in the runtime and the factory
+  (`crates/`, `muro/`, `tests/*.py`); another commit answers them, and its results are recorded there, not here.
+- **Not done:** Minor 9 (the Inputs list counts each input twice for a screen reader, because the `li` of its buttons is a
+  sibling of Sigrid's `ItemRow`: it needs a trailing-actions slot in Sigrid, and a slot cannot be made here), and the part of
+  Minor 13 that asks for the card after a reload of the window (the fake lives in the page, so a reload loses it).
+- **Still the runtime's wording:** a refusal because another run goes says *cancel it in Activity*, and the window has no
+  Activity page; the card of that run, with its Cancel, is on the Projects page instead.
+
 ## The owner's first live checks, by hand
 
-None of these has been done. Record each with the sample size, the cost, the duration and what it showed.
+None of these has been done. Record each with the sample size, the cost, the duration and what it showed. Two things the first
+live run will show, and that no fake can: the card stays on one phase while the agent works (Claude Code writes its JSON answer
+at the end, so the log is empty until then), and a run at the default budget may end at the budget, because the owner's plugins
+and hooks load into every turn.
 
 1. **A harmonization from the window, at a small budget.** The agent of the registry's settings must be Claude Code (the
    default; the Settings page that changes it is not in the window yet). On a copy of a small project (the project Muro ships
