@@ -5,10 +5,13 @@ owner's answer to the question that precedes it. Python checks shape and referen
 child or a form. The servers and tools here are stubs; no real source is named.
 """
 import copy
+import json
 
 import pytest
 
-from muro.delivery import FORMS, server_section_errors, server_sections, validate_delivery
+from muro import build_release
+from muro.delivery import (FORMS, package_server_gate_errors, server_section_errors, server_sections,
+                           validate_delivery)
 from muro.guide import _I18N
 
 
@@ -279,3 +282,110 @@ def test_a_full_length_commit_is_accepted():
     document = packaged()
     document["server_choice"]["given_on"]["sources"]["demo"] = "3bf78a42c5d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7"
     assert errors_for(document) == []
+
+
+# --- The gate, the packaged paths and what a host registers (the build) ---------------------------------------
+
+PACKAGED = "<package_root>/scripts/demo/SKILL.source.md"   # the one file the fixture source packages
+
+
+def declare(project, **over):
+    document = served(run=["python", PACKAGED, "--stdio"], env={"STUB_HOME": "<package_root>/scripts/demo"}, **over)
+    (project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    return document
+
+
+def build(project, tmp_path):
+    return build_release(project / "sources.json", project, tmp_path / "out")
+
+
+def declare_packaged(project, choice=True, **over):
+    options = {"tools": (FORWARD, {**RUN, "run": ["python", PACKAGED, "{q}"]}), **over}
+    document = packaged(**options)
+    document["mcp_servers"] = [{**SERVER, "run": ["python", PACKAGED, "--stdio"], "env": {}}]
+    commit = json.loads((project / "sources.json").read_text(encoding="utf-8"))["sources"][0]["commit"]
+    document["server_choice"]["given_on"]["sources"] = {"demo": commit[:8]}
+    if not choice:
+        del document["server_choice"]
+    (project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    return document
+
+
+def test_the_build_refuses_a_package_server_without_the_owners_answer(portable_project, tmp_path):
+    declare_packaged(portable_project, choice=False)
+    with pytest.raises(ValueError, match="needs the owner's recorded answer"):
+        build(portable_project, tmp_path)
+
+
+def test_validation_alone_accepts_it(portable_project):
+    document = declare_packaged(portable_project, choice=False)
+    assert errors_for(document) == []                       # shape only: the gate is the build's
+
+
+def test_an_answer_given_on_another_commit_asks_again():
+    document = packaged()
+    sources = [{"id": "demo", "commit": "f" * 40}]
+    assert package_server_gate_errors(document, sources) == [
+        "the owner's answer was given on demo at abc1234, now pinned at ffffffff: ask again"]
+    document["server_choice"]["given_on"]["sources"] = {}
+    assert package_server_gate_errors(document, sources) == ["the owner's answer does not cover source demo"]
+    assert package_server_gate_errors(served(), sources) == []
+
+
+def test_the_gate_reads_the_recorded_commit_whatever_its_case_and_asks_for_the_answer_when_missing():
+    document = packaged()
+    document["server_choice"]["given_on"]["sources"] = {"demo": "ABC1234"}
+    assert package_server_gate_errors(document, [{"id": "demo", "commit": "abc1234" + "0" * 33}]) == []
+    del document["server_choice"]
+    assert package_server_gate_errors(document, []) == [
+        "the package server needs the owner's recorded answer (server_choice)"]
+    assert package_server_gate_errors(None, []) == []
+
+
+def test_the_gate_asks_for_each_source_a_tool_or_a_child_uses():
+    document = packaged(tools=(FORWARD, {**RUN, "source": "other"}))
+    document["server_choice"]["given_on"]["sources"] = {}
+    sources = [{"id": "demo", "commit": "f" * 40}, {"id": "other", "commit": "e" * 40}]
+    assert package_server_gate_errors(document, sources) == [
+        "the owner's answer does not cover source demo", "the owner's answer does not cover source other"]
+
+
+def test_claude_code_registers_the_package_server_and_the_other_hosts_what_they_did(portable_project, tmp_path):
+    declare_packaged(portable_project)
+    release = build(portable_project, tmp_path)
+    claude = json.loads((release / "adapters/claude-code/.mcp.json").read_text(encoding="utf-8"))
+    assert claude == {"mcpServers": {"pack": {"command": "python", "env": {},
+        "args": ["${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py", "tools-server"]}}}
+    codex = json.loads((release / "adapters/codex/mcp.json").read_text(encoding="utf-8"))
+    assert list(codex["mcpServers"]) == ["stub"]            # not run live: the absorbed server, as today
+    sections = json.loads((release / "package-server.json").read_text(encoding="utf-8"))
+    assert sections["package_server"]["name"] == "pack" and [s["name"] for s in sections["mcp_servers"]] == ["stub"]
+    assert (release / "adapters/claude-code/skills/muro/package-server.json").read_text(encoding="utf-8") ==            (release / "package-server.json").read_text(encoding="utf-8")
+
+
+def test_a_server_kept_beside_the_package_server_stays_registered(portable_project, tmp_path):
+    declare_packaged(portable_project, children=[], tools=({**RUN, "run": ["python", PACKAGED, "{q}"]},))
+    release = build(portable_project, tmp_path)
+    claude = json.loads((release / "adapters/claude-code/.mcp.json").read_text(encoding="utf-8"))
+    assert list(claude["mcpServers"]) == ["stub", "pack"]
+
+
+def test_a_run_tool_must_name_files_the_release_carries(portable_project, tmp_path):
+    declare_packaged(portable_project, tools=(FORWARD, {**RUN, "run": ["python", "<package_root>/scripts/demo/nope.js", "{q}"]}))
+    with pytest.raises(ValueError, match="package tool lookup names a file that is not packaged"):
+        build(portable_project, tmp_path)
+
+
+def test_a_run_tool_may_name_only_the_folder_of_its_own_source(portable_project, tmp_path):
+    declare_packaged(portable_project, tools=(FORWARD, {**RUN, "run": ["python", "<package_root>/scripts/demo/../x.py", "{q}"],
+                                                       "env": {"HOME_DIR": "<package_root>/scripts/other"}}))
+    with pytest.raises(ValueError, match="package tool lookup names a path outside scripts/demo/: scripts/demo/../x.py"
+                                         ".*package tool lookup names a path outside scripts/demo/: scripts/other"):
+        build(portable_project, tmp_path)
+
+
+def test_a_release_without_a_package_server_writes_no_such_file(portable_project, tmp_path):
+    declare(portable_project)
+    release = build(portable_project, tmp_path)
+    assert not (release / "package-server.json").exists()
+    assert not (release / "adapters/claude-code/skills/muro/package-server.json").exists()

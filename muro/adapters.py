@@ -5,8 +5,8 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 
-from .delivery import (DELIVERY_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp, codex_hooks,
-                       install_note, mcp_servers, placeholder_launches, session_text)
+from .delivery import (DELIVERY_FILE, PACKAGE_SERVER_FILE, agent_plugins_mcp, claude_code_hooks, claude_code_mcp,
+                       codex_hooks, install_note, mcp_servers, placeholder_launches, session_text)
 from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTOM_RECEIPT
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
@@ -303,6 +303,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         shutil.copy2(dist / "guide-examples.json", skill_dir / "guide-examples.json")
         if (dist / DELIVERY_FILE).is_file():
             shutil.copy2(dist / DELIVERY_FILE, skill_dir / DELIVERY_FILE)
+        if (dist / PACKAGE_SERVER_FILE).is_file():
+            shutil.copy2(dist / PACKAGE_SERVER_FILE, skill_dir / PACKAGE_SERVER_FILE)
         if (dist / CUSTOM_RECEIPT).is_file():
             shutil.copy2(dist / CUSTOM_RECEIPT, skill_dir / CUSTOM_RECEIPT)
         if (dist / CUSTOM_DIRECTORY).is_dir():

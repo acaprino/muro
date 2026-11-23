@@ -52,6 +52,9 @@ _TOOL_OPTIONAL = {"annotations", "timeout", "env"}
 _TOOL_COMMANDS = {"forward", "run"}
 _TOOL_NAME = re.compile(r"[a-z][a-z0-9_]{0,39}")
 _FORWARDED_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")   # a forwarded tool keeps the child's name, whatever its spelling
+PACKAGE_SERVER_FILE = "package-server.json"   # the two sections the server reads at start, beside `muro.py`
+PACKAGE_SERVER_ACTION = "tools-server"
+PACKAGE_SERVER_HOSTS = ("claude-code",)   # run live there; the other hosts keep what they register today
 _CHOICE_KEYS = {"asked_on", "answer", "given_on"}
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
 _COMMIT = re.compile(r"[0-9a-fA-F]{7,}")
@@ -96,10 +99,19 @@ def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]
     return [{"name": server["name"], **server_launch(server, _PACKAGE_ROOT)} for server in mcp_servers(document)]
 
 
+def registered_servers(document: dict[str, Any] | None, host: str) -> list[dict[str, Any]]:
+    """What a host registers: on a package-server host the package server stands for its children."""
+    declaration = package_server(document)
+    if declaration is None or host not in PACKAGE_SERVER_HOSTS:
+        return mcp_servers(document)
+    kept = [server for server in mcp_servers(document) if server["name"] not in declaration["children"]]
+    return [*kept, {"name": declaration["name"], "run": ["python", f"{_PACKAGE_ROOT}/muro.py", PACKAGE_SERVER_ACTION]}]
+
+
 def claude_code_mcp(document: dict[str, Any] | None, command: str) -> dict[str, Any] | None:
     """The `.mcp.json` a Claude Code plugin registers when enabled, or None when no server is declared."""
     root = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{command}"
-    servers = {server["name"]: server_launch(server, root) for server in mcp_servers(document)}
+    servers = {server["name"]: server_launch(server, root) for server in registered_servers(document, "claude-code")}
     return {"mcpServers": servers} if servers else None
 
 
@@ -110,20 +122,48 @@ def agent_plugins_mcp(document: dict[str, Any] | None, package_root: str) -> dic
     return {"$schema": MCP_SCHEMA, "mcpServers": servers} if servers else None
 
 
+def _path_errors(label: str, source: str, values: list[str], package_dir: Path) -> list[str]:
+    errors = []
+    own = f"scripts/{source}/"
+    for value in values:
+        for relative in _PACKAGED_PATH.findall(value):
+            # Its own source's folder is all a server may name: a host that installs the servers as a
+            # package of their own (Hermes) carries nothing else.
+            if ".." in relative.split("/") or not (relative + "/").startswith(own):
+                errors.append(f"{label} names a path outside {own}: {relative}")
+            elif not (package_dir / relative).exists():
+                errors.append(f"{label} names a file that is not packaged: {relative}")
+    return errors
+
+
 def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> list[str]:
-    """A declared server must start from files the release carries. A path check, not a judgment."""
+    """A declared server, and a tool that runs a command, must start from files the release carries. A path check."""
     errors = []
     for server in mcp_servers(document):
-        own = f"scripts/{server['source']}/"
-        for value in [*server["run"], *server.get("env", {}).values()]:
-            for relative in _PACKAGED_PATH.findall(value):
-                # Its own source's folder is all a server may name: a host that installs the servers as a
-                # package of their own (Hermes) carries nothing else.
-                if ".." in relative.split("/") or not (relative + "/").startswith(own):
-                    errors.append(f"mcp server {server['name']} names a path outside {own}: {relative}")
-                elif not (package_dir / relative).exists():
-                    errors.append(f"mcp server {server['name']} names a file that is not packaged: {relative}")
+        errors += _path_errors(f"mcp server {server['name']}", server["source"],
+                               [*server["run"], *server.get("env", {}).values()], package_dir)
+    for tool in (package_server(document) or {}).get("tools", []):
+        if "run" in tool:
+            errors += _path_errors(f"package tool {tool['name']}", tool["source"],
+                                   [*literal_parts(tool["run"]), *tool.get("env", {}).values()], package_dir)
     return errors
+
+
+def package_server_gate_errors(document: dict[str, Any] | None, sources: list[dict[str, Any]]) -> list[str]:
+    """The build's gate: a package server is released only on the owner's answer, given on the sources as pinned."""
+    declaration = package_server(document)
+    if declaration is None:
+        return []
+    if "server_choice" not in document:
+        return ["the package server needs the owner's recorded answer (server_choice)"]
+    recorded = document["server_choice"]["given_on"]["sources"]
+    pinned = {source["id"]: source["commit"] for source in sources}
+    used = {tool["source"] for tool in declaration["tools"]}
+    used |= {server["source"] for server in mcp_servers(document) if server["name"] in declaration["children"]}
+    errors = [f"the owner's answer does not cover source {source}" for source in sorted(used - recorded.keys())]
+    return errors + [f"the owner's answer was given on {source} at {commit}, now pinned at {pinned[source][:8]}: ask again"
+                     for source, commit in recorded.items()
+                     if source in pinned and not pinned[source].lower().startswith(commit.lower())]
 
 
 def _text(value: Any) -> bool:

@@ -7,8 +7,9 @@ import shutil
 
 from .adapters import write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
-from .delivery import (DELIVERY_FILE, allows_empty_catalog, load_delivery, packaged_path_errors,
-                       unregistered_active_hooks, validate_delivery)
+from .delivery import (DELIVERY_FILE, PACKAGE_SERVER_FILE, allows_empty_catalog, load_delivery, package_server,
+                       package_server_gate_errors, packaged_path_errors, server_sections, unregistered_active_hooks,
+                       validate_delivery)
 from .entries import ENTRIES_FILE, load_entries, validate_entries
 from .factory import (PROMPT_FILES, _helper_name, copy_source_helpers, prompts_dir, runtime_source,
                       unpackaged_reference_errors)
@@ -83,6 +84,9 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             shutil.copy2(project_root / ENTRIES_FILE, dist / ENTRIES_FILE)
         if delivery_doc is not None:
             shutil.copy2(project_root / DELIVERY_FILE, dist / DELIVERY_FILE)
+        if package_server(delivery_doc):
+            (dist / PACKAGE_SERVER_FILE).write_text(json.dumps(server_sections(delivery_doc), indent=2),
+                                                    encoding="utf-8")
         copy_runtime(project_root, dist, delivery_doc)
         for src in sources:
             # A file the intake AI declared as evidence only is not shipped, and no step may point at it.
@@ -91,7 +95,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             if errors:
                 raise ValueError("Invalid helper reference: " + "; ".join(errors))
 
-        errors = packaged_path_errors(delivery_doc, dist)
+        errors = packaged_path_errors(delivery_doc, dist) + package_server_gate_errors(delivery_doc, sources)
         if errors:
             raise ValueError("Invalid delivery: " + "; ".join(errors))
 
