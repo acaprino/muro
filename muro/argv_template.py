@@ -177,3 +177,8 @@ def build_argv(run: list, arguments: dict, schema: dict, package_root: str) -> l
 def is_batch_program(path: str) -> bool:
     """A `.bat` or `.cmd` file, which Windows runs through cmd.exe (the check the hook trampoline makes)."""
     return os.path.splitext(path)[1].lower() in (".bat", ".cmd")
+
+
+def batch_refusal(command: str) -> str:
+    """What a tool or a child server answers when its `command` resolves to a batch file."""
+    return f"{command} is a batch file, which Windows runs through cmd.exe: declare the executable and its script instead"

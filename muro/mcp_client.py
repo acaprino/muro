@@ -17,6 +17,7 @@ import threading
 from typing import Any, Callable
 
 from . import __version__
+from .argv_template import batch_refusal, is_batch_program
 from .jsonrpc import METHOD_NOT_FOUND, PROTOCOL_VERSION, error, read_messages, write_message
 
 CLOSE_WAIT = 2  # seconds a child gets to exit by itself once its input is closed
@@ -91,6 +92,8 @@ class ChildServer:
         program = resolve_program(command)
         if program is None:
             raise ChildError(f"{self.name}: program not found: {command}")
+        if is_batch_program(program):  # cmd.exe would re-parse the arguments, which hold `<package_root>` paths
+            raise ChildError(batch_refusal(command))
         with self._lock:  # a close() comes before the process, which then never starts, or after it, and stops it
             if self._closed:
                 raise ChildError(f"{self.name}: the server stopped")

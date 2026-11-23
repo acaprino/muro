@@ -568,6 +568,19 @@ def test_a_batch_program_is_refused(host_with, monkeypatch, tmp_path):
     assert not (tmp_path / "batch-ran").exists()
 
 
+@pytest.mark.skipif(os.name != "nt", reason="only Windows runs a .cmd file through cmd.exe")
+def test_a_child_that_is_a_batch_program_is_not_started(host_with, monkeypatch, tmp_path):
+    programs = tmp_path / "programs"
+    programs.mkdir()
+    (programs / "demo-child.cmd").write_text(f'@echo ran>"{tmp_path / "batch-ran"}"\r\n')
+    monkeypatch.setenv("PATH", f"{programs}{os.pathsep}{os.environ['PATH']}")  # before the server inherits it
+    entry = {"name": "stub", "source": "demo", "run": ["demo-child", "<package_root>/scripts/demo/stub.py", "echo"]}
+    host = host_with(entry=entry)
+    assert host.call("echo") == tool_result("demo-child is a batch file, which Windows runs through cmd.exe: "
+                                            "declare the executable and its script instead", True)
+    assert not (tmp_path / "batch-ran").exists()
+
+
 def test_the_declared_env_is_added_to_the_servers_with_the_package_root_in_place(host_with):
     host = host_with(tools=[run_tool("show_env", ["env"], env={"DEMO_VAR": "<package_root>/x"})])
     assert json.loads(text_of(host.call("show_env"))) == [f"{host.package}/x", True]  # and PATH is still there

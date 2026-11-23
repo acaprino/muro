@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 from urllib.request import url2pathname
 
 from . import __version__
-from .argv_template import build_argv, is_batch_program
+from .argv_template import batch_refusal, build_argv, is_batch_program
 from .delivery import PACKAGE_SERVER_FILE, placed_env, server_launch, server_section_errors
 from .jsonrpc import (INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
                       PROTOCOL_VERSION, error, read_messages, result, tool_result, write_message)
@@ -299,8 +299,7 @@ class PackageServer:
             if found is None:
                 return tool_result(f"Program not found on this machine: {argv[0]}", True)
             if is_batch_program(found):
-                return tool_result(f"{argv[0]} is a batch file, which Windows runs through cmd.exe: declare the "
-                                   "executable and its script instead", True)
+                return tool_result(batch_refusal(argv[0]), True)
             env = {**os.environ, **placed_env(tool, root)}
             return run_command([found, *argv[1:]], self._working_directory(), env,  # the file that was checked runs
                                tool.get("timeout", DEFAULT_TIMEOUT), stop)
