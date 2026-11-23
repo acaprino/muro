@@ -65,6 +65,13 @@ export function examplesOf(info: ProjectInfo): Example[] {
     return { title: text(e.title) || `Example ${i + 1}`, task: text(e.task), stack: strings(e.stack_tokens), status: isStatus(e.status) ? e.status : 'selected', reason: text(e.reason), questions: strings(e.questions), steps };
   });
 }
+/** What the steps of an example produce, in the order first met and once each: the `outputs` the capability data declares for each step's capability, never inferred. A step whose capability the graph lacks adds nothing. */
+export function outputsOf(example: Example, capabilities: Cap[]): string[] {
+  const known = new Map<string, string[]>(), seen = new Set<string>();
+  for (const c of capabilities) if (!known.has(c.id)) known.set(c.id, c.outputs);
+  for (const s of example.steps) for (const o of known.get(s.capability) ?? []) seen.add(o);
+  return [...seen];
+}
 export const outcomeOfExample = (e: Example): Outcome => ({ kind: 'decision', asked: e.task, status: e.status, steps: e.steps, reason: e.reason, questions: e.questions, stack: e.stack, who: null, example: e.title });
 
 // ---------- what the runtime answers, and what the session keeps ----------

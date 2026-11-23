@@ -9,7 +9,7 @@ import { textBoxOf } from '../src/context.ts';
 import * as graph from '../src/pages/project/graph.ts';
 import * as projects from '../src/pages/projects.ts';
 import { blankProjects, fresh, recall, remember } from '../src/pages/project/state.ts';
-import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from '../src/pages/project/graph-model.ts';
+import { capsOf, entriesOf, examplesOf, outcomeOfExample, outputsOf, readAnswer, readOutcome, litOf } from '../src/pages/project/graph-model.ts';
 import type { Outcome } from '../src/pages/project/graph-model.ts';
 import { decisionScene, decisionGraphOptions } from '../src/pages/project/graph-scene.ts';
 import { createTransport } from './fake-transport.js';
@@ -100,6 +100,20 @@ it('a repeated capability is told apart by its step id, and its reason follows t
   const twice = { ...EXAMPLES[0], selections: [{ ...pick('design-taste', 'First.'), step_id: 'design-taste#1' }, { ...pick('design-taste', 'Again.'), step_id: 'design-taste#2' }], steps: [{ step: 'design-taste#1', capability: 'design-taste', intent: 'design-taste-intent' }, { step: 'design-taste#2', capability: 'design-taste', intent: 'design-taste-intent' }] };
   const [one] = examplesOf(info({}, { examples: [twice] }));
   assert.deepEqual(one.steps.map(s => [s.step_id, s.reason, s.added_as_prerequisite]), [['design-taste#1', 'First.', false], ['design-taste#2', 'Again.', false]]);
+});
+it('outputsOf lists what the steps of an example produce, once each, in order', () => {
+  const held = info();
+  assert.deepEqual(outputsOf(examplesOf(held)[0], capsOf(held)), ['design-brief', 'palette']);
+});
+it('outputsOf is empty for an example with no step or no output', () => {
+  const held = info(), [, letter, hello] = examplesOf(held);
+  assert.deepEqual(outputsOf(hello, capsOf(held)), []);
+  assert.deepEqual(outputsOf(letter, capsOf(held)), []);
+});
+it('outputsOf skips a step whose capability is not in the graph and keeps the first-seen order of a repeated output', () => {
+  const steps = ['a', 'ghost', 'b'].map(id => ({ step: id, capability: id, intent: null }));
+  const held = info({}, { capabilities: [cap('a', { outputs: ['x', 'y'] }), cap('b', { outputs: ['y', 'z'] })], examples: [{ title: 't', task: 't', stack_tokens: [], status: 'selected', selections: [], reason: '', questions: [], path: [], steps }] });
+  assert.deepEqual(outputsOf(examplesOf(held)[0], capsOf(held)), ['x', 'y', 'z']);
 });
 const valid = { valid: true, status: 'selected', steps: [{ step_id: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent', reason: 'A Word file.', added_as_prerequisite: false }], reason: 'One document.', questions: [] };
 it('the runtime\'s answer is read as a decision, with the engine that made it, its cost and its time', () => {
