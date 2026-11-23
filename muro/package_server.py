@@ -11,7 +11,6 @@ import contextlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -23,10 +22,11 @@ from urllib.request import url2pathname
 
 from . import __version__
 from .argv_template import build_argv, is_batch_program
-from .delivery import _PACKAGE_ROOT, PACKAGE_SERVER_FILE, server_launch, server_section_errors
+from .delivery import PACKAGE_SERVER_FILE, placed_env, server_launch, server_section_errors
 from .jsonrpc import (INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
                       PROTOCOL_VERSION, error, read_messages, result, tool_result, write_message)
-from .mcp_client import DRAIN_WAIT, KILL_WAIT, ChildError, ChildServer, ChildTimeout, kill_tree
+from .mcp_client import (DRAIN_WAIT, KILL_WAIT, ChildError, ChildServer, ChildTimeout, kill_tree,
+                         resolve_program)
 
 START_WAIT = 30   # seconds a child gets to start and list its tools
 ROOTS_WAIT = 5    # seconds the host gets to answer roots/list
@@ -179,7 +179,10 @@ class PackageServer:
         elif method == "tools/call":
             params = message.get("params")
             if isinstance(params, dict) and isinstance(params.get("name"), str):
-                self._spawn(self._work, message)
+                stop = threading.Event()  # a cancellation sets it; the call is registered before its worker runs
+                with self._lock:
+                    self._calls[msg_id] = stop.set
+                self._spawn(self._work, message, stop)
             else:
                 self._send(error(msg_id, INVALID_PARAMS, "Invalid params"))
         else:
@@ -256,14 +259,17 @@ class PackageServer:
             self._roots_done.wait(max(self._roots_deadline - time.monotonic(), 0))
         return self._cwd
 
-    def _work(self, message: dict[str, Any]) -> None:
+    def _work(self, message: dict[str, Any], stop: threading.Event) -> None:
         try:
-            outcome = self._call(message["params"], message["id"])
+            outcome = self._call(message["params"], message["id"], stop)
         except Exception as exc:  # a call that raises must still be answered, or the host waits for it forever
             outcome = tool_result(f"{type(exc).__name__}: {exc}", True)
+        finally:
+            with self._lock:
+                self._calls.pop(message["id"], None)
         self._send(result(message["id"], outcome))
 
-    def _call(self, params: dict[str, Any], request_id: Any) -> dict[str, Any]:
+    def _call(self, params: dict[str, Any], request_id: Any, stop: threading.Event) -> dict[str, Any]:
         name = params["name"]  # handle() checked it is text
         tool = self._tools.get(name)
         if tool is None:
@@ -274,40 +280,36 @@ class PackageServer:
         elif not isinstance(arguments, dict):
             return tool_result(f"The arguments of the tool {name} must be an object", True)
         if "run" in tool:
-            return self._run(tool, arguments, request_id)
+            return self._run(tool, arguments, stop)
         meta = params.get("_meta")
-        return self._forward(tool, arguments, meta if isinstance(meta, dict) else None, request_id)
+        return self._forward(tool, arguments, meta if isinstance(meta, dict) else None, request_id, stop)
 
-    def _run(self, tool: dict[str, Any], arguments: dict[str, Any], request_id: Any) -> dict[str, Any]:
-        stop = threading.Event()  # set by a cancellation of this call and by close()
+    def _run(self, tool: dict[str, Any], arguments: dict[str, Any], stop: threading.Event) -> dict[str, Any]:
         with self._lock:
             if self._closed:
                 stop.set()
-            self._calls[request_id] = stop.set
-            self._commands.add(stop)
+            self._commands.add(stop)  # close() sets it
         try:
             root = str(self._package)
             try:
                 argv = build_argv(tool["run"], arguments, tool["input_schema"], root)
             except ValueError as exc:
                 return tool_result(str(exc), True)
-            found = shutil.which(argv[0])
+            found = resolve_program(argv[0])
             if found is None:
                 return tool_result(f"Program not found on this machine: {argv[0]}", True)
             if is_batch_program(found):
                 return tool_result(f"{argv[0]} is a batch file, which Windows runs through cmd.exe: declare the "
                                    "executable and its script instead", True)
-            declared = tool.get("env", {})
-            env = {**os.environ, **{name: value.replace(_PACKAGE_ROOT, root) for name, value in declared.items()}}
+            env = {**os.environ, **placed_env(tool, root)}
             return run_command([found, *argv[1:]], self._working_directory(), env,  # the file that was checked runs
                                tool.get("timeout", DEFAULT_TIMEOUT), stop)
         finally:
             with self._lock:
-                self._calls.pop(request_id, None)
                 self._commands.discard(stop)
 
     def _forward(self, declared: dict[str, Any], arguments: dict[str, Any], meta: dict[str, Any] | None,
-                 request_id: Any) -> dict[str, Any]:
+                 request_id: Any, stop: threading.Event) -> dict[str, Any]:
         child, tool = declared["forward"]["server"], declared["forward"]["tool"]
         slot = self._slots[child]
         try:
@@ -334,6 +336,8 @@ class PackageServer:
         def known(child_id: int) -> None:
             with self._lock:
                 self._calls[request_id] = lambda: server.cancel(child_id)
+            if stop.is_set():  # cancelled before the child had the call: it never gets it
+                raise ChildError(f"{child}: cancelled")
 
         try:
             return server.call(tool, arguments, relay if token is not None else None, meta=meta, on_id=known)
@@ -341,9 +345,6 @@ class PackageServer:
             if not server.alive:
                 self._drop(slot, server)
             return tool_result(str(exc), True)
-        finally:
-            with self._lock:
-                self._calls.pop(request_id, None)
 
     def _drop(self, slot: _Slot, server: ChildServer | None) -> None:
         """Close a child that stopped or failed to start, so the next call starts another."""

@@ -5,6 +5,7 @@ Every wait on a child is bounded: a watchdog closes a child that is still runnin
 seconds, which turns a hung test into a failure.
 """
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -12,10 +13,10 @@ import time
 
 import pytest
 
-from mcp_stub import SLEEPERS, WATCHDOG, stub, wait_until  # noqa: F401  (stub is a fixture)
+from mcp_stub import SLEEPERS, STUB, WATCHDOG, stub, wait_until  # noqa: F401  (stub is a fixture)
 from muro import __version__, mcp_client
 from muro.jsonrpc import METHOD_NOT_FOUND, PROTOCOL_VERSION
-from muro.mcp_client import ChildError, ChildServer, ChildTimeout, kill_tree
+from muro.mcp_client import ChildError, ChildServer, ChildTimeout, kill_tree, resolve_program
 
 WAIT = 10  # seconds a call may take in a test before it counts as hung
 
@@ -91,6 +92,99 @@ def test_a_file_that_cannot_run_is_named(tmp_path):
     child = ChildServer("stub", {"command": str(not_a_program), "args": [], "env": {}})
     with pytest.raises(ChildError, match="stub: cannot start .*notes.txt"):
         child.start()
+
+
+def program(directory, name):
+    """A file that counts as the program `name` on this platform."""
+    directory.mkdir(exist_ok=True)
+    path = directory / (f"{name}.exe" if os.name == "nt" else name)
+    path.write_text("not a program", encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
+@pytest.fixture
+def where_windows_looks_first(monkeypatch):
+    """The environment Windows has by default: the working directory is searched for a program before PATH."""
+    monkeypatch.delenv("NoDefaultCurrentDirectoryInExePath", raising=False)
+
+
+def test_a_bare_name_is_found_on_the_absolute_entries_of_path(tmp_path, monkeypatch):
+    found = program(tmp_path / "bin", "demo-prog")
+    monkeypatch.setenv("PATH", os.pathsep.join(["", "relative", str(tmp_path / "empty"), str(tmp_path / "bin")]))
+    assert os.path.samefile(resolve_program("demo-prog"), found)
+    assert os.path.isabs(resolve_program("demo-prog"))
+
+
+@pytest.mark.parametrize("path", ["{empty}", ".", "bin", "{empty}{sep}.{sep}{sep}bin"],
+                         ids=["no entry", "dot", "relative entry", "dot, empty and relative entries"])
+def test_the_working_directory_is_never_searched(tmp_path, monkeypatch, where_windows_looks_first, path):
+    here = tmp_path / "here"
+    program(here, "demo-prog")
+    program(here / "bin", "demo-prog")
+    monkeypatch.chdir(here)
+    monkeypatch.setenv("PATH", path.format(empty=tmp_path / "empty", sep=os.pathsep))
+    assert resolve_program("demo-prog") is None
+
+
+def test_a_name_with_a_relative_directory_part_is_refused_and_an_absolute_one_is_used_as_it_is(tmp_path, monkeypatch):
+    found = program(tmp_path / "bin", "demo-prog")
+    monkeypatch.chdir(tmp_path)
+    assert resolve_program("bin/demo-prog") is None
+    assert resolve_program(os.path.join(".", "bin", "demo-prog")) is None
+    assert resolve_program(str(found)) == str(found)
+    assert resolve_program(str(tmp_path / "bin" / "nothing")) == str(tmp_path / "bin" / "nothing")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="only Windows has PATHEXT")
+def test_pathext_decides_which_file_of_a_name_is_the_program(tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "demo-tool").write_text("a script cmd.exe cannot run", encoding="utf-8")  # no extension in PATHEXT
+    (bin_dir / "demo-tool.cmd").write_text("@echo off\r\n", encoding="utf-8")
+    monkeypatch.setenv("PATH", str(bin_dir))
+    assert resolve_program("demo-tool").lower() == str(bin_dir / "demo-tool.cmd").lower()
+    assert resolve_program("demo-tool.cmd").lower() == str(bin_dir / "demo-tool.cmd").lower()
+
+
+def test_a_child_command_is_found_on_path_only(tmp_path, monkeypatch, where_windows_looks_first):
+    here = tmp_path / "here"
+    program(here, "demo-child")  # a file that no host could run: it shows only that it was picked
+    monkeypatch.chdir(here)
+    child = ChildServer("stub", {"command": "demo-child", "args": [], "env": {}})
+    with pytest.raises(ChildError, match="stub: program not found: demo-child"):
+        child.start()
+
+
+def test_a_child_is_started_by_the_path_its_command_was_resolved_to(tmp_path):
+    script = tmp_path / "stub_server.py"
+    script.write_text(STUB, encoding="utf-8")
+    child = ChildServer("stub", {"command": "python", "args": [str(script), "echo"], "env": {}})
+    watchdog = threading.Timer(WATCHDOG, child.close)
+    watchdog.daemon = True
+    watchdog.start()
+    try:
+        child.start()
+        started_as = child._process.args[0]
+        assert os.path.isabs(started_as) and os.path.samefile(started_as, resolve_program("python"))
+    finally:
+        watchdog.cancel()
+        child.close()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="taskkill is a Windows program")
+def test_taskkill_is_not_taken_from_the_working_directory(tmp_path, monkeypatch, where_windows_looks_first):
+    (tmp_path / "taskkill.exe").write_text("not a program", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        kill_tree(process)
+        process.wait(WAIT)
+        assert process.returncode is not None
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(WAIT)
 
 
 def test_close_stops_the_process(stub):

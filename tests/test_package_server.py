@@ -107,7 +107,7 @@ def run_tool(name, run, properties=None, required=(), **extra):
 MODE = {"mode": {"type": "string"}}
 LIST = run_tool("list_items", ["list", "--account", "{account}"], {"account": {"type": "string"}}, ["account"])
 RUN = run_tool("run_mode", ["{mode}"], MODE, ["mode"])
-SHORT = run_tool("run_short", ["{mode}"], MODE, ["mode"], timeout=1)
+SHORT = run_tool("run_short", ["{mode}"], MODE, ["mode"], timeout=3)  # the stub must write its pid within it
 NOISY = run_tool("run_noisy", ["{mode}"], MODE, ["mode"], timeout=5)  # a regression answers in seconds, not at WAIT
 SERVE = "from pathlib import Path; from muro.package_server import serve; raise SystemExit(serve(Path(r'{package}')))"
 STOPPED = "the tool {tool} is not what this package declares (missing, or its schema changed)"
@@ -177,6 +177,26 @@ def gone(pids):
     wait_until(lambda: not any(pid_alive(pid) for pid in pids))
 
 
+def server_env(**extra):
+    """The environment of a server whose working directory a program may be planted in: Windows then searches
+    that directory first, as it does by default; this session's own setting hides it."""
+    env = {key: value for key, value in os.environ.items() if key.upper() != "NODEFAULTCURRENTDIRECTORYINEXEPATH"}
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(ROOT), env.get("PYTHONPATH")]))  # the cwd is not ROOT
+    return {**env, **extra}
+
+
+def project_with(tmp_path, *names):
+    """A working directory holding a program under each of `names`: one that writes `planted` there if it runs."""
+    work = tmp_path / "project"
+    work.mkdir()
+    for name in names:
+        script = work / (f"{name}.cmd" if os.name == "nt" else name)
+        script.write_text(f'@echo ran>"{work / "planted"}"\r\n' if os.name == "nt"
+                          else f'#!/bin/sh\necho ran > "{work}/planted"\n')
+        script.chmod(0o755)
+    return work
+
+
 class Peer:
     """What a host does with a server: sends requests, collects everything that comes back, in order."""
 
@@ -228,9 +248,9 @@ class Peer:
 class Host(Peer):
     """A server run as a subprocess, spoken to through its pipes."""
 
-    def __init__(self, argv, cwd):
+    def __init__(self, argv, cwd, env=None):
         super().__init__(self._write)
-        self.process = subprocess.Popen(argv, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        self.process = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                         stderr=subprocess.PIPE, text=True, encoding="utf-8",
                                         start_new_session=True)  # so kill_tree may reach the whole tree
         self._reader = threading.Thread(target=self._read, daemon=True)
@@ -261,9 +281,9 @@ class Host(Peer):
 def host_with(tmp_path):
     hosts = []
 
-    def make(**options):
+    def make(cwd=None, env=None, **options):
         package = build_package(tmp_path, **options)
-        host = Host([sys.executable, "-c", SERVE.format(package=package)], ROOT)
+        host = Host([sys.executable, "-c", SERVE.format(package=package)], cwd or ROOT, env)
         host.package = package
         hosts.append(host)
         return host
@@ -491,7 +511,7 @@ def test_a_timeout_says_the_effect_is_unknown(host_with):
     host = host_with(tools=[SHORT])
     result = host.call("run_short", {"mode": "sleep"})
     assert result["isError"] is True
-    assert text_of(result).startswith(f"Stopped after 1 seconds. {STOP_NOTE}")
+    assert text_of(result).startswith(f"Stopped after 3 seconds. {STOP_NOTE}")
     pids = command_pids(host.package)
     assert pids
     gone(pids)
@@ -500,14 +520,40 @@ def test_a_timeout_says_the_effect_is_unknown(host_with):
 def test_a_timeout_returns_what_the_command_had_written(tmp_path):
     package = build_package(tmp_path, tools=[RUN])
     argv = [sys.executable, str(marker(package, "tool.py")), "sleep"]
-    result = package_server.run_command(argv, None, dict(os.environ), 2, threading.Event())
-    assert result == tool_result(f"Stopped after 2 seconds. {STOP_NOTE}\nstarted", True)
+    result = package_server.run_command(argv, None, dict(os.environ), 3, threading.Event())
+    assert result == tool_result(f"Stopped after 3 seconds. {STOP_NOTE}\nstarted", True)
     gone(command_pids(package))
 
 
 def test_a_missing_program_is_named(host_with):
     host = host_with(tools=[{**run_tool("missing", []), "run": ["no-such-program-xyz"]}])
     assert host.call("missing") == tool_result("Program not found on this machine: no-such-program-xyz", True)
+
+
+def test_a_program_planted_in_the_working_directory_does_not_replace_the_real_one(host_with, tmp_path):
+    work = project_with(tmp_path, "python")
+    host = host_with(tools=[LIST], cwd=work, env=server_env())
+    assert text_of(host.call("list_items", {"account": "a"})) == '["list", "--account", "a"]'
+    assert not (work / "planted").exists()
+
+
+@pytest.mark.parametrize("path", [None, os.pathsep.join([".", "", "relative", os.environ["PATH"]])],
+                         ids=["path as it is", "path with the working directory in it"])
+def test_a_program_that_is_only_in_the_working_directory_is_not_found(host_with, tmp_path, path):
+    work = project_with(tmp_path, "demo-prog")
+    host = host_with(tools=[{**run_tool("planted", []), "run": ["demo-prog"]}], cwd=work,
+                     env=server_env(**({} if path is None else {"PATH": path})))
+    assert host.call("planted") == tool_result("Program not found on this machine: demo-prog", True)
+    assert not (work / "planted").exists()
+
+
+def test_a_child_program_that_is_only_in_the_working_directory_is_not_started(host_with, tmp_path):
+    work = tmp_path / "project"
+    work.mkdir()
+    (work / ("demo-child.exe" if os.name == "nt" else "demo-child")).write_text("not a program", encoding="utf-8")
+    entry = {"name": "stub", "source": "demo", "run": ["demo-child", "<package_root>/scripts/demo/stub.py", "echo"]}
+    host = host_with(entry=entry, cwd=work, env=server_env())
+    assert host.call("echo") == tool_result("stub: program not found: demo-child", True)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="only Windows runs a .cmd file through cmd.exe")
@@ -612,6 +658,29 @@ def test_a_slot_that_changes_between_two_looks_is_read_once_and_reported(local):
         assert peer.call("echo") == tool_result("stub: the server stopped", True)
     finally:
         peer.server._slots["stub"] = live  # close() reaches the child through it
+
+
+@pytest.mark.parametrize("name, arguments, answer", [
+    ("run_mode", {"mode": "sleep"}, tool_result(CANCELLED, True)),
+    ("echo", {"wait": 30}, tool_result("stub: cancelled", True))], ids=["command", "forwarded"])
+def test_a_cancellation_before_the_worker_of_its_call_runs_is_not_lost(local, monkeypatch, name, arguments, answer):
+    peer = local(tools=[ECHO, RUN])
+    held = []
+    spawn = PackageServer._spawn
+
+    def spawn_later(self, target, *args):  # the worker of the call is slow to start; the one of the cancellation is not
+        if target == self._work:
+            held.append((target, *args))
+        else:
+            spawn(self, target, *args)
+
+    monkeypatch.setattr(PackageServer, "_spawn", spawn_later)
+    call = peer.call_request(name, arguments)
+    peer.notify("notifications/cancelled", {"requestId": call})
+    wait_until(lambda: peer.server._calls[call].__self__.is_set())  # the call is registered, and the cancel reached it
+    spawn(peer.server, *held[0])
+    assert peer.answer(call)["result"] == answer
+    assert not command_pids(peer.package)
 
 
 def test_a_request_id_that_is_a_boolean_names_no_call(host):

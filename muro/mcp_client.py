@@ -32,10 +32,34 @@ class ChildTimeout(ChildError):
     """A child server did not answer within the time a caller allowed."""
 
 
+def resolve_program(name: str) -> str | None:
+    """The program `name` as an absolute path, or None when there is none.
+
+    A bare name is looked for in the absolute entries of PATH and never in the working directory, which
+    Windows searches first and where a project could plant a program under the name of a real one: a name
+    that starts a command, a child server or taskkill is resolved here and never left to the system. A name
+    with a directory part is used as it is when it is absolute and refused when it is not."""
+    if os.path.dirname(name):
+        return name if os.path.isabs(name) else None
+    extensions = ([ext for ext in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep) if ext]
+                  if os.name == "nt" else [])
+    # cmd.exe takes a file as it is only when its extension is in PATHEXT, and otherwise adds each extension.
+    files = [name] if not extensions or name.upper().endswith(tuple(ext.upper() for ext in extensions)) else []
+    files += [name + ext for ext in extensions]
+    for entry in filter(os.path.isabs, os.environ.get("PATH", "").split(os.pathsep)):  # not "", ".", or any relative
+        for file in files:
+            path = os.path.join(entry, file)
+            if os.path.isfile(path) and os.access(path, os.X_OK):
+                return path
+    return None
+
+
 def kill_tree(process: subprocess.Popen) -> None:
     """Kill `process` and what it started; on POSIX it must have been started in its own session."""
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, check=False)
+        system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")  # by path: see resolve_program
+        subprocess.run([os.path.join(system32, "taskkill.exe"), "/T", "/F", "/PID", str(process.pid)],
+                       capture_output=True, check=False)
     else:
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
@@ -64,12 +88,15 @@ class ChildServer:
 
     def start(self, timeout: float | None = None) -> None:
         command = self._launch["command"]
+        program = resolve_program(command)
+        if program is None:
+            raise ChildError(f"{self.name}: program not found: {command}")
         with self._lock:  # a close() comes before the process, which then never starts, or after it, and stops it
             if self._closed:
                 raise ChildError(f"{self.name}: the server stopped")
             try:
                 self._process = subprocess.Popen(
-                    [command, *self._launch["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                    [program, *self._launch["args"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                     text=True, encoding="utf-8", errors="replace", cwd=self._cwd,
                     env={**os.environ, **self._launch["env"]}, start_new_session=True)  # ignored on Windows
             except FileNotFoundError:

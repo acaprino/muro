@@ -87,11 +87,19 @@ def server_sections(document: dict[str, Any] | None) -> dict[str, Any]:
     return {"package_server": package_server(document), "mcp_servers": mcp_servers(document)}
 
 
+def place_package_root(value: str, package_root: str) -> str:
+    return value.replace(_PACKAGE_ROOT, package_root)
+
+
+def placed_env(declared: dict[str, Any], package_root: str) -> dict[str, str]:
+    """What a declared server or tool adds to the environment, with the package root in place."""
+    return {name: place_package_root(value, package_root) for name, value in declared.get("env", {}).items()}
+
+
 def server_launch(server: dict[str, Any], package_root: str) -> dict[str, Any]:
     """One declared server as a program, its arguments and its environment, with the package root in place."""
-    place = lambda value: value.replace(_PACKAGE_ROOT, package_root)
-    return {"command": server["run"][0], "args": [place(part) for part in server["run"][1:]],
-            "env": {name: place(value) for name, value in server.get("env", {}).items()}}
+    return {"command": server["run"][0], "args": [place_package_root(part, package_root) for part in server["run"][1:]],
+            "env": placed_env(server, package_root)}
 
 
 def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]]:
