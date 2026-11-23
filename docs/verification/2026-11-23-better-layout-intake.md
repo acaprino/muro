@@ -61,11 +61,26 @@ The staged build carries `capabilities/layout-structure.md` in the Claude Code, 
 `reporting.md` and `LICENSE`, `LICENSES/better-layout.txt`, a `NOTICE.md` line (MIT, Copyright (c) 2026 Jakub Krehel)
 and the new sentence in the `marionette-design-review` entry that names `better-layout` among what it replaces.
 
+## GitHub Actions (develop, commit d53a3fe)
+
+The first push (9a7a5fb) failed four tests of the full Marionette suite that the targeted runs had not covered, and
+all four were caused by this change: the plugin description plus the umbrella suffix exceeded 1024 characters
+(`test_absorbed_names`, `test_audit_p0`: the description had been cut and lost its explainer terms); the router passed
+its 80-line text cap once a test appended a line (`test_ai_routing`); and the pin-mode table lacked the new source
+(`test_pin_modes`). 860 passed, 4 failed in that run. Fixed in d53a3fe: the description gained the word "layout" and
+two phrases were shortened, with no topic dropped (886 of 887 characters); the two-line HTML comment at the end of
+ROUTER.md became one line; `better-layout` was added to the pin-mode table. The full description of layout stays in the
+`marionette-design-review` entry.
+
+| Workflow | Result on d53a3fe |
+|---|---|
+| `Marionette` (run 45152737956) | Test 864 passed, 2 skipped; validate, check sources and build; pack the project file: all green |
+| `Tests` (run 45152737940) | Python 336 passed, 14 skipped (modules that do not name Marionette); Rust, frontend, design rules, type check, build, shell and browser tests: all green |
+
 ## Not executed
 
-- The full test suite, which runs on GitHub Actions only. The four test modules whose counts changed were run in part.
 - The routing evaluation (`--prepare-eval` and `--score-eval`) with a host AI: the three new eval cases are authored,
   not scored. The new test selects the capability through explicit decision fixtures, which prove mechanics only.
 - A live run on any host. Nothing was installed. The capability's behaviour on a real layout task is untested.
 - The AI-owned intake and harmonization were done by the host model in this session; no second review pass.
-- No commit, no push, no release. `docs/releases/marionette-v0.6.0.md` is not written: it needs the CI results.
+- Merge into `main` and the package release (`docs/releases/marionette-v0.6.0.md` is written; the pull request is the owner's).
