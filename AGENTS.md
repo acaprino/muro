@@ -10,6 +10,15 @@ or repeat Sigrid's, no CSS rules beyond the Tailwind entry, no literal colours
 or sizes. What Sigrid lacks is asked of Sigrid. Keep the shell body stable
 across renders while a modal is open.
 
+Every app of the suite (Daodan, Xiox, Shinatama, Mukade, Muro and the others on
+Sigrid) has the same look and feel (owner's rule of 2026-11-23): the same
+surfaces, shadows, spacing, type and motion, and the same component for the
+same need. Muro's own are only its layout, which follows its functions, its
+accent and its icon. Muro makes no component that draws: no stylesheet, no
+class, no primitive, no copy or restyling of a Sigrid part. Sigrid changes only
+when a component or primitive that a function needs is really missing, and then
+for every app; Muro's former look is never a reason to change it.
+
 Sigrid is not on npm. `package.json` names its GitHub Release tarball,
 `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
 (first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
@@ -32,8 +41,7 @@ Before UI work, read `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
 (they ship in the package; `agents/catalog.json` lists every component and its
 props) and the component or style files they reference. Apply its tokens and
 confirmed design choices within the requested scope. Use its components and
-tokens. Build a control of your own from the tokens, never from literal colours
-or sizes. Report conflicts and keep unresolved choices explicit.
+never build a control of your own (the suite's rule above). Report conflicts and keep unresolved choices explicit.
 Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done: it
 reads files and builds nothing. It needs the Sigrid package installed; the Tests
 workflow runs it ("Design rules (Sigrid)"), not blocking until its first output
