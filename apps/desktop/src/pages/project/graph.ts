@@ -4,7 +4,7 @@ import { esc, plural, tag, button, empty } from '../../ui.ts';
 import { infoPanel } from '../../sheets.ts';
 import { harnessNames, obj, text, engineOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
-import { capsOf, entriesOf, examplesOf, outcomeOfExample, readAnswer, readOutcome, litOf } from './graph-model.ts';
+import { capsOf, entriesOf, examplesOf, outcomeOfExample, outputsOf, readAnswer, readOutcome, litOf } from './graph-model.ts';
 import type { Cap, Example, Outcome, Who } from './graph-model.ts';
 import { decisionScene } from './graph-scene.ts';
 import { graphLegendHtml, noteHtml, quoteHtml as quote, bulletListHtml as bullets } from '@acaprino/imago/ui';
@@ -79,6 +79,12 @@ function card(o: Outcome): string {
   return `<div class="im-panel im-surface im-numbered-result" data-im-surface="sheet" role="status"><div class="im-tag-row">${status}${o.example !== null ? ' ' + tag('Documented example') : ''}${o.stack.length ? ` <small>With ${esc(o.stack.join(', '))}</small>` : ''}</div>${quote(o.asked)}${stepList(o)}<p class="im-wrap-text">${esc(o.reason)}</p>${bullets(o.questions)}${whoLine(o.who)}${clear}</div>`;
 }
 const shownOf = (sim: SimState, examples: Example[]): Outcome | null => sim.example !== null && examples[sim.example] ? outcomeOfExample(examples[sim.example]) : sim.result;
+/** A documented example in the list: its title, its request (with the stack it names), the intents its steps answer in order and what its capabilities produce. A prerequisite has no intent, and a line with nothing to say is not written. */
+function exampleItem(e: Example, i: number, pressed: boolean, caps: Cap[]): string {
+  const intents = e.steps.map(s => s.intent).filter((x): x is string => !!x), outs = outputsOf(e, caps);
+  return `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${pressed}"><strong>${esc(e.title)}</strong><small>${esc(e.task)}${e.stack.length ? ` · With ${esc(e.stack.join(', '))}` : ''}</small>`
+    + `${intents.length ? `<small>Intent ${intents.map(x => `<code>${esc(x)}</code>`).join(' → ')}</small>` : ''}${outs.length ? `<small>Output ${esc(outs.join(', '))}</small>` : ''}</button></li>`;
+}
 
 /** Plain scene data for Imago. Neither geometry nor rendering is implemented here. */
 export function sceneFor(state: ViewState, info: ProjectInfo) {
@@ -92,7 +98,7 @@ export function view(state: ViewState, info: ProjectInfo): string {
   const sim = state.project!.sim, engine = engineOf(state.snapshot?.registry.settings), shown = shownOf(sim, examples), lit = litOf(shown), running = sim.run !== null, explain = !told();
   const box = `<textarea class="im-textarea" name="simtask" rows="3" aria-label="Request to simulate" placeholder="Write a request as you would to your coding agent"${sim.error ? ' aria-invalid="true"' : ''} aria-describedby="err-simtask${explain ? ' sim-note' : ''}">${esc(sim.task)}</textarea>`;
   const go = running ? button(`Asking ${asking(engine)}…`, 'graph-simulate', { busy: true, attrs: { 'aria-busy': 'true', 'aria-disabled': 'true' } }) : button('Simulate', 'graph-simulate', { icon: 'play' });
-  const list = examples.length ? `<h3>Documented examples <span class="im-count">${examples.length}</span></h3><ul class="im-panel im-surface im-choice-list" data-im-surface="sheet">${examples.map((e, i) => `<li><button type="button" data-action="graph-example" data-id="${i}" aria-pressed="${sim.example === i}"><strong>${esc(e.title)}</strong><small>${esc(e.task)}</small></button></li>`).join('')}</ul>` : '';
+  const list = examples.length ? `<h3>Documented examples <span class="im-count">${examples.length}</span></h3><ul class="im-panel im-surface im-choice-list" data-im-surface="sheet">${examples.map((e, i) => exampleItem(e, i, sim.example === i, caps)).join('')}</ul>` : '';
   const legend = graphLegendHtml([
     { label: 'entry → capability' },
     { label: 'always runs first' },

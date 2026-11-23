@@ -569,6 +569,7 @@ await test('Graph & simulator: one labelled drawing, every capability a named bu
   assert.equal(await nameFits(page), true, 'every name is inside its node');
   assert.equal(await page.getByRole('heading', { name: 'Documented examples' }).count(), 1);
   assert.equal(await page.locator('.im-choice-list button').count(), 2);
+  assert.match(await squash(page.locator('.im-choice-list button', { hasText: 'A landing page' })), /Design a landing page · With stack:react Intent design-taste-intent → design-review-intent Output design-brief/);
   await page.screenshot({ path: shots + '/project-graph.png' });
 });
 

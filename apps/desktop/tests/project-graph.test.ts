@@ -244,13 +244,28 @@ it('the step has the simulator on the left and the graph on the right, with what
   assert.match(words(html), /Documented examples 3/);
   assert.equal(html.match(/data-action="graph-example"/g)?.length, 3);
   assert.deepEqual([...html.matchAll(/data-action="graph-example" data-id="(\d)" aria-pressed="(\w+)"/g)].map(m => [m[1], m[2]]), [['0', 'false'], ['1', 'false'], ['2', 'false']]);
-  assert.match(html, /<strong>A landing page<\/strong><small>Design a landing page<\/small>/);
+  assert.match(html, /<strong>A landing page<\/strong><small>Design a landing page · With stack:react<\/small><small>Intent <code>design-taste-intent<\/code> → <code>design-review-intent<\/code><\/small><small>Output design-brief, palette<\/small>/);
   assert.match(html, /<div class="im-panel im-surface im-graph-panel" data-im-surface="sheet"><div class="im-graph-legend">/);
   assert.match(words(html), /entry → capability always runs first needs, on a condition never together 2 entries · 5 capabilities/);
   assert.doesNotMatch(words(html), /activated, in order/, 'the legend says it only when something is lit');
   assert.equal(html.match(/data-project-graph/g)?.length, 1);
   assert.doesNotMatch(html, /<svg class="graph|foreignObject/);
   assert.doesNotMatch(html, /im-numbered-result|simres/, 'no result before there is one');
+});
+it('an example with no step has no Intent and no Output line', () => {
+  assert.match(show(opened()), /<strong>Hello<\/strong><small>Say hello<\/small><\/button>/);
+});
+it('an example whose steps are prerequisites only has no Intent line, and one with a prerequisite lists only the intents it answers', () => {
+  assert.match(show(opened()), /<strong>A letter<\/strong><small>Write a letter<\/small><small>Intent <code>office-docs-intent<\/code><\/small><\/button>/, 'one intent, no arrow, and no Output line: its capabilities produce nothing');
+  const only = show(opened({}, info({}, { examples: [{ ...EXAMPLES[1], steps: [{ step: 'office-fonts', capability: 'office-fonts', intent: null }] }] })));
+  assert.match(only, /<strong>A letter<\/strong><small>Write a letter<\/small><\/button>/);
+  assert.doesNotMatch(only, /Intent /);
+});
+it('intent, output and stack are escaped', () => {
+  const example = { title: 't', task: 't', stack_tokens: ['stack:<b>'], status: 'selected', selections: [], reason: '', questions: [], path: [], steps: [{ step: 'a', capability: 'a', intent: 'a&b' }] };
+  const html = show(opened({}, info({}, { capabilities: [cap('a', { outputs: ['"q"'] })], examples: [example] })));
+  assert.match(html, /<small>t · With stack:&lt;b&gt;<\/small><small>Intent <code>a&amp;b<\/code><\/small><small>Output &quot;q&quot;<\/small>/);
+  assert.doesNotMatch(html, /<b>/);
 });
 it('the text of the request is what the box holds, escaped', () => {
   assert.match(show(opened({ task: 'Make <b>"this"</b> & that' })), /<textarea[^>]*>Make &lt;b&gt;&quot;this&quot;&lt;\/b&gt; &amp; that<\/textarea>/);
