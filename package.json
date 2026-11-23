@@ -12,7 +12,10 @@
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",
-    "@acaprino/imago": "git+https://github.com/acaprino/imago.git#v0.4.1"
+    "@acaprino/imago": "git+https://github.com/acaprino/imago.git#v0.4.1",
+    "@acaprino/sigrid": "https://github.com/acaprino/sigrid/releases/download/v3.3.9/acaprino-sigrid-3.3.9.tgz",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "imago": {
     "src": ["apps/desktop/src", "apps/desktop/index.html"],
@@ -32,6 +35,11 @@
     "@tauri-apps/cli": "2.12.4",
     "typescript": "7.0.2",
     "vite": "8.3.5",
-    "@playwright/test": "1.64.1"
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/vite": "4.3.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.2.1",
+    "tailwindcss": "4.3.5"
   }
 }
