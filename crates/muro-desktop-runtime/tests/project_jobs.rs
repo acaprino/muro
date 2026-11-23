@@ -1,16 +1,48 @@
 //! Making and changing projects from the desktop (ADR-0032): what the runtime refuses before an AI run is
-//! paid for, and the edits, deletion and update check it makes through the factory. The factory is the
-//! stand-in of `common`; an AI run itself is not started here (it needs Claude Code), so what is tested is
-//! everything around it.
+//! paid for, the runs themselves, and the edits, deletion and update check it makes through the factory. The
+//! factory is the stand-in of `common`; the agent is `AGENT`, a Python script a debug build runs in place of
+//! Claude Code (`project_jobs::TEST_AGENT_SETTING`), so a run here costs nothing and proves the runtime's part:
+//! the status and the message it ends with, what it hands the factory, and the project file it leaves.
 mod common;
 
 use common::{calls, install, plugin, project_file};
-use muro_desktop_runtime::{project_jobs, request};
+use muro_desktop_runtime::{jobs, project_jobs, request};
 use serde_json::{Value, json};
 use std::{
     fs,
     path::{Path, PathBuf},
+    time::{Duration, Instant, SystemTime},
 };
+
+/// A stand-in for Claude Code: it writes how it was started beside its work folder (`agent.json`), then does
+/// what a `STUB:` word in the owner's request asks (fail, sleep a minute, wait for a `go` file beside the work
+/// folder, rewrite an owner's instruction file, have the commit wait for `go-commit`), and otherwise writes a
+/// package and a summary, as an AI run would.
+const AGENT: &str = r#"
+import json, sys, time
+from pathlib import Path
+
+args = sys.argv[1:]
+prompt = args[args.index("-p") + 1]
+work = Path.cwd()
+job = work.parent
+(job / "agent.json").write_text(json.dumps({"args": args, "cwd": str(work)}), encoding="utf-8")
+if "STUB:fail" in prompt:
+    print("the agent stopped", file=sys.stderr)
+    sys.exit(3)
+if "STUB:sleep" in prompt:
+    time.sleep(60)
+if "STUB:wait" in prompt:
+    started = time.time()
+    while not (job / "go").exists() and time.time() - started < 60:
+        time.sleep(0.05)
+if "STUB:instructions" in prompt:
+    (work / "custom-instructions" / "rules.md").write_text("Rewritten by the AI", encoding="utf-8")
+if "STUB:commit-waits" in prompt:
+    (work / "commit-waits").write_text("wait", encoding="utf-8")
+(work / "sources.json").write_text("{}", encoding="utf-8")
+(work / ".muro-summary.md").write_text("What changed for a user.", encoding="utf-8")
+"#;
 
 struct Home {
     temp: tempfile::TempDir,
@@ -61,6 +93,14 @@ impl Home {
     fn call(&self, action: &str, payload: Value) -> anyhow::Result<Value> {
         request(&self.data, action, payload)
     }
+
+    /// The stand-in agent (`AGENT`) in place of Claude Code, for the runs this home starts.
+    fn with_agent(self) -> Self {
+        let script = self.temp.path().join("agent.py");
+        fs::write(&script, AGENT).unwrap();
+        self.settings(|all| all[project_jobs::TEST_AGENT_SETTING] = json!(script));
+        self
+    }
 }
 
 fn error_of(result: anyhow::Result<Value>) -> String {
@@ -69,6 +109,59 @@ fn error_of(result: anyhow::Result<Value>) -> String {
 
 fn digest(path: &Path) -> String {
     muro_registry::projects::file_digest(path).unwrap()
+}
+
+/// The state of the run `started` as the list of jobs shows it.
+fn job_of(home: &Home, started: &Value) -> Value {
+    let all = home.call("jobs", json!({})).unwrap();
+    all.as_array().unwrap().iter().find(|job| job["id"] == started["id"]).cloned().unwrap()
+}
+
+/// The run's state once `done` holds of it, waiting a minute at most.
+fn wait(home: &Home, started: &Value, done: impl Fn(&Value) -> bool) -> Value {
+    let begun = Instant::now();
+    loop {
+        let state = job_of(home, started);
+        if done(&state) {
+            return state;
+        }
+        assert!(begun.elapsed() < Duration::from_secs(60), "the run never got there: {state}");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn finished(home: &Home, started: &Value) -> Value {
+    wait(home, started, |state| state["status"] != "running")
+}
+
+fn job_dir(home: &Home, started: &Value) -> PathBuf {
+    home.data.join("jobs").join(started["id"].as_str().unwrap())
+}
+
+/// What the stand-in agent wrote of how it was started, once it has started.
+fn agent_started(home: &Home, started: &Value) -> Value {
+    let file = job_dir(home, started).join("agent.json");
+    let begun = Instant::now();
+    loop {
+        if let Some(said) = fs::read_to_string(&file).ok().and_then(|text| serde_json::from_str::<Value>(&text).ok()) {
+            return said;
+        }
+        assert!(begun.elapsed() < Duration::from_secs(60), "the agent never started");
+        std::thread::sleep(Duration::from_millis(50));
+    }
+}
+
+fn harmonize(home: &Home, file: &Path, request: &str) -> Value {
+    home.call("project_job", json!({"id":"demo","operation":"harmonize","digest":digest(file),"budget_usd":1.0,"request":request}))
+        .unwrap()
+}
+
+fn commits(home: &Home) -> Vec<Vec<String>> {
+    calls(&home.factory).into_iter().filter(|args| args[..2] == ["project", "commit"]).collect()
+}
+
+fn value_after(args: &[String], option: &str) -> String {
+    args[args.iter().position(|arg| arg == option).unwrap() + 1].clone()
 }
 
 fn new_project(home: &Home, change: impl FnOnce(&mut Value)) -> anyhow::Result<Value> {
@@ -107,6 +200,8 @@ fn a_new_project_refuses_what_it_cannot_be_before_any_run() {
         (Box::new(|p: &mut Value| p["inputs"] = json!([{"source":"https://a/b"},{"source":"https://a/b"}])), "named twice"),
         (Box::new(|p: &mut Value| p["budget_usd"] = json!(0)), "budget"),
         (Box::new(|p: &mut Value| p["repository"] = json!({"url":"git@github.com:o/r"})), "repository address"),
+        (Box::new(|p: &mut Value| p["slug"] = json!("con")), "a name Windows keeps for a device"),
+        (Box::new(|p: &mut Value| p["slug"] = json!("lpt1")), "a name Windows keeps for a device"),
     ];
     for (change, said) in cases {
         let error = error_of(new_project(&home, change));
@@ -142,6 +237,210 @@ fn a_change_names_a_known_operation_and_the_file_as_the_page_read_it() {
     assert!(error_of(missing).contains("not in your list"));
 }
 
+// --- the runs, with the stand-in agent ----------------------------------------------------------------
+
+#[test]
+fn the_agent_is_configured_by_nothing_in_its_work_folder() {
+    // the person's user settings only (their sign-in), no project or local settings and no MCP server: the work
+    // folder holds what a project file from anyone carries (adaptation shares these arguments)
+    let args = jobs::agent_args("claude-code", "THE PROMPT", 2.0).unwrap();
+    assert_eq!(args, [
+        "-p", "THE PROMPT",
+        "--permission-mode", "acceptEdits",
+        "--allowedTools", "Read,Write,Edit,Glob,Grep,Bash",
+        "--setting-sources", "user",
+        "--strict-mcp-config",
+        "--max-budget-usd", "2",
+        "--output-format", "json",
+        "--no-session-persistence",
+    ]);
+}
+
+#[test]
+fn a_change_whose_agent_fails_leaves_the_file_as_it_was() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    let before = fs::read(&file).unwrap();
+    let started = harmonize(&home, &file, "STUB:fail");
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "failed", "{ended}");
+    let message = ended["message"].as_str().unwrap();
+    assert!(message.starts_with("The AI run failed (") && message.ends_with("; see output.log. The project file was not changed"), "{message}");
+    assert_eq!(fs::read(&file).unwrap(), before);
+    assert!(commits(&home).is_empty(), "nothing was saved");
+    assert!(job_dir(&home, &started).join("work").is_dir(), "the work folder stays, for the log to be read against");
+    // the agent ran in the work folder, with the arguments that keep that folder from configuring it
+    let agent = agent_started(&home, &started);
+    let args: Vec<&str> = agent["args"].as_array().unwrap().iter().map(|arg| arg.as_str().unwrap()).collect();
+    assert!(args.windows(2).any(|pair| pair == ["--setting-sources", "user"]) && args.contains(&"--strict-mcp-config"), "{args:?}");
+    assert!(Path::new(agent["cwd"].as_str().unwrap()).ends_with("work"), "{agent}");
+}
+
+#[test]
+fn a_cancel_before_the_project_is_saved_stops_the_agent_and_leaves_the_file() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    let before = fs::read(&file).unwrap();
+    let started = harmonize(&home, &file, "STUB:sleep");
+    agent_started(&home, &started);
+    let asked = Instant::now();
+    home.call("cancel_job", json!({"id":started["id"]})).unwrap();
+    let ended = finished(&home, &started);
+    assert!(asked.elapsed() < Duration::from_secs(30), "the agent sleeps a minute: the cancel ended it");
+    assert_eq!(ended["status"], "cancelled", "{ended}");
+    assert_eq!(ended["message"], "The AI run was cancelled. The project file was not changed");
+    assert_eq!(fs::read(&file).unwrap(), before);
+    assert!(commits(&home).is_empty(), "nothing was saved");
+}
+
+#[test]
+fn a_change_that_succeeds_is_saved_over_the_file_it_was_asked_on() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    let asked_on = digest(&file);
+    let started = harmonize(&home, &file, "");
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "completed", "{ended}");
+    assert_eq!(ended["message"], "The project was saved. Install it again from its Install step to bring the change to the harnesses");
+    let held: Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(held["committed"], json!({"operation":"Harmonize again","step":"patch","summary":"What changed for a user."}));
+    let commit = commits(&home).pop().unwrap();
+    assert_eq!(value_after(&commit, "--expect-digest"), asked_on);
+    for wanted in ["--step=patch", "--operation=Harmonize again", "--engine=claude-code", "--budget=1"] {
+        assert!(commit.contains(&wanted.to_owned()), "{wanted} in {commit:?}");
+    }
+    assert!(!job_dir(&home, &started).join("work").exists(), "a run that succeeded keeps no copy of the project");
+}
+
+#[test]
+fn a_change_saved_over_a_file_that_changed_meanwhile_is_refused_with_the_factorys_reason() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    let asked_on = digest(&file);
+    let started = harmonize(&home, &file, "STUB:wait");
+    agent_started(&home, &started);
+    let theirs = json!({"plugin":plugin("Demo","demo"),"edited":{"--name":"Someone else"}}).to_string();
+    fs::write(&file, &theirs).unwrap();
+    fs::write(job_dir(&home, &started).join("go"), b"go").unwrap();
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "failed", "{ended}");
+    // the factory's own reason, and nothing that says the file was left as it was: it was not, by someone else
+    assert_eq!(ended["message"], project_jobs::CHANGED);
+    assert_eq!(fs::read_to_string(&file).unwrap(), theirs, "the other change stays");
+    assert_eq!(value_after(&commits(&home).pop().unwrap(), "--expect-digest"), asked_on);
+    assert!(fs::read_to_string(job_dir(&home, &started).join("output.log")).unwrap().contains("Project commit failed: "));
+}
+
+#[test]
+fn a_cancel_once_the_project_is_being_saved_is_refused_and_the_save_finishes() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    let started = harmonize(&home, &file, "STUB:commit-waits");
+    wait(&home, &started, |state| state["phase"] == project_jobs::SAVING);
+    let refused = home.call("cancel_job", json!({"id":started["id"]}));
+    assert_eq!(error_of(refused), project_jobs::SAVING_NOT_CANCELLED);
+    // a Cancel that reached the run all the same (another client, a race) is not obeyed either
+    let dir = job_dir(&home, &started);
+    fs::write(dir.join("cancel"), b"cancel").unwrap();
+    std::thread::sleep(Duration::from_millis(500));
+    fs::write(dir.join("go-commit"), b"go").unwrap();
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "completed", "{ended}");
+    let held: Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(held["committed"]["operation"], "Harmonize again");
+}
+
+#[test]
+fn a_run_that_changed_the_owners_instruction_files_saves_nothing() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"instructions":{"rules.md":"Owner rules"}}));
+    let before = fs::read(&file).unwrap();
+    let ended = finished(&home, &harmonize(&home, &file, "STUB:instructions"));
+    assert_eq!(ended["status"], "failed", "{ended}");
+    let message = ended["message"].as_str().unwrap();
+    assert!(message.starts_with("The AI changed the custom instruction files") && message.ends_with(". The project file was not changed"), "{message}");
+    assert_eq!(fs::read(&file).unwrap(), before);
+    assert!(commits(&home).is_empty());
+}
+
+#[test]
+fn a_new_project_is_saved_with_the_identity_it_was_asked_for_and_listed() {
+    let home = Home::new().with_agent();
+    let started = new_project(&home, |p: &mut Value| p["name"] = json!("-My Plugin")).unwrap();
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "completed", "{ended}");
+    assert_eq!(ended["message"], "The project was created and added to your list. Install it from its Install step");
+    let file = home.files().join("my-plugin.mp");
+    assert!(file.is_file());
+    assert_eq!(home.registry()["projects"], json!([{"id":"my-plugin","path":file}]));
+    let made = calls(&home.factory);
+    // `--option=value`: a name that begins with a dash is still the name
+    let new = made.iter().find(|args| args[..2] == ["project", "new"]).unwrap();
+    for wanted in ["--slug=my-plugin", "--name=-My Plugin", "--author=me"] {
+        assert!(new.contains(&wanted.to_owned()), "{wanted} in {new:?}");
+    }
+    let commit = commits(&home).pop().unwrap();
+    for wanted in ["--create", "--slug=my-plugin", "--name=-My Plugin", "--author=me", "--operation=New project -My Plugin", "--budget=2"] {
+        assert!(commit.contains(&wanted.to_owned()), "{wanted} in {commit:?}");
+    }
+    assert!(!job_dir(&home, &started).join("work").exists());
+}
+
+#[test]
+fn a_new_project_whose_agent_fails_says_no_file_was_written() {
+    let home = Home::new().with_agent();
+    let started = new_project(&home, |p: &mut Value| p["request"] = json!("STUB:fail")).unwrap();
+    let ended = finished(&home, &started);
+    assert_eq!(ended["status"], "failed", "{ended}");
+    assert!(ended["message"].as_str().unwrap().ends_with(". No project file was written"), "{ended}");
+    assert!(!home.files().join("my-plugin.mp").exists());
+    assert_eq!(home.registry()["projects"], json!([]));
+}
+
+#[test]
+fn a_run_removes_the_work_folders_of_project_runs_that_ended_a_week_ago_and_keeps_their_logs() {
+    let home = Home::new().with_agent();
+    let jobs_dir = home.data.join("jobs");
+    let job = |id: &str, kind: &str, status: &str, days: u64| -> PathBuf {
+        let dir = jobs_dir.join(id);
+        fs::create_dir_all(dir.join("work")).unwrap();
+        fs::write(dir.join("output.log"), b"what happened").unwrap();
+        fs::write(dir.join("state.json"), json!({"id":id,"kind":kind,"status":status,"time":1}).to_string()).unwrap();
+        let when = SystemTime::now() - Duration::from_secs(days * 24 * 60 * 60);
+        fs::File::options().write(true).open(dir.join("state.json")).unwrap().set_modified(when).unwrap();
+        dir
+    };
+    let failed = job("00000000-0000-4000-8000-000000000001", "project", "failed", 8);
+    let cancelled = job("00000000-0000-4000-8000-000000000002", "project", "cancelled", 8);
+    let interrupted = job("00000000-0000-4000-8000-000000000003", "project", "interrupted", 8);
+    let recent = job("00000000-0000-4000-8000-000000000004", "project", "failed", 6);
+    let adaptation = job("00000000-0000-4000-8000-000000000005", "adaptation", "failed", 8);
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    finished(&home, &harmonize(&home, &file, "STUB:fail"));
+    for gone in [&failed, &cancelled, &interrupted] {
+        assert!(!gone.join("work").exists(), "{}", gone.display());
+        assert!(gone.join("output.log").is_file() && gone.join("state.json").is_file(), "the log and the state stay");
+    }
+    assert!(recent.join("work").is_dir(), "a week is not over");
+    assert!(adaptation.join("work").is_dir(), "an adaptation's folders are what its plugin was installed from");
+}
+
+#[test]
+fn one_job_that_cannot_be_read_is_left_out_of_the_list_not_the_list() {
+    let home = Home::new().with_agent();
+    let jobs_dir = home.data.join("jobs");
+    let (good, bad) = (jobs_dir.join("00000000-0000-4000-8000-000000000001"), jobs_dir.join("00000000-0000-4000-8000-000000000002"));
+    fs::create_dir_all(&good).unwrap();
+    fs::create_dir_all(&bad).unwrap();
+    let state = json!({"id":"00000000-0000-4000-8000-000000000001","status":"failed","time":1});
+    fs::write(good.join("state.json"), state.to_string()).unwrap();
+    fs::write(bad.join("state.json"), b"{ cut short").unwrap();
+    assert_eq!(home.call("jobs", json!({})).unwrap(), json!([state]));
+    // a run starts all the same: the list it looks at for a running one leaves that job out
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    assert_eq!(finished(&home, &harmonize(&home, &file, "STUB:fail"))["status"], "failed");
+}
+
 // --- edits by hand ----------------------------------------------------------------------------------
 
 #[test]
@@ -160,6 +459,20 @@ fn an_edit_asks_the_factory_for_exactly_what_changed_and_returns_the_new_digest(
         "records":[record],"changelog":"# Demo 1.0.0\n"}));
     let edit = calls(&home.factory).into_iter().find(|args| args[..2] == ["project", "edit"]).unwrap();
     assert_eq!(edit[3..5], ["--expect-digest".to_owned(), before]);
+}
+
+#[test]
+fn a_field_that_begins_with_a_dash_is_still_its_value() {
+    let home = Home::new();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo")}));
+    home.call("edit_project", json!({"id":"demo","digest":digest(&file),"name":"-draft","author":"--me",
+        "repository":{"url":"https://example.invalid/r","branch":"-b","tag_prefix":"-v"}})).unwrap();
+    let held: Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(held["edited"], json!({"--name":"-draft","--author":"--me","--repository":"https://example.invalid/r","--branch":"-b","--tag-prefix":"-v"}));
+    let edit = calls(&home.factory).into_iter().find(|args| args[..2] == ["project", "edit"]).unwrap();
+    for wanted in ["--name=-draft", "--author=--me", "--branch=-b", "--tag-prefix=-v"] {
+        assert!(edit.contains(&wanted.to_owned()), "{wanted} in {edit:?}");
+    }
 }
 
 #[test]

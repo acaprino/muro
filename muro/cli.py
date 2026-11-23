@@ -283,7 +283,8 @@ def _run_project_write(args: argparse.Namespace) -> int:
     try:
         _print_json(project_work.commit(args.folder, args.out, expect_digest=args.expect_digest, create=args.create,
                                         step=args.step, operation=args.operation, summary=summary,
-                                        engine=args.engine, budget_usd=args.budget))
+                                        engine=args.engine, budget_usd=args.budget, slug=args.slug, name=args.name,
+                                        author=args.author))
     except (KeyError, TypeError, AttributeError) as e:      # a package the AI wrote in a shape the build cannot read
         raise ValueError(f"the package cannot be built: {type(e).__name__}: {e}") from None
     return 0
@@ -659,6 +660,8 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--summary", type=Path, metavar="FILE", help="The AI's changelog text for this version")
     p.add_argument("--engine", help="The agent that ran it, for the history")
     p.add_argument("--budget", type=float, help="Its budget in USD, for the history")
+    for option, what in (("--slug", "plugin id"), ("--name", "name"), ("--author", "author")):
+        p.add_argument(option, help=f"With --create: the {what} the project was started with, which it must still have")
     # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
     where = argparse.ArgumentParser(add_help=False)
     where.add_argument("mp", nargs="?", type=Path, help="The .mp file (or name --manifest instead)")

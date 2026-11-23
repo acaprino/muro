@@ -20,6 +20,10 @@ Read every supplied Markdown file under custom-instructions/ as owner requiremen
     )
 }
 
+/// What starts Claude Code for an AI run, adaptation and projects alike. Nothing of the folder it works in
+/// configures it: that folder holds what a source or a project file from anyone carries, so only the person's
+/// user settings are read (their sign-in and provider; not the project or local settings, their hooks, `env`,
+/// permissions and `CLAUDE.md`), and no MCP server is started (`--strict-mcp-config` with no `--mcp-config`).
 pub fn agent_args(agent: &str, task: &str, budget: f64) -> Result<Vec<String>> {
     muro_registry::ai::validate_budget(budget)?;
     let args: Vec<String> = match agent {
@@ -30,6 +34,9 @@ pub fn agent_args(agent: &str, task: &str, budget: f64) -> Result<Vec<String>> {
             "acceptEdits".into(),
             "--allowedTools".into(),
             "Read,Write,Edit,Glob,Grep,Bash".into(),
+            "--setting-sources".into(),
+            "user".into(),
+            "--strict-mcp-config".into(),
             "--max-budget-usd".into(),
             budget.to_string(),
             "--output-format".into(),
@@ -118,6 +125,23 @@ pub(crate) fn write_state(dir: &Path, state: &Value) -> Result<()> {
     Ok(())
 }
 
+/// The state of one job, read under its lock; None when there is none to read (a job that wrote no state yet,
+/// one cut short, one that is not a JSON object).
+pub(crate) fn read_state(dir: &Path) -> Option<Value> {
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(dir.join("state.lock"))
+        .ok()?;
+    lock.lock_shared().ok()?;
+    let state: Value = serde_json::from_slice(&fs::read(dir.join("state.json")).ok()?).ok()?;
+    state.is_object().then_some(state)
+}
+
+/// Every job, newest first. A job that cannot be read is left out: one damaged `state.json` never hides the
+/// others, or stops a run from starting (`project_jobs`) or the window from reading its snapshot.
 pub fn list(data: &Path) -> Result<Vec<Value>> {
     let dir = data.join("jobs");
     if !dir.exists() {
@@ -125,36 +149,73 @@ pub fn list(data: &Path) -> Result<Vec<Value>> {
     }
     let mut jobs: Vec<Value> = vec![];
     for entry in fs::read_dir(dir)? {
-        let path = entry?.path();
+        let Ok(entry) = entry else { continue };
+        let path = entry.path();
         if !path.is_dir() {
             continue;
         }
-        let lock = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(path.join("state.lock"))?;
-        lock.lock_shared()?;
-        if let Ok(bytes) = fs::read(path.join("state.json")) {
-            jobs.push(serde_json::from_slice(&bytes)?);
+        if let Some(state) = read_state(&path) {
+            jobs.push(state);
         }
     }
     jobs.sort_by_key(|j| std::cmp::Reverse(j["time"].as_u64().unwrap_or(0)));
     Ok(jobs)
 }
 
+/// `cancel_job {id}`: asks a running job to stop. A project run that is building and saving the project
+/// (`project_jobs::SAVING`) does not obey a Cancel any more: that is the answer, also when it reached that phase
+/// while the request was being written.
 pub fn cancel(data: &Path, id: &str) -> Result<Value> {
     let dir = job_dir(data, id)?;
     ensure!(dir.is_dir(), "Job not found");
+    let saving = || read_state(&dir).is_some_and(|state| state["phase"] == crate::project_jobs::SAVING);
+    ensure!(!saving(), crate::project_jobs::SAVING_NOT_CANCELLED);
     fs::write(dir.join("cancel"), b"cancel")?;
+    ensure!(!saving(), crate::project_jobs::SAVING_NOT_CANCELLED);
     Ok(
         json!({"message":"Cancellation requested; registry remains unchanged until validation completes"}),
     )
 }
 
+/// A job stopped by its Cancel. A run whose error is, or was caused by, one is `cancelled`, not `failed`.
+#[derive(Debug)]
+pub struct Cancelled(String);
+
+impl Cancelled {
+    pub fn new(message: impl Into<String>) -> Self {
+        Self(message.into())
+    }
+}
+
+impl std::fmt::Display for Cancelled {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for Cancelled {}
+
+/// Whether `error` is a Cancel (`Cancelled`), or was caused by one.
+pub fn is_cancelled(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| cause.is::<Cancelled>())
+}
+
+/// How long each process of AI adaptation may take: the agent, the factory's validation, its build.
+pub const ADAPTATION_LIMIT: Duration = Duration::from_secs(30 * 60);
+
+/// One process of AI adaptation (`run_for`, cancellable, `ADAPTATION_LIMIT`).
 pub(crate) fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &str) -> Result<()> {
-    ensure!(!dir.join("cancel").exists(), "Job cancelled");
+    run_for(dir, exe, args, cwd, label, ADAPTATION_LIMIT, true)
+}
+
+/// One process of a job, its output appended to the job's output.log, stopped with the processes it started
+/// once it has run for `limit`. A `cancellable` one is not started, or is stopped, once the job's `cancel` file
+/// is there, and the error is then `Cancelled`; one that is not runs to its end or its limit whatever that
+/// file says. A process that reached its limit says so, apart from a cancellation.
+pub(crate) fn run_for(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &str, limit: Duration, cancellable: bool) -> Result<()> {
+    if cancellable && dir.join("cancel").exists() {
+        return Err(Cancelled::new("Job cancelled").into());
+    }
     ensure!(
         !mukade::exe::is_batch(exe),
         "Choose an executable, not a batch launcher"
@@ -168,8 +229,8 @@ pub(crate) fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &st
         .current_dir(cwd)
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log));
-    let cancelled = || dir.join("cancel").exists();
-    match crate::exec::supervise(cmd, &cancelled, Duration::from_secs(1800))
+    let cancelled = || cancellable && dir.join("cancel").exists();
+    match crate::exec::supervise(cmd, &cancelled, limit)
         .with_context(|| format!("Cannot start {label}: {exe}"))?
     {
         crate::exec::Ended::Finished(status) => {
@@ -179,8 +240,11 @@ pub(crate) fn run(dir: &Path, exe: &str, args: &[String], cwd: &Path, label: &st
             );
             Ok(())
         }
-        crate::exec::Ended::Stopped(_) => {
-            bail!("{label} cancelled or exceeded 30-minute deadline; inspect output.log")
+        crate::exec::Ended::Stopped(crate::exec::Stop::Cancelled) => {
+            Err(Cancelled::new(format!("{label} was cancelled")).into())
+        }
+        crate::exec::Ended::Stopped(crate::exec::Stop::TimedOut) => {
+            bail!("{label} reached its limit of {} minutes; see output.log", limit.as_secs() / 60)
         }
     }
 }
@@ -394,17 +458,14 @@ pub fn recover(data: &Path) -> Result<()> {
     }
     for mut state in list(data)? {
         if state["status"] == "running" {
+            // A state that names no job of its own is not this function's to rewrite.
+            let Some(id) = state["id"].as_str().map(str::to_owned) else { continue };
+            let Ok(dir) = job_dir(data, &id) else { continue };
             state["status"] = json!("interrupted");
             state["message"] = json!(
                 "Previous desktop session ended; inspect log and retry. No automatic installation."
             );
-            write_state(
-                &job_dir(
-                    data,
-                    state["id"].as_str().context("Invalid persisted job ID")?,
-                )?,
-                &state,
-            )?;
+            write_state(&dir, &state)?;
         }
     }
     Ok(())

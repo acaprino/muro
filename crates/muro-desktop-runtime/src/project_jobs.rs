@@ -10,7 +10,7 @@
 //! the file the run started from. A change no AI judges (the name, the author, the repository, the records,
 //! the changelog) is `muro project edit`. Nothing is installed on a harness: a project's plugin is installed
 //! from its Install step, through a plan the person applies.
-use crate::{factory::Factory, jobs, projects};
+use crate::{exec::Captured, factory::Factory, jobs, projects};
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use muro_registry::projects::{self as list, DEFAULT_ID};
@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use std::{
     fs::{self, OpenOptions},
     path::{Path, PathBuf},
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 /// The changes of an existing project that an AI run makes.
@@ -28,6 +28,22 @@ pub const NEEDS_CLAUDE: &str =
     "Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.";
 /// What the factory says, and the page repeats, when the file changed while a change was prepared.
 pub const CHANGED: &str = "The project file changed since it was opened: open it again and repeat the change";
+/// How long each step of a project run may take: the AI run, and each factory command around it (starting or
+/// opening the project, building and saving it). Intake and harmonization of several inputs, or harmonizing
+/// Marionette again, take far longer than the 30 minutes of AI adaptation (`jobs::ADAPTATION_LIMIT`). A step that
+/// reaches it is stopped with the processes it started, and the run fails saying "The AI run reached its limit of
+/// 120 minutes" (or the step it was).
+pub const PROJECT_LIMIT: Duration = Duration::from_secs(120 * 60);
+/// The phase in which a run builds the package and replaces the project file (`muro project commit`). From its
+/// start a Cancel is not obeyed: stopped half way, the file could be replaced while the run said it was not.
+pub const SAVING: &str = "Building and saving the project";
+/// What `cancel_job` answers for a run in that phase.
+pub const SAVING_NOT_CANCELLED: &str =
+    "The run is building and saving the project: it can no longer be cancelled, and it ends by itself";
+/// The setting a test names a stand-in for the agent with: a Python script, run by the factory's Python with the
+/// agent's arguments in place of Claude Code. Only a debug build (the tests') reads it; the release Muro ships
+/// always runs Claude Code.
+pub const TEST_AGENT_SETTING: &str = "test_agent_script";
 const MAX_INPUTS: usize = 20;
 const MAX_LINE: usize = 200;
 const MAX_TEXT: usize = 4000;
@@ -36,6 +52,15 @@ const MAX_INSTRUCTION_FILES: usize = 50;
 /// What `edit` and `updates` may take: a repack of a large project, or a look at every input's upstream.
 const EDIT_LIMIT: Duration = Duration::from_secs(600);
 const UPDATES_LIMIT: Duration = Duration::from_secs(300);
+/// How long the work folder of a project run that failed, was cancelled or was interrupted is kept, for its log to
+/// be read against: a whole unpack of the project each.
+const KEEP_WORK: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+/// The names Windows keeps for devices, with or without an extension: no file or folder can have one, so the
+/// project format refuses them (`muro/project.py`) and so does every name here that becomes one.
+const DEVICES: [&str; 22] = [
+    "con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2",
+    "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+];
 
 fn registry(data: &Path) -> Result<Value> {
     muro_registry::service::request(data, "registry", json!({}))
@@ -65,11 +90,19 @@ pub fn request_text(value: &Value, what: &str) -> Result<String> {
     Ok(text.replace("\r\n", "\n"))
 }
 
-/// The plugin id: kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`), the factory's own rule, at most 64 characters.
+/// Whether Windows reads `name` as a device (`CON`, `aux.md`, `com1.tar.gz`): its part before the first dot is one.
+pub fn is_device_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or("");
+    DEVICES.iter().any(|device| device.eq_ignore_ascii_case(stem))
+}
+
+/// The plugin id: kebab-case (`^[a-z0-9]+(-[a-z0-9]+)*$`), the factory's own rule, at most 64 characters, and
+/// not a name Windows keeps for a device (it names the project file and the plugin's folders).
 pub fn is_slug(slug: &str) -> bool {
     !slug.is_empty()
         && slug.len() <= 64
         && slug.split('-').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+        && !is_device_name(slug)
 }
 
 /// Where an input comes from: an `https://` address of a repository (a folder of it after `#`), or the
@@ -146,6 +179,10 @@ pub fn instruction_edits(value: &Value) -> Result<Vec<(String, Option<String>)>>
                     && !part.chars().any(|c| c.is_control() || "\\:<>\"|?*".contains(c)),
                 "An instruction file's name is plain folder and file names separated by / ({path})"
             );
+            ensure!(
+                !is_device_name(part),
+                "{part} is a name Windows keeps for a device: an instruction file or folder cannot have it ({path})"
+            );
         }
         ensure!(
             !edits.iter().any(|(known, _)| known.eq_ignore_ascii_case(path)),
@@ -215,7 +252,7 @@ pub fn prompt(factory: &str, python: &str, work: &str, name: &str, slug: &str, t
 {task}
 
 The contract. Read the factory's README.md, AGENTS.md, prompts/intake.md, prompts/harmonizer.md and prompts/delivery.md before you change anything, and follow them. YOU own intake and harmonization: inspect each input's license and published releases, pin published releases first (pin: release; head only for an upstream without releases), read every file you select or leave out, classify every supported outcome, and author sources.json, capabilities/, ROUTER.md, guide-examples.json and, as appropriate, delivery.json and entries.json. Scope comes from the inputs. Never alter what a source prescribes except to make two of them coexist, and record each such change with its collision. No keyword or regex classification. A preparation command alone is not completed intake.
-The factory's commands, run with its own Python from the work folder: {python:?} {factory:?}/muro_build.py --manifest {work:?}/sources.json followed by --prepare-intake <source id>, --harmonize, --validate or --check-sources. The intake workbench's coverage.json says which files the selected ones name: select every file the method uses at run time, or explain it in omissions.
+The factory's commands, run with its own Python in UTF-8 mode from the work folder: {python:?} -X utf8 {factory:?}/muro_build.py --manifest {work:?}/sources.json followed by --prepare-intake <source id>, --harmonize, --validate or --check-sources. The intake workbench's coverage.json says which files the selected ones name: select every file the method uses at run time, or explain it in omissions.
 The work folder holds the package files at its top. inputs/<source id>/ (when present) is each current input at its pin and release/ the last build: read them as evidence, never edit them.
 Decision records: keep every record in records.json and add one for each decision of this run that shapes the project: {{"id": "<short-unique-id>", "date": "<today, YYYY-MM-DD>", "subjects": [<capability or input ids>], "text": "<the decision and its reason, grounded in the sources>", "author": "muro", "binding": false}}. A record with "binding": true is the owner's rule: follow it, and if the request cannot be done without breaking one, stop and say so instead.
 Leave to the desktop: do not edit project.json, history.json or CHANGELOG.md, and do not change plugin.slug or plugin.version in sources.json. The desktop builds the package, records this run, moves the version and writes the changelog.
@@ -299,6 +336,9 @@ struct Run {
     settings: Value,
     /// `project new` arguments for a new project; None for a change, which unpacks `file` instead.
     create: Option<Vec<String>>,
+    /// What a new project was asked to be (`--slug=`, `--name=`, `--author=`), which its commit holds it to; empty
+    /// for a change, whose identity is the file's.
+    identity: Vec<String>,
     expect: Option<String>,
     edits: Vec<(String, Option<String>)>,
     agent_args: Vec<String>,
@@ -307,16 +347,78 @@ struct Run {
     budget: f64,
 }
 
-/// A factory command of the run, logged with the agent's output and stopped by its cancellation.
+/// A factory command of the run before the AI's: logged with the agent's output, stopped by its cancellation.
 fn run_factory(run: &Run, factory: &Factory, args: Vec<String>, label: &str) -> Result<()> {
     let (python, all) = factory.invocation(&args);
-    jobs::run(&run.dir, &python, &all, &run.dir, label)
+    jobs::run_for(&run.dir, &python, &all, &run.dir, label, PROJECT_LIMIT, true)
 }
 
-/// The run itself, on its own thread: prepare the folder, run the agent, check it, commit.
-fn execute(data: &Path, run: &Run, state: &mut Value) -> Result<()> {
+/// What starts the agent: Claude Code as Mukade resolves it. A debug build (the tests') runs instead the Python
+/// script the settings name under `TEST_AGENT_SETTING`, with the factory's Python and the same arguments.
+fn agent_command(settings: &Value, factory: &Factory, args: &[String]) -> Result<(String, Vec<String>)> {
+    if cfg!(debug_assertions) {
+        if let Some(script) = settings[TEST_AGENT_SETTING].as_str().filter(|script| !script.is_empty()) {
+            let mut all = vec![script.to_owned()];
+            all.extend(args.iter().cloned());
+            return Ok((factory.python().to_owned(), all));
+        }
+    }
+    Ok((crate::cli::resolve_executable("claude-code")?, args.to_vec()))
+}
+
+/// At the start of a run: the work folders (`jobs/<id>/work`) of the project runs that failed, were cancelled or
+/// were interrupted more than `KEEP_WORK` ago are removed; their state, prompt and log stay. A run that succeeded
+/// removed its own already, and the folders of an AI adaptation are what its plugin was installed from: they are
+/// not this sweep's. Best effort: what cannot be removed now is tried at the next run.
+fn sweep_work_folders(data: &Path) {
+    let Ok(entries) = fs::read_dir(data.join("jobs")) else { return };
+    let now = SystemTime::now();
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        let work = dir.join("work");
+        if !work.is_dir() {
+            continue;
+        }
+        let Some(state) = jobs::read_state(&dir) else { continue };
+        let ended = matches!(state["status"].as_str(), Some("failed" | "cancelled" | "interrupted"));
+        let old = fs::metadata(dir.join("state.json"))
+            .and_then(|meta| meta.modified())
+            .is_ok_and(|time| now.duration_since(time).is_ok_and(|age| age > KEEP_WORK));
+        if state["kind"] == "project" && ended && old {
+            let _ = fs::remove_dir_all(&work);
+        }
+    }
+}
+
+/// Appends what a step run with its output kept printed to the run's output.log, after the agent's. Best effort.
+fn log_output(dir: &Path, done: &Captured) {
+    use std::io::Write;
+    if let Ok(mut log) = OpenOptions::new().create(true).append(true).open(dir.join("output.log")) {
+        let _ = log.write_all(done.stdout.as_bytes());
+        let _ = log.write_all(done.stderr.as_bytes());
+    }
+}
+
+/// The factory's own reason for a commit it refused, from what it wrote on stderr (`Project commit failed:
+/// <reason>`, docs/cli.md): the first line of it, the rest left to output.log.
+fn commit_reason(stderr: &str, status: std::process::ExitStatus) -> String {
+    const SAID: &str = "Project commit failed: ";
+    let lines: Vec<&str> = stderr.lines().skip_while(|line| !line.starts_with(SAID)).collect();
+    match lines.first() {
+        Some(&first) => {
+            let reason = first.strip_prefix(SAID).unwrap_or(first).trim().trim_end_matches(':');
+            if lines.len() > 1 { format!("{reason}; see output.log") } else { reason.to_owned() }
+        }
+        None => format!("{SAVING} failed ({status}); see output.log"),
+    }
+}
+
+/// The run itself, on its own thread: prepare the folder, run the agent, check it, commit. `saved` is set once
+/// the factory has written the project file.
+fn execute(data: &Path, run: &Run, state: &mut Value, saved: &mut bool) -> Result<()> {
     let lock = OpenOptions::new().create(true).truncate(false).read(true).write(true).open(data.join("adaptation.lock"))?;
     lock.try_lock_exclusive().context("Another AI run is active; retry after it finishes")?;
+    sweep_work_folders(data);
     let factory = Factory::from_settings(&run.settings)?;
     let path = |p: &Path| p.to_string_lossy().into_owned();
     match &run.create {
@@ -337,32 +439,67 @@ fn execute(data: &Path, run: &Run, state: &mut Value) -> Result<()> {
     let instructions = muro_registry::instructions::read_directory(&run.work.join("custom-instructions"))?.files;
     state["phase"] = json!("AI intake and harmonization");
     jobs::write_state(&run.dir, state)?;
-    let exe = crate::cli::resolve_executable("claude-code")?;
-    jobs::run(&run.dir, &exe, &run.agent_args, &run.work, "The AI run")?;
+    let (exe, args) = agent_command(&run.settings, &factory, &run.agent_args)?;
+    jobs::run_for(&run.dir, &exe, &args, &run.work, "The AI run", PROJECT_LIMIT, true)?;
     ensure!(
         muro_registry::instructions::read_directory(&run.work.join("custom-instructions"))?.files == instructions,
         "The AI changed the custom instruction files; they are the owner's and must stay as they are. Nothing was saved"
     );
-    ensure!(!run.dir.join("cancel").exists(), "Cancelled before the project was saved");
-    state["phase"] = json!("Building and saving the project");
+    if run.dir.join("cancel").exists() {
+        return Err(jobs::Cancelled::new("Cancelled before the project was saved").into());
+    }
+    state["phase"] = json!(SAVING);
     jobs::write_state(&run.dir, state)?;
     let mut commit = vec!["project".to_owned(), "commit".into(), path(&run.work), "--out".into(), path(&run.file)];
     match &run.expect {
-        Some(digest) => commit.extend(["--expect-digest".to_owned(), digest.clone(), "--step".into(), run.step.clone()]),
-        None => commit.push("--create".into()),
+        Some(digest) => commit.extend(["--expect-digest".to_owned(), digest.clone(), format!("--step={}", run.step)]),
+        None => {
+            commit.push("--create".into());
+            commit.extend(run.identity.iter().cloned());
+        }
     }
-    commit.extend(["--operation".to_owned(), run.title.clone(), "--engine".into(), "claude-code".into(), "--budget".into(), run.budget.to_string()]);
+    commit.extend([format!("--operation={}", run.title), "--engine=claude-code".to_owned(), format!("--budget={}", run.budget)]);
     let summary = run.work.join(".muro-summary.md");
     if summary.is_file() {
-        commit.extend(["--summary".to_owned(), path(&summary)]);
+        commit.push(format!("--summary={}", path(&summary)));
     }
-    run_factory(run, &factory, commit, "Building and saving the project")?;
+    // From here a Cancel is not obeyed (`SAVING`): the commit ends by itself or at its limit, and what it said goes
+    // to the log; its own reason, when it refuses, is the run's.
+    let done = factory.run(&commit, SAVING, &|| false, PROJECT_LIMIT)?;
+    log_output(&run.dir, &done);
+    if !done.status.success() {
+        bail!("{}", commit_reason(&done.stderr, done.status));
+    }
+    *saved = true;
     if run.create.is_some() {
-        projects::open(data, &json!({"path": path(&run.file)}))
-            .context("The project file was written but could not be added to your list: open it with Open project file")?;
+        projects::open(data, &json!({"path": path(&run.file)})).map_err(|error| {
+            anyhow::anyhow!(
+                "The project file was written to {} but could not be added to your list ({error:#}): open it with Open project file",
+                run.file.display()
+            )
+        })?;
     }
     projects::sweep_cache(data);
     Ok(())
+}
+
+/// What a run that did not succeed says of the project file, from what is on disk now: never "not changed" for a
+/// file that was replaced, or for a project that never had one.
+fn file_after_failure(run: &Run, saved: bool, error: &str) -> String {
+    let path = run.file.display();
+    match &run.expect {
+        // the file was written and only its listing failed: that message says where it is
+        None if saved => String::new(),
+        None if run.file.exists() => format!(". A project file is now at {path}: open it with Open project file to see what it holds"),
+        None => ". No project file was written".to_owned(),
+        // the file changed under the run, and the message says so
+        Some(_) if error == CHANGED => String::new(),
+        Some(expect) => match list::file_digest(&run.file) {
+            Ok(digest) if digest == *expect => ". The project file was not changed".to_owned(),
+            Ok(_) => ". The project file was replaced while the run went: open it again to see what it holds".to_owned(),
+            Err(_) => format!(". The project file can no longer be read: {path}"),
+        },
+    }
 }
 
 /// Writes the first state of a run and starts its thread.
@@ -373,15 +510,23 @@ fn launch(data: &Path, run: Run, mut state: Value) -> Result<Value> {
     let initial = state.clone();
     let data = data.to_owned();
     std::thread::spawn(move || {
-        let result = execute(&data, &run, &mut state);
-        state["status"] = json!(if result.is_ok() { "completed" } else if run.dir.join("cancel").exists() { "cancelled" } else { "failed" });
+        let mut saved = false;
+        let result = execute(&data, &run, &mut state, &mut saved);
+        // Cancelled is where the run stopped, not whether a cancel file is there: one that reached the commit is not obeyed.
+        let cancelled = result.as_ref().err().is_some_and(jobs::is_cancelled);
+        state["status"] = json!(if result.is_ok() { "completed" } else if cancelled { "cancelled" } else { "failed" });
         state["phase"] = json!("Finished");
         state["message"] = json!(match &result {
             Ok(()) if run.create.is_some() => "The project was created and added to your list. Install it from its Install step".to_owned(),
             Ok(()) => "The project was saved. Install it again from its Install step to bring the change to the harnesses".to_owned(),
-            Err(error) => format!("{error:#}. The project file was not changed"),
+            Err(error) => {
+                let text = format!("{error:#}");
+                let after = file_after_failure(&run, saved, &text);
+                format!("{text}{after}")
+            }
         });
-        // A failed run leaves its work folder for the log to be read against, never a second copy of the inputs.
+        // A failed run leaves its work folder for the log to be read against (a week: `sweep_work_folders`), never a
+        // second copy of the inputs.
         if result.is_ok() {
             let _ = fs::remove_dir_all(&run.work);
         }
@@ -404,6 +549,7 @@ pub fn create(data: &Path, payload: &Value) -> Result<Value> {
     agent(&current)?;
     let name = line(&payload["name"], "The project name")?;
     let slug = payload["slug"].as_str().unwrap_or("").trim().to_owned();
+    ensure!(!is_device_name(&slug), "The plugin id {slug} is a name Windows keeps for a device: choose another");
     ensure!(is_slug(&slug), "The plugin id is lowercase letters and digits joined by dashes, such as my-plugin");
     ensure!(slug != DEFAULT_ID, "The plugin id {slug} is the project Muro ships: choose another");
     let author = line(&payload["author"], "The author")?;
@@ -447,16 +593,18 @@ pub fn create(data: &Path, payload: &Value) -> Result<Value> {
     );
     let text = prompt(&factory.root().to_string_lossy(), factory.python(), &work.to_string_lossy(), &name, &slug, &task_text);
     let agent_args = jobs::agent_args("claude-code", &text, budget)?;
-    let mut create = vec!["--name".to_owned(), name.clone(), "--slug".into(), slug.clone(), "--author".into(), author];
+    // `--option=value`: a value a person typed that begins with a dash is still that option's value.
+    let identity = vec![format!("--slug={slug}"), format!("--name={name}"), format!("--author={author}")];
+    let mut create = identity.clone();
     if let Some((url, branch, prefix)) = repo {
-        create.extend(["--repository".to_owned(), url, "--branch".into(), branch, "--tag-prefix".into(), prefix]);
+        create.extend([format!("--repository={url}"), format!("--branch={branch}"), format!("--tag-prefix={prefix}")]);
     }
     let title = format!("New project {name}");
     let state = json!({"id":id,"kind":"project","project_id":slug,"operation":"create","title":title,"time":jobs::now(),
         "status":"running","phase":"Starting the project","budget_usd":budget,"log_path":dir.join("output.log"),"file":file,
         "message":"The AI makes the project; nothing is installed"});
-    let run = Run { dir, work, file, settings: current["settings"].clone(), create: Some(create), expect: None, edits: vec![],
-        agent_args, title, step: "none".into(), budget };
+    let run = Run { dir, work, file, settings: current["settings"].clone(), create: Some(create), identity, expect: None,
+        edits: vec![], agent_args, title, step: "none".into(), budget };
     launch(data, run, state)
 }
 
@@ -481,7 +629,13 @@ pub fn change(data: &Path, payload: &Value) -> Result<Value> {
     let inputs = info["inputs"].as_array().cloned().unwrap_or_default();
     let (title, task_text) = task(operation, payload, &inputs)?;
     let edits = if operation == "instructions" { instruction_edits(&payload["instructions"])? } else { vec![] };
-    let name = info["project"]["name"].as_str().unwrap_or(id).to_owned();
+    // The name comes from the file, which may be anyone's: it enters the prompt only as one line of at most
+    // `MAX_LINE` characters, the project's id otherwise.
+    let name = info["project"]["name"]
+        .as_str()
+        .filter(|name| !name.is_empty() && name.chars().count() <= MAX_LINE && !name.chars().any(char::is_control))
+        .unwrap_or(id)
+        .to_owned();
     let (job, dir) = new_job(data)?;
     let work = dir.join("work");
     let text = prompt(&factory.root().to_string_lossy(), factory.python(), &work.to_string_lossy(), &name, id, &task_text);
@@ -489,8 +643,8 @@ pub fn change(data: &Path, payload: &Value) -> Result<Value> {
     let state = json!({"id":job,"kind":"project","project_id":id,"operation":operation,"title":title,"time":jobs::now(),
         "status":"running","phase":"Opening the project","budget_usd":budget,"log_path":dir.join("output.log"),"file":file,
         "message":"The AI changes the project; the file is replaced only when the build succeeds"});
-    let run = Run { dir, work, file, settings: current["settings"].clone(), create: None, expect: Some(digest.to_owned()),
-        edits, agent_args, title, step, budget };
+    let run = Run { dir, work, file, settings: current["settings"].clone(), create: None, identity: vec![],
+        expect: Some(digest.to_owned()), edits, agent_args, title, step, budget };
     launch(data, run, state)
 }
 
@@ -510,18 +664,21 @@ pub fn edit(data: &Path, payload: &Value) -> Result<Value> {
     let scratch = tempfile::Builder::new().prefix(".muro-edit-").tempdir_in(data)?;
     let mut args = vec!["project".to_owned(), "edit".into(), file.to_string_lossy().into_owned(), "--expect-digest".into(), digest.to_owned()];
     let mut changed = false;
+    // `--option=value`: a value a person typed that begins with a dash is still that option's value.
     if !payload["name"].is_null() {
-        args.extend(["--name".to_owned(), line(&payload["name"], "The project name")?]);
+        args.push(format!("--name={}", line(&payload["name"], "The project name")?));
         changed = true;
     }
     if !payload["author"].is_null() {
-        args.extend(["--author".to_owned(), line(&payload["author"], "The author")?]);
+        args.push(format!("--author={}", line(&payload["author"], "The author")?));
         changed = true;
     }
     if let Some(value) = payload.get("repository") {
         match repository(value)? {
             None => args.push("--no-repository".into()),
-            Some((url, branch, prefix)) => args.extend(["--repository".to_owned(), url, "--branch".into(), branch, "--tag-prefix".into(), prefix]),
+            Some((url, branch, prefix)) => {
+                args.extend([format!("--repository={url}"), format!("--branch={branch}"), format!("--tag-prefix={prefix}")])
+            }
         }
         changed = true;
     }
@@ -605,14 +762,38 @@ mod tests {
 
     #[test]
     fn slugs_are_the_factorys_kebab_case() {
-        for good in ["a", "my-plugin", "x2-y3"] {
+        for good in ["a", "my-plugin", "x2-y3", "con-x", "console", "com10", "lpt0", "nul-terminated"] {
             assert!(is_slug(good), "{good}");
         }
-        for bad in ["", "-a", "a-", "a--b", "My", "a_b", "a b"] {
+        for bad in ["", "-a", "a-", "a--b", "My", "a_b", "a b", "con", "prn", "aux", "nul", "com1", "com9", "lpt1", "lpt9"] {
             assert!(!is_slug(bad), "{bad}");
         }
         let long = "a".repeat(65);
         assert!(!is_slug(&long));
+    }
+
+    #[test]
+    fn device_names_are_windows_own_with_or_without_an_extension() {
+        for device in ["CON", "con", "Aux", "nul.md", "COM1.tar.gz", "lpt9.txt"] {
+            assert!(is_device_name(device), "{device}");
+        }
+        for name in ["console.md", "com10", "a-con", "x.con", "COM.txt", "", "lpt"] {
+            assert!(!is_device_name(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_commit_says_the_factorys_own_reason() {
+        let status = std::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
+            .args(if cfg!(windows) { ["/C", "exit 1"] } else { ["-c", "exit 1"] })
+            .status()
+            .unwrap();
+        assert_eq!(commit_reason(&format!("Project commit failed: {CHANGED}\n"), status), CHANGED);
+        assert_eq!(
+            commit_reason("a warning\nProject commit failed: The package does not validate:\n- capability x has no row\n", status),
+            "The package does not validate; see output.log"
+        );
+        assert!(commit_reason("Traceback (most recent call last):\n", status).starts_with(&format!("{SAVING} failed (")));
     }
 
     #[test]
@@ -632,9 +813,11 @@ mod tests {
         assert_eq!(edits, vec![("rules.md".to_owned(), Some("Keep it short.".to_owned())), ("team/style.MD".to_owned(), None)]);
         for bad in [json!([]), json!([{"path":"notes.txt","text":""}]), json!([{"path":"../x.md","text":""}]), json!([{"path":"a\\b.md","text":""}]),
                     json!([{"path":"c:x.md","text":""}]), json!([{"path":"a.md","text":1}]), json!([{"path":"a.md","text":""},{"path":"A.md","text":""}]),
-                    json!([{"path":"/a.md","text":""}])] {
+                    json!([{"path":"/a.md","text":""}]), json!([{"path":"aux.md","text":""}]), json!([{"path":"team/nul.md","text":""}]),
+                    json!([{"path":"COM1/x.md","text":""}])] {
             assert!(instruction_edits(&bad).is_err(), "{bad}");
         }
+        assert!(instruction_edits(&json!([{"path":"console.md","text":""}])).is_ok());
     }
 
     #[test]
@@ -674,7 +857,7 @@ mod tests {
     fn the_prompt_leaves_the_record_of_the_run_to_the_desktop() {
         let text = prompt("/factory", "python", "/work", "My Plugin", "my-plugin", "Harmonize again.");
         for said in ["Harmonize again.", "do not edit project.json, history.json or CHANGELOG.md", "plugin.slug or plugin.version",
-                     ".muro-summary.md", "byte for byte", "\"binding\": true", "Never install plugins"] {
+                     ".muro-summary.md", "byte for byte", "\"binding\": true", "Never install plugins", "\"python\" -X utf8 \"/factory\"/muro_build.py"] {
             assert!(text.contains(said), "{said}");
         }
     }
