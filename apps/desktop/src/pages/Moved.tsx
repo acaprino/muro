@@ -1,9 +1,9 @@
 import { Empty } from '@acaprino/sigrid';
 
 /**
- * The page of a tab the new window does not have yet (plan R0: Projects comes with its Task 5, Sync with plan R1,
- * Activity and Settings with R2): one sentence where the page will be. Meanwhile the background worker goes on checking
- * the registry, and applies what changed only when automatic sync is on (docs/desktop.md, "The background worker").
+ * The page of a tab the new window does not have yet: Activity and Settings, which come with plan R2 (Projects came with plan R0,
+ * Sync with plan R1). One sentence where the page will be. Meanwhile the background worker goes on checking the registry, and
+ * applies what changed only when automatic sync is on (docs/desktop.md, "The background worker").
  */
 export function Moved({ page }: { page: string }) {
   return (
