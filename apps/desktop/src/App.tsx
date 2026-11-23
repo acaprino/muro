@@ -13,6 +13,7 @@ import { plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
 import { useNotify } from './state/notices.tsx';
 import { ErrorBoundary } from './ErrorBoundary.tsx';
+import { ProjectJobsProvider } from './pages/project/write/useJobs.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
 import { THEME_LABELS, otherChoices } from './theme.ts';
@@ -79,7 +80,8 @@ function PageTabs({ page, go }: { page: Page; go: (value: string) => void }) {
   );
 }
 
-export function App() {
+/** The window: the frame, the page of the tab and the surfaces over it. */
+function AppFrame() {
   const { snapshot, error, reload } = useRegistry();
   const { choice, resolved, set: setChoice } = useScheme();
   const [page, setPage] = useState<Page>('sync');
@@ -152,4 +154,9 @@ export function App() {
       <CommandPalette open={palette} onOpenChange={setPalette} commands={commands} label="Search commands" />
     </AppShell>
   );
+}
+
+/** The window, with the AI runs of the runtime (`useJobs`) available to every page of it. */
+export function App() {
+  return <ProjectJobsProvider><AppFrame /></ProjectJobsProvider>;
 }

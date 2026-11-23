@@ -16,7 +16,9 @@ export interface Registry { schema:number; revision:number; plugins:Plugin[]; ta
 export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean; plugin_name?:string|null; enabled?:boolean }
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
-export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
+/** An AI run of the runtime (`jobs`): an adaptation of a plugin (`plugin_id`, `harness`; no `kind`), or, with `kind` "project", a project made or changed (`project_id`, `operation`, `title`, `file`).
+ * `status` is running, completed, failed, cancelled or interrupted. `time` is when it started, in epoch seconds (the runtime sends a number; a text of digits is read the same). */
+export interface Job { id:string; kind?:'project'; plugin_id?:string; harness?:string; project_id?:string; operation?:string; title?:string; file?:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string|number }
 /** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan, and `errors` is the sources the last check could not resolve (null before any check). */
 export interface SyncTimes { checked:string|null; synced:string|null }
 export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; targets:Record<string,SyncTimes> }
@@ -39,9 +41,24 @@ export type DecisionForm = 'capability'|'always-on'|'hook'|'dropped';
 export interface ProjectInput { id:string; url:string|null; pin:string; release:string|null; commit:string|null; license:string|null; paths:string[]; became:Record<DecisionForm,number> }
 export interface ProjectDecision { source:string; content:string; form:DecisionForm; targets:string[]; reason:string }
 export interface ProjectRecord { id:string; date:string; subjects:string[]; text:string; author:'muro'|'you'; binding:boolean }
-export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; pins:Record<string,string>; changelog:string }
+export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; operation?:string; pins:Record<string,string>; changelog:string }
 /** One capability and one documented example as the guide's data model carries them (`guide_data`): the keys the graph reads are its own to name. */
 export interface GraphCapability { id:string; title:string; [key:string]:unknown }
 export interface GraphExample { [key:string]:unknown }
 /** What the action `project {id}` returns: `muro project info` of the file as it is, and `included`: whether it is the copy of the project Muro ships (the runtime says so; `project.builtin` is what the file claims of itself, and is not what decides). */
-export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; instructions?:InstructionFile[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+/** One of the owner's Markdown files under `custom-instructions/` as `muro project info` reads it: its path relative to that folder and its text. */
+export interface InstructionFile { path:string; text:string }
+/** The repository a project is published from: the https address, the branch and the prefix of its release tags. */
+export type ProjectRepository = { url:string; branch:string; tag_prefix:string };
+/** The changes of a project that an AI run makes (`project_job` `operation`), and the run that makes a new project. */
+export type ChangeOperation = 'harmonize'|'add_input'|'remove_input'|'move_pin'|'instructions';
+export type ProjectOperation = ChangeOperation|'create';
+/** How the version of a project moves after an AI run. */
+export type VersionStep = 'patch'|'minor'|'major';
+/** What a change of an instruction file says: the file written whole, or `text` null to remove it. */
+export type InstructionEdit = { path:string; text:string|null };
+/** How one input's pin stands against its upstream (`project_updates`, from `muro baseline`): `behind` names the newest release or commit in `upstream`. */
+export interface ProjectUpdate { id:string; pin:string; pinned:string; upstream:string|null; status:'current'|'behind'|'frozen'|'drifted'|'unknown'|'error'; note:string }
+/** The last update check of a project's inputs, for the file it was made on (`digest`). */
+export interface ProjectUpdates { id:string; digest:string; inputs:ProjectUpdate[] }
