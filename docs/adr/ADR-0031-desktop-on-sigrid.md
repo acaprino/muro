@@ -18,8 +18,8 @@ accepted_on: null
 # ADR-0031 — The desktop window moves from Imago to React on Sigrid
 
 Date: 2026-11-23. Status: records the owner's decision of the same day. Nothing
-of it was built or run when this record was written (see "What was not
-verified"); the explanatory text and the implementation choices have not been
+of it was built or run when this record was written (see "What was verified and
+what was not"); the explanatory text and the implementation choices have not been
 separately approved.
 
 ## Context
@@ -68,7 +68,8 @@ owner chose "sostituzione sul posto".
 2. **The package is the release tarball.** `package.json` names
    `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
    (first `v3.3.9`), and the SHA-256 of `manifest.json` is recorded in
-   `docs/verification/` and appears as the lockfile's `integrity`. Never a
+   `docs/verification/`; the lockfile's `integrity` is npm's sha512 of the same
+   tarball. Never a
    `file:` path to a checkout, and never a git dependency that runs `prepare`
    (AGENTS.md, "Nothing is compiled on this machine").
 
@@ -102,18 +103,22 @@ owner chose "sostituzione sul posto".
    removed with this record: it needs the Imago package the window no longer
    uses. Sigrid's `sigrid-check` reads files and builds nothing; its launcher
    and the bundled tool it starts import only Node's own modules, and both ship
-   in the release package, so it needs no dependency beyond Sigrid itself. It
-   cannot run on `develop` yet, because the package is not installed there.
-   Until it is, no CI step checks the design rules. Once the package is
-   installed the step is `npx --no sigrid-check apps/desktop/src`, run from the
-   folder whose `package.json` lists Sigrid; it needs a decision on whether to
-   gate on it (it exits 1 on a finding) and a `sigrid-check.config.json` for
-   any accepted exception.
+   in the release package, so it needs no dependency beyond Sigrid itself.
+   *Amended on 2026-11-23 (the final review of plan R0): CI installs the
+   package (`npm ci`), so the desktop job of the Tests workflow runs it, in the
+   step "Design rules (Sigrid)" after the frontend build: `npx --no
+   sigrid-check apps/desktop/src`, from the repository root, whose
+   `package.json` lists Sigrid. The step does not block (`continue-on-error`)
+   until its first output has been read; then the owner decides whether it
+   gates (it exits 1 on a finding) and which exceptions, if any, go in a
+   `sigrid-check.config.json`.*
 
 ## What is lost
 
 - The ONI look and the Smooth/ONI setting. Settings → Appearance will offer
   the theme (System, Light, Dark), as today, and Sigrid's density.
+- The translucent ground over the acrylic: the page paints Sigrid's opaque
+  ground, so the Windows 11 material of `imago-shell` no longer shows through.
 - Imago's design file as the reference for the window, and `imago-check`
   together with what it compared: the Imago rules, the equality of the npm and
   Rust pins, the app icons against the package.
@@ -142,8 +147,21 @@ owner chose "sostituzione sul posto".
   the window in that time.
 - **`develop` is not merged into `main` meanwhile**: every merge into `main` is
   a release (AGENTS.md, "Git"), and it would ship a window without Sync.
-- Muro's colour (hue 170) becomes a Sigrid theme; the accent of the window is
-  what that theme computes.
+- Muro's colour (hue 170) becomes a Sigrid theme; the accent is Muro's own
+  (oklch 0.82/0.47, C 0.12/0.13, h 170), put over `colorTheme`'s
+  (`apps/desktop/src/sigridTheme.ts`).
+- The graph entry, `@acaprino/sigrid/graph`, is read from Sigrid's source, not
+  its bundle: an alias in `apps/desktop/vite.config.ts` points it at
+  `src/graph.ts` of the package, because the 3.3.9 `dist/graph.js` inlines
+  the React Compiler runtime with a CommonJS `__require("react")` that the
+  dev server cannot run in a browser. Its types still come from
+  `dist/graph.d.ts`. The source brings copies of its own: the build has two
+  `motion-impl` chunks, and the graph's tooltips read the source's own
+  `PortalContainer` and mount on `<body>`, not in the overlay layer of
+  `AppShell` under the title bar (a `WordsProvider` above the window would not
+  reach the canvas either). The alias needs `src/graph.ts` and the `src` folder
+  in the package (the `@source` lines of `styles.css` need that folder too). It
+  goes when Sigrid's graph bundle no longer requires `react` that way.
 - Dependencies change in `package.json` and its lockfile. The lockfile cannot
   be regenerated on this machine, which installs nothing: the first CI run
   after the change says what is missing.
@@ -159,7 +177,62 @@ workspace, against the fake service, including a graph of 37 capabilities in 15 
 
 Not verified: the window in Tauri with the real registry (the first run of the desktop with this front-end has not happened); that
 `imago-shell` works with a page that mounts Imago's window glue on Sigrid's title bar (the overlay of Snap Layouts, the caption
-buttons); the project file of the owner opened in this window; `sigrid-check` (it is not run by any CI step yet). Seen on the CI
-screenshots: with 15 closed entries the graph is a narrow column whose names are drawn at about 8 px (scale 0.59), and with two
-entries the canvas leaves a node cut at its right edge; both are asked of Sigrid, which also cannot draw an edge's kind or number
-several marked things (see the plan R0 report).
+buttons); the project file of the owner opened in this window; `sigrid-check` (a non-blocking CI step runs it since the final review
+of plan R0, and its first output has not been read yet). Seen on the CI screenshots: with 15 closed entries the graph is a narrow
+column whose names are drawn at about 8 px (scale 0.59), and with two entries the canvas leaves a node cut at its right edge; both
+are asked of Sigrid, which also cannot draw an edge's kind or number several marked things (see the plan R0 report). Since the
+final review a closed entry has no second line, which makes that column shorter; the scale it is drawn at now is in the CI log,
+and the browser test only holds it at 0.5 or more.
+
+## Note of 2026-11-23: Sigrid 4.3.1
+
+Written by Claude Code from the Sigrid sources at the tag `v4.3.1` and its release tarball; nothing was built or run here,
+and the CI run on the commit that makes the move is the first check of it. The record of the pin is
+`docs/verification/2026-11-23-sigrid-pin.md`.
+
+- **The pin.** `package.json` names the 4.3.1 tarball (SHA-256 `aa7a0ed7…89c3`, the manifest's, recomputed on the
+  download). Sigrid 4.0.0 to 4.3.1 grew the graph canvas for this window (its release notes: kinds of line, a numbered
+  path, a readable fitted view; the app's places, sizes, routes and `layoutKey`; one screen that fits; IME guards).
+- **What broke, and how it was fixed.** Of what Muro imports, one thing: `GraphEdge` now has a `kind` of its own
+  (`'child' | 'link'`), which made Muro's `kind` (`member`, `after`, `needs`, `conflicts`) a contradiction for the type
+  check, and an edge whose `kind` is not `link` hangs, so every relation would have been drawn as a branch of the tree.
+  Muro's field is now `relation`, and Sigrid's `kind` says how the line is read. The other changes are additions
+  (`CommandPalette`'s `open` and `onOpenChange` are now both or neither, as Muro passes them; F6 is the frame's round and
+  the notices' own key is Alt+T; tabs and segments keep one width), and `AppShell` is as tall as the window by itself
+  (`--app-height`), so the `h-dvh` the window set on it is gone.
+- **The alias is gone.** Every entry of `dist` is an ES module that takes `react` and `react/compiler-runtime` from the
+  app (since 4.1.0), so `@acaprino/sigrid/graph` is read from the bundle, as the main entry is, and shares its chunks
+  and contexts: the consequence above about the alias, the two `motion-impl` chunks and the tooltips on `<body>` no
+  longer holds. The `@source` lines of `styles.css` still read Sigrid's `src` folder, for its classes.
+- **What the graph draws now** (`apps/desktop/src/pages/project/graphScene.ts`, `Workspace.tsx`):
+  - an entry's capabilities hang from it (the tree: it opens, closes and says how many it hides);
+  - what the plugin declares between two capabilities is a line that hangs nothing, told by its dash and its words:
+    «runs first» solid with an arrowhead (`after`), the AI's own label of the condition dashed (`needs`), «never
+    together» dotted with no arrowhead (`conflicts`); the words show while one end is chosen or has the focus, or on
+    the path, and screen readers hear them always. The inspector no longer writes these out in words, and choosing a
+    capability opens the entries of what it is joined to and brings them into the view, so its lines are drawn;
+  - a documented example or the validated answer is the canvas's numbered path (`steps`): the step in dots and in the
+    name screen readers hear, the line between two steps in the accent, the rest dimmed; the "step N" second line and
+    the inspector's "Step N of the decision" are gone;
+  - an input marks the capabilities its decisions went to as chosen together (several `selected`), as well as opening
+    their entries;
+  - the view is never fitted smaller than names can be read (`minFitZoom` 0.8: a 14px name at about 11px); a graph too
+    large for that, as fifteen closed entries are, starts at its first entry and the rest is a pan, the map or the
+    find field away. A new light asks the canvas to bring what it lights into the view (its handle's `focus`), which
+    replaces the remount (`key={fit}`) of plan R0. The app's places, sizes and routes are not used: they would be a
+    layout of Muro's own.
+  The ADR-0003 rule holds: only a documented example or the validated answer numbers a path, and an input marks what its
+  decisions target.
+- **Still missing.** A view of the whole of a fifteen-entry graph at a readable size at once (Sigrid now keeps names
+  readable and the rest is a pan away; several columns of roots is not asked for yet); the link lines of a capability are
+  drawn only while both ends are in sight, which is why choosing it opens the entries of its partners. A relation to a
+  capability the graph lacks has no line and is no longer said in the inspector (the factory's validation refuses such a
+  reference). The first Tauri run of this window is still to come.
+- **The window glue.** Sigrid 4.x has a Tauri entry, `@acaprino/sigrid/tauri` (`useWindowControls`, `useSnapLayouts`,
+  `useZoom`, with `useDesktopGuard` in the main entry), whose command (`window_caption_maximize`), event
+  (`caption-maximize`), payloads, zoom storage and permissions match `imago-shell` and `capabilities/main.json` on
+  reading. It is not used yet, so decision 4's amendment stands, without its reason that Sigrid has no Tauri side:
+  nothing of it has run against the crate, and its `useWindowTheme` sends only when the scheme changes, while
+  `set_window_theme` is told the choice too (System and Dark draw the same scheme), so that call stays Muro's whatever
+  happens. Moving the controls, Snap Layouts, the zoom and the guard to it would let `@acaprino/imago` leave
+  `package.json` and its lockfile; it waits for a run of the window in Tauri.

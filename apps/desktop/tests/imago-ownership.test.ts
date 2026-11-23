@@ -32,8 +32,9 @@ test('the application has no private SVG renderer, inline style or HTML string, 
   }
 });
 
-// The window glue (window controls, zoom, the guard of the browser's own keys) is the one thing the desktop still takes from Imago: Sigrid has no Tauri side
-// (ADR-0031 and the plan R0 ruling). Nothing else of Imago, in particular none of its markup, graph or UI modules, is imported.
+// The window glue (window controls, zoom, the guard of the browser's own keys) is the one thing the desktop still takes from Imago (ADR-0031 and the plan R0
+// ruling). Sigrid 4.x has a Tauri entry (`@acaprino/sigrid/tauri`) that matches the imago-shell crate on reading, but it has not run against the crate, so the
+// glue has not moved yet (window.ts). Nothing else of Imago, in particular none of its markup, graph or UI modules, is imported.
 test('the only Imago the application imports is the window glue: its shell module and the Tauri adapter', async () => {
   const allowed = new Set(['@acaprino/imago/shell', '@acaprino/imago/tauri']);
   const found: string[] = [];

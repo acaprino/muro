@@ -283,7 +283,8 @@ def test_pack_refuses_a_missing_or_malformed_project_json(tmp_path, package, cac
     (package / "project.json").unlink()
     with pytest.raises(ValueError, match="project.json"):
         project.pack(package, tmp_path / "t.mp")
-    for broken in ({**PROJECT_JSON, "schema": 2}, {**PROJECT_JSON, "name": 3},
+    for broken in ({**PROJECT_JSON, "schema": 2}, {**PROJECT_JSON, "name": 3}, {**PROJECT_JSON, "name": "x" * 201},
+                   {**PROJECT_JSON, "name": "two\nlines"},
                    {k: v for k, v in PROJECT_JSON.items() if k != "builtin"},
                    {**PROJECT_JSON, "created": "yesterday"}, {**PROJECT_JSON, "changed": "2026-11-20T10:30:00+01:00"},
                    {**PROJECT_JSON, "repository": {"url": "u"}}, {**PROJECT_JSON, "slug": "another"}):
@@ -581,8 +582,9 @@ def test_unpack_refuses_a_name_windows_cannot_make_and_says_which(tmp_path, name
 @pytest.mark.parametrize("name", ORDINARY)
 def test_a_name_that_only_looks_like_a_device_or_holds_ordinary_characters_is_fine(tmp_path, name):
     assert project._unsafe_name(name) is None
-    folder = project.unpack(crafted(tmp_path / "ok.mp", [(name, b"x")]), tmp_path / "out")
-    assert (folder.joinpath(*name.split("/"))).read_bytes() == b"x"
+    member = f"inputs/demo/{name}"                       # where a copy of an input carries any name its source has
+    folder = project.unpack(crafted(tmp_path / "ok.mp", [(member, b"x")]), tmp_path / "out")
+    assert (folder.joinpath(*member.split("/"))).read_bytes() == b"x"
 
 
 def test_unpack_refuses_traversal_absolute_drive_and_links(tmp_path):
@@ -623,7 +625,7 @@ def test_unpack_refuses_encrypted_duplicate_and_unusual_members(tmp_path):
 
 
 def test_unpack_stops_at_the_size_and_count_limits(tmp_path, monkeypatch):
-    members = [(f"f{index}.txt", b"x" * 50) for index in range(5)]
+    members = [(f"capabilities/f{index}.txt", b"x" * 50) for index in range(5)]
     mp = crafted(tmp_path / "big.mp", members)
     monkeypatch.setattr(project, "MAX_MEMBERS", 5)             # the five files and the mimetype are six
     with pytest.raises(ValueError, match="more than 5 members"):
@@ -634,7 +636,7 @@ def test_unpack_stops_at_the_size_and_count_limits(tmp_path, monkeypatch):
         project.unpack(mp, tmp_path / "out")
     assert not (tmp_path / "out").exists()
     monkeypatch.setattr(project, "MAX_BYTES", 250 + len(project.MIMETYPE))   # exactly the limit is allowed
-    assert (project.unpack(mp, tmp_path / "out") / "f4.txt").read_bytes() == b"x" * 50
+    assert (project.unpack(mp, tmp_path / "out") / "capabilities" / "f4.txt").read_bytes() == b"x" * 50
 
 
 def test_the_published_limits_are_two_gib_and_fifty_thousand_members():
@@ -671,11 +673,11 @@ def test_a_corrupted_member_is_refused_and_leaves_nothing(tmp_path, compression)
         first = zipfile.ZipInfo("mimetype")
         first.compress_type = zipfile.ZIP_STORED
         archive.writestr(first, project.MIMETYPE)
-        member = zipfile.ZipInfo("a.txt")
+        member = zipfile.ZipInfo("capabilities/a.txt")
         member.compress_type = compression
         archive.writestr(member, b"hello world, " * 20)
     raw = bytearray(mp.read_bytes())
-    start = raw.index(b"a.txt") + len(b"a.txt")                    # the member's data follows its local header
+    start = raw.index(b"capabilities/a.txt") + len(b"capabilities/a.txt")   # the member's data follows its local header
     for offset in range(start, start + 6):
         raw[offset] ^= 0xFF
     mp.write_bytes(bytes(raw))
@@ -690,25 +692,25 @@ def test_a_missing_file_is_an_os_error_not_a_project_error(tmp_path):
 
 
 def test_unpack_needs_a_fresh_folder(tmp_path):
-    mp = crafted(tmp_path / "x.mp", [("a.txt", b"a")])
+    mp = crafted(tmp_path / "x.mp", [("CHANGELOG.md", b"a")])
     taken = tmp_path / "taken"
     taken.mkdir()
     (taken / "mine.txt").write_text("keep", encoding="utf-8")
     with pytest.raises(ValueError, match="new folder"):
         project.unpack(mp, taken)
-    assert (taken / "mine.txt").read_text(encoding="utf-8") == "keep" and not (taken / "a.txt").exists()
+    assert (taken / "mine.txt").read_text(encoding="utf-8") == "keep" and not (taken / "CHANGELOG.md").exists()
     with pytest.raises(ValueError, match="new folder"):
         project.unpack(mp, tmp_path / "x.mp")                  # a file is not a folder
     empty = tmp_path / "empty"
     empty.mkdir()
-    assert (project.unpack(mp, empty) / "a.txt").read_bytes() == b"a"
-    assert (project.unpack(mp, tmp_path / "deep" / "er" / "out") / "a.txt").read_bytes() == b"a"
+    assert (project.unpack(mp, empty) / "CHANGELOG.md").read_bytes() == b"a"
+    assert (project.unpack(mp, tmp_path / "deep" / "er" / "out") / "CHANGELOG.md").read_bytes() == b"a"
 
 
 def test_unpack_keeps_folders_the_zip_lists(tmp_path):
-    mp = crafted(tmp_path / "x.mp", [("empty-dir/", b""), ("sub/inner/a.txt", b"a")])
+    mp = crafted(tmp_path / "x.mp", [("capabilities/empty-dir/", b""), ("inputs/", b""), ("inputs/sub/inner/a.txt", b"a")])
     folder = project.unpack(mp, tmp_path / "out")
-    assert (folder / "empty-dir").is_dir() and (folder / "sub" / "inner" / "a.txt").is_file()
+    assert (folder / "capabilities" / "empty-dir").is_dir() and (folder / "inputs" / "sub" / "inner" / "a.txt").is_file()
 
 
 # --- the cache by content --------------------------------------------------------------------------
@@ -752,8 +754,8 @@ def test_the_default_cache_root_is_per_user(monkeypatch, tmp_path):
 
 # --- info: everything the project page shows ---------------------------------------------------------
 
-INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "graph", "files",
-             "digest"}
+INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "instructions",
+             "graph", "files", "digest"}
 FILE_PARTS = ["Identity", "Author and dates", "Repository", "Inputs", "Choices", "Result", "Your instructions", "History",
               "Changelog", "Decision records", "Input copies", "Built plugin"]
 RUN = {"id": "run-1", "time": "2026-11-12T10:00:00Z", "version": "0.1.0", "status": "completed", "budget_usd": None,
@@ -804,6 +806,8 @@ def test_info_has_everything_the_project_page_shows(tmp_path, described, cache):
     assert result["history"] == [RUN]
     assert result["changelog"] == "# Changelog\n"
     assert result["decisions"] == json.loads((described / "delivery.json").read_text(encoding="utf-8"))["decisions"]
+    # the owner's instruction files whole, for the page to show and edit (the CRLF is kept: they are bytes the owner wrote)
+    assert result["instructions"] == [{"path": "rules.md", "text": "Owner rules\r\nwith CRLF kept\r\n"}]
 
 
 def test_info_of_a_package_without_delivery_choices_has_none(tmp_path, package, cache):

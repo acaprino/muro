@@ -85,6 +85,13 @@ jobs:
       - name: Frontend build
         if: always()
         run: npm run build
+      # Sigrid's design check (ADR-0031, decision 6): it reads apps/desktop/src and builds nothing, from the folder whose
+      # package.json lists Sigrid. Not blocking until its first output has been read; then the owner decides whether it
+      # gates (it exits 1 on a finding) and which exceptions go in a sigrid-check.config.json.
+      - name: Design rules (Sigrid)
+        if: always()
+        continue-on-error: true
+        run: npx --no sigrid-check apps/desktop/src
       # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty

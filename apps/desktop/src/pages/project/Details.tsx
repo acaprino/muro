@@ -9,7 +9,8 @@ import { becameParts, pinnedOf, sourcesOf, targetsOf } from './data.ts';
 import type { ProjectData } from './data.ts';
 
 /** The inspector of the workspace: the documented example, the capability or the input that is selected, read only. What it says is the project's data as it is:
- * an example's own steps and reasons, a capability's role, intents, branches and outputs, and which inputs it comes from (the decisions that target it). */
+ * an example's own steps and reasons, a capability's role, intents and outputs, and which inputs it comes from (the decisions that target it). What a capability is
+ * joined to (runs first, needs on a condition, never together) and its step on a lit path are drawn on the canvas (graphScene.ts), not said again here. */
 
 /** What the selection names in this project, or null when it names nothing the project has (a selection kept from before the project changed). */
 export type Shown =
@@ -35,16 +36,14 @@ export const TITLES: Record<Shown['kind'], string> = { example: 'Documented exam
 export interface DetailsProps {
   shown: Shown;
   data: ProjectData;
-  /** The capabilities the lit decision activates, with the numbers of their steps. */
-  lit: Map<string, number[]>;
   onSelect(next: Selected): void;
 }
 
-export function Details({ shown, data, lit, onSelect }: DetailsProps) {
+export function Details({ shown, data, onSelect }: DetailsProps) {
   const known = React.useMemo(() => new Set(data.caps.map(c => c.id)), [data]);
   const toCap = (id: string) => onSelect({ kind: 'capability', id });
   if (shown.kind === 'example') return <ExampleDetails example={shown.example} data={data} known={known} onCapability={toCap} />;
-  if (shown.kind === 'capability') return <CapabilityDetails cap={shown.cap} data={data} lit={lit} known={known} onSelect={onSelect} />;
+  if (shown.kind === 'capability') return <CapabilityDetails cap={shown.cap} data={data} onSelect={onSelect} />;
   return <InputDetails input={shown.input} data={data} known={known} onCapability={toCap} />;
 }
 
@@ -115,25 +114,16 @@ function ExampleDetails({ example: e, data, known, onCapability }: { example: Ex
   );
 }
 
-const stepWords = (n: number[]): string => n.length === 1 ? `Step ${n[0]} of the decision on the graph` : `Steps ${n.slice(0, -1).join(', ')} and ${n.at(-1)} of the decision on the graph`;
-
-/** A capability as the old window's sheet told it: role, entry, which inputs it comes from (the decisions that name it), the intents it answers, its branches and what it produces.
- * The branches are said in words: the canvas draws every line the same, so a line between two capabilities would not tell "runs first" from "never together". */
-function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; data: ProjectData; lit: Map<string, number[]>; known: Set<string>; onSelect(next: Selected): void }) {
-  const entry = data.entries.find(e => e.capabilities.includes(c.id)), from = sourcesOf(data.decisions, c.id), steps = lit.get(c.id) ?? [];
-  const toCap = (id: string) => onSelect({ kind: 'capability', id }), toInput = (id: string) => onSelect({ kind: 'input', id });
-  const other = (id: string) => known.has(id) ? <ItemLink id={id} onPress={toCap} /> : <strong className="font-medium">{id}</strong>;
-  const branches: React.ReactNode[] = [
-    ...c.after.map(id => <li key={'a:' + id}>Always runs {other(id)} first</li>),
-    ...c.needs.map(n => <li key={'n:' + n.capability}>Runs {other(n.capability)} first, on a condition{n.label ? <span className="block text-xs text-ink-mute">{n.label}</span> : null}</li>),
-    ...c.conflicts.map(id => <li key={'c:' + id}>Never together with {other(id)}</li>),
-  ];
+/** A capability as the old window's sheet told it: role, entry, which inputs it comes from (the decisions that name it), the intents it answers and what it produces.
+ * Its branches are the canvas's lines (graphScene.ts): choosing it opens the entries of what it is joined to (Workspace.tsx), and the words of its lines are drawn and read there. */
+function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: ProjectData; onSelect(next: Selected): void }) {
+  const entry = data.entries.find(e => e.capabilities.includes(c.id)), from = sourcesOf(data.decisions, c.id);
+  const toInput = (id: string) => onSelect({ kind: 'input', id });
   return (
     <div className="flex flex-col gap-4">
       <div className="flex min-w-0 flex-col gap-1">
         <h3 className="truncate text-base font-semibold text-ink" title={c.id}>{c.id}</h3>
         {c.title && c.title !== c.id ? <p className="text-sm text-ink-soft">{c.title}</p> : null}
-        {steps.length ? <p className="text-xs font-medium text-ink">{stepWords(steps)}</p> : null}
       </div>
       <dl className="flex flex-col gap-2">
         <Fact name="Role">{c.role || none}</Fact>
@@ -144,8 +134,8 @@ function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; d
         <section className="flex flex-col gap-2">
           <Heading icon="ai">Activates when the request means</Heading>
           <ul className="flex flex-col gap-2">
-            {c.intents.map(i => (
-              <li key={i.id} className="flex min-w-0 flex-col gap-0.5">
+            {c.intents.map((i, k) => (
+              <li key={`${k}:${i.id}`} className="flex min-w-0 flex-col gap-0.5">
                 <code className="truncate font-mono text-xs text-ink" title={i.id}>{i.id}</code>
                 {i.description ? <span className="text-xs text-ink-soft">{i.description}</span> : null}
                 {i.excludes ? <span className="text-xs text-ink-mute">Not for: {i.excludes}</span> : null}
@@ -154,16 +144,10 @@ function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; d
           </ul>
         </section>
       ) : null}
-      {branches.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="structure">Branches</Heading>
-          <ul className="flex flex-col gap-1 text-sm text-ink-soft">{branches}</ul>
-        </section>
-      ) : null}
       {c.outputs.length ? (
         <section className="flex flex-col gap-2">
           <Heading icon="tag">Produces</Heading>
-          <div className="flex flex-wrap gap-1">{c.outputs.map(o => <Badge key={o} variant="outline">{o}</Badge>)}</div>
+          <div className="flex flex-wrap gap-1">{c.outputs.map((o, k) => <Badge key={`${k}:${o}`} variant="outline">{o}</Badge>)}</div>
         </section>
       ) : null}
     </div>
@@ -171,6 +155,8 @@ function CapabilityDetails({ cap: c, data, lit, known, onSelect }: { cap: Cap; d
 }
 
 const FORMS: Record<string, string> = { capability: 'Capability', 'always-on': 'Always on', hook: 'Hook', 'mcp-server': 'MCP server', dropped: 'Dropped' };
+/** A form in the words of the interface; one this window does not know is shown as it came (`constructor` is none of them either). */
+const formOf = (form: string): string => Object.hasOwn(FORMS, form) ? FORMS[form] : form;
 
 /** An input: where it comes from, how it is pinned, its license, what it became, and its choices one by one, each with the capabilities it went to. */
 function InputDetails({ input, data, known, onCapability }: { input: ProjectInput; data: ProjectData; known: Set<string>; onCapability(id: string): void }) {
@@ -201,7 +187,7 @@ function InputDetails({ input, data, known, onCapability }: { input: ProjectInpu
             {choices.map((d, i) => (
               <li key={i} className="flex min-w-0 flex-col gap-0.5">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{FORMS[d.form] ?? d.form}</Badge>
+                  <Badge variant="secondary">{formOf(d.form)}</Badge>
                   <span className="min-w-0 truncate font-mono text-xs text-ink" title={d.content}>{d.content}</span>
                 </div>
                 {d.reason ? <span className="text-xs text-ink-mute">{d.reason}</span> : null}

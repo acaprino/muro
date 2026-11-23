@@ -8,8 +8,10 @@ it, at the pinned commit) and `release/<slug>/...` (a built release as `--build 
 `info` is what the desktop's project page shows, with the release guide's data model for the graph.
 
 A `.mp` may come from elsewhere, so reading one is the security-sensitive side: no member is written
-outside its folder (no absolute path, no `..`, no drive letter, no link), and unpacking stops at
-`MAX_BYTES` uncompressed or `MAX_MEMBERS` members. Packing refuses what unpacking would refuse.
+outside its folder (no absolute path, no `..`, no drive letter, no link), no member is outside the layout above
+(a coding agent started in the unpacked folder must find there nothing that configures it, such as
+`.claude/settings.json`, `.mcp.json` or `CLAUDE.md`), and unpacking stops at `MAX_BYTES` uncompressed or
+`MAX_MEMBERS` members. Packing refuses what unpacking would refuse.
 Python only carries and checks here; it decides nothing about what a package means.
 """
 from __future__ import annotations
@@ -21,13 +23,14 @@ import re
 import secrets
 import shutil
 import stat
+import time
 import zipfile
 import zlib
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator, NamedTuple
 
-from .core import SLUG_PATTERN, validate_plugin_identity
+from .core import SLUG_PATTERN, is_device_name, validate_plugin_identity
 from .custom_instructions import DIRECTORY as CUSTOM_INSTRUCTIONS
 from .delivery import FORMS
 from .entries import entry_description, load_entries, validate_entries
@@ -46,10 +49,16 @@ MAX_READ = 256 * 1024 ** 2
 # What `verify` says of a release that is not the build of the package beside it.
 MISMATCH = "The plugin inside this project does not match the project: it was not built from it"
 
+# What one field of project.json that a person types may hold (a name, an author, an address, a branch): one line of
+# at most this many characters. `project_work` checks it as it writes; `info` holds a file from anyone to it.
+MAX_FIELD = 200
 # What a package folder carries into a project file; anything else in the folder stays out.
 _PACKAGE_FILES = ("sources.json", "delivery.json", "ROUTER.md", "entries.json", "guide-examples.json",
                   "eval-cases.json", "project.json", "records.json", "history.json", "CHANGELOG.md")
 _PACKAGE_FOLDERS = ("capabilities", "custom-instructions", "prompts")
+# The top level of a project file: the package's own files and folders, the copies of the inputs and the built
+# release. Nothing else is unpacked, whatever its name.
+_LAYOUT_FOLDERS = (*_PACKAGE_FOLDERS, "inputs", "release")
 # A project without records, runs or release notes yet says so with empty ones, so a reader can rely on them.
 _EMPTY = {"records.json": b'{"records": []}\n', "history.json": b'{"runs": []}\n', "CHANGELOG.md": b""}
 _ROOT_KEY = {"records.json": "records", "history.json": "runs"}
@@ -57,10 +66,11 @@ _ROOT_KEY = {"records.json": "records", "history.json": "runs"}
 _EPOCH = (1980, 1, 1, 0, 0, 0)        # the zip format's earliest time: the same project packs to the same bytes
 _CHUNK = 1024 * 1024
 _DRIVE = re.compile(r"^[A-Za-z]:")
-# A name Windows reads as a device, with or without an extension: `CON`, `aux.txt`, `COM1.tar.gz`.
-_DEVICE = re.compile(r"(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])")
 _FORBIDDEN = frozenset('<>"|?*')
 _NOT_A_PROJECT = "Not a Muro project file"
+# How long `replace_file` tries again, on Windows, while another program holds one of its files (the waits, in
+# seconds): an antivirus scan, a sync client, a reader of the project list. Elsewhere a refusal is not a passing one.
+_REPLACE_DELAYS = (0.1, 0.2, 0.4, 0.8, 1.0, 1.0, 1.0) if os.name == "nt" else ()
 
 
 class _Member(NamedTuple):
@@ -89,7 +99,7 @@ def _unsafe_name(name: str) -> str | None:
             return "colon in a name"
         if part.endswith((".", " ")):
             return "name ends in a dot or a space"
-        if _DEVICE.fullmatch(part.split(".", 1)[0]):
+        if is_device_name(part):
             return "a device name on Windows"
     return None
 
@@ -98,6 +108,33 @@ def _check_name(name: str) -> None:
     reason = _unsafe_name(name)
     if reason:
         raise ValueError(f"Unsafe member in the project file: {name!r} ({reason})")
+
+
+def _in_layout(name: str) -> bool:
+    """Whether a member name is in the format's layout: a package file at the top, or under one of its folders."""
+    parts = name.rstrip("/").split("/")
+    if len(parts) == 1 and not name.endswith("/"):
+        return parts[0] in _PACKAGE_FILES
+    return parts[0] in _LAYOUT_FOLDERS
+
+
+def _check_layout(name: str) -> None:
+    if not _in_layout(name):
+        folders = ", ".join(f"{folder}/" for folder in _LAYOUT_FOLDERS)
+        raise ValueError(f"Unsafe member in the project file: {name!r} (not part of a Muro project: its top level "
+                         f"holds only {', '.join(_PACKAGE_FILES)} and the folders {folders})")
+
+
+def replace_file(source: Path, target: Path) -> None:
+    """`os.replace`, tried again for a few seconds on Windows while another program holds one of the files open
+    without letting it be replaced (`_REPLACE_DELAYS`); then its error is the error."""
+    for delay in _REPLACE_DELAYS:
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            time.sleep(delay)
+    os.replace(source, target)
 
 
 def _check_limits(count: int, size: int) -> None:
@@ -148,7 +185,7 @@ def _open(handle) -> zipfile.ZipFile:
 
 
 def _plan(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
-    """The members to write, every one checked before anything is written."""
+    """The members to write, every one checked before anything is written: its name, its kind, then the layout."""
     infos = archive.infolist()
     _check_limits(len(infos), sum(info.file_size for info in infos))
     seen: set[str] = set()
@@ -165,7 +202,10 @@ def _plan(archive: zipfile.ZipFile) -> list[zipfile.ZipInfo]:
         if key in seen:
             raise ValueError(f"Member {info.filename!r} appears twice in the project file")
         seen.add(key)
-    return infos[1:]                                    # the mimetype is the container's, not a file of the project
+    members = infos[1:]                                 # the mimetype is the container's, not a file of the project
+    for info in members:
+        _check_layout(info.filename)
+    return members
 
 
 def _extract(handle, out: Path) -> Path:
@@ -319,6 +359,25 @@ def _file_rows(identity: dict[str, Any], meta: dict[str, Any], *, inputs: int, d
     return [{"part": part, "path": path, "detail": detail} for part, path, detail in rows]
 
 
+def _instruction_texts(folder: Path) -> list[dict[str, str]]:
+    """The owner's custom instruction files as the project holds them, `[{path, text}]`, `path` relative to
+    `custom-instructions/`: what the page shows and edits. Markdown only, as the factory reads them; a file that
+    is not UTF-8 is refused like any other member that is not what its name says."""
+    root = folder / CUSTOM_INSTRUCTIONS
+    if not root.is_dir():
+        return []
+    shown = []
+    for relative, path in _walk(root):
+        if not relative.lower().endswith(".md"):
+            continue
+        try:
+            text = path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"{CUSTOM_INSTRUCTIONS}/{relative} is not UTF-8 text") from exc
+        shown.append({"path": relative, "text": text})
+    return shown
+
+
 def info(mp: Path, cache_root: Path) -> dict[str, Any]:
     """Everything the project page shows of a project file, read through `cached` (unpacked once per content).
 
@@ -374,6 +433,7 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
         "history": runs,
         "changelog": changelog,
         "prompts": [{"file": name, "text": (prompts_folder / name).read_text(encoding="utf-8")} for name in PROMPT_FILES],
+        "instructions": _instruction_texts(folder),
         "graph": {"entries": entries, "capabilities": data["capabilities"], "examples": data["examples"]},
         "files": _file_rows(
             plugin, meta, inputs=len(sources), decisions=len(decisions), capabilities=len(data["capabilities"]),
@@ -504,6 +564,9 @@ def _project_json_errors(data: Any, slug: str) -> str | None:
                       ("changed", str), ("builtin", bool)):
         if type(data.get(key)) is not kind:
             return f"{key} must be {kind.__name__}"
+    # the name is shown in every list and enters the AI's prompt: one line, as a person types it
+    if len(data["name"]) > MAX_FIELD or any(ord(char) < 32 or ord(char) == 127 for char in data["name"]):
+        return f"name must be one line of at most {MAX_FIELD} characters"
     if type(data.get("schema")) is not int or data["schema"] != 1:
         return "schema must be 1"
     if not isinstance(slug, str) or not SLUG_PATTERN.fullmatch(slug):
@@ -753,12 +816,13 @@ def pack(package_dir: Path, out: Path, *, sources_cache: Path | None = None,
         _add_tree(members, built, f"release/{built.name}/")
     for name in members:
         _check_name(name)
+        _check_layout(name)
     _check_limits(len(members) + 1, len(MIMETYPE) + sum(_size(member) for member in members.values()))
     out.parent.mkdir(parents=True, exist_ok=True)
     temporary = out.parent / f".{out.name}.{secrets.token_hex(4)}.tmp"
     try:
         _write(temporary, members)
-        os.replace(temporary, out)
+        replace_file(temporary, out)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise

@@ -29,6 +29,16 @@ impl Factory {
         Ok(Self { python, root })
     }
 
+    /// The Python executable the factory runs with.
+    pub fn python(&self) -> &str {
+        &self.python
+    }
+
+    /// The factory's folder: the one that holds `muro_build.py`.
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// The Python executable and the arguments that start `muro_build.py` with `args`: the factory's
     /// launcher, which also answers the subcommands (`project ...`, `mcp`). Python runs in UTF-8
     /// mode, whatever the machine's locale: the factory prints JSON with its own characters.
