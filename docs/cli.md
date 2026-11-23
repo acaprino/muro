@@ -357,6 +357,8 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
 
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
+(Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below.)
+
 The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
 everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
 (`application/vnd.muro.project+zip`). The other members:
@@ -412,6 +414,7 @@ shows:
 | `decisions` | the decisions of `delivery.json` as they are (empty without one) |
 | `records`, `history`, `changelog` | `records.json`'s records, `history.json`'s runs, `CHANGELOG.md` as text |
 | `prompts` | `[{file, text}]`: `intake.md`, `harmonizer.md`, `delivery.md` and `classify.md`, the package's own folder or else the factory's (`prompts_dir`, as the build resolves them) |
+| `instructions` | `[{path, text}]`: the owner's Markdown files under `custom-instructions/`, `path` relative to it, the text as written (a file that is not UTF-8 is refused) |
 | `graph` | `{entries, capabilities, examples}`: `entries` are the discovery entries `{name, description, capabilities}` (the description as a host reads it, with the sentence naming what the entry absorbs; empty without `entries.json`); `capabilities` and `examples` are the release guide's own data (`muro.guide.guide_data`: each capability with its title, body, intents, needs, conflicts, outputs, checks and check scope, and each example resolved to its steps), computed on the package as the file holds it, not on a release it may carry |
 | `files` | `[{part, path, detail}]`: the list "What this project file holds", with the project's own counts |
 | `digest` | the SHA-256 of the file |
@@ -434,6 +437,43 @@ muro project pack --manifest examples/marionette/sources.json --out marionette.m
   --sources-cache ~/.cache/muro-sources --release /tmp/stage
 muro project info marionette.mp
 ```
+
+### `muro project new` / `edit` / `commit`
+
+Writing a project ([ADR-0032](adr/ADR-0032-desktop-projects-write-side.md)). Python packs, records and guards; what the
+package means is the host AI's, which writes it between `new` (or `unpack`) and `commit`.
+
+```sh
+muro project new DIR --name N --slug S --author A [--version 0.1.0] [--repository URL [--branch B] [--tag-prefix P]]
+muro project edit FILE.mp --expect-digest SHA256 [--name N] [--author A] [--repository URL [--branch B] [--tag-prefix P] | --no-repository] [--records FILE.json] [--changelog FILE.md]
+muro project commit DIR --out FILE.mp (--expect-digest SHA256 | --create) --operation TEXT [--step patch|minor|major|none] [--summary FILE.md] [--engine E] [--budget USD]
+```
+
+`new` writes a new project's work folder (new or empty): `project.json` (schema 1, `builtin` false, `created` and `changed`
+now, in UTC), an empty `records.json`, `history.json` and `CHANGELOG.md`. It writes no package: `sources.json`, the
+capabilities, the router and the rest are the host AI's (intake and harmonization). It prints the folder.
+
+`edit` changes what a person owns, with no AI and no network: the name, the author and the repository of `project.json`
+(`changed` moves), every record of `records.json` (`{records: [...]}` or a bare list; each `{id, date, subjects, text, author:
+muro|you, binding}`, an id of letters, digits, `.`, `_` or `-`, unique, a real `YYYY-MM-DD` date, a nonempty text of at most
+20,000 characters) and the text of `CHANGELOG.md` (at most 1 MiB). The file is unpacked, changed and packed again with its own
+copies of the inputs (they fill a sources cache of the edit's own, stamped for each source as `sources.json` declares it) and
+its own release, which the package, unchanged, still matches. It is replaced only while it still has `--expect-digest`;
+otherwise "The project file changed since it was opened: open it again and repeat the change". Prints `{path, digest}`.
+
+`commit` turns a work folder into the project file, after the AI changed an unpacked project (`--expect-digest` of the file it
+was unpacked from) or wrote a new one (`--create`: refused where a file is). It refuses a folder without `sources.json` or
+`project.json`, and a plugin id that changed. The version moves by `--step` from the file's (default `patch`; a new project
+keeps its own). It builds the package with `build_release` (identity, catalog, router, delivery, prompts, intake goals,
+entries, the license and coverage gates of every source, every adapter), then appends the run to `history.json` (`{id:
+<slug>-v<version>, time, version, status: completed, budget_usd, engine, operation, pins: {source id: commit}, changelog}`), sets
+`project.json`'s version and `changed`, puts a new entry on top of `CHANGELOG.md` (`# <name> <version>`, the `--summary` text,
+then the mechanical differences as a list: inputs added, removed or moved, capabilities added or removed, instruction files
+added, changed or removed, and the catalog's size), packs the folder with that release and replaces the file under the same
+digest guard. An input the old file already carried at the same pin and selection is taken from its copy, not fetched. Nothing
+is written to `--out` unless all of it succeeds. Prints `{path, digest, version, run}`.
+
+All three exit `0` on success and `1` with the reason on stderr (`Project new|edit|commit failed: ...`).
 
 ### `muro project simulate` / `simulate-prepare` / `simulate-check`
 

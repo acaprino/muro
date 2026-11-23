@@ -276,3 +276,16 @@ for the native window. It names what is lost (the ONI look, `imago-check`),
 the consequence for `develop` (no Sync page until the follow-up plans port it,
 and no merge into `main` meanwhile) and what was not verified. Proposed: the
 decision is the owner's; the explanatory text is not separately approved.
+
+## Desktop projects, write side
+
+Manual note outside the generated index: [ADR-0032 — Projects are made and
+changed in the desktop app](ADR-0032-desktop-projects-write-side.md) records the
+owner's requirement of 2026-11-21 ("è fondamentale poterli creare gestire
+aggiornare editare") and its implementation, the third plan of ADR-0028: a
+change of a package is an AI run of Claude Code committed by the factory under a
+digest guard, and the details, records and changelog are edited offline. It was
+written on a side branch as ADR-0030 and renumbered when its factory commands and
+runtime actions were taken over on 2026-11-23; its screens were written for the
+Imago window and are rewritten in React (ADR-0031). Proposed: the decisions are
+implementation choices, not separately approved.

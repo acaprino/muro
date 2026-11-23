@@ -752,8 +752,8 @@ def test_the_default_cache_root_is_per_user(monkeypatch, tmp_path):
 
 # --- info: everything the project page shows ---------------------------------------------------------
 
-INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "graph", "files",
-             "digest"}
+INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "instructions",
+             "graph", "files", "digest"}
 FILE_PARTS = ["Identity", "Author and dates", "Repository", "Inputs", "Choices", "Result", "Your instructions", "History",
               "Changelog", "Decision records", "Input copies", "Built plugin"]
 RUN = {"id": "run-1", "time": "2026-11-12T10:00:00Z", "version": "0.1.0", "status": "completed", "budget_usd": None,
@@ -804,6 +804,8 @@ def test_info_has_everything_the_project_page_shows(tmp_path, described, cache):
     assert result["history"] == [RUN]
     assert result["changelog"] == "# Changelog\n"
     assert result["decisions"] == json.loads((described / "delivery.json").read_text(encoding="utf-8"))["decisions"]
+    # the owner's instruction files whole, for the page to show and edit (the CRLF is kept: they are bytes the owner wrote)
+    assert result["instructions"] == [{"path": "rules.md", "text": "Owner rules\r\nwith CRLF kept\r\n"}]
 
 
 def test_info_of_a_package_without_delivery_choices_has_none(tmp_path, package, cache):

@@ -319,6 +319,25 @@ def _file_rows(identity: dict[str, Any], meta: dict[str, Any], *, inputs: int, d
     return [{"part": part, "path": path, "detail": detail} for part, path, detail in rows]
 
 
+def _instruction_texts(folder: Path) -> list[dict[str, str]]:
+    """The owner's custom instruction files as the project holds them, `[{path, text}]`, `path` relative to
+    `custom-instructions/`: what the page shows and edits. Markdown only, as the factory reads them; a file that
+    is not UTF-8 is refused like any other member that is not what its name says."""
+    root = folder / CUSTOM_INSTRUCTIONS
+    if not root.is_dir():
+        return []
+    shown = []
+    for relative, path in _walk(root):
+        if not relative.lower().endswith(".md"):
+            continue
+        try:
+            text = path.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ValueError(f"{CUSTOM_INSTRUCTIONS}/{relative} is not UTF-8 text") from exc
+        shown.append({"path": relative, "text": text})
+    return shown
+
+
 def info(mp: Path, cache_root: Path) -> dict[str, Any]:
     """Everything the project page shows of a project file, read through `cached` (unpacked once per content).
 
@@ -374,6 +393,7 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
         "history": runs,
         "changelog": changelog,
         "prompts": [{"file": name, "text": (prompts_folder / name).read_text(encoding="utf-8")} for name in PROMPT_FILES],
+        "instructions": _instruction_texts(folder),
         "graph": {"entries": entries, "capabilities": data["capabilities"], "examples": data["examples"]},
         "files": _file_rows(
             plugin, meta, inputs=len(sources), decisions=len(decisions), capabilities=len(data["capabilities"]),

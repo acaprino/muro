@@ -146,6 +146,23 @@ fn pick_file(app: &tauri::AppHandle, payload: &Value) -> anyhow::Result<Value> {
     Ok(json!({"path":path.to_string_lossy()}))
 }
 
+/// The native folder dialog, over the main window: where a new project is saved, or a folder an input
+/// comes from. It answers `{path}`: the chosen folder, or null when the dialog was closed without one.
+fn pick_folder(app: &tauri::AppHandle) -> anyhow::Result<Value> {
+    let mut dialog = app.dialog().file();
+    if let Some(window) = app.get_webview_window("main") {
+        dialog = dialog.set_parent(&window);
+    }
+    // Blocks until the dialog closes: this runs on a blocking thread, never on the window's.
+    let Some(picked) = dialog.blocking_pick_folder() else {
+        return Ok(json!({"path":Value::Null}));
+    };
+    let path = picked.into_path().map_err(|error| {
+        anyhow::anyhow!("The chosen folder is not a path on this computer: {error}")
+    })?;
+    Ok(json!({"path":path.to_string_lossy()}))
+}
+
 #[tauri::command]
 async fn request(
     app: tauri::AppHandle,
@@ -157,6 +174,7 @@ async fn request(
     tauri::async_runtime::spawn_blocking(move || {
         let answer = match action.as_str() {
             "pick_file" => pick_file(&app, &payload),
+            "pick_folder" => pick_folder(&app),
             _ => backend.request(&action, payload),
         };
         answer.map_err(|e| format!("{e:#}"))
