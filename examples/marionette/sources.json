@@ -3,9 +3,9 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
+    "description": "Use when building websites and landing pages, UI/UX, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, setting or reviewing a layout in code for narrow, mobile, translated and RTL viewports, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, auditing a repository, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking HTML explainers; humanizing prose; paper search; or steering TokenEconomizer.",
     "replaces": [
       "landing-page-design",
       "figma-designer",
@@ -67,7 +67,8 @@
       "export-design-tokens",
       "enforce-design",
       "text-humanizer",
-      "humanize"
+      "humanize",
+      "better-layout"
     ]
   },
   "stack": {
@@ -1028,6 +1029,47 @@
         "README.md",
         ".claude-plugin/plugin.json"
       ]
+    },
+    {
+      "id": "better-layout",
+      "repo_url": "https://github.com/jakubkrehel/skills",
+      "commit": "672ae44ace6aaed65b86cbb1e2fd6fbea0e79578",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Jakub Krehel",
+      "selected_paths": [
+        "skills/better-layout/SKILL.md",
+        "skills/better-layout/grouping-and-alignment.md",
+        "skills/better-layout/spacing-and-adaptivity.md",
+        "skills/better-layout/reporting.md",
+        "LICENSE"
+      ],
+      "excluded_paths": [
+        "skills/better-layout/agents/**",
+        "skills/afk/**",
+        "skills/better-accessibility/**",
+        "skills/better-colors/**",
+        "skills/better-interface/**",
+        "skills/better-motion/**",
+        "skills/better-typography/**",
+        "skills/better-ui/**",
+        "skills/better-writing/**",
+        "skills/break/**",
+        "skills/build-design/**",
+        "skills/explain-interface/**",
+        "skills/interface-review/**",
+        "skills/state-machine/**",
+        "skills/upskill/**",
+        "skills/variant/**",
+        ".claude-plugin/**",
+        "opencode.json",
+        "AGENTS.md",
+        "CLAUDE.md"
+      ],
+      "runtime_deps": [],
+      "intake": {
+        "goal": "Understand the layout skill: grouping and alignment, reading order, progressive disclosure, content-driven breakpoints, container queries, safe areas, full-bleed content, RTL and logical properties, growth for translated text, and its review report. Identify every task outcome it supports (building or restructuring a layout, and reviewing code for layout problems) and compare with the existing catalog (responsive data in a DESIGN.md, design review, design guidance, visual direction): justify one owner per output, stages or alternatives from the source evidence; do not preassign the destination by name or source order. The upstream has no release or tag, so the pin follows its head. The skill defers hit areas, polish, line length and its orchestrated review to sibling skills of the same repository: read what those hand-offs need to be carried and decide from the evidence whether the siblings are covered by the existing catalog or must be selected, recording the reading in `dropped` decisions or `omissions`; never tell the host that part of the source is not packaged. A vendored, unmodified copy of these skills exists in boraoztunc/skills; the original upstream is the source of this pin."
+      }
     }
   ]
 }

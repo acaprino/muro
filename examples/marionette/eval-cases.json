@@ -1602,6 +1602,60 @@
         ]
       },
       "why": "The user explicitly requests discovery and retrieval before the single interactive article: search and fetch are separate catalog intents."
+    },
+    {
+      "id": "bl-fix-mobile-layout",
+      "task": "Il layout di checkout.tsx si rompe a 320px e con i testi in tedesco: sistemalo nel codice, senza cambiare colori e font.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "layout-structure"
+        ],
+        "selections": [
+          {
+            "capability": "layout-structure",
+            "intent": "ui.layout-structure"
+          }
+        ]
+      },
+      "why": "Setting a layout right in code for narrow viewports and longer text is layout structure; nothing records data in a design file and no accessibility audit is asked."
+    },
+    {
+      "id": "bl-layout-review-report-only",
+      "task": "Controlla il layout di Pricing.tsx (overflow, RTL, testi lunghi) e dammi i problemi con la gravità. Non modificare niente.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "layout-structure"
+        ],
+        "selections": [
+          {
+            "capability": "layout-structure",
+            "intent": "ui.layout-review"
+          }
+        ]
+      },
+      "why": "A report without edits is the review intent of the same capability; it is not the accessibility or polish pass of design-review and not a logic review of the change."
+    },
+    {
+      "id": "bl-responsive-limits-stay-design-file",
+      "task": "Nel DESIGN.md aggiorna i limiti responsive: breakpoint a 600 e 960 px, sidebar a icone sotto i 960, e il comportamento della navigazione a ciascuno.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-file"
+        ],
+        "selections": [
+          {
+            "capability": "design-file",
+            "intent": "design-file.update"
+          }
+        ]
+      },
+      "why": "The responsive limits are data of the design file; layout-structure builds or reviews layout in code and does not write the file."
     }
   ]
 }
