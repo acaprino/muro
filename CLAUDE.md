@@ -1,9 +1,7 @@
 @AGENTS.md
 
-For UI work, apply the design file and inspect the project files it references.
-Run npx imago-check before you say UI work is done.
-
-@node_modules/@acaprino/imago/docs/design-file.md
+For UI work, read node_modules/@acaprino/sigrid/AGENTS.md and DESIGN.md, apply them and inspect the project files they reference.
+Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done (see "Desktop UI ownership" in AGENTS.md and ADR-0031).
 
 
 Never run `cargo` (build, test, clippy, check, run, doc), `tauri dev` or `tauri build` on this machine: Rust is built and tested on GitHub Actions only. See "Rust is built and tested on GitHub only" in AGENTS.md.

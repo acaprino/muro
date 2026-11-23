@@ -1,8 +1,12 @@
 # Muro desktop: harness manager, plugin sync and updater
 
-The desktop interface and Windows frame use Imago. Appearance offers Smooth and
-ONI, with System/Light/Dark themes. See [Imago migration](imago-migration.md) for
-component ownership, the paired development dependency and the integration gate.
+The desktop interface is a React app on Sigrid (`@acaprino/sigrid`) and its Windows frame is the Rust crate
+`imago-shell` ([ADR-0031](adr/ADR-0031-desktop-on-sigrid.md), owner decision of 2026-11-23). The window is
+being replaced in place: the pages and the screenshots described below are those of the Imago window, which
+each page of the new one replaces as it is ported. From the commit that mounts the React window until Sync,
+Activity, Settings and the first run are ported, the window has no Sync page; the tray, the background worker
+and the registry keep working. See
+[Imago migration](imago-migration.md) for what the old window took from Imago, kept as history.
 
 The desktop app is one window with four tabs, **Projects**, **Sync**, **Activity** and **Settings**. Projects is where a plugin is made and read; Sync is where plugins reach the harnesses ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md)). The window opens on Sync. Until Muro manages a harness, three steps take the place of the tabs (the first run). The README shows the pages with demo data.
 

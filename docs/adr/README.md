@@ -265,3 +265,14 @@ with it and is registered by the generated plugin, declared once in
 `delivery.json` and written by each adapter in its host's form. Proposed: the
 owner approved the design before the code; the explanatory text is not
 separately approved.
+
+## Desktop on Sigrid
+
+Manual note outside the generated index: [ADR-0031 — The desktop window moves
+from Imago to React on Sigrid](ADR-0031-desktop-on-sigrid.md) records the
+owner's decision of 2026-11-23 that the window is a React app on
+`@acaprino/sigrid`, replacing the Imago window in place, with `imago-shell` kept
+for the native window. It names what is lost (the ONI look, `imago-check`),
+the consequence for `develop` (no Sync page until the follow-up plans port it,
+and no merge into `main` meanwhile) and what was not verified. Proposed: the
+decision is the owner's; the explanatory text is not separately approved.

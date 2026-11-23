@@ -2,23 +2,36 @@
 
 ## Desktop UI ownership
 
-Desktop UI and native window primitives come from `@acaprino/imago` and
-`imago-shell`. Extend Imago for every component, layout, style and UI behaviour,
-including the graph renderer and layout. Muro owns only domain data, operations
-and screen composition; no private components, SVG renderer or CSS rules belong
-here. Keep the shell body stable across renders while a modal is open.
+The desktop UI is React on `@acaprino/sigrid` (owner decision of 2026-11-23,
+ADR-0031). Every component, layout, style and UI behaviour comes from Sigrid,
+the graph canvas included. Muro owns only domain data, operations and screen
+composition; it keeps no design system of its own: no components that restyle
+or repeat Sigrid's, no CSS rules beyond the Tailwind entry, no literal colours
+or sizes. What Sigrid lacks is asked of Sigrid. Keep the shell body stable
+across renders while a modal is open.
 
-Before UI work, read node_modules/@acaprino/imago/docs/design-file.md and the component or style files it references.
-Apply its tokens and confirmed design choices within the requested scope.
-Use the package's im- classes and --im- tokens. Build a control of your own from the tokens, never from literal colours or sizes.
-Report conflicts and keep unresolved choices explicit.
-Run npx imago-check before you say UI work is done.
+Sigrid is not on npm. `package.json` names its GitHub Release tarball,
+`https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
+(first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
+in `docs/verification/`. Never a `file:` path to a checkout, and never a git
+dependency that runs `prepare`. `package.json` changes in the commit that
+installs it; until then it still names Imago.
 
-Keep the npm and the Rust pins of Imago the same (`imago-check` reports a
-difference): a commit of Imago's `develop` while Muro waits for a release, the
-tag `v<x>` for a release of Muro, in `package.json`, `Cargo.toml` and both
-lockfiles (using-imago.md, section 1). `docs/imago-migration.md` records what
-Muro takes from Imago.
+Native window primitives (glass and native theme, caption controls, navigation
+guard) stay with the Rust crate `imago-shell`, pinned in
+`apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`, until the owner moves
+them. It is the only Imago pin left: there is no npm pin to keep equal to it.
+`docs/imago-migration.md` is the history of what Muro took from Imago.
+
+Before UI work, read `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
+(they ship in the package; `agents/catalog.json` lists every component and its
+props) and the component or style files they reference. Apply its tokens and
+confirmed design choices within the requested scope. Use its components and
+tokens. Build a control of your own from the tokens, never from literal colours
+or sizes. Report conflicts and keep unresolved choices explicit.
+Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done: it
+reads files and builds nothing. It needs the Sigrid package installed, and no CI
+step runs it yet (ADR-0031); where it was not run, say so.
 
 ## Product contract
 
