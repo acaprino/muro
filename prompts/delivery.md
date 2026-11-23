@@ -273,9 +273,18 @@ keep their meaning, and `mcp-server` is still a server the source ships.
   from the pinned source. A tool description is loaded in every session and a
   direct call opens no capability, so it keeps the source's words. They change
   only when two tools would share a name, and you record that collision in the
-  decision's reason (ADR-0017). The server compares the declared schema with the
-  child's own at the first call. The saving of a package server is therefore in
+  decision's reason (ADR-0017). The saving of a package server is therefore in
   the tools it leaves out, not in shorter descriptions.
+  At the first call the server compares the declared schema with the child's own
+  `inputSchema`, key for key and value for value: a difference of any size
+  makes every call of that tool answer an error naming it. So copy the schema
+  as the child's own `tools/list` gives it, from a recorded listing where one
+  exists, and never translate it by hand from the source's schema library.
+  Harmonization starts no server. Where no listing is recorded, write the schema
+  the server's source code builds, say in the decision's reason that it was
+  not checked against a running server, and expect the first call of a tool
+  whose schema differs to answer an error naming the tool: the verification run
+  after the build is where it is caught.
 - A `run` tool's name matches `[a-z][a-z0-9_]{0,39}`. It has an argv template: a
   list whose items are literal strings, placeholders `{param}` that are a whole
   item, and conditional groups `{"if": "<param>", "args": [...]}` or

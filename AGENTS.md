@@ -297,8 +297,9 @@ installation, publication or replacement of existing dist output without request
   a source ships a server the Harmonizer AI shows the owner the evidence and
   asks, and never proceeds on its own choice; with no owner to ask it writes no
   `package_server`. Every caller checks the shape; only `build` refuses a
-  package server whose answer is missing, was given on another commit of a
-  serving source, or does not show every tool it declares. One generic program
+  package server whose answer is missing, does not cover a source its tools or
+  children use, was given on another commit of a serving source, or does not
+  show every tool it declares. One generic program
   serves any declaration (`python muro.py tools-server`, reading
   `package-server.json`), and Python never chooses a tool, a child or the
   number of servers. Only Claude Code registers it for now: every other host

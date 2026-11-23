@@ -506,8 +506,9 @@ lost if it was wrong.
 1. **A `run` tool's schema may carry `description`**, at the top level and on each
    property, and a property may carry `allow_leading_dash`. The implementation
    plan said any other key is an error, which would have removed the argument text
-   a model needs, and the design is silent on it. Only `type`, `required` and
-   `enum` are enforced; any other key is refused.
+   a model needs, and the design is silent on it. At a call the server enforces
+   `type`, `required` and `enum`. `description` is allowed and not enforced.
+   `allow_leading_dash` is read by rule 4. Any other key is refused at validation.
 2. **A placeholder inside a group names the group's own `if` property or a
    required property.** Rule 2 of the design spoke only of a placeholder outside a
    group, and the plan left the case open. A declaration error should surface at
@@ -538,7 +539,8 @@ lost if it was wrong.
    initialization completes. A command or child waits up to 5 seconds for the
    answer, then works where the server does.
 7. **A program is resolved on `PATH` only, never in the working directory.** One
-   resolver serves run tools, child servers and `taskkill`. `shutil.which` searches
+   resolver serves run tools and child servers; `kill_tree` starts `taskkill` by its
+   path in System32 and does not go through it. `shutil.which` searches
    the current directory first on Windows, and the working directory is the user's
    project: a planted `python.exe` or `node.exe` would run with the user's
    credentials. A user who keeps a program only in the project folder must put it
@@ -573,9 +575,16 @@ lost if it was wrong.
   start of a child and its first `tools/list` are limited, to 30 seconds, and a
   child that does not answer in time is given up with an error naming it. The
   "per-call timeout" of the risk table is the `run` tool's.
-- The first-call comparison covers the tool's presence and its `inputSchema`. A
-  changed description is not detected there. The gate asks the owner again when
-  the pinned commit of a serving source changes.
+- The first-call comparison covers the tool's presence and its `inputSchema`,
+  compared as equal dictionaries, key for key. A schema translated by hand fails
+  every call of that tool, so the delivery prompt says to copy it as the child's own
+  `tools/list` gives it. A changed description is not detected there. The gate asks
+  the owner again when the pinned commit of a serving source changes.
+- The check that a `run` tool's packaged paths lie under its source's folder and
+  exist in the release runs at build only (`packaged_path_errors`). The design's
+  section 4 listed it among the checks of every caller of `validate_delivery`.
+- The working directory of children and commands is the first `file://` root the
+  host names that is a directory; the design said "the first root".
 - The five rules apply to `run` tools. A forwarded call goes to the child as it
   came, and the child validates it.
 - Rule 4 is for strings. A negative number reaches the program as `-5`.
@@ -590,8 +599,9 @@ lost if it was wrong.
 - The design said `INSTALL.md` states that credentials in the inherited
   environment reach every tool of the server. The Claude Code note states it for
   commands: when the package server has a `run` tool it adds "A command one of its
-  tools runs inherits the environment of this session, credentials included." It
-  says nothing of a child server, which starts with the same environment.
+  tools runs inherits the environment of the server process, credentials included."
+  What the host hands the server was not verified. The note says nothing of a child
+  server, which starts with the same environment.
 - `GUIDE.html` shows a `package-tool` decision under its source like any other
   (a label was added, in English and Italian). It does not list the package
   server's tools.
@@ -624,5 +634,7 @@ file. Fixtures prove mechanics only.
 - `muro/delivery.py` (the hook trampoline) and `muro/installer.py` still resolve a
   program with `shutil.which`, which searches the working directory first on
   Windows. That is outside this change.
+- The environment variables that reach the server on Claude Code were not recorded,
+  nor the working directory it starts in.
 - That a permission rule saved for the old tool ids stops matching, as `INSTALL.md`
   says, was not verified on a host.

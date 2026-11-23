@@ -481,7 +481,7 @@ def test_install_notes_say_where_the_package_server_is_registered(portable_proje
         assert "MCP server `stub`" in note and "Their ids changed" not in note
 
 
-INHERITS = "A command one of its tools runs inherits the environment of this session, credentials included."
+INHERITS = "A command one of its tools runs inherits the environment of the server process, credentials included."
 
 
 def test_the_install_note_says_a_command_inherits_the_session_environment_when_a_tool_runs_one(portable_project, tmp_path):
@@ -553,7 +553,8 @@ def test_the_delivery_prompt_states_the_declaration():
     for phrase in ("## The package server", "keeps the child's name, description and input schema", "argv template",
                    "`package-tool`", "Only a server that declares tools alone may be a child",
                    "the source's rule as a declared default", "`server_choice`", "allow_leading_dash",
-                   "Never a key, a token or another secret",
+                   "Never a key, a token or another secret", "key for key",
+                   "as the child's own `tools/list` gives it", "not checked against a running server",
                    "get one `dropped` decision that lists them, with the owner's answer as its reason"):
         assert phrase in text, phrase
     output = text.split("\n## Output", 1)[1]
@@ -578,9 +579,12 @@ def test_the_contract_is_recorded():
 def test_the_documents_name_the_form_and_record_what_was_not_run():
     root = PROMPTS.parent
     assert "mcp-server, package-tool, dropped}" in (root / "docs/cli.md").read_text(encoding="utf-8")
-    assert "`mcp-server`, `package-tool` or `dropped`" in " ".join((root / "AGENTS.md").read_text(encoding="utf-8").split())
+    agents = " ".join((root / "AGENTS.md").read_text(encoding="utf-8").split())
+    assert "`mcp-server`, `package-tool` or `dropped`" in agents
+    assert "does not cover a source" in agents    # the gate's refusal for a source the answer never named
     adr = (root / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8")
     assert "## Amendment: implementation (2026-11-23)" in adr
     not_run = adr.split("## Not run", 1)[1]
-    for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which"):
+    for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which",
+                   "environment variables that reach the server"):
         assert phrase in not_run, phrase
