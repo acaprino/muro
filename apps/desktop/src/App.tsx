@@ -96,8 +96,11 @@ function AppFrame() {
   const harnessOpenChange = useCallback((open: boolean) => {
     setHarness(now => (now ? { ...now, open } : now));
     if (open) return;
-    // Once the frame has drawn it closed: back to its column, or, for a harness Muro no longer manages (its column is gone), to the content.
+    // Once the frame has drawn it closed: back to its column, or, for a harness Muro no longer manages (its column is gone), to the content. Only when the focus was lost
+    // with it (on the page's body, in the inspector, or in a question asked over it): a press elsewhere that closed the drawer keeps the focus it gave.
     setTimeout(() => {
+      const now = document.activeElement;
+      if (now && now !== document.body && !now.closest('[data-inspector-form], [role="dialog"], [role="alertdialog"]')) return;
       const back = harnessOpener.current;
       if (back?.isConnected) back.focus();
       else document.querySelector<HTMLElement>('main[data-slot="app-shell-content"]')?.focus();
