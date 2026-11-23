@@ -178,9 +178,8 @@ Activity page yet), saying whose it is, so it can be stopped from there. A reque
 goes (one that `muroctl` or another client started) makes the window read the runs again, and the card shows.
 
 **Cancel, and the saving phase.** A Cancel before the factory builds the project leaves the file as it was: between the steps
-of the run the card says *Job cancelled. The project file was not changed*, and during the agent's step *The AI run cancelled
-or exceeded …-minute deadline; inspect output.log. The project file was not changed* (the runtime cannot tell a Cancel from
-its limit, and says both). Once the factory has started to build and save the project (the phase *Building and saving the
+of the run the card says *Job cancelled. The project file was not changed*, and during the agent's step *The AI run was cancelled. The project file was not changed*. A run that reaches its limit (120 minutes for
+each step of a project run) ends failed and says *The AI run reached its limit of 120 minutes; see output.log*. Once the factory has started to build and save the project (the phase *Building and saving the
 project*) the runtime ignores a Cancel, because a build that replaces the file cannot be stopped half way: the card then
 shows no Cancel and says *The project is being saved: it cannot be cancelled now*. The run ends as it would have, with the
 file replaced or not.

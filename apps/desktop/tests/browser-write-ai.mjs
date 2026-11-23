@@ -184,7 +184,7 @@ await test('Cancel during the agent: the run is asked to stop and the card says 
   assert.equal(await button(page, 'Harmonize again…').isDisabled(), true, 'nothing else starts while it still goes');
   await finish(page, 'cancelled');
   // In the agent's step the runtime cannot tell a Cancel from its limit, and says both (the number of minutes is the runtime's).
-  await card(page).getByText(/^Harmonize again was cancelled: The AI run cancelled or exceeded \d+-minute deadline; inspect output\.log\. The project file was not changed$/).waitFor();
+  await card(page).getByText(/^Harmonize again was cancelled: The AI run was cancelled\. The project file was not changed$/).waitFor();
   await card(page).getByText('Cancelled', { exact: true }).waitFor();
   await until(() => button(page, 'Harmonize again…').isEnabled(), 'the changes come back');
   await versionShown(page, '0.5.0');

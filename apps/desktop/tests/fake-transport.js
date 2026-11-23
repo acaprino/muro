@@ -45,7 +45,7 @@
 //   behind.finish(status, message) ends the AI runs that go (status completed, failed, cancelled or interrupted; the message defaults to the runtime's own), behind.phase(text) says the phase they are in,
 //   behind.touch(id) writes a project's file (another window, a sync: the page's digest is stale), behind.digest(id) is the digest of its file now,
 //   behind.adapt(plugin, harness) starts an AI adaptation as another client would, and the page is not told: its next request is refused ("Another AI run is in progress").
-//   What a run says when it is cancelled depends on where it was, as the runtime's does: during the agent ("The AI run cancelled or exceeded <n>-minute deadline; inspect output.log. The project file was
+//   What a run says when it is cancelled depends on where it was, as the runtime's does: during the agent ("The AI run was cancelled. The project file was
 //   not changed", phase "AI intake and harmonization") and between the steps of the run ("Job cancelled. The project file was not changed").
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
 // installed outside the list), removals (an exclusive harness: one plugin to install, one outside the list to uninstall and one record whose files are gone,
@@ -441,8 +441,8 @@ export function createTransport(scenario = 'default') {
     const said = {
       completed: !project ? 'Adapter validated and added to registry; review a new sync plan to install' : created ? 'The project was created and added to your list. Install it from its Install step' : 'The project was saved. Install it again from its Install step to bring the change to the harnesses',
       failed: `${flags.runMessage || 'The AI run failed (exit code: 1); see output.log'}${project ? '. The project file was not changed' : ''}`,
-      // The runtime's own words: the agent's step says it was cancelled or timed out (it cannot tell which), the others that the job was cancelled.
-      cancelled: project ? (job.phase === AGENT_PHASE ? `The AI run cancelled or exceeded ${PROJECT_RUN_MINUTES}-minute deadline; inspect output.log. The project file was not changed` : 'Job cancelled. The project file was not changed') : 'Job cancelled',
+      // The runtime's own words: the agent's step says the AI run was cancelled, the others that the job was cancelled.
+      cancelled: project ? (job.phase === AGENT_PHASE ? 'The AI run was cancelled. The project file was not changed' : 'Job cancelled. The project file was not changed') : 'Job cancelled',
       interrupted: 'Previous desktop session ended; inspect log and retry. No automatic installation.',
     };
     if (status === 'completed') {
@@ -576,8 +576,9 @@ export function createTransport(scenario = 'default') {
   function cancelJob({ id }) {
     const job = jobs.find(j => j.id === id);
     if (!job) throw new Error('Job not found');
-    const saving = job.kind === 'project' && job.phase === SAVING_PHASE;   // the commit cannot be taken back half way: the runtime ignores a cancel from here on
-    if (!flags.cancelHolds && !saving) settle(job, 'cancelled');
+    // The commit cannot be taken back half way: from the saving phase on the runtime refuses a cancel, and the run ends by itself.
+    if (job.kind === 'project' && job.phase === SAVING_PHASE) throw new Error('The run is building and saving the project: it can no longer be cancelled, and it ends by itself');
+    if (!flags.cancelHolds) settle(job, 'cancelled');
     return { message: 'Cancellation requested; registry remains unchanged until validation completes' };
   }
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.

@@ -481,7 +481,7 @@ test('a cancelled run says it in the words of the phase it was in, and in the ph
   // During the agent: the runtime cannot tell a cancel from the limit, and says both.
   job = await cancel('AI intake and harmonization');
   assert.deepEqual([job.status, job.phase], ['cancelled', 'Finished']);
-  assert.match(job.message, /^The AI run cancelled or exceeded \d+-minute deadline; inspect output\.log\. The project file was not changed$/);
+  assert.match(job.message, /^The AI run was cancelled\. The project file was not changed$/);
   // While the project is built and saved the run goes on, and ends as it would have.
   const started: any = await fake.request('project_job', harmonize(fake));
   fake.behind.phase(SAVING_PHASE);

@@ -164,8 +164,8 @@ review's findings, and which of them this amendment answers, are in
   could report "not changed" for a file that was in fact replaced. The card
   shows no Cancel in that phase and says why. A cancel before it leaves the file
   as it was, with the runtime's own words for where the run was (between steps,
-  "Job cancelled"; during the agent, that it was cancelled or exceeded its
-  limit).
+  "Job cancelled"; during the agent, "The AI run was cancelled"; a run that
+  reaches its limit of 120 minutes ends failed and says so).
 - **The page (decision 7).** The card of a run that is not the page's own (the
   run of another project, an adaptation) is shown too, with its Cancel, because
   it is why no change is offered and the window has no Activity page; a refusal
