@@ -48,7 +48,9 @@ class PackageServer:
         self._send = send
         self._declaration = sections["package_server"]
         self._tools = {tool["name"]: tool for tool in self._declaration["tools"]}
-        self._entries = {s["name"]: s for s in sections["mcp_servers"] if isinstance(s, dict) and "name" in s}
+        servers = sections.get("mcp_servers")
+        self._entries = ({s["name"]: s for s in servers if isinstance(s, dict) and "name" in s}
+                         if isinstance(servers, list) else {})
         self._slots = {tool["forward"]["server"]: _Slot() for tool in self._tools.values() if "forward" in tool}
         self._lock = threading.Lock()  # guards _workers, _closed and every slot's server
         self._workers: set[threading.Thread] = set()
@@ -65,8 +67,7 @@ class PackageServer:
                 self._take_roots(message)
         elif msg_id is None:
             if method == "notifications/cancelled":
-                for server in self._servers(listed=True):
-                    server.cancel_all()
+                self._spawn(self._cancel)
             elif method == "notifications/initialized" and self._roots_wanted:
                 self._roots_deadline = time.monotonic() + ROOTS_WAIT
                 self._send({"jsonrpc": "2.0", "id": ROOTS_ID, "method": "roots/list"})
@@ -77,15 +78,30 @@ class PackageServer:
         elif method == "tools/list":
             self._send(result(msg_id, {"tools": [self._listed(tool) for tool in self._tools.values()]}))
         elif method == "tools/call":
-            worker = threading.Thread(target=self._work, args=(message,), name="package-server-call", daemon=True)
-            with self._lock:
-                self._workers.add(worker)
-            worker.start()
+            self._spawn(self._work, message)
         else:
             self._send(error(msg_id, METHOD_NOT_FOUND, f"Method not found: {method}"))
 
+    def _spawn(self, target: Callable[..., None], *args: Any) -> None:
+        """Run `target` off the read loop, which a write to a child that reads nothing could hold up."""
+        worker = threading.Thread(target=self._tracked, args=(target, *args), name="package-server-worker", daemon=True)
+        with self._lock:
+            self._workers.add(worker)
+        worker.start()
+
+    def _tracked(self, target: Callable[..., None], *args: Any) -> None:
+        try:
+            target(*args)
+        finally:
+            with self._lock:
+                self._workers.discard(threading.current_thread())
+
+    def _cancel(self) -> None:
+        for server in self._servers(listed=True):
+            server.cancel_all()
+
     def close(self) -> None:
-        """Stop every child, which wakes the calls waiting on one, and wait for those calls to answer."""
+        """Stop every child, which wakes the calls waiting on one, and wait for the calls and cancellations to end."""
         with self._lock:
             self._closed = True
             workers = list(self._workers)
@@ -138,8 +154,6 @@ class PackageServer:
         except Exception as exc:  # a call that raises must still be answered, or the host waits for it forever
             outcome = tool_result(f"{type(exc).__name__}: {exc}", True)
         self._send(result(message["id"], outcome))
-        with self._lock:
-            self._workers.discard(threading.current_thread())
 
     def _call(self, params: dict[str, Any]) -> dict[str, Any]:
         name = params.get("name")
@@ -208,9 +222,12 @@ class PackageServer:
         except ChildTimeout:
             self._drop(slot, server)
             raise ChildError(f"{child}: no answer after {START_WAIT:g} seconds at start") from None
-        except Exception:  # whatever the child sent, a half-started child must not stay registered
+        except ChildError:
             self._drop(slot, server)
             raise
+        except Exception as exc:  # whatever the child sent, a half-started child must not stay registered
+            self._drop(slot, server)
+            raise ChildError(f"{child}: cannot start ({type(exc).__name__}: {exc})") from None
 
 
 def _load(package: Path) -> tuple[dict[str, Any] | None, str]:

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from mcp_stub import STUB
+from mcp_stub import STUB, wait_until
 from muro import __version__, package_server
 from muro.adapters import _LAUNCHER
 from muro.delivery import PACKAGE_SERVER_ACTION, PACKAGE_SERVER_FILE, server_section_errors
@@ -306,8 +306,24 @@ def test_the_end_of_input_leaves_no_call_running(tmp_path):
         {"jsonrpc": "2.0", "id": 2, "method": "ping"}))
     out = io.StringIO()
     assert serve(package, io.StringIO(lines), out) == 0
-    assert not [t for t in threading.enumerate() if t.name == "package-server-call"]
+    assert not [t for t in threading.enumerate() if t.name == "package-server-worker"]
     assert '"id": 2' in out.getvalue()
+
+
+def test_a_cancellation_does_not_hold_up_the_read_loop(local):
+    peer = local(mode="deaf-after-list")
+    peer.call_request("echo", {"blob": "x" * 2_000_000})  # the child reads nothing: this write stays in flight
+    child = peer.server._slots["stub"]
+    wait_until(lambda: child.server is not None and child.server._write_lock.locked())
+    asked = []
+
+    def read_loop():  # what serve() does with the next two lines of input
+        peer.notify("notifications/cancelled", {"requestId": 1})
+        asked.append(peer.request("ping"))
+
+    threading.Thread(target=read_loop, daemon=True).start()
+    wait_until(lambda: asked)
+    assert peer.answer(asked[0])["result"] == {}
 
 
 def roots(peer, answer):
@@ -348,8 +364,10 @@ def test_a_child_that_does_not_start_in_time_is_given_up(local, monkeypatch, mod
         assert peer.call("echo") == tool_result("stub: no answer after 0.5 seconds at start", True)
 
 
-def test_a_child_whose_declaration_cannot_be_launched_is_named(local):
-    peer = local(entry={"name": "stub", "source": "demo"})
+@pytest.mark.parametrize("entry", [{"name": "stub", "source": "demo"}, {"name": "stub", "source": "demo", "run": [1]}],
+                         ids=["no run", "program that is not text"])
+def test_a_child_whose_declaration_cannot_be_launched_is_named(local, entry):
+    peer = local(entry=entry)
     result = peer.call("echo")
     assert result["isError"] is True and text_of(result).startswith("stub: ")
     assert peer.ask("ping")["result"] == {}

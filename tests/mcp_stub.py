@@ -115,6 +115,8 @@ for line in sys.stdin:
             reply(msg_id, page)
         else:
             reply(msg_id, {"tools": [{"name": "echo", "inputSchema": {"type": "object"}}]})
+        if mode == "deaf-after-list":
+            threading.Event().wait(20)  # busy: reads nothing for a while
     elif method == "tools/call" and mode == "orphans":
         sys.exit(0)  # stops without answering
     elif method == "tools/call" and mode == "dies-once" and not DIED.exists():
