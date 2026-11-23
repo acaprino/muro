@@ -178,7 +178,7 @@ export function DetailsDialog({ id, info, open, onOpenChange }: DetailsDialogPro
     >
       <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-4">
         <FormField label="Name" required error={fault(problems.name)}>
-          <Input name="name" autoComplete="off" value={form.name} onChange={e => change({ name: e.currentTarget.value })} />
+          <Input name="name" autoComplete="off" autoFocus value={form.name} onChange={e => change({ name: e.currentTarget.value })} />
         </FormField>
         <FormField label="Author" required error={fault(problems.author)}>
           <Input name="author" autoComplete="off" value={form.author} onChange={e => change({ author: e.currentTarget.value })} />

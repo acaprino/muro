@@ -305,7 +305,7 @@ test('a change is refused as the runtime refuses it, before any run starts, and 
   assert.equal((await fake.request('project', { id: 'marionette' }) as any).digest, digest);
   const refused = async (patch: Record<string, unknown>, said: RegExp | string) => {
     const attempt = fake.request('project_job', harmonize(fake, patch));
-    await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, said));
+    await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, { message: said }));
   };
   await refused({ operation: 'rename' }, /^Unknown change rename: it is one of harmonize, add_input, remove_input, move_pin, instructions$/);
   await refused({ id: 'nope' }, 'That project is not in your list');
@@ -343,8 +343,8 @@ test('one AI run goes at a time, an adaptation counts, and the project that is b
     ['project', 'running', 'marionette', 'harmonize', 'Harmonize again', 'Opening the project', 5, 'D:/Muro/data/projects/marionette.mp', 'number']);
   assert.match(started.log_path, /output\.log$/);
   const second = /^Another AI run is in progress \(Harmonize again\): wait for it to finish, or cancel it in Activity$/;
-  await assert.rejects(fake.request('project_job', harmonize(fake)), second);
-  await assert.rejects(fake.request('create_project', NEW_PROJECT), second);
+  await assert.rejects(fake.request('project_job', harmonize(fake)), { message: second });
+  await assert.rejects(fake.request('create_project', NEW_PROJECT), { message: second });
   await assert.rejects(fake.request('edit_project', { id: 'marionette', digest: fake.behind.digest('marionette'), name: 'X' }), { message: 'An AI run is changing this project: wait for it to finish' });
   assert.equal((await jobsOf(fake)).length, 1);
   fake.behind.finish();
@@ -476,7 +476,7 @@ test('a new project is refused before the run for what the runtime refuses, list
     [{ budget_usd: 0 }, /^The AI budget must be above 0 and at most 100 USD$/], [{ repository: { url: 'git@github.com:o/r' } }, /^The repository address must be an https:\/\/ address$/],
     [{ request: 'x'.repeat(4001) }, /^The request must be at most 4000 characters$/],
   ];
-  for (const [patch, said] of cases) await assert.rejects(fake.request('create_project', { ...NEW_PROJECT, ...patch }), said, JSON.stringify(patch));
+  for (const [patch, said] of cases) await assert.rejects(fake.request('create_project', { ...NEW_PROJECT, ...patch }), { message: said }, JSON.stringify(patch));
   // a file that is there is never written over, whatever the slashes and the case
   fake.flags.existingFiles = ['d:\\projects\\docs-kit.mp'];
   await assert.rejects(fake.request('create_project', NEW_PROJECT), { message: 'D:/Projects/docs-kit.mp already exists: choose another folder or plugin id' });
@@ -518,7 +518,7 @@ test('an edit by hand changes only what it names, on the digest the last write l
   const digest = second.digest;
   const refused = async (patch: Record<string, unknown>, said: string | RegExp) => {
     const attempt = fake.request('edit_project', { id: 'marionette', digest, ...patch });
-    await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, said));
+    await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, { message: said }));
   };
   await refused({}, 'Nothing to change');
   await refused({ name: 'two\nlines' }, /^The project name must be one line of at most 200 characters$/);
