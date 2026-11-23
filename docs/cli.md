@@ -283,6 +283,33 @@ claude -p "..." --mcp-config '{"mcpServers":{"muro":{"command":"python","args":[
 For Codex, declare the same `command`/`args` stdio server in its MCP
 configuration.
 
+### `python <package_root>/muro.py tools-server`
+
+Serves the package's declared tools over stdio; started by the host, not by a
+person. It is an action of the packaged launcher (`muro.py` at the root of a
+release and in each host's skill folder), not a subcommand of `muro`, and it
+has work to do only in a release whose `delivery.json` declares a
+`package_server` ([ADR-0033](adr/ADR-0033-package-mcp-server.md)). The adapter
+of a host that registers it writes this command as the server's entry; today
+that is Claude Code's `.mcp.json`.
+
+It reads `package-server.json` beside the launcher, which the build writes from
+the `package_server` and `mcp_servers` sections of `delivery.json`, and checks it
+with the function the build uses. A file that is missing, is not JSON or does
+not pass: it prints `package-server.json: <the first problem>` to stderr and
+exits `1`. Otherwise it answers `initialize`, `ping`, `tools/list` and
+`tools/call` until stdin closes (exit `0`), then stops its children and any
+running command.
+
+- `tools/list` is the declaration. Nothing is started to answer it.
+- A forwarded call starts the child server on its first call and keeps it for the
+  session. A `run` tool starts its command with the argv its template builds,
+  with no shell, no input, a timeout (120 seconds unless the tool declares one)
+  and its output cut at 100,000 characters.
+- When the host declares roots, the first `file://` root that is a directory is
+  the working directory of children and commands; otherwise the server's own.
+- A program is found on `PATH` and never in the working directory.
+
 ### `muro agent <intake|harmonize|review> [source-id] --model M [--api-base URL] [--api-key-env VAR] [--rounds N] [--manifest PATH]`
 
 Runs one AI-owned step through an OpenAI-compatible `/chat/completions`
@@ -408,7 +435,7 @@ shows:
 | --- | --- |
 | `project` | `project.json` as it is |
 | `plugin` | `{name, slug, version, description}` of `sources.json` |
-| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, mcp-server, dropped}` |
+| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, mcp-server, package-tool, dropped}` |
 | `decisions` | the decisions of `delivery.json` as they are (empty without one) |
 | `records`, `history`, `changelog` | `records.json`'s records, `history.json`'s runs, `CHANGELOG.md` as text |
 | `prompts` | `[{file, text}]`: `intake.md`, `harmonizer.md`, `delivery.md` and `classify.md`, the package's own folder or else the factory's (`prompts_dir`, as the build resolves them) |

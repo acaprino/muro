@@ -198,6 +198,14 @@ select the files it runs from and decide its delivery with the form `mcp-server`
 server the source only calls and does not ship is a runtime dependency of the
 capability that needs it. Either way `tools` names each operation a step calls.
 
+Record a source's command-line programs as evidence for harmonization,
+without choosing a form for them. For each program the methods run, note its
+commands, whether each is a read or write operation and what a write creates,
+changes, spends or sends, and which credentials it takes from the environment.
+Put it in the capability's `tools` and in `## Sources`. The capability keeps
+running the program as a command; whether a command also becomes a tool of a
+package server is decided at harmonization, with the owner.
+
 For each adopted hook use exactly `{event, action, tools, policy}`: a nonempty
 event/action description, an array of declared tool names and policy `manual`,
 `host-approved` or `active`. Describe the original trigger, changed files/external

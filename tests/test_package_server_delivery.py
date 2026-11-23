@@ -419,7 +419,7 @@ def test_a_release_without_a_package_server_writes_no_such_file(portable_project
 # --- The installed plugin end to end, and what INSTALL.md says ------------------------------------------------
 
 SCRIPT = "<package_root>/scripts/demo/tool.py"   # packaged by `scripted_project`: it prints its arguments as JSON
-LIVE = "the package server `pack` is registered only on hosts where it was run live (Claude Code)."
+LIVE = "the package server `pack` is registered only on Claude Code for now; this host is added after a live run on it."
 
 
 @pytest.fixture
@@ -512,3 +512,44 @@ def test_without_a_package_server_install_notes_are_what_they_were(portable_proj
     release = build(portable_project, tmp_path)
     for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
         assert "package server" not in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+
+
+# --- The contract in words: the prompts, the ADR and the documents ---------------------------------------------
+
+PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+
+
+def test_the_harmonizer_prompt_asks_the_owner_about_servers():
+    text = (PROMPTS / "harmonizer.md").read_text(encoding="utf-8")
+    for phrase in ("## Servers and tools", "ships an MCP server", "Never proceed on your own choice",
+                   "read from the pinned source files", "an estimate", "no server is started", "as two lists",
+                   "only when there is no recorded answer or the evidence changed",
+                   "With no owner to ask, write no `package_server`"):
+        assert phrase in text, phrase
+
+
+def test_the_delivery_prompt_states_the_declaration():
+    text = (PROMPTS / "delivery.md").read_text(encoding="utf-8")
+    for phrase in ("## The package server", "keeps the child's name, description and input schema", "argv template",
+                   "`package-tool`", "Only a server that declares tools alone may be a child",
+                   "the source's rule as a declared default", "`server_choice`", "allow_leading_dash",
+                   "Never a key, a token or another secret",
+                   "get one `dropped` decision that lists them, with the owner's answer as its reason"):
+        assert phrase in text, phrase
+    output = text.split("\n## Output", 1)[1]
+    assert "`package_server`" in output and "`server_choice`" in output and "package-tool" in output
+
+
+def test_the_intake_prompt_records_command_line_programs_as_evidence():
+    text = (PROMPTS / "intake.md").read_text(encoding="utf-8")
+    for phrase in ("command-line programs as evidence for harmonization", "read or write",
+                   "which credentials it takes from the environment", "without choosing a form"):
+        assert phrase in text, phrase
+
+
+def test_the_contract_is_recorded():
+    root = PROMPTS.parent
+    adr = (root / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8")
+    assert "adr_id: ADR-0033" in adr and "muro deve chiedere cosa fare di eventuali server mcp" in adr
+    assert "(ADR-0033)" in (root / "AGENTS.md").read_text(encoding="utf-8")
+    assert "tools-server" in (root / "docs/cli.md").read_text(encoding="utf-8")

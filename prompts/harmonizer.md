@@ -113,6 +113,54 @@ narrowed can justify the opposite. Every source keeps at least one decision, and
 a form with nothing behind it (always-on without text, a hook without a wiring)
 is rejected.
 
+## Servers and tools
+
+When a source of the package ships an MCP server (`delivery.json` declares an
+`mcp_servers` entry), the owner decides what the package does with its servers,
+and you ask before you write that part of `delivery.json`. A package whose
+sources ship no server is not asked, and nothing about it changes.
+
+Gather the evidence yourself. It is read from the pinned source files and the
+catalog, it is an estimate, and no server is started to get it. Show the owner:
+
+- each shipped server: its tools, what each does and what it sends off the
+  machine, the estimated weight of its tool list (the bytes of its `tools/list`
+  answer), which capabilities call which tools, the tools no capability calls,
+  and what the server declares besides tools (resources, prompts, an
+  `instructions` text);
+- tools of different servers, or a server's tool and a command, that do the
+  same thing: say for each pair whether it is merged or one is left out, with a
+  reason grounded in the sources;
+- each command-line program the methods run: its commands as two lists, those
+  that read and those that write, and the credentials it takes from the
+  environment.
+
+Ask with the host's question tool where it has one. The choice is between every
+server registered as it is (what a release does without a package server) and
+one package server named for the package. For the package server the owner also
+decides which tools it serves, which commands become tools, and whether any
+server stays registered beside it. Give your recommendation and the weight of
+each option. Never proceed on your own choice.
+
+Record the answer in `delivery.json` as `server_choice`: `asked_on` (a date),
+`answer` (the owner's own words) and `given_on`. You author `given_on`: `sources`
+maps each serving source to the commit the answer was given on, and `shown`
+lists the names of the tools and commands the owner was shown. The build
+refuses a package server whose answer does not cover every source its tools and
+children use at the commit now pinned, or does not show every tool it declares.
+The Delivery protocol, "The package server", says how to declare it.
+
+Ask again only when there is no recorded answer or the evidence changed: a
+serving source pinned at another commit, also when no tool changed (that is the
+cost of binding the answer to a commit), or a tool or command the answer did
+not show. Otherwise show the recorded answer and keep it. After a re-pin, copy
+the description and schema of each child's tool again from the new commit.
+
+With no owner to ask, write no `package_server`. An unattended run leaves the
+servers declared as intake left them and says in its notes that the question is
+open. Python checks the shape of the declaration and of the record; it never
+chooses a tool, a child or the number of servers.
+
 ## Step weight, replaced originals and eval cases
 
 Declare `resumable: true` on a capability whose step is long or asks the user

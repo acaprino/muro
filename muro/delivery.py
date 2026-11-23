@@ -605,12 +605,13 @@ _SERVER_CHANNELS = {
 
 
 def _package_server_note(declaration: dict[str, Any], host: str, absorbed: bool) -> str:
-    """Where the package server is registered: on the host it was run live on, and on no other."""
+    """Where the package server is registered: only on the hosts of PACKAGE_SERVER_HOSTS, and on no other."""
     name = declaration["name"]
     if host not in PACKAGE_SERVER_HOSTS:
         lead = "This host registers the absorbed servers as they are" if absorbed \
             else "This host registers no server of this package"
-        return f"{lead}: the package server `{name}` is registered only on hosts where it was run live (Claude Code)."
+        return (f"{lead}: the package server `{name}` is registered only on Claude Code for now; "
+                "this host is added after a live run on it.")
     children = ", ".join(f"`{child}`" for child in declaration["children"])
     served = (f"starts {children} itself, on the first call that needs it, and serves the tools this package declares"
               if children else "serves the commands this package declares")

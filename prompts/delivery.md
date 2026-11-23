@@ -48,6 +48,8 @@ every reference to it from the bodies. Decide per file and say why.
 - `mcp-server`: an MCP server the source ships, whose tools its procedures call.
   The release carries its files and registers it, so the tools exist as soon as
   the plugin is installed.
+- `package-tool`: a command of the source, served as a tool of the package
+  server (below), with the capabilities whose steps call it as `targets`.
 - `dropped`: not carried. Typical: the source's own routing between its skills,
   installing the source itself, marketing, a duplicate of what the catalog has.
 
@@ -219,6 +221,118 @@ host, say so in the reason and in the capability that sets the server up: two
 servers with the same tools offer every tool twice, and on some hosts a server
 the user configured under the same name wins over the plugin's.
 
+## The package server
+
+By default every absorbed server registers as itself. When the owner answered
+that the package has one server of its own (the harmonization prompt, "Servers
+and tools"), declare it. It is a declaration and not a form: the forms above
+keep their meaning, and `mcp-server` is still a server the source ships.
+
+```json
+"package_server": {
+  "name": "<server name>",
+  "children": ["<name of an mcp_servers entry>"],
+  "tools": [
+    {"name": "<the child's tool name>", "source": "<the child's source id>",
+     "forward": {"server": "<child name>", "tool": "<the child's tool name>"},
+     "description": "<the child's own description, copied>",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "<tool name>", "source": "<source id>",
+     "description": "<what the command does, in your words>",
+     "input_schema": {"type": "object",
+                      "properties": {"<param>": {"type": "string"}, "<flag>": {"type": "integer"}},
+                      "required": ["<param>"]},
+     "run": ["<program>", "<package_root>/scripts/<source id>/<path>", "<command>",
+             "--option", "{<param>}", {"if": "<flag>", "args": ["--limit", "{<flag>}"]}],
+     "timeout": 120, "env": {"<NAME>": "<package_root>/scripts/<source id>/<path>"},
+     "annotations": {"readOnlyHint": true}}
+  ]
+},
+"server_choice": {
+  "asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
+  "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<tool or command name>"]}
+}
+```
+
+- `name`: lowercase letters, digits and hyphens, starting with a letter; never
+  the name of a server that stays registered.
+- `children`: the `mcp_servers` entries the package server starts itself, on the
+  first call that needs one. A child is not registered on the host by itself; a
+  server not named here registers as before.
+  Only a server that declares tools alone may be a child: one that also offers
+  resources, prompts, an `instructions` text or requests of its own stays
+  registered separately, because the package server forwards tools only and no
+  part of a source is dropped without a decision. Python cannot see what a
+  server declares without starting it: you read it from the source.
+- A tool has `name`, `source`, `description` and `input_schema`, and exactly one
+  of `forward` and `run`. `annotations` is optional; `timeout` and `env` belong
+  to a `run` tool. A name is unique in the server and differs from the tools of
+  a server that stays registered (Python does not see those: you check it).
+- A forwarded tool keeps the child's name, description and input schema, copied
+  from the pinned source. A tool description is loaded in every session and a
+  direct call opens no capability, so it keeps the source's words. They change
+  only when two tools would share a name, and you record that collision in the
+  decision's reason (ADR-0017). The server compares the declared schema with the
+  child's own at the first call. The saving of a package server is therefore in
+  the tools it leaves out, not in shorter descriptions.
+- A `run` tool's name matches `[a-z][a-z0-9_]{0,39}`. It has an argv template: a
+  list whose items are literal strings, placeholders `{param}` that are a whole
+  item, and conditional groups `{"if": "<param>", "args": [...]}` or
+  `{"unless": "<param>", "args": [...]}`. A group is not nested; its `args` hold
+  literals and placeholders. The first item is a literal program found on the
+  host's `PATH`: never a placeholder, a `<package_root>` path or a `.cmd` or
+  `.bat` file. A packaged file is named with `<package_root>` and lies under
+  `scripts/<source id>/` of the tool's own source; the build refuses any other
+  path and one the release does not carry. There is no shell syntax: the server
+  starts the program with this argv. The source gives a command no tool
+  description: write it, and quote the source's rule in full where one applies
+  to that command.
+- Its `input_schema` is `{"type": "object", "properties": {...}, "required": [...]}`.
+  A property has a `type` of `string`, `integer`, `number` or `boolean`, and may
+  add `enum`, `description` and `allow_leading_dash`; the schema may carry a
+  `description`. Any other key is refused. The server applies five rules to
+  every call:
+  1. An argument not in the schema is refused. `type`, `required` and `enum`
+     are enforced, and nothing else of JSON Schema.
+  2. A placeholder outside a group names a required property. Inside a group it
+     names the group's own `if` property or a required one.
+  3. A string is passed as it is and a number in its JSON form. A boolean is
+     only a group's condition. An array or an object is refused.
+  4. A string that begins with `-` is refused, unless its property declares
+     `"allow_leading_dash": true` (a program may read any item that starts with
+     `--` as an option).
+  5. An `if` group is included when its argument was given and is not `false`;
+     an `unless` group when it was not given or is `false`.
+- Carry the source's rule as a declared default. Where the source prescribes
+  that a change is drafted or run dry first and applied only on the user's
+  approval, declare the write command with
+  `{"unless": "apply", "args": ["--dry-run"]}` (or the flag its program has for
+  it) and a boolean `apply` in the schema, and quote the source's sentence in
+  the description. That is the source's rule as data, not a limit the factory
+  adds.
+- `annotations` are MCP tool hints, authored from what the source says the
+  command does. They go to the host's own permission system; the server adds no
+  confirmation step. `idempotentHint` only where the source says a command is
+  safe to repeat. `timeout` is whole seconds (120 without it).
+- `env`, as for a server's: only what the command needs to find its packaged
+  files. Never a key, a token or another secret. The package server and what it
+  starts inherit the host's environment, where the source's own way of
+  receiving credentials puts them: carry that way as content in the capability
+  that sets the package up.
+
+Decisions. Every source whose commands a `run` tool serves has one decision with
+form `package-tool`: the commands as `content`, the capabilities whose steps
+call them as `targets`. A `package-tool` decision that no `run` tool serves is
+refused. A child's source keeps its `mcp-server` decision; its reason states the
+estimated weight of the package server's own tool list and why the package pays
+it.
+Tools of a child that the package server leaves out get one `dropped` decision that lists them, with the owner's answer as its reason.
+
+A capability body keeps naming a tool as its source does, which is also its name
+in the package server. What changes on the host is the server it appears under,
+so a tool's id changes. Only Claude Code registers the package server for now;
+every other host registers the absorbed servers as it does without one.
+
 ## Output
 
 Write `delivery.json` in the package directory:
@@ -227,7 +341,7 @@ Write `delivery.json` in the package directory:
 {
   "decisions": [
     {"source": "<source id>", "content": "<which part of the source>",
-     "form": "capability | always-on | hook | mcp-server | dropped",
+     "form": "capability | always-on | hook | mcp-server | package-tool | dropped",
      "targets": ["<capability id>"], "reason": "<answers that decided it, and open doubts>"}
   ],
   "always_on": "<the session text, only with an always-on decision>",
@@ -240,12 +354,17 @@ Write `delivery.json` in the package directory:
     {"name": "<server name>", "source": "<source id>",
      "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"],
      "env": {"<NAME>": "<package_root>/scripts/<source-id>/<path>"}}
-  ]
+  ],
+  "package_server": {"name": "<server name>", "children": ["<server name>"], "tools": ["<see The package server>"]},
+  "server_choice": {"asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
+                    "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<name>"]}}
 }
 ```
 
-Every source has at least one decision. `capability`, `hook` and `mcp-server` name
-their target capabilities; `always-on` and `dropped` name none. Omit `always_on`,
-`hooks` and `mcp_servers` when no decision uses them, `timeout` when the source
-declares none and `env` when the server needs none. Reasons cite source paths or sections, like
-`## Sources` does.
+Every source has at least one decision. `capability`, `hook`, `mcp-server` and
+`package-tool` name their target capabilities; `always-on` and `dropped` name
+none. Omit `always_on`, `hooks` and `mcp_servers` when no decision uses them,
+`timeout` when the source declares none and `env` when the server needs none.
+Omit `package_server` unless the owner chose one; write `server_choice` whenever
+the owner was asked, with or without a package server. Reasons cite source paths
+or sections, like `## Sources` does.

@@ -287,6 +287,22 @@ installation, publication or replacement of existing dist output without request
   that folder or one the release does not carry. A server the source only calls and does not
   ship stays a runtime dependency. Python never chooses a name or a host
   (ADR-0030).
+  Owner, 2026-11-23 ("muro deve chiedere cosa fare di eventuali server mcp"):
+  a package may have one MCP server of its own. `package_server` declares it as
+  data, `{name, children, tools}`: `children` are `mcp_servers` entries it starts
+  itself, and a tool either forwards to a child's tool, keeping its name,
+  description and schema, or runs a packaged command from an argv template, with
+  no shell. `server_choice` records the owner's answer, `{asked_on, answer,
+  given_on}`, and the form `package-tool` marks a command served as a tool. When
+  a source ships a server the Harmonizer AI shows the owner the evidence and
+  asks, and never proceeds on its own choice; with no owner to ask it writes no
+  `package_server`. Every caller checks the shape; only `build` refuses a
+  package server whose answer is missing, was given on another commit of a
+  serving source, or does not show every tool it declares. One generic program
+  serves any declaration (`python muro.py tools-server`, reading
+  `package-server.json`), and Python never chooses a tool, a child or the
+  number of servers. Only Claude Code registers it for now: every other host
+  registers the absorbed servers as before until it is run live (ADR-0033).
 - `eval-cases.json` (optional): AI-authored requests with expected status and
   ordered capabilities. Use `expect.selections` to test the actual operation
   when a capability serves several intents or depends on a conditional prerequisite.
@@ -514,7 +530,10 @@ credit files in `notice_paths`, and explain in `omissions` each named file that
 stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
 ADR-0027). Write the pin and its release into each capability's `## Sources`
 line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
-each part of the source became and why, and review the earlier decisions. Record the release, the diff
+each part of the source became and why, and review the earlier decisions. When
+the source serves a package server, copy the description and schema of each of
+its forwarded tools again from the new commit and ask the owner again: the
+build refuses the old answer on a new commit (ADR-0033). Record the release, the diff
 summary, the commands and their results in `docs/verification/`. A release
 proves packaging; say what was not executed.
 

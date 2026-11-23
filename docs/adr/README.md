@@ -276,3 +276,15 @@ for the native window. It names what is lost (the ONI look, `imago-check`),
 the consequence for `develop` (no Sync page until the follow-up plans port it,
 and no merge into `main` meanwhile) and what was not verified. Proposed: the
 decision is the owner's; the explanatory text is not separately approved.
+
+## Package MCP server
+
+Manual note outside the generated index: [ADR-0033 — A package's own MCP server,
+decided with the owner at harmonization](ADR-0033-package-mcp-server.md) records
+the owner's request of 2026-11-23 that Muro ask, at harmonization, what to do
+with the MCP servers a source ships. One answer is a package server named for the
+package, whose tools are declared in `delivery.json` and either forward to a tool
+of an absorbed server or run an absorbed command. The build refuses it without
+the recorded answer on the sources as pinned. Only Claude Code registers it for
+now. Proposed: the owner chose the approach and accepted the review's fixes; the
+explanatory text is not separately approved. No live host session has run.
