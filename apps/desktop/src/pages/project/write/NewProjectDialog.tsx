@@ -123,7 +123,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
       const path = picked?.path;
       if (path) setForm(f => ({ ...f, folder: path }));
     } catch (e) {
-      if (unknownTo(e, 'pick_folder')) { noFolderShell = true; setNoPicker(true); notify('This version of Muro cannot open a folder dialog yet: type the path.', 'error'); }
+      if (unknownTo(e, 'pick_folder')) { noFolderShell = true; setNoPicker(true); }
       else notify(message(e), 'error');
     } finally { setPicking(false); }
   }
@@ -173,7 +173,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
           <FormField id={fieldId('folder')} label="Save in folder" help="The project is one file in this folder, named after the plugin id." error={say('folder')}>
             <Input autoComplete="off" spellCheck={false} className="font-mono" {...text('folder')} />
           </FormField>
-          {noPicker ? null : <Button variant="outline" size="sm" className="self-start" loading={picking} loadingText="Choosing…" onMouseDown={keepFocus} onClick={() => void chooseFolder()}>Choose folder…</Button>}
+          {noPicker ? <p className="text-xs text-ink-mute">This version of Muro cannot open a folder dialog yet: type the path.</p> : <Button variant="outline" size="sm" className="self-start" loading={picking} loadingText="Choosing…" onMouseDown={keepFocus} onClick={() => void chooseFolder()}>Choose folder…</Button>}
         </div>
         <FormField
           id={fieldId('inputs')}
