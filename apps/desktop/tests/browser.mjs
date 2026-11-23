@@ -1,7 +1,7 @@
 // Runs the browser test files one after the other (each starts its own dev server on MURO_UI_PORT and closes it), and
 // fails when one fails. A single file runs on its own: node apps/desktop/tests/browser-shell.mjs
-// For now only browser-shell.mjs: plan R0, Task 3, put the React window in place of the Imago one, and the other
-// browser-*.mjs files test pages the new window does not have yet. They stay in the folder until Task 6 deletes them.
+// The files of the React window: the frame (browser-shell.mjs) and the project workspace (browser-workspace.mjs). The
+// pages that are not in it yet (Sync, Activity, Settings, the first run) bring their own file when they are ported.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 

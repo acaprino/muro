@@ -9,7 +9,7 @@ import {
 } from '@acaprino/sigrid';
 import type { Page, Snapshot } from './types.ts';
 import { nextCheck, stamp, syncHeadline, type SyncHeadline } from './model.ts';
-import { plural } from './ui.ts';
+import { plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';

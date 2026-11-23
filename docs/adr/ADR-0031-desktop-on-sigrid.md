@@ -84,8 +84,12 @@ owner chose "sostituzione sul posto".
 4. **`imago-shell` stays.** The Rust crate keeps the native window: glass and
    native theme, caption controls and Snap Layouts, the navigation guard and
    the recovery of WebView2. Its pin stays in `apps/desktop/src-tauri/Cargo.toml`
-   and `Cargo.lock` until the owner moves the window to something else. No npm
-   pin of Imago remains, so there is no second pin to keep equal to it.
+   and `Cargo.lock` until the owner moves the window to something else. *Amended
+   on 2026-11-23 (plan R0, Task 6): the npm package `@acaprino/imago` stays, for
+   its window glue only (`@acaprino/imago/shell` and its Tauri adapter: caption
+   buttons, zoom, the guard of the browser's own keys), because Sigrid has no
+   Tauri side. Its tag stays equal to the Rust pin, by hand, since `imago-check`
+   is gone.*
 
 5. **The rule files follow.** AGENTS.md and CLAUDE.md name Sigrid and no longer
    import Imago's design file or ask for `imago-check`. `docs/desktop.md` no

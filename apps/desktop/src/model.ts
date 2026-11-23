@@ -1,5 +1,5 @@
 import type { Plugin, Snapshot, Target, Plan, Operation, InstalledPlugin } from './types.ts';
-import { plural } from './ui.ts';
+import { plural } from './words.ts';
 export interface PluginStatus { kind:string; label:string; tone:string }
 const status=(kind:string,label:string,tone:string):PluginStatus=>({kind,label,tone});
 /** What the snapshot holds about one plugin on one target; the plugin state and the cell read it the same way. */

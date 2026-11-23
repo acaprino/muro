@@ -20,7 +20,10 @@ installs it; until then it still names Imago.
 Native window primitives (glass and native theme, caption controls, navigation
 guard) stay with the Rust crate `imago-shell`, pinned in
 `apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`, until the owner moves
-them. It is the only Imago pin left: there is no npm pin to keep equal to it.
+them. The npm package `@acaprino/imago` stays for its window glue
+(`@acaprino/imago/shell`, with its Tauri adapter) and nothing else of it: keep
+its tag in `package.json` and `package-lock.json` equal to the Rust pin
+(`imago-check` is gone: compare them by hand).
 `docs/imago-migration.md` is the history of what Muro took from Imago.
 
 Before UI work, read `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
