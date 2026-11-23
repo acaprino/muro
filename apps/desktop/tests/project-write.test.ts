@@ -482,12 +482,12 @@ test('a cancelled run says it in the words of the phase it was in, and in the ph
   job = await cancel('AI intake and harmonization');
   assert.deepEqual([job.status, job.phase], ['cancelled', 'Finished']);
   assert.match(job.message, /^The AI run was cancelled\. The project file was not changed$/);
-  // While the project is built and saved the run goes on, and ends as it would have.
+  // While the project is built and saved the runtime refuses a cancel, and the run goes on and ends as it would have.
   const started: any = await fake.request('project_job', harmonize(fake));
   fake.behind.phase(SAVING_PHASE);
-  assert.deepEqual(await fake.request('cancel_job', { id: started.id }), { message: 'Cancellation requested; registry remains unchanged until validation completes' });
+  await assert.rejects(fake.request('cancel_job', { id: started.id }), { message: 'The run is building and saving the project: it can no longer be cancelled, and it ends by itself' });
   const [saving] = await jobsOf(fake);
-  assert.deepEqual([saving.status, saving.phase], ['running', SAVING_PHASE], 'the cancel was ignored');
+  assert.deepEqual([saving.status, saving.phase], ['running', SAVING_PHASE], 'the cancel was refused');
   fake.behind.finish();
   assert.equal((await jobsOf(fake))[0].status, 'completed');
   assert.notEqual(fake.behind.digest('marionette'), digest);
