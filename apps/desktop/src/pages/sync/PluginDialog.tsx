@@ -163,12 +163,13 @@ const POLICIES: readonly { value: Plugin['policy']; label: string }[] = [
 ];
 const isPolicy = (value: string): value is Plugin['policy'] => POLICIES.some(p => p.value === value);
 
-/** A part of a form that opens and closes: a quiet button with its chevron and `aria-expanded`, and what it holds below. */
+/** A part of a form that opens and closes: a quiet button with its chevron and `aria-expanded`, and what it holds below. A label longer than the drawer is wide
+ * ("Custom instructions · 1 Markdown file" in a window of 500 at 200%) ends in an ellipsis inside it, with the whole label as its title. */
 export function Fold({ label, open, onToggle, children }: { label: string; open: boolean; onToggle(): void; children?: React.ReactNode }) {
   return (
     <Column gap="md">
-      <Button variant="ghost" size="sm" className="self-start" aria-expanded={open} onClick={onToggle}>
-        <Icon name={open ? 'chevronDown' : 'chevron'} />{label}
+      <Button variant="ghost" size="sm" className="max-w-full self-start" title={label} aria-expanded={open} onClick={onToggle}>
+        <Icon name={open ? 'chevronDown' : 'chevron'} /><span className="min-w-0 truncate">{label}</span>
       </Button>
       {open ? <Column gap="md">{children}</Column> : null}
     </Column>
@@ -323,9 +324,12 @@ export interface PluginDialogProps {
   pluginId: string;
   open: boolean;
   onOpenChange(open: boolean): void;
+  /** The control the drawer was opened from (the plugin's row), where the focus goes back when it closes. The drawer cannot tell it by itself: its Source field takes the focus as it
+   * mounts, before Sigrid's sheet records what had the focus, so the sheet would give it back to a field that is gone. */
+  restoreFocusTo: React.RefObject<HTMLElement | null>;
 }
 
-export function PluginDialog({ pluginId, open, onOpenChange }: PluginDialogProps) {
+export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: PluginDialogProps) {
   const { snapshot, request } = useRegistry();
   const sync = useSync();
   const jobs = useJobs();
@@ -341,7 +345,8 @@ export function PluginDialog({ pluginId, open, onOpenChange }: PluginDialogProps
   const shown = plugin ?? seen.current;
   const gone = plugin === null && shown !== null;
 
-  /** What the focus does when the drawer is gone: after a removal it goes to the page (the row it came from is gone), and after the review opens it stays where the review put it. */
+  /** What the focus does when the drawer is gone: back to the row it was opened from (`restoreFocusTo`); after a removal, or when that row is gone, to the page; and after the review opens it stays
+   * where the review put it. */
   const after = React.useRef<'removed' | 'review' | null>(null);
 
   // The form starts from the plugin each time the drawer opens (or another plugin is asked for), and is not made again when the registry changes while it is open: what the person typed is
@@ -571,10 +576,15 @@ export function PluginDialog({ pluginId, open, onOpenChange }: PluginDialogProps
       drawer
       open={open}
       onOpenChange={next => { if (next) onOpenChange(true); else leave(); }}
+      restoreFocusTo={restoreFocusTo}
       onCloseAutoFocus={event => {
-        // The row the drawer came from is gone with the plugin: the page takes the focus. A review opened in its place has the focus already.
-        if (after.current === 'removed') { event.preventDefault(); document.querySelector<HTMLElement>('[data-slot="app-shell-content"]')?.focus(); }
-        else if (after.current === 'review') event.preventDefault();
+        // A review opened in its place has the focus already.
+        if (after.current === 'review') { event.preventDefault(); return; }
+        // The row the drawer came from is gone with the plugin (removed here or somewhere else): the page takes the focus. Otherwise `restoreFocusTo` gives it back to the row.
+        if (after.current === 'removed' || !restoreFocusTo.current?.isConnected) {
+          event.preventDefault();
+          document.querySelector<HTMLElement>('[data-slot="app-shell-content"]')?.focus();
+        }
       }}
       title={title}
       description={description}

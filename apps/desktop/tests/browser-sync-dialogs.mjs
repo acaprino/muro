@@ -264,7 +264,8 @@ await test('a plugin row opens its drawer: edits keep what the form does not sho
   await s.getByText('D:/isolated/data/custom-instructions/' + saved.id, { exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await s.waitFor({ state: 'detached' });
-  assert.equal(await page.evaluate(() => document.activeElement?.closest('main') !== null), true, 'the keyboard goes back to the page, where the row is');
+  // The keyboard goes back to the page, where the row is (the sheet gives the focus back one turn after it closes).
+  await page.waitForFunction(() => !!document.activeElement?.closest('main'));
 });
 
 await test('the install-on boxes, the update policy and the builds are saved as the form says', 'two-harnesses', {}, async app => {
@@ -609,7 +610,9 @@ await test('the drawer of a plugin stays inside a window of 500 at 200% zoom (25
   await fold(s, 'More').click();
   assert.ok(await sideways(page) <= 0, 'no sideways scroll at 250');
   assert.ok(await s.evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'nothing inside the drawer scrolls sideways at 250');
-  assert.deepEqual(await stickingOut(s), [], 'and nothing runs past its edge');
+  // What runs past it is named in the message itself: the run keeps only the first lines of a failure, and a diff starts below them.
+  const out = await stickingOut(s);
+  assert.deepEqual(out, [], `and nothing runs past its edge: ${out.join('; ')}`);
   const inside = name => s.getByRole('button', { name, exact: true }).evaluate(el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= window.innerWidth; });
   for (const name of ['Cancel', 'Save']) assert.equal(await inside(name), true, `${name} is inside the window`);
   for (const name of ['Check for updates', 'Open instructions folder', 'Remove from my list']) {

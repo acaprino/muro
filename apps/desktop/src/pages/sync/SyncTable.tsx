@@ -18,8 +18,8 @@ const needBuild = (n: number): string => `${plural(n, 'plugin')} need${n === 1 ?
 
 export interface SyncTableProps {
   snapshot: Snapshot;
-  /** A plugin's name was pressed: its dialog opens. */
-  onOpenPlugin(pluginId: string): void;
+  /** A plugin's name was pressed: its dialog opens, and focus comes back to `opener` when it closes. */
+  onOpenPlugin(pluginId: string, opener: HTMLElement | null): void;
   /** A harness's name was pressed: its inspector opens, and focus comes back to `opener` when it closes. */
   onOpenHarness(targetId: string, opener: HTMLElement | null): void;
 }
@@ -131,7 +131,7 @@ interface PluginRowProps {
   plan: Plan | null;
   tabStop: boolean;
   onFocusRow(pluginId: string): void;
-  onOpen(pluginId: string): void;
+  onOpen(pluginId: string, opener: HTMLElement | null): void;
 }
 
 /** One plugin: its name (which opens it) and source, its latest version with the update policy, and one cell per harness. */
@@ -147,7 +147,7 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
             data-row-button=""
             tabIndex={tabStop ? 0 : -1}
             onFocus={() => onFocusRow(plugin.id)}
-            onClick={() => onOpen(plugin.id)}
+            onClick={event => onOpen(plugin.id, event.currentTarget)}
           >
             <span className="truncate" title={plugin.name}>{plugin.name}</span>
           </Button>

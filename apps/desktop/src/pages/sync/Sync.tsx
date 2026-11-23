@@ -27,8 +27,9 @@ export interface SyncProps {
 
 export function Sync({ openHarness }: SyncProps) {
   const { snapshot } = useRegistry();
-  // The plugin whose dialog is open, kept while it closes.
+  // The plugin whose dialog is open, kept while it closes, and the row it was opened from, where focus goes back.
   const [plugin, setPlugin] = React.useState<{ id: string; open: boolean } | null>(null);
+  const pluginOpener = React.useRef<HTMLElement | null>(null);
   const [addingPlugin, setAddingPlugin] = React.useState(false);
   const [addingHarness, setAddingHarness] = React.useState(false);
   if (!snapshot) return <p role="status" className="p-4 text-sm text-ink-mute sm:p-6">Reading your registry…</p>;
@@ -63,12 +64,12 @@ export function Sync({ openHarness }: SyncProps) {
       {listEmpty ? (
         <Empty className="rounded-md border border-line px-4 py-8" title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
       ) : noPlugin ? null : (
-        <SyncTable snapshot={snapshot} onOpenPlugin={id => setPlugin({ id, open: true })} onOpenHarness={openHarness} />
+        <SyncTable snapshot={snapshot} onOpenPlugin={(id, opener) => { pluginOpener.current = opener; setPlugin({ id, open: true }); }} onOpenHarness={openHarness} />
       )}
       <Unlisted />
       <ReviewSheet />
       {/* One dialog for each plugin opened: another row starts a dialog of its own, with nothing of the last one's form. */}
-      {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} /> : null}
+      {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} restoreFocusTo={pluginOpener} /> : null}
       <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} />
       <AddHarnessDialog open={addingHarness} onOpenChange={setAddingHarness} />
     </div>

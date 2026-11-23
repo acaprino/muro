@@ -48,7 +48,7 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
   let session = held;
   if (open && !held.open) {
     session = opened(true, targets);
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
     added.current = null;
   } else if (open !== held.open) session = { ...held, open };
   if (session !== held) setHeld(session);
@@ -117,13 +117,16 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
       drawer
       open={open}
       onOpenChange={next => { if (next) onOpenChange(true); else leave(); }}
+      // The focus goes back to the button this drawer was opened from. The drawer cannot tell it by itself: its Source field takes the focus as it mounts, before Sigrid's sheet records
+      // what had the focus, so the sheet would give it back to a field that is gone.
+      restoreFocusTo={opener}
       onCloseAutoFocus={event => {
-        // The button this drawer was opened from is gone when the list was empty (its empty state went with the first plugin): the focus goes to the row of the plugin that was added.
-        const name = added.current;
-        if (name === null || opener.current?.isConnected) return;
+        if (opener.current?.isConnected) return;
+        // That button is gone when the list was empty (its empty state went with the first plugin): the focus goes to the row of the plugin that was added, else to the page.
         event.preventDefault();
+        const name = added.current;
         const main = document.querySelector<HTMLElement>('[data-slot="app-shell-content"]');
-        const row = main ? Array.from(main.querySelectorAll<HTMLElement>('button')).find(b => b.textContent?.trim() === name) : undefined;
+        const row = name !== null && main ? Array.from(main.querySelectorAll<HTMLElement>('button')).find(b => b.textContent?.trim() === name) : undefined;
         (row ?? main)?.focus();
       }}
       title={asking ? 'Discard changes to the new plugin?' : 'Add a plugin'}
