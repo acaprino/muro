@@ -20,7 +20,8 @@ from . import __version__
 from .jsonrpc import METHOD_NOT_FOUND, PROTOCOL_VERSION, error, read_messages, write_message
 
 CLOSE_WAIT = 2  # seconds a child gets to exit by itself once its input is closed
-KILL_WAIT = 5   # seconds a killed child gets to disappear and its output to end
+KILL_WAIT = 5   # seconds a killed child gets to disappear
+DRAIN_WAIT = 1  # seconds the reader gets to deliver what a child wrote once the child is gone
 
 
 class ChildError(RuntimeError):
@@ -54,7 +55,8 @@ class ChildServer:
 
     @property
     def alive(self) -> bool:
-        return self._process is not None and self._process.poll() is None
+        # On POSIX poll() lags behind an exit while the watcher waits; _stopped is set before a caller sees the error.
+        return self._process is not None and not self._stopped and self._process.poll() is None
 
     def start(self) -> None:
         command = self._launch["command"]
@@ -70,6 +72,8 @@ class ChildServer:
         self._stopped = False
         self._reader = threading.Thread(target=self._read, args=(self._process.stdout,), daemon=True)
         self._reader.start()
+        # A grandchild that keeps the output pipe open would hide the child's exit from the reader.
+        threading.Thread(target=self._watch, args=(self._process,), daemon=True).start()
         try:
             self._request("initialize", {
                 "protocolVersion": PROTOCOL_VERSION, "capabilities": {},
@@ -96,8 +100,11 @@ class ChildServer:
 
     def call(self, tool: str, arguments: dict[str, Any],
              on_progress: Callable[[dict[str, Any]], None] | None = None,
-             timeout: float | None = None) -> dict[str, Any]:
-        return self._request("tools/call", {"name": tool, "arguments": arguments}, on_progress, timeout)
+             timeout: float | None = None, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+        params: dict[str, Any] = {"name": tool, "arguments": arguments}
+        if meta is not None:
+            params["_meta"] = meta
+        return self._request("tools/call", params, on_progress, timeout)
 
     def cancel_all(self) -> None:
         with self._lock:
@@ -112,16 +119,25 @@ class ChildServer:
         if process is None or self._closed:
             return
         self._closed = True
-        with contextlib.suppress(OSError, ValueError):
-            process.stdin.close()
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            process.wait(CLOSE_WAIT)
+        # A write blocked on a child that reads nothing holds this lock and the stream's own: closing
+        # stdin would wait behind it, so a busy child is killed first and stdin is closed afterwards.
+        idle = self._write_lock.acquire(blocking=False)
+        if idle:
+            try:
+                with contextlib.suppress(OSError, ValueError):
+                    process.stdin.close()
+            finally:
+                self._write_lock.release()
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                process.wait(CLOSE_WAIT)
         kill_tree(process)
         with contextlib.suppress(subprocess.TimeoutExpired):
             process.wait(KILL_WAIT)
-        self._reader.join(KILL_WAIT)
-        if not self._reader.is_alive():
-            process.stdout.close()
+        if not idle and process.poll() is not None:
+            with contextlib.suppress(OSError, ValueError):
+                process.stdin.close()  # the blocked write has failed with the child gone
+        self._stop()
+        self._reader.join(DRAIN_WAIT)
 
     def _request(self, method: str, params: dict[str, Any],
                  on_progress: Callable[[dict[str, Any]], None] | None = None,
@@ -165,11 +181,22 @@ class ChildServer:
         except (OSError, ValueError):
             pass  # the stream was closed under the reader: the child is gone either way
         finally:
-            with self._lock:
-                self._stopped = True
-                waiting = list(self._waiters.values())
-            for waiter in waiting:
-                waiter.put(None)
+            self._stop()
+            with contextlib.suppress(OSError, ValueError):
+                stdout.close()
+
+    def _watch(self, process: subprocess.Popen) -> None:
+        process.wait()
+        self._reader.join(DRAIN_WAIT)  # an answer written just before the exit is still delivered
+        self._stop()
+
+    def _stop(self) -> None:
+        """No answer will come any more: refuse new requests and wake every waiting call."""
+        with self._lock:
+            self._stopped = True
+            waiting = list(self._waiters.values())
+        for waiter in waiting:
+            waiter.put(None)
 
     def _dispatch(self, message: dict[str, Any]) -> None:
         method, msg_id = message.get("method"), message.get("id")

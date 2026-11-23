@@ -4,7 +4,10 @@ The child here is a stub written into `tmp_path`: it speaks only what the tests 
 names no real server. Every wait on a child is bounded: a watchdog closes a child that is
 still running after `WATCHDOG` seconds, which turns a hung test into a failure.
 """
+import contextlib
 import json
+import os
+import signal
 import subprocess
 import sys
 import threading
@@ -18,6 +21,7 @@ from muro.mcp_client import ChildError, ChildServer, kill_tree
 
 WATCHDOG = 10
 WAIT = 10  # seconds a call may take in a test before it counts as hung
+SLEEPERS = "sleepers"  # file in tmp_path where the stub's long-lived processes write their pids
 
 STUB = r'''
 import json
@@ -32,6 +36,9 @@ out = threading.Lock()
 stops = {}          # request id -> Event set by notifications/cancelled
 asked = threading.Event()
 asked_answer = {}   # the client's answer to the request the stub made
+SLEEPER = "import os, sys, time\nopen(sys.argv[1], 'a').write(str(os.getpid()) + chr(10))\ntime.sleep(12)\n"
+SPAWNER = ("import subprocess, sys\nsubprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]], "
+           "stdin=subprocess.DEVNULL, start_new_session=True)\n")
 HEARTBEAT = "import sys, time\nfor n in range(300):\n    open(sys.argv[1], 'w').write(str(n))\n    time.sleep(0.05)\n"
 
 
@@ -49,7 +56,8 @@ def text_result(text):
     return {"content": [{"type": "text", "text": text}], "isError": False}
 
 
-def tool_call(msg_id, arguments):
+def tool_call(msg_id, params):
+    arguments = params["arguments"]
     if arguments.get("progress"):
         send({"jsonrpc": "2.0", "method": "notifications/progress",
               "params": {"progressToken": "t", "progress": 1}})
@@ -57,6 +65,8 @@ def tool_call(msg_id, arguments):
         send({"jsonrpc": "2.0", "id": "ask-1", "method": "sampling/createMessage", "params": {}})
         asked.wait(5)
         text = json.dumps(asked_answer.get("error"))
+    elif arguments.get("show_meta"):
+        text = json.dumps(params.get("_meta"))
     elif stops[msg_id].wait(arguments.get("wait", 0)):
         send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "cancelled"}})
         return
@@ -82,10 +92,16 @@ for line in sys.stdin:
             banner = False
         if mode == "spawns":
             subprocess.Popen([sys.executable, "-c", HEARTBEAT, sys.argv[2]], stdin=subprocess.DEVNULL)
+        if mode == "orphans":  # a process that keeps the output pipe open after the stub is gone
+            subprocess.Popen([sys.executable, "-c", SLEEPER, sys.argv[2]], stdin=subprocess.DEVNULL)
+        if mode == "escapes":  # the same, in a process the stub's tree no longer reaches
+            subprocess.run([sys.executable, "-c", SPAWNER, SLEEPER, sys.argv[2]], stdin=subprocess.DEVNULL)
         reply(msg_id, {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
                        "serverInfo": {"name": "stub", "version": "0"}})
         if mode == "dies":
             sys.exit(0)
+        if mode == "deaf":
+            threading.Event().wait(20)  # busy: reads nothing for a while
     elif method == "tools/list":
         cursor = message.get("params", {}).get("cursor")
         if mode == "paged":
@@ -93,13 +109,15 @@ for line in sys.stdin:
             reply(msg_id, page)
         else:
             reply(msg_id, {"tools": [{"name": "echo", "inputSchema": {"type": "object"}}]})
+    elif method == "tools/call" and mode == "orphans":
+        sys.exit(0)  # stops without answering
     elif method == "tools/call" and mode == "rpc-error":
         send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "refused"}})
     elif method == "tools/call":
         stops[msg_id] = threading.Event()
-        threading.Thread(target=tool_call, args=(msg_id, message["params"]["arguments"]), daemon=True).start()
+        threading.Thread(target=tool_call, args=(msg_id, message["params"]), daemon=True).start()
 
-if mode == "spawns":
+if mode in ("spawns", "escapes"):
     threading.Event().wait(60)  # a server that does not stop when its input ends
 '''
 
@@ -122,6 +140,10 @@ def stub(tmp_path):
     for child, watchdog in started:
         watchdog.cancel()
         child.close()
+    sleepers = tmp_path / SLEEPERS
+    for pid in sleepers.read_text().split() if sleepers.exists() else []:
+        with contextlib.suppress(OSError):
+            os.kill(int(pid), signal.SIGTERM)
 
 
 def wait_until(condition, seconds=5):
@@ -173,6 +195,14 @@ def test_a_child_that_stops_is_reported(stub):
     child.start()
     with pytest.raises(ChildError, match="stub: the server stopped"):
         child.call("echo", {}, timeout=WAIT)
+
+
+def test_a_child_that_stopped_is_not_alive_when_the_call_reports_it(stub):
+    child = stub("dies")
+    child.start()
+    with pytest.raises(ChildError):
+        child.call("echo", {}, timeout=WAIT)
+    assert not child.alive
 
 
 def test_no_answer_in_time_is_reported(stub):
@@ -315,3 +345,75 @@ def test_kill_tree_stops_a_process_started_in_its_own_session():
     kill_tree(process)
     process.wait(WAIT)
     assert process.returncode is not None
+
+
+def test_a_call_shows_the_meta_it_is_given(stub):
+    child = stub()
+    child.start()
+    without = child.call("echo", {"show_meta": 1}, timeout=WAIT)
+    with_meta = child.call("echo", {"show_meta": 1}, meta={"progressToken": "p1"}, timeout=WAIT)
+    assert without["content"][0]["text"] == "null"
+    assert with_meta["content"][0]["text"] == '{"progressToken": "p1"}'
+
+
+def test_close_wakes_a_call_that_is_waiting(stub, tmp_path, monkeypatch):
+    monkeypatch.setattr(mcp_client, "CLOSE_WAIT", 0.2)
+    child = stub("escapes", str(tmp_path / SLEEPERS))
+    child.start()
+    in_flight = threading.Event()
+    outcome = []
+
+    def run():
+        try:
+            child.call("echo", {"wait": 30, "progress": 1}, on_progress=lambda message: in_flight.set())
+        except ChildError as exc:
+            outcome.append(str(exc))
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    assert in_flight.wait(WAIT)
+    child.close()
+    thread.join(2)
+    assert not thread.is_alive()
+    assert outcome == ["stub: the server stopped"]
+
+
+def test_a_call_does_not_wait_for_a_pipe_that_a_grandchild_holds_open(stub, tmp_path):
+    child = stub("orphans", str(tmp_path / SLEEPERS))
+    child.start()
+    outcome = []
+
+    def run():
+        try:
+            child.call("echo", {})
+        except ChildError as exc:
+            outcome.append(str(exc))
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(4)
+    assert not thread.is_alive()
+    assert outcome == ["stub: the server stopped"]
+
+
+def test_close_does_not_wait_for_a_write_the_child_does_not_read(stub):
+    child = stub("deaf")
+    child.start()
+    outcome = []
+
+    def run():
+        try:
+            child.call("echo", {"blob": "x" * 2_000_000})
+        except ChildError as exc:
+            outcome.append(str(exc))
+
+    writer = threading.Thread(target=run, daemon=True)
+    writer.start()
+    wait_until(child._write_lock.locked)
+    closer = threading.Thread(target=child.close, daemon=True)
+    closer.start()
+    closer.join(5)
+    assert not closer.is_alive()
+    assert not child.alive
+    writer.join(2)
+    assert outcome == ["stub: the server stopped"]
