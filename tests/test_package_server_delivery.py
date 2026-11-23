@@ -481,6 +481,26 @@ def test_install_notes_say_where_the_package_server_is_registered(portable_proje
         assert "MCP server `stub`" in note and "Their ids changed" not in note
 
 
+INHERITS = "A command one of its tools runs inherits the environment of this session, credentials included."
+
+
+def test_the_install_note_says_a_command_inherits_the_session_environment_when_a_tool_runs_one(portable_project, tmp_path):
+    declare_packaged(portable_project)
+    release = build(portable_project, tmp_path)
+    claude = (release / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
+    assert f"no longer matches. {INHERITS}" in claude
+    for host in ("codex", "pi", "opencode", "hermes"):    # the package server is not registered there
+        assert "inherits" not in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+
+
+def test_the_install_note_says_nothing_of_commands_when_the_tools_only_forward(portable_project, tmp_path):
+    document = declare_packaged(portable_project, tools=(FORWARD,))
+    document["decisions"] = [item for item in document["decisions"] if item["form"] != "package-tool"]
+    (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    claude = (build(portable_project, tmp_path) / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
+    assert "The package server `pack` starts `stub` itself" in claude and "inherits" not in claude
+
+
 def test_the_other_hosts_register_none_of_the_package_server(portable_project, tmp_path):
     declare_packaged(portable_project)
     release = build(portable_project, tmp_path)

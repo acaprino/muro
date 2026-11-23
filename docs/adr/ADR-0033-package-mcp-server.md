@@ -588,8 +588,10 @@ lost if it was wrong.
   live run of section 6 can only happen on a build that registers the server, and
   nothing in `INSTALL.md` says the registration was run.
 - The design said `INSTALL.md` states that credentials in the inherited
-  environment reach every tool of the server. It does not state this yet. The
-  server and what it starts do inherit the host's environment.
+  environment reach every tool of the server. The Claude Code note states it for
+  commands: when the package server has a `run` tool it adds "A command one of its
+  tools runs inherits the environment of this session, credentials included." It
+  says nothing of a child server, which starts with the same environment.
 - `GUIDE.html` shows a `package-tool` decision under its source like any other
   (a label was added, in English and Italian). It does not list the package
   server's tools.
@@ -622,6 +624,5 @@ file. Fixtures prove mechanics only.
 - `muro/delivery.py` (the hook trampoline) and `muro/installer.py` still resolve a
   program with `shutil.which`, which searches the working directory first on
   Windows. That is outside this change.
-- `INSTALL.md` does not yet state that credentials in the inherited environment
-  reach every tool, and that a permission rule saved for the old tool ids stops
-  matching was not verified on a host.
+- That a permission rule saved for the old tool ids stops matching, as `INSTALL.md`
+  says, was not verified on a host.

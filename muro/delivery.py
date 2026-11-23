@@ -617,7 +617,9 @@ def _package_server_note(declaration: dict[str, Any], host: str, absorbed: bool)
               if children else "serves the commands this package declares")
     moved = (" Their ids changed with the server's name: a permission rule saved for the old ids no longer matches."
              if children else "")
-    return f"The package server `{name}` {served}. Tools appear under the server `{name}`.{moved}"
+    inherits = (" A command one of its tools runs inherits the environment of this session, credentials included."
+                if any("run" in tool for tool in declaration["tools"]) else "")
+    return f"The package server `{name}` {served}. Tools appear under the server `{name}`.{moved}{inherits}"
 
 
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
