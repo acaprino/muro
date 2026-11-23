@@ -637,6 +637,24 @@ lost if it was wrong.
 - `GUIDE.html` shows a `package-tool` decision under its source like any other
   (a label was added, in English and Italian). It does not list the package
   server's tools.
+- The risk row "Processes left behind on Windows" names a "Test on Windows in CI"
+  as what shows it. There is none: `.github/workflows/tests.yml` runs the Python
+  tests on `ubuntu-latest` only (its Windows job builds the desktop app). The tests
+  that need Windows (a batch program, a batch child, `PATHEXT`, the `taskkill` path,
+  the drive form of a root) are skipped there, and that a process tree is killed on
+  Windows by `taskkill` is shown by the local run on Windows alone. A Windows job
+  for these tests is the owner's decision and stays open; the workflow is not
+  changed.
+- Section 6 says a package without the declaration writes what it writes today,
+  byte-equal. In the release, byte-equal holds for the registration files and
+  `INSTALL.md` only: `.mcp.json`, the `mcp.json` of Codex and Hermes, the Pi and
+  OpenCode extensions and `adapters/hermes-mcp` come out of code paths this work did
+  not change. A release as a whole is not byte-equal, by design: the whole `muro`
+  package is copied into each skill folder, so every release now carries four more
+  runtime modules (`jsonrpc.py`, `mcp_client.py`, `package_server.py`,
+  `argv_template.py`, and `mcp.py` takes its message helpers from `jsonrpc.py`), and
+  every `GUIDE.html` embeds the new label `form_package-tool`, in English and
+  Italian.
 
 **Verified.** Tests with stub servers and stub commands, no name of a real source:
 `tests/test_argv_template.py`, `tests/test_jsonrpc.py`, `tests/test_mcp_client.py`
@@ -654,6 +672,17 @@ file. Fixtures prove mechanics only.
 - No live host session has run on any host, Claude Code included. The `.mcp.json`
   entry was started from a copy of the adapter folder by a test, not by Claude
   Code.
+- Condition before a first release: no package that declares `package_server` is
+  released before the live Claude Code run of section 6. `PACKAGE_SERVER_HOSTS`
+  holds Claude Code before any live run, because that run needs a build that
+  registers the server. The run also checks whether the host accepts
+  `allow_leading_dash` inside a listed `inputSchema`, the working directory the
+  server starts in, and whether child processes open console windows on Windows.
+- The Windows-only tests (a batch program, a batch child, `PATHEXT`, the `taskkill`
+  path, the drive form of a root) do not run in CI: `.github/workflows/tests.yml`
+  runs the Python tests on `ubuntu-latest` only. That process trees are killed on
+  Windows is shown by the run on the author's Windows machine alone. A Windows job
+  is the owner's decision; none was added.
 - The POSIX branches of the client and the server (`killpg`, `start_new_session`,
   the resolver's POSIX branch) have not run: this work was done on Windows. The
   Linux run of the `Tests` workflow on GitHub Actions is the check, and the full

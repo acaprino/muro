@@ -597,3 +597,19 @@ def test_the_documents_name_the_form_and_record_what_was_not_run():
     for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which",
                    "environment variables that reach the server"):
         assert phrase in not_run, phrase
+
+
+def test_the_adr_says_what_ci_does_not_run_what_a_release_carries_and_the_condition_before_a_first_release():
+    adr = (PROMPTS.parent / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8")
+    amendment, not_run = adr.split("## Amendment: implementation (2026-11-23)", 1)[1].split("## Not run", 1)
+    amendment, not_run = " ".join(amendment.split()), " ".join(not_run.split())
+    # CI: the risk row names a Windows test in CI, and the Python tests run on ubuntu-latest only.
+    for text in (amendment, not_run):
+        assert "ubuntu-latest" in text and "taskkill" in text
+    assert "Windows job is the owner's decision" in not_run
+    # What a release carries: byte-equal holds for the registration files, not for the release.
+    assert "byte-equal holds for the registration files" in amendment
+    assert "form_package-tool" in amendment and "jsonrpc.py" in amendment
+    # The condition before a first release.
+    assert "no package that declares `package_server` is released before the live Claude Code run" in not_run
+    assert "allow_leading_dash" in not_run and "console windows" in not_run
