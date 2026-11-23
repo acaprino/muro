@@ -78,7 +78,6 @@ await test('the list says what each project is, what is installed as published, 
   assert.equal(await page.getByRole('button', { name: /^Remove .* from the list$/ }).count(), 0, 'the project Muro ships stays in the list');
   await page.getByRole('heading', { name: /Installed as published/, level: 2 }).waitFor();
   assert.match(await page.getByRole('list', { name: 'Installed as published' }).textContent(), /commit-helper.*Needs a build for Codex/);
-  assert.equal(await page.getByText(/New project|Create a project/).count(), 0, 'the write side is a later plan');
   await page.screenshot({ path: shots + '/workspace-list.png' });
   await page.getByRole('button', { name: 'Marionette', exact: true }).click();
   await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
@@ -491,7 +490,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   await page.screenshot({ path: shots + '/workspace-500.png' });
 });
 
-await test('every control has a name, and the editor\'s actions are disabled and say why', 'projects', {}, async app => {
+await test('every control has a name, and the actions that are not there yet are disabled and say why', 'projects', {}, async app => {
   const { page } = app;
   await openMarionette(page);
   await row(page, 'A landing page').click();
@@ -502,10 +501,14 @@ await test('every control has a name, and the editor\'s actions are disabled and
     assert.deepEqual(await unnamed(page), [], name);
   }
   const actions = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Add input…'];
+  // Add input… and Harmonize again… work (plan W, browser-write-ai.mjs); the two that wait for another plan say which.
+  const waiting = { 'Review decisions…': 'Coming with the review', 'Install on harnesses…': 'Coming with the Sync page' };
   for (const name of actions) {
     const button = page.getByRole('button', { name, exact: true });
-    assert.equal(await button.isDisabled(), true, `${name} waits for the editor`);
-    assert.equal(await button.getAttribute('title'), 'Coming with the editor');
+    if (name in waiting) {
+      assert.equal(await button.isDisabled(), true, `${name} waits for another plan`);
+      assert.equal(await button.getAttribute('title'), waiting[name]);
+    } else assert.equal(await button.isDisabled(), false, `${name} is live`);
   }
   assert.deepEqual(await texts(actionBar(page).locator('button')), actions, 'Add input… is last');
   assert.deepEqual(await actionBar(page).locator('button').evaluateAll(buttons => buttons.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
