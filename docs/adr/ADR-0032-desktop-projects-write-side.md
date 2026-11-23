@@ -23,7 +23,15 @@ implementation choices; neither they nor this text have been separately
 approved. Rust was compiled and tested in GitHub Actions only; no run was made
 against a real Claude Code (see the verification record).
 
-**Note of 2026-11-23.** This ADR was written on the side branch `claude/busy-pascal-a74l79` as ADR-0030 and renumbered when it was taken over. Taken over: the factory commands (`muro project new`, `edit`, `commit`), the runtime actions and the shell's folder dialog. Not taken over: the screens (`apps/desktop/src/pages/project/write.ts` and the Imago pages), which the move to React on Sigrid (ADR-0031) replaced; they are written again in the React window. Where the text below says the desktop does something, it describes the intended behaviour of those screens, not code that is in the window today.
+**Note of 2026-11-23.** This ADR was written on the side branch `claude/busy-pascal-a74l79` as ADR-0030 and renumbered when it was taken over. Taken over: the factory commands (`muro project new`, `edit`, `commit`), the runtime actions and the shell's folder dialog. Not taken over: the screens of that branch (`apps/desktop/src/pages/project/write.ts` and the Imago pages), which the move to React on Sigrid (ADR-0031) replaced. They are written again in the React window (plan W, commits `ba5929a` to `114178a`), under `apps/desktop/src/pages/project/write/` unless a path says otherwise:
+
+- the write layer and the runs: `jobs.ts` (the shapes of the requests, the checks of what is typed that the runtime makes again, the wording of its refusals), `useJobs.tsx` (the runtime's jobs, read for the whole window) and `JobCard.tsx` (the card of a run, with Cancel);
+- the AI changes (decisions 1 and 2): `NewProjectDialog.tsx`, `AddInputDialog.tsx`, `HarmonizeDialog.tsx` (which also holds what the dialogs of a change share), `PinDialog.tsx` (move a pin, with Check for updates, and remove an input) and `InstructionsDialog.tsx`;
+- the edits by hand (decision 6): `DetailsDialog.tsx` (name, author, repository, changelog) and `RecordsEditor.tsx` (add, edit and delete a decision record);
+- deleting a project: `DeleteDialog.tsx`;
+- the pages that hold them: `pages/Projects.tsx` (New project, Delete, the card above the list), `pages/project/Workspace.tsx` (the action bar, Edit details, the card of the project), `InputsPanel.tsx` (Move pin, Remove, Instructions) and `RecordsPanel.tsx`.
+
+Not in the window: **Install on harnesses** (decision 8 has a new version installed from the Install step; that step comes with the Sync page), **Review decisions** (the runtime has no operation for it) and the Activity page (decision 7's filter *AI runs*: the run's card on the project page and above the list is there). The Consequences' note on Imago's `textArea` is about the earlier window: the React window uses Sigrid's own field. Nothing of this was run with a real Claude Code or on a Windows window: the tests drive a fake service, and the record is `docs/verification/2026-11-23-project-write-react.md`.
 
 ## Context
 

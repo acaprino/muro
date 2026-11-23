@@ -2,9 +2,10 @@
 
 The desktop interface is a React app on Sigrid (`@acaprino/sigrid`) and its Windows frame is the Rust crate
 `imago-shell` ([ADR-0031](adr/ADR-0031-desktop-on-sigrid.md), owner decision of 2026-11-23). The React window took the place
-of the Imago window and is not complete: it has the project workspace, and **Sync**, **Activity**, **Settings** and the
-first run are not in it yet (the plans R1 to R3, kept outside this repository, are meant to bring them back). Until they
-are, a person cannot review or apply a plan, change a setting or add a harness in the window. The tray, the background
+of the Imago window and is not complete: it has the Projects page, where a project is read, simulated and now also made and
+changed ([Changing a project](#changing-a-project)), and **Sync**, **Activity**, **Settings** and the first run are not in it
+yet (the plans R1 to R3, kept outside this repository, are meant to bring them back). Until they are, a person cannot review
+or apply a plan, change a setting or add a harness in the window. The tray, the background
 worker and the registry are as they were, so automatic sync still runs, and the registry's operations stay available
 through `muroctl` and `muro` ([CLI reference](desktop-cli.md)). [Imago migration](imago-migration.md) records what the
 old window took from Imago, kept as history.
@@ -36,19 +37,22 @@ only Projects is built. It is Sigrid's `AppShell` (title bar, status row, conten
   has the focus, unless a request of the person is waiting.
 
 **Projects.** The list shows each project file with its version, file and counts (or *Cannot be read* and the reason, for a
-file that does not open), and keeps the plugins installed as published apart, under **Installed as published**. **Open
-project file…** adds a project through the shell's file dialog (the button is not shown where the shell has none), and
-**Remove from list** takes one off after asking, leaving its file alone; the project Muro ships (*Included with Muro*) has
-no such button. [Projects](#projects) says what a project file holds.
+file that does not open), and keeps the plugins installed as published apart, under **Installed as published**. **New
+project…** (the one solid button of the list) makes a project from the plugins and skills you name, and **Open project
+file…** adds an existing one through the shell's file dialog (the button is not shown where the shell has none). On every
+project but the one Muro ships (*Included with Muro*), **Remove from list** takes it off after asking, leaving its file
+alone, and **Delete…** deletes its file as well, after asking. While an AI run goes the list shows its card above the table,
+and **New project…** is off with the reason. [Projects](#projects) says what a project file holds.
 
 A project opens on its workspace. Its head says the project's name, version and counts, its file with **Open folder** (the
 file manager on the file's folder, `open_folder`; the button is gone for the session where the shell cannot open folders),
-and its repository and branch, its author and its creation date. Under it are three regions side by side:
+and its repository and branch, its author and its creation date, and **Edit details…**. Below the head comes the card of the
+project's AI run, while there is one to say, and then three regions side by side:
 
 - a panel at the left with four views: **Inputs** (the plugins and skills the project absorbs, each with its pin, its
   license and what it became, and your custom instructions), **Examples** (the simulator and the documented examples,
-  [below](#the-simulator-and-its-engines)), **Records** (the decision records, read only) and **Runs** (one row per
-  harmonization, newest first, with its version, changelog, result, budget and engine);
+  [below](#the-simulator-and-its-engines)), **Records** (the decision records, which you add, edit and delete by hand) and
+  **Runs** (one row per harmonization, newest first, with its version, changelog, result, budget and engine);
 - the decision graph in the middle: the discovery entries, closed until opened, with their capabilities under them. A closed
   entry shows its name only, an open one also the first sentence of its "Use when". Choosing an example or an input opens the
   entries that hold what it lights, and the view is fitted again to what is open. The canvas draws one kind of line, from an entry to its
@@ -57,11 +61,13 @@ and its repository and branch, its author and its creation date. Under it are th
 - the details of what is selected (an example, an input or a capability) in the inspector at the right: docked from 1000 px,
   and a panel over the end of the graph under it. Under 620 px the left panel becomes a drawer, opened by a button.
 
-At the foot are **Review decisions…**, **Harmonize again…**, **Install on harnesses…** and **Add input…**, all disabled with
-the hint *Coming with the editor*: the window reads a project and simulates requests against it, and neither changes a
-project nor installs its plugin on a harness. The open project, its view, the selection and the request being typed survive
-a reload of the page (session storage, key `muro.project`); a simulation that was waiting for the AI never comes back as
-waiting.
+At the foot are **Review decisions…**, **Harmonize again…**, **Install on harnesses…** and **Add input…**, the last one the
+solid button. **Harmonize again…** and **Add input…** start an AI run, and are off, with the reason, while another run goes.
+**Review decisions…** (*Coming with the review*) and **Install on harnesses…** (*Coming with the Sync page*) are disabled:
+the runtime has no operation that reviews a project's decisions yet, and the window installs nothing on a harness until the
+Sync page is back. [Changing a project](#changing-a-project) says what each change does. The open project, its view, the
+selection and the request being typed survive a reload of the page (session storage, key `muro.project`); a simulation that
+was waiting for the AI never comes back as waiting.
 
 **Sync, Activity and Settings** each say that the page is moving to the new window (*Sync is moving to the new window*, and
 so on), and the first run is not shown at all. The tray and the background
@@ -118,9 +124,67 @@ Registry writes are revision-checked and atomic; native operations have a journa
 **The default project.** Muro is meant to ship with Marionette inside (ADR-0028, decision 5), but it builds nothing of it: its release takes the latest published release of `acaprino/marionette` and bundles it, unchanged, as `projects/marionette-<version>.zip` with its `.sha256` (owner decision of 2026-11-22). That release is a zip of the built plugin folder, not a `.mp` project file, and the runtime installs a default project only from `projects/marionette.mp`, which nothing makes any more: today the zip is carried and not read, a new data directory lists no default project (`NotBundled`), and a copy that an earlier Muro installed stays as it is. Reading the release as the default project (or as a plugin to install) is a follow-up of the runtime; `muro project pack` is still how a project file of Marionette is made, and `marionette.yml` still checks that it can be.
 
 **The page.** The workspace of an open project is described under [The window](#the-window): it reads the project's inputs,
-decisions, records, runs and graph from `muro project info`, and shows the simulator. The Harmonize views and the Install
-step of the Imago window (switches that prepared a project's build for each harness through `install_project`) are not in it
-yet; the service still answers that action.
+decisions, records, runs and graph from `muro project info`, shows the simulator, and changes the project as
+[Changing a project](#changing-a-project) says. The Install step of the Imago window (switches that prepared a project's
+build for each harness through `install_project`) is not in it yet; the service still answers that action.
+
+## Changing a project
+
+The Projects page makes and changes projects as [ADR-0032](adr/ADR-0032-desktop-projects-write-side.md) describes, in two
+kinds of change. The factory commands and the runtime actions behind them are in [the CLI reference](cli.md) ("Writing a
+project"); the page only asks and shows what the runtime answers. It never judges what a project means: that stays with the
+AI that runs.
+
+**An AI run** changes the package itself: its inputs, how they fit together, its instructions. The runtime runs Claude Code
+on this computer, with its own credentials, in a work folder of the job, and the factory commits the result. The page sends
+`create_project` for a new project and `project_job` (with an `operation`) for a change of one:
+
+- **New project…** (the list): a name, a plugin id (it follows the name until you type one), an author, a folder (the file is
+  `<plugin id>.mp` in it; **Choose folder…** opens the shell's folder dialog, `pick_folder`, and is gone for the session where
+  the shell has none), the inputs, one per line (an `https://` address, a folder of the repository after `#`, or the full
+  path of a folder on this computer), your request in words (optional), a repository (optional) and the budget.
+- **Add input…** (the foot of the workspace): one more input, by address or folder.
+- **Harmonize again…** (the foot): the AI reads the inputs and the decision records again and fixes what no longer holds.
+- **Move pin…** and **Remove…** on each input (Inputs panel). Move pin offers **Check for updates**, which asks
+  `project_updates` (read only) how the pin stands against its upstream and fills the field with a newer release it
+  reports; the field empty means the newest release. It is not offered for a frozen (`static`) pin. Removing asks first, with
+  the focus on Cancel, and is not offered for the only input.
+- **Instructions…** (Inputs panel): the Markdown files of the project's own instructions, added, edited or removed. Only the
+  files that changed are sent.
+
+A change of an existing project also takes a request in words (optional) and the version step (patch, minor or major; adding
+or removing an input starts on minor, the others on patch). Every run takes a maximum budget in US dollars, 5 by default,
+above 0 and at most 100, which Claude Code checks between turns, so a run can end slightly above it. What the page can check
+from what was typed (the plugin id, the addresses, the budget, the lengths) it checks before it sends, in the runtime's own
+words; what only the runtime knows (that the folder is there, that no file of that name exists, that no other run goes) it
+says when the form is sent, before any run is paid for, and the dialog shows that sentence as it comes and keeps what was
+typed. When the agent chosen in Settings → AI is not Claude Code the page says so before the run and offers none; the
+Settings page that changes it is not in the window yet. Every change of an existing project carries the digest of the file
+the page shows: when the file changed since, the runtime refuses it (*The project file changed since it was opened…*).
+
+**The card of the run.** While a run goes its card shows the title, the phase, the time, the most it may cost, its log file
+and **Cancel** (the card says *Stopping* until the runtime ends the run): above the list for a new project, under the head
+of the project for a change. The runs are the runtime's, not the page's. The window reads them (`jobs`) when it opens, after
+a start or a cancel, every 2 seconds while one goes and when the registry it reads shows one it did not know, so the card is
+there again after leaving the project or the tab, or after a reload. When a run ends the list and the open project are read
+again and the outcome is notified in the runtime's words. A run that failed, was cancelled or was interrupted stays on the
+card, with its log, until **Dismiss**; a run that succeeded is said once, if this window saw it going. One AI run goes at a
+time, adaptations included (the runtime's lock): while one does, no other AI run is offered and the buttons say why.
+
+**An edit by hand** changes what no AI judges and runs none (`edit_project`, offline): **Edit details…** (name, author, the
+repository the project is published from, which can be taken away, and its changelog) and, in the Records panel, **Add
+record…**, **Edit** and **Delete** on a record. The page sends only what changed, with the digest of the file it shows, and
+reads the project again once the runtime answers, so the next edit is made on the file as the last one left it. A record
+you add is yours, and a record Muro wrote becomes yours when you change its words. While an AI run is changing the project
+no edit is offered (the runtime refuses one); a run of another project does not stop it.
+
+**Delete…** (the list) asks first, names the file, says that it cannot be undone and that the project's installed plugin
+stays where it is, then sends `delete_project` with the registry revision (once more, with the revision read again, when the
+registry moved meanwhile). The project Muro ships has no such button.
+
+**Not in the window yet.** **Install on harnesses…** and **Review decisions…** (above), the Activity page, where ADR-0032
+decision 7 has the filter *AI runs*, and the pages of the plans R1 to R3. No change was run with a real Claude Code from this
+window, and none on a Windows window: see [the verification record](verification/2026-11-23-project-write-react.md).
 
 ## The simulator and its engines
 
@@ -173,7 +237,7 @@ Portable distributions contain `portable.marker` and keep state under `data/` be
 
 **The window beside the worker.** The worker and the tray's **Pause** change the registry while the window is open or hidden. The window reads the registry again when it gets the focus (it is shown again from the tray, or clicked back to) and every 30 seconds while it has the focus, and only when no request of yours is waiting; an open dialog and the text being typed are kept, since React does not paint over them. It asks for no plan on the way: the recorded check says what changed. A project taken off the list (`remove_project`) that the registry refuses because it moved (*Registry revision changed*) is sent once more with the revision read again; only a second refusal reaches you. The Settings page of the earlier window retried its save the same way, over what the worker saved; it is not in the React window yet (plan R2).
 
-**Waiting for the registry.** The registry takes its writer lock without waiting and refuses a second request, and a check of sources that answer slowly holds it for as long as they take. The desktop shell does the waiting for every page, in one place: a request of the window waits for the sync in progress (10 minutes at most), then tries a busy registry again every 250 ms for 15 seconds before it returns the error. The tray and the worker read the lock-free `status` instead of a snapshot. A launch while another process holds the registry waits for it too. Inside the window the page sends its requests one after another, except `discover`, `simulate` and `cancel_simulation` (`ALONE` in `apps/desktop/src/queue.ts`): a simulation holds no registry lock while the AI works and can last minutes, so nothing else in the window waits for it and **Cancel** reaches the runtime while the run it stops is still going. The shell holds a `simulate` back while a sync is in progress, like any request that reads the registry, and lets `cancel_simulation`, `env_present`, `discover` and `status` through.
+**Waiting for the registry.** The registry takes its writer lock without waiting and refuses a second request, and a check of sources that answer slowly holds it for as long as they take. The desktop shell does the waiting for every page, in one place: a request of the window waits for the sync in progress (10 minutes at most), then tries a busy registry again every 250 ms for 15 seconds before it returns the error. The tray and the worker read the lock-free `status` instead of a snapshot. A launch while another process holds the registry waits for it too. Inside the window the page sends its requests one after another, except `discover`, `simulate`, `cancel_simulation`, `jobs` and `cancel_job` (`ALONE` in `apps/desktop/src/queue.ts`): a simulation holds no registry lock while the AI works and can last minutes, so nothing else in the window waits for it and **Cancel** reaches the runtime while the run it stops is still going. The same holds for the AI runs of a project: `jobs`, which follows a run, and `cancel_job` do not wait behind a long `project_updates` or `edit_project` that the page sent before them. The shell holds a `simulate` back while a sync is in progress, like any request that reads the registry, and lets `cancel_simulation`, `env_present`, `discover` and `status` through.
 
 - **Automatic sync on:** it then applies the plan without a review step, except its removals. Blockers do not stop it: it applies what is ready and leaves the blocked items out, and the event says what was left out (Activity: *Automatic sync*, failed when blockers remain). The worker never uninstalls, whatever the rule for plugins outside your list says: it applies with `skip_removals`, and the removals stay in the sync state as pending until you confirm them in the review sheet. Its message then ends with how many wait (*31 removals wait for your confirmation*, or *1 removal waits for your confirmation*), after the changes it applied when it applied any; a plan of removals only makes no `apply` call.
 - **Automatic sync off:** it only checks. Nothing is installed or removed; the tray says how many changes are waiting (Activity: *Background check*).
@@ -206,12 +270,12 @@ python muro_build.py --manifest examples/marionette/sources.json --validate
 
 The Python tests that do not name Marionette (`python -m pytest -q -m "not marionette"`) run in the Tests workflow on GitHub, and the ones that do run in the Marionette workflow; the Rust tests, `npm test`, the type check, the frontend build, Sigrid's design check (`sigrid-check`, not blocking until its first output has been read) and the browser tests of the `desktop` job run in Tests.
 
-- **`npm test`** runs Node's test runner over `apps/desktop/tests/*.test.ts`, as plain functions: the model (`model.test.ts`), the request queue, the theme, the state the project workspace keeps across a reload (`project-state.test.ts`), the graph model and the scene made for Sigrid's canvas (`graph-model.test.ts`, `graph-scene.test.ts`), what the workspace reads of a project and the lines it writes from it, such as the engine note and the runs (`project-data.test.ts`), the fake service (`fake-transport.test.ts`), Imago's zoom with Muro's storage key (`imago-zoom.test.ts`) and the rules for the sources (`imago-ownership.test.ts`: the stylesheet only imports Sigrid, no inline style, SVG or HTML string, and Imago is imported for the window glue only).
-- **`browser-shell.mjs`** (the frame, the theme, the palette, the refresh of the registry) and **`browser-workspace.mjs`** (the list of projects and the workspace); `browser.mjs` runs them one after the other. They start the Vite dev server and headless Edge (Playwright's `msedge` channel) and drive the real window against `fake-transport.js`, a fake of the registry service that keeps its rules: revision conflicts, blockers, `allow_blocked`, removals only on a harness without a blocker and only when confirmed (`confirm_removals` or `skip_removals`). They prove the window, not the service. `screenshots.mjs` draws the Projects list, the workspace (dark and light) and a simulation from the fake's `projects` scenario; CI does not run it, and it has not been run on the React window yet.
+- **`npm test`** runs Node's test runner over `apps/desktop/tests/*.test.ts`, as plain functions: the model (`model.test.ts`), the request queue, the theme, the state the project workspace keeps across a reload (`project-state.test.ts`), the graph model and the scene made for Sigrid's canvas (`graph-model.test.ts`, `graph-scene.test.ts`), what the workspace reads of a project and the lines it writes from it, such as the engine note and the runs (`project-data.test.ts`), the write side of a project (`project-write.test.ts`: the shapes of the requests, the checks of what is typed with the runtime's wording, the runs, and the refusals of the fake service's write actions), the fake service (`fake-transport.test.ts`), Imago's zoom with Muro's storage key (`imago-zoom.test.ts`) and the rules for the sources (`imago-ownership.test.ts`: the stylesheet only imports Sigrid, no inline style, SVG or HTML string, and Imago is imported for the window glue only).
+- **`browser-shell.mjs`** (the frame, the theme, the palette, the refresh of the registry) and **`browser-workspace.mjs`** (the list of projects and the workspace), and three files for the write side of a project: **`browser-write-ai.mjs`** (the AI dialogs, the job card and the action bar), **`browser-write-edit.mjs`** (the details and the decision records edited by hand) and **`browser-write-new.mjs`** (a new project, and deleting one); `browser.mjs` runs the five one after the other. They start the Vite dev server and headless Edge (Playwright's `msedge` channel) and drive the real window against `fake-transport.js`, a fake of the registry service that keeps its rules: revision conflicts, blockers, `allow_blocked`, removals only on a harness without a blocker and only when confirmed (`confirm_removals` or `skip_removals`), and, for the write side, a stale digest refused, one AI run at a time, a new project never written over an existing file and the shipped project not deletable. Its runs end by themselves or when a test says so: no Claude Code runs behind it. They prove the window, not the service. `screenshots.mjs` draws the Projects list, the workspace (dark and light) and a simulation from the fake's `projects` scenario; CI does not run it, and it has not been run on the React window yet.
 - **`native.mjs`** drives the real executable over the WebView2 debugging port, against the real Tauri `request` command, the real registry service and a real OpenCode profile in a temporary folder. It was written for the Imago window: it walks the first run and the Sync page (pick the harness, add a plugin, Check now, Apply all, a second Check), which the React window does not have yet, so it does not pass on it. It uses a Run value of its own name and deletes it.
 - **`native-shell.mjs`** drives the same executable but calls the shell's `request` command from the page, not the interface: start with Windows, close to the tray, `--background`, the worker, a second launch and the quit path. It asks the window to close the way Windows does (`WM_CLOSE`) and reads whether the window shows from user32. Its section 8 reads Sync's note and status row of the Imago window, which this window does not have. The tray menu itself is a native menu that no test reaches.
 - Neither native test has been run against the React window.
 
 - **The Rust tests of Projects** (`cargo test -p muro-registry -p muro-desktop-runtime`): the list and the AI settings of the registry, and, in the runtime, `projects` (a stand-in factory), `simulate` (the exact command lines of both harnesses, the readers of their output, the API engine through a local endpoint, cancellation) and `real_factory` (a `.mp` packed by the real factory, listed, installed on a temporary OpenCode target, planned, replaced and simulated through a local endpoint).
 
-The two native tests, as they were run on the Imago window, prove the app/configuration boundary; they do not prove that an OpenCode agent loaded and executed a plugin, and none of them is a real sign-in to Windows. See the dated verification records for real host checks and remaining limits: the Projects tab ([2026-11-20](verification/2026-11-20-desktop-projects-read.md)) was not run with a real Claude Code, Codex or API for a free-text simulation, and whether Codex runs an MCP tool in `exec` without an approval prompt is unverified. No personal harness installation is required by these tests.
+The two native tests, as they were run on the Imago window, prove the app/configuration boundary; they do not prove that an OpenCode agent loaded and executed a plugin, and none of them is a real sign-in to Windows. See the dated verification records for real host checks and remaining limits: the Projects tab ([2026-11-20](verification/2026-11-20-desktop-projects-read.md)) was not run with a real Claude Code, Codex or API for a free-text simulation, and whether Codex runs an MCP tool in `exec` without an approval prompt is unverified. The write side of a project in the React window ([2026-11-23](verification/2026-11-23-project-write-react.md)) was not run with a real Claude Code either, nor on a Windows window. No personal harness installation is required by these tests.
