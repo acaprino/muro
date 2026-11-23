@@ -21,7 +21,9 @@ Date: 2026-11-23. Status: Proposed. The owner chose the approach ("1") and
 accepted the fixes of a fresh-context review ("auto accept"); the explanatory
 text and the implementation choices are not separately approved. What was built,
 the decisions taken while building it and what was not run are in the amendment
-and in "Not run" at the end.
+and in "Not run" at the end. The design called this record ADR-0032. That number
+was taken on `develop` by the record of the projects write side of the desktop app,
+so this one is ADR-0033.
 
 ## Intent and why
 
@@ -45,7 +47,7 @@ The owner's words, 2026-11-23, about Supads:
   changing what gets built: "auto accept"
 
 In ADR-0030 the owner was offered "C: one Muro server that proxies every absorbed
-server" and chose A (each server registered as it is). This decision adds a
+server" and chose A (each server registered as it is). This design adds a
 variant of C: a server in front of the absorbed servers it is told to start,
 which can also serve absorbed commands. A stays available as one of the answers
 the owner can give.
@@ -61,8 +63,7 @@ of which no capability calls, and runs its ads commands through the shell
 packaged server started by hand on Windows 11, `tools/list` 46,245 bytes, on
 2026-11-21).
 
-Success for Supads, each point to be measured in verification (none is measured
-yet; see "Not run"):
+Success for Supads, each point measured in verification:
 
 1. One server, named `supads`, is what the host shows.
 2. Its `tools/list` answer is smaller in bytes than `supercmo`'s alone.
@@ -86,7 +87,7 @@ yet; see "Not run"):
 - **Source**: a pinned repository a package absorbs. **Capability**: one on-demand
   method in the catalog. **Decision**: an entry of `delivery.json` saying what a
   part of a source became; its **form** is one of `capability`, `always-on`,
-  `hook`, `mcp-server`, `package-tool`, `dropped`; its **targets** are the
+  `hook`, `mcp-server`, `dropped`; its **targets** are the
   capabilities it serves. **`catalog_digest`**: a hash of the catalog and of
   `delivery.json`; when it changes, the routing eval is run again.
   **`<package_root>`**: the folder of the installed release.
@@ -318,7 +319,7 @@ Three components in the factory's runtime, shipped in every release:
   arguments and environment the adapter would have registered), `initialize`, one
   reader thread per child, `tools/list`, `tools/call`, shutdown.
 - **The package server**, `muro/package_server.py`, started as
-  `python <package_root>/muro.py tools-server`.
+  `python <package_root>/muro.py <subcommand>`.
 
 Behaviour:
 
@@ -340,8 +341,9 @@ Behaviour:
   child that dies is started again once; a second failure is an error naming the
   child.
 - `tools/call`, run: argv is built from the template and the arguments, with no
-  shell. A program that resolves to a `.cmd` or `.bat` file is refused, because
-  Windows runs those through `cmd.exe`. Output is decoded as UTF-8 with
+  shell. A program that resolves to a `.cmd` or `.bat` file is refused by the
+  function the hook trampoline already uses, because Windows runs those through
+  `cmd.exe`. Output is decoded as UTF-8 with
   replacement and cut at 100,000 characters with a notice. A nonzero exit is
   `isError` with stderr and the exit code. A program not found is an error naming
   it. On timeout the process tree is killed and the result is `isError` saying the
@@ -410,12 +412,12 @@ twice.
   never enter the declaration.
 - `prompts/intake.md`: record a source's command-line programs as evidence for
   harmonization (commands, read or write, credentials) without choosing a form.
-- This ADR, `AGENTS.md` (the paragraph on servers), `docs/cli.md` for the
+- ADR-0033, `AGENTS.md` (the paragraph on servers), `docs/cli.md` for the
   launcher's subcommand, the re-pin procedure ("copy a child's tool descriptions and
   schemas again").
 - `GUIDE.html`: package tools under their sources' decisions. No new view.
 
-### 6. Verification planned
+### 6. Verification
 
 - `tests/test_package_server.py`, with stub servers and stub commands and no name
   of a real source: every shape refusal; the gate in `build` and its absence
@@ -449,9 +451,9 @@ twice.
 | --- | --- | --- | --- |
 | A host calls a write tool directly, without the capability that carries draft first | A campaign changed or money spent without a draft | Two deliveries; the declared `--dry-run` default; the source's rule quoted in the description | The deciding test of section 6 |
 | A model-written value read as a flag | Another option set on a paid account | Leading-dash values refused unless declared | Unit test |
-| A program that is a batch file | Command injection through `&` and `%` | Refused | Unit test |
-| Credentials in the inherited environment | Every tool of the server can use them | Accepted: the source's programs are built so; to be stated in `INSTALL.md`; never in the declaration, never printed by the server | Review of the output path |
-| A child hangs or dies | A tool that never answers | Per-call timeout, a restart, a named error | Unit test |
+| A program that is a batch file | Command injection through `&` and `%` | Refused, with the trampoline's function | Unit test |
+| Credentials in the inherited environment | Every tool of the server can use them | Accepted: the source's programs are built so; stated in `INSTALL.md`; never in the declaration, never printed by the server | Review of the output path |
+| A child hangs or dies | A tool that never answers | Per-call timeout, one restart, a named error | Unit test |
 | One server for everything | A bad file or a missing `python` removes every tool at once | Accepted and stated; the build validates the file it writes | Build test |
 | Timeout on a write | A retry spends twice | The "effect unknown" result | Unit test |
 | Processes left behind on Windows | Stray `node` or `python` | Process trees killed on timeout and shutdown | Test on Windows in CI |
@@ -472,17 +474,18 @@ amendment is what the code does.
   MCP server, the package server and the client all use them.
 - `muro/mcp_client.py`: `ChildServer`, the client that starts one absorbed server
   and calls its tools; `resolve_program`; `kill_tree`.
-- `muro/package_server.py`: the server, `PackageServer` and `serve`. The launcher's
-  action `tools-server` runs `serve` in `muro/runtime.py` before any catalog is
-  loaded, because the server reads only its own file.
+- `muro/package_server.py`: the server, `PackageServer` and `serve`. The design left
+  the launcher's subcommand name to the builder: it is the action `tools-server`,
+  which `muro/runtime.py` runs through `serve` before any catalog is loaded,
+  because the server reads only its own file.
 - `muro/argv_template.py`: the template's shape check against the schema, the
   builder of one call's argv and the one batch-file check, `is_batch_program`
   with its message `batch_refusal`. The package server uses it for commands and
   for children. The hook trampoline in `muro/delivery.py` keeps its own inline
   check of a batch file: it is a one-line Python program that runs before `muro`
-  can be imported, so it cannot call this module. The design said the server
-  refuses a batch file "with the trampoline's function"; there are two checks
-  for that reason, and each says why.
+  can be imported, so it cannot call this module. The design (section 3 and the
+  risk table) said the server refuses a batch file by "the function the hook
+  trampoline already uses"; there are two checks, for that reason.
 - `muro/delivery.py`: `package_server`, `server_sections`, `server_section_errors`
   (every check that needs neither the capabilities nor the manifest, which the
   server also runs on its own file), `package_server_gate_errors` (called by
@@ -501,14 +504,15 @@ amendment is what the code does.
 lost if it was wrong.
 
 1. **A `run` tool's schema may carry `description`**, at the top level and on each
-   property, and a property may carry `allow_leading_dash`. The design's "nothing
-   else of JSON Schema" would have removed the argument text a model needs. Only
-   `type`, `required` and `enum` are enforced; any other key is refused.
+   property, and a property may carry `allow_leading_dash`. The implementation
+   plan said any other key is an error, which would have removed the argument text
+   a model needs, and the design is silent on it. Only `type`, `required` and
+   `enum` are enforced; any other key is refused.
 2. **A placeholder inside a group names the group's own `if` property or a
    required property.** Rule 2 of the design spoke only of a placeholder outside a
-   group. A declaration that leaves the case open surfaces at call time, so it is
-   refused at validation, where the build reports it. If a legitimate template
-   shape is refused, the rule is relaxed.
+   group, and the plan left the case open. A declaration error should surface at
+   the build, not at a call, so it is refused at validation. If a legitimate
+   template shape is refused, the rule is relaxed.
 3. **A forwarded tool keeps the child's name whatever its spelling.** For a
    forwarded tool the name pattern is `[A-Za-z0-9_-]{1,64}`; the strict
    `[a-z][a-z0-9_]{0,39}` holds for `run` tools only. The design puts "keeps the
@@ -520,8 +524,10 @@ lost if it was wrong.
    ("the owner's answer does not cover tool X: ask again"). The design binds the
    answer to "the names of the tools and commands shown". Without this, a tool
    added at an unchanged commit builds with no question, for tools that act on
-   paid accounts. A Harmonizer AI that lists commands under other names in `shown`
-   is asked to list the tool names.
+   paid accounts. A command that becomes a tool is listed under the tool's `name`:
+   the `shown` example of section 1 (`meta-ads campaigns list`) would be refused for
+   a tool named `meta_campaigns_list`. A Harmonizer AI that lists commands under
+   other names in `shown` is asked to list the tool names.
 5. **Cancellation is by request id.** `notifications/cancelled` cancels only the
    call whose host request id is `params.requestId`. MCP names the request, and
    cancelling an unrelated call would be a wrong result for it. A host that sends
@@ -559,20 +565,28 @@ lost if it was wrong.
   the package server uses. A recorded commit is compared as a prefix of the
   pinned commit, in either case, and has at least 7 hex characters.
 - A child that dies: the call that was waiting for it is answered with an error
-  naming the child, and it is not repeated, because a call can act on a paid
-  account. The next call that needs the child starts it again. A child that does
-  not start and list its tools within 30 seconds is given up with an error naming
-  it. The design said "started again once; a second failure is an error".
+  naming the child, and it is not repeated. The next call that needs the child
+  starts it again. The design said "started again once; a second failure is an
+  error".
+- A forwarded call has no time limit of the server's: it ends when the child
+  answers, the child stops, the host cancels it or the server closes. Only the
+  start of a child and its first `tools/list` are limited, to 30 seconds, and a
+  child that does not answer in time is given up with an error naming it. The
+  "per-call timeout" of the risk table is the `run` tool's.
 - The first-call comparison covers the tool's presence and its `inputSchema`. A
-  changed description is not detected there; the gate's commit binding is what
-  keeps a description current.
+  changed description is not detected there. The gate asks the owner again when
+  the pinned commit of a serving source changes.
 - The five rules apply to `run` tools. A forwarded call goes to the child as it
   came, and the child validates it.
 - Rule 4 is for strings. A negative number reaches the program as `-5`.
-- The build cannot see what a server declares without starting it, so it does not
-  check that a child "declares tools alone", and it cannot see the tools of a
-  server that stays registered, so it does not check that a tool name differs from
-  them. The Harmonizer AI does both from the source, and the prompts say so.
+- The build starts no server, so it does not check that a child "declares tools
+  alone" and does not know the tools of a server that stays registered, so it does
+  not check that a tool name differs from them. The Harmonizer AI does both from
+  the source, and the prompts say so.
+- `PACKAGE_SERVER_HOSTS` holds Claude Code although no live session has run, which
+  differs from the constraint that a host joins the list after it was run live. The
+  live run of section 6 can only happen on a build that registers the server, and
+  nothing in `INSTALL.md` says the registration was run.
 - The design said `INSTALL.md` states that credentials in the inherited
   environment reach every tool of the server. It does not state this yet. The
   server and what it starts do inherit the host's environment.

@@ -523,7 +523,7 @@ def test_the_harmonizer_prompt_asks_the_owner_about_servers():
     text = (PROMPTS / "harmonizer.md").read_text(encoding="utf-8")
     for phrase in ("## Servers and tools", "ships an MCP server", "Never proceed on your own choice",
                    "read from the pinned source files", "an estimate", "no server is started", "as two lists",
-                   "only when there is no recorded answer or the evidence changed",
+                   "only when there is no recorded answer or the evidence changed", "under its `name`",
                    "With no owner to ask, write no `package_server`"):
         assert phrase in text, phrase
 
@@ -553,3 +553,14 @@ def test_the_contract_is_recorded():
     assert "adr_id: ADR-0033" in adr and "muro deve chiedere cosa fare di eventuali server mcp" in adr
     assert "(ADR-0033)" in (root / "AGENTS.md").read_text(encoding="utf-8")
     assert "tools-server" in (root / "docs/cli.md").read_text(encoding="utf-8")
+
+
+def test_the_documents_name_the_form_and_record_what_was_not_run():
+    root = PROMPTS.parent
+    assert "mcp-server, package-tool, dropped}" in (root / "docs/cli.md").read_text(encoding="utf-8")
+    assert "`mcp-server`, `package-tool` or `dropped`" in " ".join((root / "AGENTS.md").read_text(encoding="utf-8").split())
+    adr = (root / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8")
+    assert "## Amendment: implementation (2026-11-23)" in adr
+    not_run = adr.split("## Not run", 1)[1]
+    for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which"):
+        assert phrase in not_run, phrase

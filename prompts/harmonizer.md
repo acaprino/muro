@@ -145,9 +145,11 @@ each option. Never proceed on your own choice.
 Record the answer in `delivery.json` as `server_choice`: `asked_on` (a date),
 `answer` (the owner's own words) and `given_on`. You author `given_on`: `sources`
 maps each serving source to the commit the answer was given on, and `shown`
-lists the names of the tools and commands the owner was shown. The build
-refuses a package server whose answer does not cover every source its tools and
-children use at the commit now pinned, or does not show every tool it declares.
+lists the names of what the owner was shown. Every tool the package server
+declares appears in it under its `name`: a command that becomes a tool is listed
+as that tool's name, not as the command line. The build refuses a package server
+whose answer does not cover every source its tools and children use at the
+commit now pinned, or does not show every tool it declares.
 The Delivery protocol, "The package server", says how to declare it.
 
 Ask again only when there is no recorded answer or the evidence changed: a

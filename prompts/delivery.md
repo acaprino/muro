@@ -49,7 +49,8 @@ every reference to it from the bodies. Decide per file and say why.
   The release carries its files and registers it, so the tools exist as soon as
   the plugin is installed.
 - `package-tool`: a command of the source, served as a tool of the package
-  server (below), with the capabilities whose steps call it as `targets`.
+  server (below), with the capabilities whose steps call it as `targets`. It is
+  decided at harmonization, with the owner's answer; an intake does not choose it.
 - `dropped`: not carried. Typical: the source's own routing between its skills,
   installing the source itself, marketing, a duplicate of what the catalog has.
 
@@ -250,7 +251,7 @@ keep their meaning, and `mcp-server` is still a server the source ships.
 },
 "server_choice": {
   "asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
-  "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<tool or command name>"]}
+  "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<the name of every tool above>"]}
 }
 ```
 
@@ -319,6 +320,11 @@ keep their meaning, and `mcp-server` is still a server the source ships.
   starts inherit the host's environment, where the source's own way of
   receiving credentials puts them: carry that way as content in the capability
   that sets the package up.
+- `server_choice` is the owner's recorded answer (see the harmonization prompt,
+  "Servers and tools"). `given_on.shown` holds the `name` of every tool the
+  package server declares, and `given_on.sources` every source its tools and
+  children use, at the commit now pinned; the build refuses the package server
+  otherwise.
 
 Decisions. Every source whose commands a `run` tool serves has one decision with
 form `package-tool`: the commands as `content`, the capabilities whose steps
@@ -357,7 +363,7 @@ Write `delivery.json` in the package directory:
   ],
   "package_server": {"name": "<server name>", "children": ["<server name>"], "tools": ["<see The package server>"]},
   "server_choice": {"asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
-                    "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<name>"]}}
+                    "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<tool name>"]}}
 }
 ```
 

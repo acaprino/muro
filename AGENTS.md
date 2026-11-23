@@ -259,7 +259,7 @@ installation, publication or replacement of existing dist output without request
 - `delivery.json` (optional) and `prompts/delivery.md`: what each part of each
   source becomes in this package, decided by the host AI at intake and reviewed
   at harmonization: `decisions` of `{source, content, form, targets, reason}`
-  with form `capability`, `always-on`, `hook`, `mcp-server` or `dropped`, the `always_on`
+  with form `capability`, `always-on`, `hook`, `mcp-server`, `package-tool` or `dropped`, the `always_on`
   session text (the contributing sources' own words plus marked coexistence
   lines; at most 6000 characters for each source with an `always-on` decision,
   owner rule of 2026-11-12: the limit is proportional to the intakes that go
