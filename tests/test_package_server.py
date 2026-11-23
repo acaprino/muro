@@ -21,7 +21,8 @@ from mcp_stub import STUB, wait_until
 from muro import __version__, package_server
 from muro.adapters import _LAUNCHER
 from muro.delivery import PACKAGE_SERVER_ACTION, PACKAGE_SERVER_FILE, server_section_errors
-from muro.jsonrpc import METHOD_NOT_FOUND, PARSE_ERROR, PROTOCOL_VERSION, tool_result
+from muro.jsonrpc import (INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+                          PROTOCOL_VERSION, tool_result)
 from muro.mcp_client import kill_tree
 from muro.package_server import PackageServer, serve
 
@@ -254,11 +255,53 @@ def test_an_unknown_tool_and_an_unknown_method(host):
     assert error == {"code": METHOD_NOT_FOUND, "message": "Method not found: no/such"}
 
 
-def test_a_malformed_call_is_answered_and_does_not_stop_the_server(local):
+@pytest.mark.parametrize("params", ["not an object", None, {}, {"name": 5, "arguments": {}}],
+                         ids=["not an object", "no params", "no name", "name that is not text"])
+def test_a_call_without_a_tool_name_is_an_invalid_params_error(local, params):
     peer = local()
-    answer = peer.answer(peer.request("tools/call", "not an object"))
-    assert answer["result"] == tool_result("This server does not serve the tool None", True)
+    assert peer.ask("tools/call", params)["error"] == {"code": INVALID_PARAMS, "message": "Invalid params"}
     assert peer.ask("ping")["result"] == {}
+
+
+@pytest.mark.parametrize("arguments", [["a"], [], "text", ""], ids=["list", "empty list", "text", "empty text"])
+def test_arguments_that_are_not_an_object_are_refused(local, arguments):
+    peer = local()
+    result = peer.ask("tools/call", {"name": "echo", "arguments": arguments})["result"]
+    assert result == tool_result("The arguments of the tool echo must be an object", True)
+    assert not marker(peer.package, "started").exists()  # refused before any child starts
+
+
+def test_a_call_with_no_arguments_runs_with_none(local):
+    peer = local()
+    assert text_of(peer.ask("tools/call", {"name": "echo"})["result"]) == "{}"
+
+
+@pytest.mark.parametrize("method", [None, 5, ["ping"]], ids=["null", "number", "list"])
+def test_a_request_whose_method_is_not_text_is_an_invalid_request(local, method):
+    peer = local()
+    peer.deliver({"jsonrpc": "2.0", "id": 7, "method": method})
+    assert peer.answer(7)["error"] == {"code": INVALID_REQUEST, "message": "Invalid Request"}
+    assert peer.ask("ping")["result"] == {}
+
+
+def test_a_message_that_makes_the_server_raise_is_answered_with_an_internal_error(local, monkeypatch):
+    peer = local()
+    monkeypatch.setattr(PackageServer, "_listed", staticmethod(lambda tool: 1 / 0))
+    error = peer.ask("tools/list")["error"]
+    assert error["code"] == INTERNAL_ERROR and error["message"].startswith("Internal error: ZeroDivisionError")
+    assert peer.ask("ping")["result"] == {}
+
+
+def test_a_notification_whose_method_is_not_text_is_ignored(local):
+    peer = local()
+    peer.deliver({"jsonrpc": "2.0", "method": 5})
+    assert peer.ask("ping")["result"] == {}
+
+
+def test_a_tool_the_child_lists_and_the_package_does_not_declare_is_not_reachable(local):
+    peer = local(tools=[GONE])  # the stub lists echo, which this package does not declare
+    assert peer.call("echo") == tool_result("This server does not serve the tool echo", True)
+    assert not marker(peer.package, "started").exists()
 
 
 def test_a_line_that_is_not_json_is_a_parse_error(host):
@@ -310,6 +353,34 @@ def test_the_end_of_input_leaves_no_call_running(tmp_path):
     assert '"id": 2' in out.getvalue()
 
 
+def test_cancelling_one_call_by_its_id_leaves_the_others(host):
+    slow = host.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "pa"})
+    short = host.call_request("echo", {"wait": 2.0, "progress": 1}, meta={"progressToken": "pb"})
+    for token in ("pa", "pb"):  # both are in the child
+        host.wait(lambda m: m.get("params", {}).get("progressToken") == token, f"progress {token}")
+    host.notify("notifications/cancelled", {"requestId": 999})  # names no pending call
+    host.notify("notifications/cancelled", {"requestId": [slow]})  # not an id at all
+    host.notify("notifications/cancelled", {"requestId": slow})
+    assert host.answer(slow)["result"] == tool_result("stub: cancelled", True)
+    assert host.answer(short)["result"] == tool_result('{"wait": 2.0, "progress": 1}')
+
+
+def test_a_child_dropped_by_another_call_just_after_it_started_is_reported(local, monkeypatch):
+    peer = local()
+    start = PackageServer._start
+
+    def start_then_drop(self, slot, child):
+        start(self, slot, child)
+        self._drop(slot, slot.server)  # what a failing call of another worker does at this moment
+
+    monkeypatch.setattr(PackageServer, "_start", start_then_drop)
+    assert peer.call("echo") == tool_result("stub: the server stopped", True)
+
+
+def test_a_result_with_a_lone_surrogate_reaches_the_host_as_its_escape(host):
+    assert text_of(host.call("echo", {"surrogate": 1})) == "\ud83d"
+
+
 def test_a_cancellation_does_not_hold_up_the_read_loop(local):
     peer = local(mode="deaf-after-list")
     peer.call_request("echo", {"blob": "x" * 2_000_000})  # the child reads nothing: this write stays in flight
@@ -347,12 +418,48 @@ def test_the_first_file_root_is_where_children_work(local, tmp_path):
     assert working_directory(peer).samefile(work)
 
 
-@pytest.mark.parametrize("answer", [None, [], [{"uri": "https://example.invalid/x"}]],
-                         ids=["no answer", "no roots", "no file root"])
+@pytest.mark.parametrize("answer", [None, [], [{"uri": "https://example.invalid/x"}], [{"uri": "file://["}],
+                                    [{"uri": "file:///C:/a:b"}], [{"uri": "file:///no/such/directory"}],
+                                    [{"uri": 5}, "file:///x", None]],
+                         ids=["no answer", "no roots", "no file root", "bad host", "bad drive", "not a directory",
+                              "not roots"])
 def test_without_a_file_root_children_work_where_the_server_does(local, monkeypatch, answer):
     monkeypatch.setattr(package_server, "ROOTS_WAIT", 0.3)
     peer = local()
     roots(peer, answer)
+    assert working_directory(peer).samefile(os.getcwd())
+
+
+def test_a_root_that_does_not_decode_is_skipped_for_the_next(local, tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    peer = local()
+    roots(peer, [{"uri": "file://["}, {"uri": "file:///C:/a:b"}, {"uri": work.as_uri()}])
+    assert working_directory(peer).samefile(work)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the drive form of a file URL is a Windows one")
+def test_a_root_with_the_drive_colon_escaped_is_used(local, tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    drive, rest = work.as_uri().removeprefix("file:///").split(":", 1)  # the form an editor sends: file:///c%3A/...
+    peer = local()
+    roots(peer, [{"uri": f"file:///{drive.lower()}%3A{rest}"}])
+    assert working_directory(peer).samefile(work)
+
+
+@pytest.mark.parametrize("message", [{"result": "x"}, {"result": ["a"]}, {"error": {"code": -1, "message": "no"}}, {}],
+                         ids=["text result", "list result", "error", "empty"])
+def test_a_message_with_the_id_of_the_roots_request_that_is_not_an_answer_is_harmless(local, message):
+    peer = local()
+    roots(peer, None)
+    peer.deliver({"jsonrpc": "2.0", "id": package_server.ROOTS_ID, **message})
+    assert working_directory(peer).samefile(os.getcwd())
+
+
+def test_a_message_with_the_id_of_the_roots_request_before_any_request_is_ignored(local, tmp_path):
+    peer = local()
+    peer.deliver({"jsonrpc": "2.0", "id": package_server.ROOTS_ID, "result": {"roots": [{"uri": tmp_path.as_uri()}]}})
     assert working_directory(peer).samefile(os.getcwd())
 
 

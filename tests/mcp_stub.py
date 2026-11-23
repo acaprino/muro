@@ -70,6 +70,12 @@ def tool_call(msg_id, params):
         text = json.dumps(params.get("_meta"))
     elif arguments.get("show_cwd"):
         text = os.getcwd()
+    elif arguments.get("surrogate"):
+        with out:  # the escape of a lone surrogate, as JSON.stringify writes it when it splits a pair
+            sys.stdout.write('{"jsonrpc": "2.0", "id": %d, "result": {"content": [{"type": "text", '
+                             '"text": "\\ud83d"}], "isError": false}}\n' % msg_id)
+            sys.stdout.flush()
+        return
     elif stops[msg_id].wait(arguments.get("wait", 0)):
         send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "cancelled"}})
         return

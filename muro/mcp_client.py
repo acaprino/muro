@@ -108,19 +108,23 @@ class ChildServer:
 
     def call(self, tool: str, arguments: dict[str, Any],
              on_progress: Callable[[dict[str, Any]], None] | None = None,
-             timeout: float | None = None, meta: dict[str, Any] | None = None) -> dict[str, Any]:
+             timeout: float | None = None, meta: dict[str, Any] | None = None,
+             on_id: Callable[[int], None] | None = None) -> dict[str, Any]:
+        """`on_id` receives the id the child knows this call by, before the call is sent: what `cancel` needs."""
         params: dict[str, Any] = {"name": tool, "arguments": arguments}
         if meta is not None:
             params["_meta"] = meta
-        return self._request("tools/call", params, on_progress, timeout)
+        return self._request("tools/call", params, on_progress, timeout, on_id)
+
+    def cancel(self, msg_id: int) -> None:
+        with contextlib.suppress(ChildError):
+            self._send({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": msg_id}})
 
     def cancel_all(self) -> None:
         with self._lock:
             pending = list(self._waiters)
         for msg_id in pending:
-            with contextlib.suppress(ChildError):
-                self._send({"jsonrpc": "2.0", "method": "notifications/cancelled",
-                            "params": {"requestId": msg_id}})
+            self.cancel(msg_id)
 
     def close(self) -> None:
         with self._lock:
@@ -150,7 +154,7 @@ class ChildServer:
 
     def _request(self, method: str, params: dict[str, Any],
                  on_progress: Callable[[dict[str, Any]], None] | None = None,
-                 timeout: float | None = None) -> dict[str, Any]:
+                 timeout: float | None = None, on_id: Callable[[int], None] | None = None) -> dict[str, Any]:
         waiter: queue.Queue = queue.Queue()
         with self._lock:
             if self._stopped:
@@ -160,6 +164,8 @@ class ChildServer:
             if on_progress is not None:
                 self._progress[msg_id] = on_progress
         try:
+            if on_id is not None:
+                on_id(msg_id)
             self._send({"jsonrpc": "2.0", "id": msg_id, "method": method, "params": params})
             try:
                 reply = waiter.get(timeout=timeout)

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
+import re
 import sys
 import threading
 import time
@@ -18,8 +20,8 @@ from urllib.request import url2pathname
 
 from . import __version__
 from .delivery import PACKAGE_SERVER_FILE, server_launch, server_section_errors
-from .jsonrpc import (METHOD_NOT_FOUND, PARSE_ERROR, PROTOCOL_VERSION, error, read_messages, result, tool_result,
-                      write_message)
+from .jsonrpc import (INTERNAL_ERROR, INVALID_PARAMS, INVALID_REQUEST, METHOD_NOT_FOUND, PARSE_ERROR,
+                      PROTOCOL_VERSION, error, read_messages, result, tool_result, write_message)
 from .mcp_client import ChildError, ChildServer, ChildTimeout
 
 START_WAIT = 30   # seconds a child gets to start and list its tools
@@ -42,6 +44,17 @@ def _params(message: dict[str, Any]) -> dict[str, Any]:
     return params if isinstance(params, dict) else {}
 
 
+def _root_directory(uri: str) -> str | None:
+    """The directory a `file://` root names, or None when it does not decode or is not a directory that exists."""
+    try:
+        path = url2pathname(urlparse(uri).path)
+    except (ValueError, OSError):  # file://[ is not a host, and a drive path may carry a second colon
+        return None
+    if os.name == "nt":
+        path = re.sub(r"^\\(?=[A-Za-z]:)", "", path)  # file:///c%3A/x: url2pathname keeps the slash before the drive
+    return path if os.path.isdir(path) else None
+
+
 class PackageServer:
     def __init__(self, package: Path, sections: dict[str, Any], send: Callable[[dict[str, Any]], None]) -> None:
         self._package = package
@@ -52,8 +65,9 @@ class PackageServer:
         self._entries = ({s["name"]: s for s in servers if isinstance(s, dict) and "name" in s}
                          if isinstance(servers, list) else {})
         self._slots = {tool["forward"]["server"]: _Slot() for tool in self._tools.values() if "forward" in tool}
-        self._lock = threading.Lock()  # guards _workers, _closed and every slot's server
+        self._lock = threading.Lock()  # guards _workers, _calls, _closed and every slot's server and listing
         self._workers: set[threading.Thread] = set()
+        self._calls: dict[Any, tuple[ChildServer, int]] = {}  # host request id -> its child and the child's id
         self._closed = False
         self._roots_wanted = False
         self._roots_deadline: float | None = None
@@ -61,13 +75,27 @@ class PackageServer:
         self._cwd: str | None = None
 
     def handle(self, message: dict[str, Any]) -> None:
-        method, msg_id = message.get("method"), message.get("id")
-        if method is None:
-            if msg_id == ROOTS_ID:
+        try:
+            self._dispatch(message)
+        except Exception as exc:  # a message the server cannot take must not end it
+            if "method" in message and message.get("id") is not None:
+                self._send(error(message["id"], INTERNAL_ERROR, f"Internal error: {type(exc).__name__}: {exc}"))
+
+    def _dispatch(self, message: dict[str, Any]) -> None:
+        msg_id = message.get("id")
+        if "method" not in message:  # an answer: the one request this server makes is roots/list
+            if msg_id == ROOTS_ID and self._roots_deadline is not None:
                 self._take_roots(message)
+            return
+        method = message["method"]
+        if not isinstance(method, str):
+            if msg_id is not None:
+                self._send(error(msg_id, INVALID_REQUEST, "Invalid Request"))
         elif msg_id is None:
             if method == "notifications/cancelled":
-                self._spawn(self._cancel)
+                request_id = _params(message).get("requestId")
+                if isinstance(request_id, (str, int)):
+                    self._spawn(self._cancel, request_id)
             elif method == "notifications/initialized" and self._roots_wanted:
                 self._roots_deadline = time.monotonic() + ROOTS_WAIT
                 self._send({"jsonrpc": "2.0", "id": ROOTS_ID, "method": "roots/list"})
@@ -78,7 +106,11 @@ class PackageServer:
         elif method == "tools/list":
             self._send(result(msg_id, {"tools": [self._listed(tool) for tool in self._tools.values()]}))
         elif method == "tools/call":
-            self._spawn(self._work, message)
+            params = message.get("params")
+            if isinstance(params, dict) and isinstance(params.get("name"), str):
+                self._spawn(self._work, message)
+            else:
+                self._send(error(msg_id, INVALID_PARAMS, "Invalid params"))
         else:
             self._send(error(msg_id, METHOD_NOT_FOUND, f"Method not found: {method}"))
 
@@ -96,9 +128,12 @@ class PackageServer:
             with self._lock:
                 self._workers.discard(threading.current_thread())
 
-    def _cancel(self) -> None:
-        for server in self._servers(listed=True):
-            server.cancel_all()
+    def _cancel(self, request_id: Any) -> None:
+        """Cancel the call the host numbered `request_id`; one that is not pending needs nothing."""
+        with self._lock:
+            pending = self._calls.get(request_id)
+        if pending is not None:
+            pending[0].cancel(pending[1])
 
     def close(self) -> None:
         """Stop every child, which wakes the calls waiting on one, and wait for the calls and cancellations to end."""
@@ -127,19 +162,18 @@ class PackageServer:
             entry["annotations"] = tool["annotations"]
         return entry
 
-    def _servers(self, listed: bool = False) -> list[ChildServer]:
-        """The children that exist; with `listed`, only those past their start: a cancel must not reach a handshake."""
+    def _servers(self) -> list[ChildServer]:
         with self._lock:
-            return [slot.server for slot in self._slots.values()
-                    if slot.server is not None and (slot.listing is not None or not listed)]
+            return [slot.server for slot in self._slots.values() if slot.server is not None]
 
     def _take_roots(self, message: dict[str, Any]) -> None:
         answer = message.get("result")
         roots = answer.get("roots") if isinstance(answer, dict) else None
         for root in roots if isinstance(roots, list) else []:
             uri = root.get("uri") if isinstance(root, dict) else None
-            if isinstance(uri, str) and uri.startswith("file://"):
-                self._cwd = url2pathname(urlparse(uri).path)
+            directory = _root_directory(uri) if isinstance(uri, str) and uri.startswith("file://") else None
+            if directory is not None:
+                self._cwd = directory
                 break
         self._roots_done.set()
 
@@ -150,23 +184,28 @@ class PackageServer:
 
     def _work(self, message: dict[str, Any]) -> None:
         try:
-            outcome = self._call(_params(message))
+            outcome = self._call(message["params"], message["id"])
         except Exception as exc:  # a call that raises must still be answered, or the host waits for it forever
             outcome = tool_result(f"{type(exc).__name__}: {exc}", True)
         self._send(result(message["id"], outcome))
 
-    def _call(self, params: dict[str, Any]) -> dict[str, Any]:
-        name = params.get("name")
-        tool = self._tools.get(name) if isinstance(name, str) else None
+    def _call(self, params: dict[str, Any], request_id: Any) -> dict[str, Any]:
+        name = params["name"]  # handle() checked it is text
+        tool = self._tools.get(name)
         if tool is None:
             return tool_result(f"This server does not serve the tool {name}", True)
+        arguments = params.get("arguments")
+        if arguments is None:
+            arguments = {}
+        elif not isinstance(arguments, dict):
+            return tool_result(f"The arguments of the tool {name} must be an object", True)
         if "run" in tool:
             return tool_result("This server does not run commands yet", True)
-        arguments, meta = params.get("arguments") or {}, params.get("_meta")
-        return self._forward(tool, arguments, meta if isinstance(meta, dict) else None)
+        meta = params.get("_meta")
+        return self._forward(tool, arguments, meta if isinstance(meta, dict) else None, request_id)
 
-    def _forward(self, declared: dict[str, Any], arguments: dict[str, Any],
-                 meta: dict[str, Any] | None) -> dict[str, Any]:
+    def _forward(self, declared: dict[str, Any], arguments: dict[str, Any], meta: dict[str, Any] | None,
+                 request_id: Any) -> dict[str, Any]:
         child, tool = declared["forward"]["server"], declared["forward"]["tool"]
         slot = self._slots[child]
         try:
@@ -174,9 +213,12 @@ class PackageServer:
                 if slot.server is None or not slot.server.alive:
                     self._drop(slot, slot.server)
                     self._start(slot, child)
-                server, listing = slot.server, slot.listing
+                with self._lock:  # a failing call of another worker may clear both at once
+                    server, listing = slot.server, slot.listing
         except ChildError as exc:
             return tool_result(str(exc), True)
+        if server is None or listing is None:
+            return tool_result(f"{child}: the server stopped", True)
         if tool not in listing or listing[tool] != declared["input_schema"]:
             return tool_result(f"{child}: the tool {tool} is not what this package declares "
                                "(missing, or its schema changed)", True)
@@ -186,12 +228,19 @@ class PackageServer:
             if (message.get("params") or {}).get("progressToken") == token:
                 self._send(message)  # every pending call of a child gets each notification: only the owner relays it
 
+        def known(child_id: int) -> None:
+            with self._lock:
+                self._calls[request_id] = (server, child_id)
+
         try:
-            return server.call(tool, arguments, relay if token is not None else None, meta=meta)
+            return server.call(tool, arguments, relay if token is not None else None, meta=meta, on_id=known)
         except ChildError as exc:
             if not server.alive:
                 self._drop(slot, server)
             return tool_result(str(exc), True)
+        finally:
+            with self._lock:
+                self._calls.pop(request_id, None)
 
     def _drop(self, slot: _Slot, server: ChildServer | None) -> None:
         """Close a child that stopped or failed to start, so the next call starts another."""
@@ -254,7 +303,8 @@ def serve(package: Path, stdin=None, stdout=None) -> int:
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")  # MCP is UTF-8, whatever the console's code page
         stdin = sys.stdin
     if stdout is None:
-        sys.stdout.reconfigure(encoding="utf-8")
+        # A lone surrogate in a result (JSON.stringify writes one for half a pair) goes out as its escape, unchanged.
+        sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
         stdout = sys.stdout
     out_lock = threading.Lock()
 

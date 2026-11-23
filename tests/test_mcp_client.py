@@ -316,3 +316,28 @@ def test_a_child_closed_before_it_starts_never_starts(stub, tmp_path):
         child.start()
     assert not child.alive
     assert not (tmp_path / "started").exists()  # the stub writes this when it runs
+
+
+def test_cancel_cancels_the_one_call_whose_id_it_is_given(stub):
+    child = stub()
+    child.start()
+    ids, outcome, in_flight = {}, {}, threading.Event()
+
+    def run(key, arguments):
+        try:
+            outcome[key] = child.call("echo", arguments, on_progress=lambda message: in_flight.set(),
+                                      timeout=WAIT, on_id=lambda msg_id: ids.__setitem__(key, msg_id))
+        except ChildError as exc:
+            outcome[key] = str(exc)
+
+    threads = [threading.Thread(target=run, args=("slow", {"wait": 30, "progress": 1})),
+               threading.Thread(target=run, args=("short", {"wait": 1.0}))]
+    for thread in threads:
+        thread.start()
+    assert in_flight.wait(WAIT)
+    wait_until(lambda: len(ids) == 2)
+    child.cancel(ids["slow"])
+    for thread in threads:
+        thread.join(WAIT)
+    assert outcome["slow"] == "stub: cancelled"
+    assert outcome["short"]["content"][0]["text"] == '{"wait": 1.0}'
