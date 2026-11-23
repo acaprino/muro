@@ -166,8 +166,7 @@ await test('New project: the folder dialog fills the folder, a closed dialog lea
   // The drawer must still be open and reachable after the notice; if it is not, say what it is instead of timing out.
   const state = await page.evaluate(() => { const d = document.querySelector('[data-slot="sheet-content"][data-side="right"]'); return d ? { present: true, hiddenAncestor: !!d.closest('[aria-hidden="true"]'), inert: !!d.closest('[inert]'), buttons: [...d.querySelectorAll('button')].map(b => b.textContent.trim()), active: document.activeElement ? document.activeElement.tagName + ':' + (document.activeElement.textContent || '').slice(0, 20) : null } : { present: false }; });
   assert.equal(state.present, true, 'the drawer is still open after the notice: ' + JSON.stringify(state));
-  await drawer.getByRole('button', { name: 'Cancel', exact: true }).click({ timeout: 3000 }).catch(e => { throw new Error('Cancel cannot be reached: ' + JSON.stringify(state) + ' ' + e.message.split('
-')[0]); });
+  await drawer.getByRole('button', { name: 'Cancel', exact: true }).click({ timeout: 3000 }).catch(e => { throw new Error('Cancel cannot be reached: ' + JSON.stringify(state) + ' ' + e.message.split(String.fromCharCode(10))[0]); });
   await drawer.waitFor({ state: 'detached' });
   const again = await openNew(page);
   assert.equal(await again.getByRole('button', { name: 'Choose folder…', exact: true }).count(), 0, 'it stays gone for the session');
