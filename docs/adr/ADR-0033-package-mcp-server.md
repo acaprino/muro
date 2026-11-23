@@ -575,6 +575,20 @@ lost if it was wrong.
   start of a child and its first `tools/list` are limited, to 30 seconds, and a
   child that does not answer in time is given up with an error naming it. The
   "per-call timeout" of the risk table is the `run` tool's.
+- A forwarded call the host cancels is answered at once with the text a cancelled
+  command gets ("Cancelled by the host. The effect of this command is unknown: ..."),
+  whatever the child does. The cancellation is forwarded to the child and the client
+  stops waiting for the call, because MCP lets a child send no answer to a cancelled
+  request and the sender ignores a late one: the first build waited for the child,
+  and a child that sent nothing left the worker thread and its entry until the child
+  exited. The design did not say what such a call answers. The server sets the
+  call's stop and reads the child's id for it under one lock, and a call stores that
+  id and reads the stop under the same lock, so a cancellation that arrives while the
+  call is on its way to the child is either seen before the request is sent or
+  forwarded after it was. One window remains: between the id being stored and the
+  request being written, the notification can reach the child first, which may
+  ignore an id it has not seen; the host is answered anyway, and the child's work
+  for that call is not stopped.
 - The first-call comparison covers the tool's presence and its `inputSchema`,
   compared as equal dictionaries, key for key. A schema translated by hand fails
   every call of that tool, so the delivery prompt says to copy it as the child's own

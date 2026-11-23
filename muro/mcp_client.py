@@ -38,8 +38,9 @@ def resolve_program(name: str) -> str | None:
 
     A bare name is looked for in the absolute entries of PATH and never in the working directory, which
     Windows searches first and where a project could plant a program under the name of a real one: a name
-    that starts a command, a child server or taskkill is resolved here and never left to the system. A name
-    with a directory part is used as it is when it is absolute and refused when it is not."""
+    that starts a command or a child server is resolved here and never left to the system (`kill_tree` starts
+    taskkill by its own path instead). A name with a directory part is used as it is when it is absolute and
+    refused when it is not."""
     if os.path.dirname(name):
         return name if os.path.isabs(name) else None
     extensions = ([ext for ext in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(os.pathsep) if ext]
@@ -147,8 +148,13 @@ class ChildServer:
         return self._request("tools/call", params, on_progress, timeout, on_id)
 
     def cancel(self, msg_id: int) -> None:
+        """Tell the child the call is cancelled and stop waiting for it: a child that follows MCP may send no answer."""
         with contextlib.suppress(ChildError):
             self._send({"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": msg_id}})
+        with self._lock:
+            waiter = self._waiters.pop(msg_id, None)
+        if waiter is not None:
+            waiter.put({"error": {"message": "cancelled"}})  # an answer that arrives later finds no one waiting
 
     def cancel_all(self) -> None:
         with self._lock:

@@ -135,9 +135,10 @@ class PackageServer:
         self._entries = ({s["name"]: s for s in servers if isinstance(s, dict) and "name" in s}
                          if isinstance(servers, list) else {})
         self._slots = {tool["forward"]["server"]: _Slot() for tool in self._tools.values() if "forward" in tool}
-        self._lock = threading.Lock()  # guards _workers, _calls, _commands, _closed and every slot's server and listing
+        self._lock = threading.Lock()  # guards the sets and maps below, _closed, and every slot's server and listing
         self._workers: set[threading.Thread] = set()
-        self._calls: dict[Any, Callable[[], None]] = {}  # host request id of a running call -> how to cancel it
+        self._calls: dict[Any, threading.Event] = {}  # host request id of a running call -> its stop, set to cancel it
+        self._forwarded: dict[Any, tuple[ChildServer, int]] = {}  # ... -> the child and the id the child knows it by
         self._commands: set[threading.Event] = set()  # the stop of each running command: close() sets them all
         self._closed = False
         self._roots_wanted = False
@@ -181,7 +182,7 @@ class PackageServer:
             if isinstance(params, dict) and isinstance(params.get("name"), str):
                 stop = threading.Event()  # a cancellation sets it; the call is registered before its worker runs
                 with self._lock:
-                    self._calls[msg_id] = stop.set
+                    self._calls[msg_id] = stop
                 self._spawn(self._work, message, stop)
             else:
                 self._send(error(msg_id, INVALID_PARAMS, "Invalid params"))
@@ -204,10 +205,14 @@ class PackageServer:
 
     def _cancel(self, request_id: Any) -> None:
         """Cancel the call the host numbered `request_id`; one that is not pending needs nothing."""
-        with self._lock:
-            cancel = self._calls.get(request_id)
-        if cancel is not None:
-            cancel()
+        with self._lock:  # stop and child id together: a call stores its id and reads the stop under this same lock
+            stop = self._calls.get(request_id)
+            if stop is None:
+                return
+            stop.set()
+            forwarded = self._forwarded.get(request_id)
+        if forwarded is not None:  # outside the lock: the write waits for a child that reads nothing
+            forwarded[0].cancel(forwarded[1])
 
     def close(self) -> None:
         """Stop every command and child, which wakes the calls waiting on one, and wait for the calls to end."""
@@ -267,6 +272,7 @@ class PackageServer:
         finally:
             with self._lock:
                 self._calls.pop(message["id"], None)
+                self._forwarded.pop(message["id"], None)
         self._send(result(message["id"], outcome))
 
     def _call(self, params: dict[str, Any], request_id: Any, stop: threading.Event) -> dict[str, Any]:
@@ -334,8 +340,9 @@ class PackageServer:
 
         def known(child_id: int) -> None:
             with self._lock:
-                self._calls[request_id] = lambda: server.cancel(child_id)
-            if stop.is_set():  # cancelled before the child had the call: it never gets it
+                self._forwarded[request_id] = (server, child_id)
+                cancelled = stop.is_set()
+            if cancelled:  # cancelled before the child had the call: it never gets it
                 raise ChildError(f"{child}: cancelled")
 
         try:
@@ -343,7 +350,7 @@ class PackageServer:
         except ChildError as exc:
             if not server.alive:
                 self._drop(slot, server)
-            return tool_result(str(exc), True)
+            return tool_result(CANCELLED if stop.is_set() else str(exc), True)  # a cancelled call has no other answer
 
     def _drop(self, slot: _Slot, server: ChildServer | None) -> None:
         """Close a child that stopped or failed to start, so the next call starts another."""

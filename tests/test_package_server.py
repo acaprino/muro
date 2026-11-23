@@ -676,7 +676,7 @@ def test_a_slot_that_changes_between_two_looks_is_read_once_and_reported(local):
 
 @pytest.mark.parametrize("name, arguments, answer", [
     ("run_mode", {"mode": "sleep"}, tool_result(CANCELLED, True)),
-    ("echo", {"wait": 30}, tool_result("stub: cancelled", True))], ids=["command", "forwarded"])
+    ("echo", {"wait": 30}, tool_result(CANCELLED, True))], ids=["command", "forwarded"])
 def test_a_cancellation_before_the_worker_of_its_call_runs_is_not_lost(local, monkeypatch, name, arguments, answer):
     peer = local(tools=[ECHO, RUN])
     held = []
@@ -691,7 +691,7 @@ def test_a_cancellation_before_the_worker_of_its_call_runs_is_not_lost(local, mo
     monkeypatch.setattr(PackageServer, "_spawn", spawn_later)
     call = peer.call_request(name, arguments)
     peer.notify("notifications/cancelled", {"requestId": call})
-    wait_until(lambda: peer.server._calls[call].__self__.is_set())  # the call is registered, and the cancel reached it
+    wait_until(lambda: peer.server._calls[call].is_set())  # the call is registered, and the cancel reached it
     spawn(peer.server, *held[0])
     assert peer.answer(call)["result"] == answer
     assert not command_pids(peer.package)
@@ -720,7 +720,67 @@ def test_cancelling_reaches_the_child(host):
     call = host.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "p"})
     host.wait(lambda m: m.get("method") == "notifications/progress", "progress")  # the call is in the child
     host.notify("notifications/cancelled", {"requestId": call})
-    assert host.answer(call)["result"] == tool_result("stub: cancelled", True)
+    assert host.answer(call)["result"] == tool_result(CANCELLED, True)
+    wait_until(lambda: marker(host.package, "cancelled").exists(), WAIT)  # the stub writes it when told
+
+
+def test_a_cancelled_call_is_answered_at_once_when_the_child_answers_nothing_to_it(host_with):
+    host = host_with(mode="silent-cancel")
+    call = host.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "p"})
+    host.wait(lambda m: m.get("method") == "notifications/progress", "progress")  # the call is in the child
+    host.notify("notifications/cancelled", {"requestId": call})
+    assert host.answer(call)["result"] == tool_result(CANCELLED, True)
+    assert text_of(host.call("echo", {"a": 1})) == '{"a": 1}'  # the child still serves, and no call is left waiting
+    host.process.stdin.close()
+    assert host.process.wait(WAIT) == 0
+
+
+def test_a_cancelled_call_leaves_no_worker_when_the_child_answers_nothing_to_it(local):
+    peer = local(mode="silent-cancel")
+    call = peer.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "p"})
+    peer.wait(lambda m: m.get("method") == "notifications/progress", "progress")
+    peer.notify("notifications/cancelled", {"requestId": call})
+    assert peer.answer(call)["result"] == tool_result(CANCELLED, True)
+    wait_until(lambda: not peer.server._workers and not peer.server._calls)
+
+
+class Held:
+    """Stands in for the server's lock: the thread of a cancellation is held back once it has let go of it."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.cancelling = None  # the thread that runs the cancellation
+        self.held = threading.Event()
+        self.release = threading.Event()
+
+    def __enter__(self):
+        self._lock.acquire()
+
+    def __exit__(self, *exc):
+        self._lock.release()
+        if threading.get_ident() == self.cancelling and not self.held.is_set():
+            self.held.set()
+            self.release.wait(WAIT)
+
+
+def test_a_cancellation_held_back_while_its_call_reaches_the_child_is_not_lost(local, monkeypatch):
+    # The cancellation has looked at the call; the call goes on to its child; only then does the cancellation act.
+    peer = local()
+    gate = peer.server._lock = Held()
+    cancel = PackageServer._cancel
+
+    def cancel_marked(self, request_id):
+        gate.cancelling = threading.get_ident()
+        cancel(self, request_id)
+
+    monkeypatch.setattr(PackageServer, "_cancel", cancel_marked)
+    call = peer.call_request("echo", {"wait": 30, "progress": 1}, meta={"progressToken": "p"})
+    peer.notify("notifications/cancelled", {"requestId": call})
+    assert gate.held.wait(WAIT)
+    # The call is in its child, or it was cancelled before it got there: either way it is not left to run.
+    peer.wait(lambda m: m.get("method") == "notifications/progress" or m.get("id") == call, "progress or answer")
+    gate.release.set()
+    assert peer.answer(call)["result"] == tool_result(CANCELLED, True)
 
 
 def test_the_end_of_input_stops_the_server_and_a_child_with_a_call_in_flight(host):
@@ -750,7 +810,7 @@ def test_cancelling_one_call_by_its_id_leaves_the_others(host):
     host.notify("notifications/cancelled", {"requestId": 999})  # names no pending call
     host.notify("notifications/cancelled", {"requestId": [slow]})  # not an id at all
     host.notify("notifications/cancelled", {"requestId": slow})
-    assert host.answer(slow)["result"] == tool_result("stub: cancelled", True)
+    assert host.answer(slow)["result"] == tool_result(CANCELLED, True)
     assert host.answer(short)["result"] == tool_result('{"wait": 2.0, "progress": 1}')
 
 

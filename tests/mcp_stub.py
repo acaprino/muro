@@ -79,7 +79,8 @@ def tool_call(msg_id, params):
             sys.stdout.flush()
         return
     elif stops[msg_id].wait(arguments.get("wait", 0)):
-        send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "cancelled"}})
+        if mode != "silent-cancel":  # silent-cancel: a child that follows MCP and sends nothing for a cancelled request
+            send({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -1, "message": "cancelled"}})
         return
     else:
         text = json.dumps(arguments, ensure_ascii=False)
@@ -94,6 +95,7 @@ for line in sys.stdin:
         asked_answer.update(message)
         asked.set()
     elif method == "notifications/cancelled":
+        Path(__file__).with_name("cancelled").write_text("x")  # for a test that checks the child was told
         stops[message["params"]["requestId"]].set()
     elif msg_id is None:
         continue

@@ -412,6 +412,27 @@ def test_a_child_closed_before_it_starts_never_starts(stub, tmp_path):
     assert not (tmp_path / "started").exists()  # the stub writes this when it runs
 
 
+def test_cancel_stops_waiting_for_a_child_that_answers_nothing_to_a_cancelled_request(stub):
+    child = stub("silent-cancel")
+    child.start()
+    ids, outcome, in_flight = {}, [], threading.Event()
+
+    def run():
+        try:
+            outcome.append(child.call("echo", {"wait": 30, "progress": 1}, on_progress=lambda message: in_flight.set(),
+                                      timeout=WAIT, on_id=lambda msg_id: ids.__setitem__("call", msg_id)))
+        except ChildError as exc:
+            outcome.append(str(exc))
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    assert in_flight.wait(WAIT)
+    child.cancel(ids["call"])
+    thread.join(3)  # a call that still waits is not woken by the cancel: it would end at WAIT, with a timeout
+    assert not thread.is_alive() and outcome == ["stub: cancelled"]
+    assert child.call("echo", {"a": 1}, timeout=WAIT)["content"][0]["text"] == '{"a": 1}'  # the child still serves
+
+
 def test_cancel_cancels_the_one_call_whose_id_it_is_given(stub):
     child = stub()
     child.start()
