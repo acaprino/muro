@@ -50,8 +50,18 @@ const unnamed = scope => scope.evaluate(root => [...root.querySelectorAll('butto
   const by = e.getAttribute('aria-labelledby');
   return !(e.getAttribute('aria-label') || (by && by.split(/\s+/).some(id => document.getElementById(id)?.textContent.trim())) || e.textContent.trim() || e.labels?.length);
 }).map(e => e.outerHTML.slice(0, 120)));
-/** Escape on the inspector: a form with changes asks once, and the test discards them. */
-const leave = async page => { await insideInspector(page); await page.keyboard.press('Escape'); await page.getByRole('button', { name: 'Discard changes' }).click({ timeout: 700 }).catch(() => {}); };
+/** Escape on the inspector: a form with changes asks once, and the test discards them. It waits for the question or for the closing, whichever comes (5s), and keeps a picture when neither does. */
+const leave = async page => {
+  await insideInspector(page);
+  await page.keyboard.press('Escape');
+  const discard = page.getByRole('button', { name: 'Discard changes' });
+  for (const end = Date.now() + 5000; Date.now() < end;) {
+    if (await discard.isVisible()) { await discard.click(); return; }
+    if (await inspector(page).count() === 0) return;
+    await page.waitForTimeout(50);
+  }
+  await page.screenshot({ path: shots + '/sync-harness-leave-failed.png' });
+};
 /** Opens the inspector of a harness from its column header and waits until the keyboard is in its name field. */
 async function openHarness(page, name) {
   await ready(page);
