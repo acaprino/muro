@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Count, Empty, FormField, Icon, ItemList, ItemRow, Textarea } from '@acaprino/sigrid';
+import { Badge, Button, Count, Icon, Textarea } from '@acaprino/sigrid/primitives';
+import { Empty, FormField, ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { engineOf } from '../../model.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';

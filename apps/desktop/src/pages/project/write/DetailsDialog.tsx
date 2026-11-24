@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Dialog, FormField, Input, Textarea } from '@acaprino/sigrid';
+import { Button, Input, Textarea } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRepository } from '../../../types.ts';
 import { text } from '../../../model.ts';
 import { useNotify } from '../../../state/notices.tsx';

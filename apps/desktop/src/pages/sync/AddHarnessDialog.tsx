@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Dialog, Icon, RadioGroup, RadioGroupItem } from '@acaprino/sigrid';
+import { Button, Icon, RadioGroup, RadioGroupItem } from '@acaprino/sigrid/primitives';
+import { Dialog } from '@acaprino/sigrid/components';
 import type { Discovered, Target } from '../../types.ts';
 import { useNotify } from '../../state/notices.tsx';
 import { useRegistry } from '../../state/registry.tsx';

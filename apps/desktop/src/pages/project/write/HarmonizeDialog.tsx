@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Dialog, FormField, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid';
+import { Button, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ChangeOperation, ProjectInfo, VersionStep } from '../../../types.ts';
 import { text } from '../../../model.ts';
 import { useRegistry } from '../../../state/registry.tsx';

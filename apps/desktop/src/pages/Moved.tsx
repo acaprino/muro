@@ -1,4 +1,4 @@
-import { Empty } from '@acaprino/sigrid';
+import { Empty } from '@acaprino/sigrid/components';
 
 /**
  * The page of a tab the new window does not have yet: Activity and Settings, which come with plan R2 (Projects came with plan R0,

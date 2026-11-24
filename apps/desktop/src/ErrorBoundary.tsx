@@ -2,7 +2,8 @@
 // the page's own place says what failed, with Try again, and the frame around it (the title bar and its three buttons, the status row, the footer) stays, so the
 // window can still be moved, minimized and closed. Without it React takes the whole window away, frame included. React draws such a place only from a class.
 import * as React from 'react';
-import { Button, Empty } from '@acaprino/sigrid';
+import { Button } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
 import { message } from './words.ts';
 
 export interface ErrorBoundaryProps {

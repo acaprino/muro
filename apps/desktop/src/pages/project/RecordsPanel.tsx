@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Count, Empty, Icon } from '@acaprino/sigrid';
+import { Badge, Button, Count, Icon } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
 import { useProject } from '../../state/useProject.tsx';
 import type { ProjectData } from './data.ts';
 import { useBlocked } from './write/DetailsDialog.tsx';

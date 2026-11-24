@@ -61,8 +61,14 @@ const inSight = (page, id) => page.waitForFunction(id => {
 }, id);
 /** What a screen reader hears after a thing's name: the description Sigrid ties to it (`aria-describedby`), which says each of its lines with its words and the other end. */
 const described = (page, id) => node(page, id).evaluate(n => (n.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean).map(x => document.getElementById(x)?.textContent ?? '').join(' '));
-/** The lines of the canvas that carry Sigrid's class for a dash, a tone or the path (`sigrid-graph-dashed`, `-dotted`, `-accent`, `-path`), each the element of one line. */
-const drawnLines = (page, ...classes) => page.locator('[data-slot="graph"]').locator(classes.map(c => `.sigrid-graph-${c}`).join(''));
+/** What Sigrid draws a line with: its look is four custom properties on the line's path (`lineVars`, `--sigrid-line-stroke`, `-width`, `-dash`, `-cap`), no class. The dash of each style, the colour of each tone and the width
+ * of the chosen and of the path's lines are Sigrid's (`LINE_STYLES`, `LINE_TONES`, `LINE_NEAR`, `LINE_PATH`): a dashed line is `6 4`, a dotted one `0 4`, and the path or a tone of the accent is `var(--color-accent)` 2px thick. */
+const DASHED = { dash: '6 4' }, DOTTED = { dash: '0 4' }, ACCENT = { stroke: 'var(--color-accent)', width: '2' };
+const NEAR = { stroke: 'var(--color-ink-soft)', width: '1.5' }, NEAR_DOTTED = { stroke: 'var(--color-ink-soft)', width: '2', dash: '0 4' };
+/** The lines of the canvas (each `.react-flow__edge`, with the words of the line inside it) whose path has every property of `look`. */
+const drawnLines = (page, look) => page.locator('[data-slot="graph"] .react-flow__edge').filter({
+  has: page.locator(`.react-flow__edge-path${Object.entries(look).map(([name, value]) => `[style*="--sigrid-line-${name}: ${value}"]`).join('')}`),
+});
 /** Waits until the canvas numbers the capability `id` as step `step` of the lit path: the name a screen reader hears says it ("design-taste, step 1", Sigrid's
  * `graph.onPath`), and so do the dots on the thing. */
 const numbered = async (page, id, step) => {
@@ -154,11 +160,11 @@ await test('the graph opens with every entry closed, each saying how many it hid
   for (const fact of ['design-review', 'worker', 'marionette-design', 'Activates when the request means', 'Review a finished design', 'Not for: Building one']) assert.ok(details.includes(fact), `the details say ${fact}`);
   // What it needs is a line of the canvas, no longer words of the details: dashed, with the AI's label of the condition drawn while one of its ends is chosen, and heard.
   assert.equal(details.includes('on a condition'), false, 'the details no longer write the lines out');
-  await drawnLines(page, 'dashed').filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
+  await drawnLines(page, DASHED).filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
   assert.match(await described(page, 'cap:design-review'), /A design exists, from design-taste/);
   // Choosing it brought in sight what it is joined to: office-docs, which never goes with it, sits in the office entry, which opened, and the dotted line between them is drawn.
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', OFFICE);
-  await drawnLines(page, 'dotted').filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
+  await drawnLines(page, DOTTED).filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
   assert.match(await described(page, 'cap:design-review'), /never together, with office-docs/);
   await node(page, 'cap:design-taste').click();
   await inspector(page).getByRole('heading', { name: 'design-taste', level: 3 }).waitFor();
@@ -242,8 +248,8 @@ await test('each example says its request, its intents and its outputs; a click 
   await numbered(page, 'design-taste', 1);
   await numbered(page, 'design-review', 2);
   // The line between the two steps is the path's, in the accent: here the dashed line of the need, its words drawn on the path.
-  await drawnLines(page, 'path', 'accent', 'dashed').filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
-  assert.equal(await drawnLines(page, 'path').count(), 1, 'one line between the two steps');
+  await drawnLines(page, { ...ACCENT, ...DASHED }).filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
+  assert.equal(await drawnLines(page, ACCENT).count(), 1, 'one line between the two steps');
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'true', 'the entry of the path is open');
   assert.equal(await node(page, OFFICE).getAttribute('aria-expanded'), 'false', 'the others stay closed');
   await graphPane(page).getByText('The steps of “A landing page” are numbered on the graph.', { exact: true }).waitFor();
@@ -258,13 +264,13 @@ await test('each example says its request, its intents and its outputs; a click 
   await letter.click();
   await numbered(page, 'office-pdf', 1);
   await numbered(page, 'office-docs', 2);
-  await drawnLines(page, 'path', 'accent').filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
+  await drawnLines(page, ACCENT).filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'false', 'the entries of the old path close');
   assert.equal(await landing.getAttribute('aria-current'), null);
   await letter.click();
   await inspector(page).waitFor({ state: 'detached' }).catch(() => inspector(page).waitFor({ state: 'hidden' }));
   assert.equal(await letter.getAttribute('aria-current'), null);
-  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph"] [data-slot="graph-steps"], [data-slot="graph"] .sigrid-graph-path').length === 0);
+  await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph"] [data-slot="graph-steps"], [data-slot="graph"] .react-flow__edge-path[style*="--sigrid-line-stroke: var(--color-accent)"]').length === 0);
   assert.equal(await node(page, 'cap:office-docs').getAttribute('aria-label'), 'office-docs', 'nothing is numbered any more, and no line is the path\'s');
   // A capability chosen on the canvas is drawn with its lines: what it is joined to in a closed entry comes in sight (design-review, in the design entry), and the
   // words of its lines are drawn and heard. The details no longer write them out.
@@ -272,8 +278,8 @@ await test('each example says its request, its intents and its outputs; a click 
   await inspector(page).getByRole('heading', { name: 'office-docs', level: 3 }).waitFor();
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', DESIGN);
   await inSight(page, 'cap:design-review');
-  await drawnLines(page, 'near').filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
-  await drawnLines(page, 'near', 'dotted').filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
+  await drawnLines(page, NEAR).filter({ hasText: 'runs first' }).waitFor({ state: 'attached' });
+  await drawnLines(page, NEAR_DOTTED).filter({ hasText: 'never together' }).waitFor({ state: 'attached' });
   const heard = await described(page, 'cap:office-docs');
   assert.match(heard, /runs first, from office-pdf/);
   assert.match(heard, /never together, with design-review/);

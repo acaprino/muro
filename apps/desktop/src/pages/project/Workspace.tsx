@@ -1,5 +1,7 @@
 import * as React from 'react';
-import { Badge, Button, Empty, Icon, Inspector, Sheet, SheetContent, SheetTitle, ToggleGroup, ToggleGroupItem, useAppShell } from '@acaprino/sigrid';
+import { Badge, Button, Icon, Sheet, SheetContent, SheetTitle, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
+import { Inspector, useAppShell } from '@acaprino/sigrid/layout';
 import { GraphCanvas, type GraphCanvasHandle } from '@acaprino/sigrid/graph';
 import type { ProjectInfo } from '../../types.ts';
 import { text } from '../../model.ts';

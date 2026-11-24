@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Count, Empty, Icon, ItemList, ItemRow } from '@acaprino/sigrid';
+import { Count, Icon } from '@acaprino/sigrid/primitives';
+import { Empty, ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { useProject } from '../../state/useProject.tsx';
 import { becameParts, instructionsOf, pinnedOf } from './data.ts';
 import type { ProjectData } from './data.ts';

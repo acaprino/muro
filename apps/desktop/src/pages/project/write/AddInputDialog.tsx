@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Dialog, FormField, Input } from '@acaprino/sigrid';
+import { Input } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import { checkSource, operationWords } from './jobs.ts';
 import { RunFields, RunFooter, RunFormBody, afterColon, projectName, useRunForm } from './HarmonizeDialog.tsx';
 import type { ChangeDialogProps } from './HarmonizeDialog.tsx';

@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { Badge, Button, Icon, Progress, cn } from '@acaprino/sigrid';
-import type { ButtonProps } from '@acaprino/sigrid';
+import { cn } from '@acaprino/sigrid';
+import { Badge, Button, Icon, Progress } from '@acaprino/sigrid/primitives';
+import type { ButtonProps } from '@acaprino/sigrid/primitives';
 import type { Job } from '../../../types.ts';
 import { useNotify } from '../../../state/notices.tsx';
 import { message, money } from '../../../words.ts';

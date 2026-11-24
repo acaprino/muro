@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Dialog, FormField, Icon, Input } from '@acaprino/sigrid';
+import { Badge, Button, Icon, Input } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectUpdate, ProjectUpdates } from '../../../types.ts';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';

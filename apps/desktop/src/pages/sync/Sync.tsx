@@ -6,7 +6,8 @@
 // shows is the registry (useRegistry) and the sync state (useSync), and its buttons ask useSync; the dialogs of a plugin, a new plugin and a new harness are
 // their own files, and the harness inspector is the frame's (App.tsx), so the table stays usable beside it.
 import * as React from 'react';
-import { Button, Empty, Icon } from '@acaprino/sigrid';
+import { Button, Icon } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
 import type { Snapshot } from '../../types.ts';
 import { syncHeadline } from '../../model.ts';
 import { plural } from '../../words.ts';

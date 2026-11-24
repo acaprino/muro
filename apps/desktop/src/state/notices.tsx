@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Toasts } from '@acaprino/sigrid';
-import type { ToastItem } from '@acaprino/sigrid';
+import { Toasts } from '@acaprino/sigrid/components';
+import type { ToastItem } from '@acaprino/sigrid/components';
 
 /** The notices of a page: the short results of what the person did ("Notes added to your list."), and the errors, which stay until they are closed. Drawn by Sigrid's `Toasts`. */
 export type Notify = (text: string, kind?: 'error') => void;

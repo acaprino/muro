@@ -1,5 +1,7 @@
 import * as React from 'react';
-import { Button, Checkbox, Dialog, FormField, Icon, Input, Inspector, Select, Spacer } from '@acaprino/sigrid';
+import { Button, Checkbox, Icon, Input, Select, Spacer } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { filesMissing, harnessNames, inList, stamp } from '../../model.ts';
 import { useNotify } from '../../state/notices.tsx';

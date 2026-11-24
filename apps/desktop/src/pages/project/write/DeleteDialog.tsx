@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Dialog } from '@acaprino/sigrid';
+import { Button } from '@acaprino/sigrid/primitives';
+import { Dialog } from '@acaprino/sigrid/components';
 import type { ProjectSummary, Snapshot, Transport } from '../../../types.ts';
 import { useNotify } from '../../../state/notices.tsx';
 import { useRegistry } from '../../../state/registry.tsx';

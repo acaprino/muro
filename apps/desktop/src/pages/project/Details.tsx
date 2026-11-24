@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Icon } from '@acaprino/sigrid';
-import type { IconName } from '@acaprino/sigrid';
+import { Badge, Button, Icon } from '@acaprino/sigrid/primitives';
+import type { IconName } from '@acaprino/sigrid/primitives';
 import type { ProjectInput } from '../../types.ts';
 import type { Selected } from '../../state/project.ts';
 import { outputsOf } from './graph-model.ts';

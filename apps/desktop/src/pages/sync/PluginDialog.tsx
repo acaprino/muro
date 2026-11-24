@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Checkbox, Cluster, Column, Dialog, FormField, Icon, Input, RadioGroup, RadioGroupItem, Select, Text } from '@acaprino/sigrid';
+import { Button, Checkbox, Cluster, Column, Icon, Input, RadioGroup, RadioGroupItem, Select, Text } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { Distribution, Plan, Plugin, Snapshot, Target, Transport } from '../../types.ts';
 import { engineOf, harnessNames, versionOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';

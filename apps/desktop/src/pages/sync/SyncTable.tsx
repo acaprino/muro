@@ -5,7 +5,7 @@
 // The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); "Sync N changes" under a harness opens the review
 // sheet on the plan of that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
 import * as React from 'react';
-import { Badge, Button, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid';
+import { Badge, Button, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
 import { cellState, harnessState, stamp, versionOf, type CellStatus } from '../../model.ts';
 import { plural } from '../../words.ts';

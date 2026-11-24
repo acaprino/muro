@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Badge, Button, Count, Icon, RadioGroup, RadioGroupItem, Section } from '@acaprino/sigrid';
+import { Badge, Button, Count, Icon, RadioGroup, RadioGroupItem, Section } from '@acaprino/sigrid/primitives';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { exclusiveMode, filesMissing, listing, unlisted } from '../../model.ts';
 import { useNotify } from '../../state/notices.tsx';

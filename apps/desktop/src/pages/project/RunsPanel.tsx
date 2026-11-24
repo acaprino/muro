@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Badge, Count, Empty, Icon } from '@acaprino/sigrid';
+import { Badge, Count, Icon } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
 import type { ProjectRun } from '../../types.ts';
 import { at } from '../../words.ts';
 import { runsOf, tagOf } from './data.ts';

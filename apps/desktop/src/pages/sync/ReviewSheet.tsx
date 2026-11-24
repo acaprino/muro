@@ -9,7 +9,8 @@
 // - A refusal stays in the sheet, in its own line: a notice would cover its buttons. A plan refused because the registry moved is made again by useSync, and the
 //   sheet shows the new one.
 import * as React from 'react';
-import { Badge, Button, Dialog, Icon } from '@acaprino/sigrid';
+import { Badge, Button, Icon } from '@acaprino/sigrid/primitives';
+import { Dialog } from '@acaprino/sigrid/components';
 import type { Operation, Review } from '../../types.ts';
 import { removalLabel, removals } from '../../model.ts';
 import { plural } from '../../words.ts';

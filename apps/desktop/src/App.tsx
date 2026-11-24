@@ -3,11 +3,13 @@
 // frame also holds the page's action bar and the harness inspector, beside the table.
 // The pages that are not in the new window yet say so (pages/Moved.tsx); the window opens on Sync, as before.
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { NARROW, useMedia } from '@acaprino/sigrid';
+import { Button, Icon, type IconName } from '@acaprino/sigrid/primitives';
+import { Empty } from '@acaprino/sigrid/components';
 import {
-  AppShell, Button, CommandPalette, Empty, Icon, NARROW, TitleBar, Toolbar, ToolbarBrand, ToolbarButton, ToolbarSpacer,
-  ToolbarTab, ToolbarTabs, WindowControls, useCommandKey, useMedia,
-  type Command, type IconName, type TitleBarDragProps,
-} from '@acaprino/sigrid';
+  AppShell, TitleBar, Toolbar, ToolbarBrand, ToolbarButton, ToolbarSpacer, ToolbarTab, ToolbarTabs, WindowControls, type TitleBarDragProps,
+} from '@acaprino/sigrid/layout';
+import { CommandPalette, useCommandKey, type Command } from '@acaprino/sigrid/assemblies';
 import type { Page, Snapshot } from './types.ts';
 import { stamp, syncHeadline } from './model.ts';
 import { plural } from './words.ts';

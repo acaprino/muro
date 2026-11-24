@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Button, Checkbox, Dialog, FormField, Input, Textarea } from '@acaprino/sigrid';
+import { Button, Checkbox, Input, Textarea } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRecord } from '../../../types.ts';
 import { useNotify } from '../../../state/notices.tsx';
 import { checkRecords, newRecordId } from './jobs.ts';

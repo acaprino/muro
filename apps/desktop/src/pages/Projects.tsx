@@ -1,5 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Count, Dialog, Empty, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid';
+import { Badge, Button, Count, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid/primitives';
+import { Dialog, Empty } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
 import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
