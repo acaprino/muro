@@ -280,7 +280,9 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
       <Inspector
         title={target?.name ?? 'Harness'}
         open={open && !!target}
-        onOpenChange={next => { if (!next) requestClose(); }}
+        // Sigrid's docked inspector answers Escape in React's handler and asks here. The question it opens would hear that same Escape (Base UI's dialog listens on the document, which
+        // the key has not reached yet) and close at once: so the question waits until the key is dispatched.
+        onOpenChange={next => { if (!next) setTimeout(() => closing.current(), 0); }}
         footer={target ? (
           <div className="flex w-full flex-wrap items-center gap-2">
             <Button variant="outline" className="text-destructive" disabled={saving} onClick={() => patch({ confirm: 'stop', stopError: null })}>Stop managing</Button>
