@@ -1,0 +1,68 @@
+import * as React from 'react';
+import { fresh, recall, remember, sameSelected } from './project.ts';
+import type { Panel, ProjectView, Selected, SimState } from './project.ts';
+import { useRegistry } from './registry.tsx';
+
+/** The open project of the Projects tab, for the components of the workspace. The state is `state/project.ts`'s; this only holds it in React and writes it to the
+ * session at every change, so a reload, or leaving the tab and coming back, finds the same project, panel, selection and request. A free-text request still waited
+ * for when the project is closed, another one is opened or the tab is left is stopped (`cancel_simulation`): nobody would see its answer, and the AI would go on. */
+export interface ProjectApi {
+  view: ProjectView | null;
+  /** The latest state, for a caller that awaited something and must check it is still the one it started from (a simulation waited for). */
+  current(): ProjectView | null;
+  open(id: string): void;
+  close(): void;
+  setPanel(panel: Panel): void;
+  /** A new selection, or a function of the one there is (to clear only what an inspector was showing). */
+  select(next: Selected | ((now: Selected) => Selected)): void;
+  /** A change of the simulation, or a function of it that returns the change, or null for none (an answer that is no longer the one waited for). */
+  patchSim(patch: Partial<SimState> | ((sim: SimState) => Partial<SimState> | null)): void;
+}
+
+const ProjectContext = React.createContext<ProjectApi | null>(null);
+
+export function ProjectProvider({ children }: { children?: React.ReactNode }) {
+  const { request } = useRegistry();
+  const send = React.useRef(request);
+  send.current = request;
+  const [view, setView] = React.useState<ProjectView | null>(() => recall());
+  const latest = React.useRef(view);
+  latest.current = view;
+  React.useEffect(() => { remember(view); }, [view]);
+  /** Stops the request the open project is waiting for, if any. A runtime that cannot say so is no error of the page, which stops waiting either way. */
+  const stopRun = React.useCallback(() => {
+    const run = latest.current?.sim.run ?? null;
+    if (run !== null) send.current('cancel_simulation', { run }).catch(() => { /* nothing is waiting for it */ });
+  }, []);
+  React.useEffect(() => stopRun, [stopRun]);
+  const api = React.useMemo<ProjectApi>(() => {
+    const change = (next: (v: ProjectView) => ProjectView) => setView(v => {
+      if (!v) return v;
+      const made = next(v);
+      latest.current = made;
+      return made;
+    });
+    return {
+      view,
+      current: () => latest.current,
+      open: id => { stopRun(); setView(() => (latest.current = fresh(id))); },
+      close: () => { stopRun(); setView(() => (latest.current = null)); },
+      setPanel: panel => change(v => v.panel === panel ? v : { ...v, panel }),
+      select: next => change(v => {
+        const selected = typeof next === 'function' ? next(v.selected) : next;
+        return sameSelected(selected, v.selected) ? v : { ...v, selected };
+      }),
+      patchSim: patch => change(v => {
+        const made = typeof patch === 'function' ? patch(v.sim) : patch;
+        return made ? { ...v, sim: { ...v.sim, ...made } } : v;
+      }),
+    };
+  }, [view, stopRun]);
+  return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>;
+}
+
+export function useProject(): ProjectApi {
+  const api = React.useContext(ProjectContext);
+  if (!api) throw new Error('useProject is used outside a ProjectProvider');
+  return api;
+}

@@ -267,6 +267,16 @@
       "text": "2026-11-22: claude-design-system-prompt is pinned to its tag v1-design-prompt (release mode) instead of its upstream head. The commit is the same, 3c3ddb07; the upstream replaced the design prompt that day, so head no longer matched, and the tag is where it keeps the one Marionette absorbed. No capability, intent, output, edge or delivery decision changes.",
       "author": "muro",
       "binding": false
+    },
+    {
+      "id": "harmonization-22",
+      "date": "2026-11-23",
+      "subjects": [
+        "better-layout"
+      ],
+      "text": "2026-11-23: better-layout (jakubkrehel/skills, head 672ae44a: no release upstream) is absorbed as one on-demand role, layout-structure, with a build intent and a review intent; nothing acts in every session. The owner asked for a responsive and mobile layout skill, compared four candidates and took only better-layout (\"è meglio solo better layout\", ui-craft being heavy). Its hand-offs to sibling skills of the repository are not carried, because those skills are not in the package; the concerns that have an owner here (accessibility, animation) are named. Responsive limits recorded as data stay design-file; accessibility stays design-review.",
+      "author": "muro",
+      "binding": false
     }
   ]
 }

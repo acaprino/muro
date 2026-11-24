@@ -48,6 +48,9 @@ every reference to it from the bodies. Decide per file and say why.
 - `mcp-server`: an MCP server the source ships, whose tools its procedures call.
   The release carries its files and registers it, so the tools exist as soon as
   the plugin is installed.
+- `package-tool`: a command of the source, served as a tool of the package
+  server (below), with the capabilities whose steps call it as `targets`. It is
+  decided at harmonization, with the owner's answer; an intake does not choose it.
 - `dropped`: not carried. Typical: the source's own routing between its skills,
   installing the source itself, marketing, a duplicate of what the catalog has.
 
@@ -219,6 +222,236 @@ host, say so in the reason and in the capability that sets the server up: two
 servers with the same tools offer every tool twice, and on some hosts a server
 the user configured under the same name wins over the plugin's.
 
+## The package server
+
+By default every absorbed server registers as itself. When the owner answered
+that the package has one server of its own (the harmonization prompt, "Servers
+and tools"), declare it. It is a declaration and not a form: the forms above
+keep their meaning, and `mcp-server` is still a server the source ships.
+
+```json
+"package_server": {
+  "name": "<server name>",
+  "children": ["<name of an mcp_servers entry>"],
+  "tools": [
+    {"name": "<the child's tool name>", "source": "<the child's source id>",
+     "forward": {"server": "<child name>", "tool": "<the child's tool name>"},
+     "description": "<the child's own description, copied>",
+     "input_schema": {"type": "object", "properties": {}}},
+    {"name": "<tool name>", "source": "<source id>",
+     "description": "<what the command does, in your words>",
+     "input_schema": {"type": "object",
+                      "properties": {"<param>": {"type": "string"}, "<flag>": {"type": "integer"}},
+                      "required": ["<param>"]},
+     "run": ["<program>", "<package_root>/scripts/<source id>/<path>", "<command>",
+             "--option", "{<param>}", {"if": "<flag>", "args": ["--limit", "{<flag>}"]}],
+     "timeout": 120, "env": {"<NAME>": "<package_root>/scripts/<source id>/<path>"},
+     "annotations": {"readOnlyHint": true}}
+  ]
+},
+"server_choice": {
+  "asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
+  "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<the name of every tool above>"]}
+}
+```
+
+- `name`: lowercase letters, digits and hyphens, starting with a letter; never
+  the name of a server that stays registered.
+- `children`: the `mcp_servers` entries the package server starts itself, on the
+  first call that needs one. A child is not registered on the host by itself; a
+  server not named here registers as before.
+  Only a server that declares tools alone may be a child: one that also offers
+  resources, prompts, an `instructions` text or requests of its own stays
+  registered separately, because the package server forwards tools only and no
+  part of a source is dropped without a decision. Python cannot see what a
+  server declares without starting it: you read it from the source.
+- A tool has `name`, `source`, `description` and `input_schema`, and exactly one
+  of `forward` and `run`. `annotations` is optional; `timeout` and `env` belong
+  to a `run` tool. A name is unique in the server and differs from the tools of
+  a server that stays registered (Python does not see those: you check it).
+- A forwarded tool keeps the child's name, description and input schema, copied
+  from the pinned source. A tool description is loaded in every session and a
+  direct call opens no capability, so it keeps the source's words. They change
+  only when two tools would share a name, and you record that collision in the
+  decision's reason (ADR-0017). The saving of a package server is therefore in
+  the tools it leaves out, not in shorter descriptions.
+  At the first call the server compares the declared schema with the child's own
+  `inputSchema`, key for key and value for value: a difference of any size
+  makes every call of that tool answer an error naming it. So copy the schema
+  as the child's own `tools/list` gives it, from a recorded listing where one
+  exists, and never translate it by hand from the source's schema library.
+  Harmonization starts no server. Where no listing is recorded, write the schema
+  the server's source code builds, say in the decision's reason that it was
+  not checked against a running server, and expect the first call of a tool
+  whose schema differs to answer an error naming the tool: the verification run
+  after the build is where it is caught.
+- A `run` tool's name matches `[a-z][a-z0-9_]{0,39}`. It has an argv template: a
+  list whose items are literal strings, placeholders `{param}` that are a whole
+  item, and conditional groups `{"if": "<param>", "args": [...]}` or
+  `{"unless": "<param>", "args": [...]}`. A group is not nested; its `args` hold
+  literals and placeholders. The first item is a literal program found on the
+  host's `PATH`: never a placeholder, a `<package_root>` path or a `.cmd` or
+  `.bat` file. A packaged file is named with `<package_root>` and lies under
+  `scripts/<source id>/` of the tool's own source; the build refuses any other
+  path and one the release does not carry. There is no shell syntax: the server
+  starts the program with this argv. The source gives a command no tool
+  description: write it, and quote the source's rule in full where one applies
+  to that command.
+- Its `input_schema` is `{"type": "object", "properties": {...}, "required": [...]}`.
+  A property has a `type` of `string`, `integer`, `number` or `boolean`, and may
+  add `enum`, `description` and `allow_leading_dash`; the schema may carry a
+  `description`. Any other key is refused. The server applies five rules to
+  every call:
+  1. An argument not in the schema is refused. `type`, `required` and `enum`
+     are enforced, and nothing else of JSON Schema.
+  2. A placeholder outside a group names a required property. Inside a group it
+     names the group's own `if` property or a required one.
+  3. A string is passed as it is and a number in its JSON form. A boolean is
+     only a group's condition. An array or an object is refused.
+  4. A string that begins with `-` is refused, unless its property declares
+     `"allow_leading_dash": true` (a program may read any item that starts with
+     `--` as an option).
+  5. An `if` group is included when its argument was given and is not `false`;
+     an `unless` group when it was not given or is `false`.
+- Carry the source's rule as a declared default. Where the source prescribes
+  that a change is drafted or run dry first and applied only on the user's
+  approval, declare the write command with
+  `{"unless": "apply", "args": ["--dry-run"]}` (or the flag its program has for
+  it) and a boolean `apply` in the schema, and quote the source's sentence in
+  the description. That is the source's rule as data, not a limit the factory
+  adds.
+- `annotations` are MCP tool hints, authored from what the source says the
+  command does. They go to the host's own permission system; the server adds no
+  confirmation step. `idempotentHint` only where the source says a command is
+  safe to repeat. `timeout` is whole seconds (120 without it).
+- `env`, as for a server's: only what the command needs to find its packaged
+  files. Never a key, a token or another secret. The package server and what it
+  starts inherit the host's environment, where the source's own way of
+  receiving credentials puts them: carry that way as content in the capability
+  that sets the package up.
+- `server_choice` is the owner's recorded answer (see the harmonization prompt,
+  "Servers and tools"), needed only when the package server serves or leaves out
+  a tool that writes or sends. `given_on.shown` holds the `id` of every such tool
+  (its id in `server_review`), and `given_on.sources` every source of those tools,
+  at the commit now pinned; the build refuses the package server otherwise. A
+  package server whose tools all have effect `none` has no `server_choice`.
+
+Decisions. Every source whose commands a `run` tool serves has one decision with
+form `package-tool`: the commands as `content`, the capabilities whose steps
+call them as `targets`. A `package-tool` decision that no `run` tool serves is
+refused. A child's source keeps its `mcp-server` decision; its reason states the
+estimated weight of the package server's own tool list and why the package pays
+it.
+Tools of a child that the package server leaves out get one `dropped` decision that lists them, with the owner's answer as its reason where the tool writes or sends, and your own reason, grounded in the sources, for the others.
+
+A capability body keeps naming a tool as its source does, which is also its name
+in the package server. What changes on the host is the server it appears under,
+so a tool's id changes. Only Claude Code registers the package server for now;
+every other host registers the absorbed servers as it does without one.
+
+## The server review
+
+Whenever a source ships an MCP server or the package declares a `package_server`,
+record your judgment of its tools in `delivery.json` as `server_review`: an object
+with exactly `judged_on`, `tools` and `pairs`. The harmonization prompt, "Servers
+and tools", says how to reach it.
+
+- `judged_on`: each source the roster names, with the commit you judged on (at
+  least 7 hex characters). Judge again after a re-pin; the build refuses a record
+  judged on another commit.
+- `tools`: one entry for each roster tool. `id` (`<server or program>/<tool or
+  command>`, unique; for a forwarded tool `<child name>/<tool name>`), `source`,
+  `kind` (`server-tool` or `command`), `effect` (below), `basis` (the source's own
+  words and where: what it changes and what leaves, at most 600 characters),
+  either `overlaps` (the ids of the entries that do the same or nearly the same
+  thing) or `alone` (why nothing else does, at most 300 characters), never both:
+  write the one that is true; an empty `overlaps` list beside `alone` is read as
+  `alone`, and `alone` beside a nonempty `overlaps` is refused. `fate`
+  (`served`, `registered`, `command`, `left-out`), `served_as` (the name the
+  package server declares, only for `served`), `decided_by` (`owner` when the tool
+  writes or sends and is `served` or `left-out`, otherwise `ai`) and `reason`
+  (why this fate and what it was compared with, at most 400 characters).
+- `pairs`: one entry for every pair that `overlaps` names, once: `tools` (the two
+  ids), `judgment` (`keep-both`, `merge` or `discard`), `survivor` (only for `merge`
+  and `discard`), `reason` (at most 600 characters) and `evidence` (the source paths
+  or sections you read).
+- Every tool declared in `package_server.tools` has exactly one entry with
+  `fate: served` and its name in `served_as`. A command is `served` or `command`,
+  never `left-out`. `merge` and `discard` are never used on a pair that holds a
+  command, nor on a pair whose members are both left out. A `left-out` server tool
+  is named by no capability: not in its `tools`, and not written as code (backticks
+  or a fenced block) in its body. A body that uses the same word as an ordinary
+  verb names nothing, and is not rewritten for it.
+- Python checks shape, closure and these references; it never decides an effect, a
+  pair or a fate. It proves the record is closed, not that it is complete or right.
+
+## Effects of a tool
+
+A tool or a command is **gated** unless the source's own code or text shows that it
+neither changes, spends nor sends, in the sense below. The owner decides the
+exposure of the gated tools that a package server serves or leaves out.
+
+- **It counts** when it changes or deletes something that existed before the call (a
+  file, a record, a calendar, an account); when it spends (credits, money: `writes`);
+  when it sends to a third party anything the user or the task supplied (text,
+  files, media, URLs); when it sends a credential to someone other than the service
+  the credential belongs to (an intermediary), or to an address that an argument of
+  the caller names.
+- **It does not count:** creating a new output file whose name cannot collide with an
+  existing one (a random token) in the tool's own output folder, with no path chosen
+  by the caller; using a key to authenticate a call to its own service; reading one's
+  own account at the provider that already holds it; polling a job that was already
+  launched; the server's own usage event (state it once, in the `mcp-server`
+  decision).
+- A file the tool can replace is a change: a default name that is fixed, or a path
+  the caller chooses, with a write or a move onto an existing file.
+- An argument or a handle that decides where a key goes or where a file is written
+  counts as the highest effect any of its values can reach; so does any argument
+  that changes the effect: take the highest value. A case you would call marginal is
+  a doubt.
+- `undetermined` is for what the source does not settle. It is gated.
+- `effect` is one of `none`, `writes`, `sends`, `writes-and-sends`, `undetermined`.
+  `none` is the only value that skips the owner; a missing value is an error and
+  never `none`. The facts go in `basis`; this rule decides the value. Where the
+  recipient depends on how a call is routed (an own key goes to the vendor, a
+  managed key to the vendor's proxy), say it in `basis`.
+
+## Credentials
+
+The API keys that the tools of the package read are declared once, in
+`credentials`, whichever form carries the tool: a capability's command, a
+server, a tool of the package server. The release shows the list at once in its
+guide and in `INSTALL.md`. It is data and not a form: no decision depends on it.
+
+```json
+"credentials": [
+  {"env": "<VARIABLE_NAME>", "service": "<who issues the key>", "required": true,
+   "unlocks": "<what the key makes possible>", "rank": 1,
+   "route": "<how the source itself receives it>",
+   "used_by": {"sources": ["<source id>"], "capabilities": ["<capability id>"], "tools": ["<tool id>"]}}
+]
+```
+
+- `env`: the name of the environment variable, never its value. There is no field
+  for a value: do not add one, and never write a key, a token or another secret
+  anywhere in the package. The factory never reads or writes one.
+- One entry for each variable. A name that several sources read is one entry,
+  and `used_by` lists all of them.
+- `service` and `unlocks`: nonempty text, from the sources' own words.
+  `required` is `true` when the part that reads the key cannot run without it,
+  `false` when the key only adds to what that part does.
+- `rank`: optional, a positive whole number, unique across entries. It is the
+  owner's order, 1 first (harmonization prompt, "Credentials"); never infer it,
+  and leave it out where the owner gave none. The guide sets the first three
+  apart and shows every entry in a table.
+- `route`: optional text, how the source itself receives the key (the variable,
+  a file it reads, a managed alternative it falls back on).
+- `used_by`: optional. `sources` and `capabilities` name ids that exist;
+  `tools` names the tools that read the key, by the ids the package gives them.
+  Each is a list of names. Python checks the sources and the capabilities, checks
+  the tools only where the package records a roster of them, and puts the list in
+  order by `rank` alone.
+
 ## Output
 
 Write `delivery.json` in the package directory:
@@ -227,7 +460,7 @@ Write `delivery.json` in the package directory:
 {
   "decisions": [
     {"source": "<source id>", "content": "<which part of the source>",
-     "form": "capability | always-on | hook | mcp-server | dropped",
+     "form": "capability | always-on | hook | mcp-server | package-tool | dropped",
      "targets": ["<capability id>"], "reason": "<answers that decided it, and open doubts>"}
   ],
   "always_on": "<the session text, only with an always-on decision>",
@@ -240,12 +473,27 @@ Write `delivery.json` in the package directory:
     {"name": "<server name>", "source": "<source id>",
      "run": ["<program>", "<package_root>/scripts/<source-id>/<path>"],
      "env": {"<NAME>": "<package_root>/scripts/<source-id>/<path>"}}
+  ],
+  "package_server": {"name": "<server name>", "children": ["<server name>"], "tools": ["<see The package server>"]},
+  "server_choice": {"asked_on": "<YYYY-MM-DD>", "answer": "<the owner's own words>",
+                    "given_on": {"sources": {"<source id>": "<commit>"}, "shown": ["<tool id in server_review>"]}},
+  "server_review": {"judged_on": {"<source id>": "<commit>"}, "tools": ["<see The server review>"],
+                    "pairs": ["<see The server review>"]},
+  "credentials": [
+    {"env": "<VARIABLE_NAME>", "service": "<who issues the key>", "required": true,
+     "unlocks": "<what the key makes possible>", "rank": 1, "route": "<how the source itself receives it>",
+     "used_by": {"sources": ["<source id>"], "capabilities": ["<capability id>"], "tools": ["<tool id>"]}}
   ]
 }
 ```
 
-Every source has at least one decision. `capability`, `hook` and `mcp-server` name
-their target capabilities; `always-on` and `dropped` name none. Omit `always_on`,
-`hooks` and `mcp_servers` when no decision uses them, `timeout` when the source
-declares none and `env` when the server needs none. Reasons cite source paths or sections, like
-`## Sources` does.
+Every source has at least one decision. `capability`, `hook`, `mcp-server` and
+`package-tool` name their target capabilities; `always-on` and `dropped` name
+none. Omit `always_on`, `hooks` and `mcp_servers` when no decision uses them,
+`timeout` when the source declares none and `env` when the server needs none.
+Omit `package_server` unless the owner chose one, or no tool of it writes or
+sends; write `server_choice` whenever the owner was asked, with or without a
+package server. Write `server_review` whenever a source ships a server or the
+package declares a `package_server`, and omit it otherwise. Omit `credentials`
+when no source takes a key, and `rank` and `route` where there is nothing to say.
+Reasons cite source paths or sections, like `## Sources` does.

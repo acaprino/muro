@@ -19,11 +19,34 @@
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
 //                                `simulate` needs the `run` the page names; `cancel_simulation {run}` ends a delayed one ("The simulation was cancelled") and refuses one that is not running.
-//             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name (set it before opening the project)
+//             bigGraph           the next `project` answers a graph of 37 capabilities in 15 entries, one with a very long name, and 26 documented examples (set it before opening the project)
+//             emptyGraph         the next `project` has no capability, no entry and no example; noEntries: its capabilities and examples, and no entry
+//             oddNames           the next `project` has a second example titled "A letter", and one whose title, intent id and output hold <, & and quotes (ODD_TITLE and the rest, below)
+//             objectFields       the next `project` holds an object where its first record has its text and its newest run its changelog, as a file written by hand may
+//             Writing (the runtime's project_jobs.rs and the shell's folder dialog; its refusals come in its own words and order):
+//             pickFolder         what the shell's folder dialog answers (a folder, or null for a closed dialog); noShellActions makes it unknown too
+//             existingFiles      paths of files that are on the computer: a new project is never written over one (a file of a listed project counts)
+//             missingFolders     folders that are not there: a new project's folder and an input given as a folder are refused when named in it
+//             runEnds            '' (default): an AI run (create_project, project_job) goes on until a test ends it with behind.finish(); 'completed', 'failed', 'cancelled' or 'interrupted':
+//                                it ends by itself runDelay ms after it starts (default 0: on the next turn of the event loop, after the answer that started it)
+//             runMessage         what a run that failed says (default "The AI run failed (exit code: 1); see output.log"); the file "was not changed" follows, as the runtime says it
+//             cancelHolds        cancel_job answers as the runtime does and the run goes on until behind.finish() (a run that is slow to stop). A project run in the phase "Building and saving the project" ignores
+//                                a cancel whatever the flag says, as the runtime does once the commit started; a cancel before that ends the run as `cancelled`, with the words of the phase it was in (below)
+//             staleDeletes (n)   the next n delete_project requests are refused as the registry refuses a stale revision, and the registry has moved on (its revision is one higher), so the page's retry carries a new one
+//             updatesError       project_updates fails with this message (an upstream that cannot be reached)
+//             A run is a job of kind "project" (jobs, snapshot.jobs): the runtime's fields (project_id, operation, title, file, phase, budget_usd, log_path, message, time in epoch seconds). One goes at a time,
+//             and an adaptation counts. When a run completes it does what the factory's commit does and nothing about meaning: a new project is listed (and its file exists); a change moves the version by its
+//             step, adds the run to the history and an entry to the changelog, gives the file a new digest, and adds, removes or re-pins the input it names, or writes the instruction files. A project's digest is
+//             64 hex digits that change at every write (a run, an edit); behind.touch(id) writes the file as someone else would; behind.digest(id) tells it.
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
-//   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision.
+//   behind.settings(patch) saves settings, behind.check() records a check, behind.bump() moves the revision;
+//   behind.finish(status, message) ends the AI runs that go (status completed, failed, cancelled or interrupted; the message defaults to the runtime's own), behind.phase(text) says the phase they are in,
+//   behind.touch(id) writes a project's file (another window, a sync: the page's digest is stale), behind.digest(id) is the digest of its file now,
+//   behind.adapt(plugin, harness) starts an AI adaptation as another client would, and the page is not told: its next request is refused ("Another AI run is in progress").
+//   What a run says when it is cancelled depends on where it was, as the runtime's does: during the agent ("The AI run was cancelled. The project file was
+//   not changed", phase "AI intake and harmonization") and between the steps of the run ("Job cancelled. The project file was not changed").
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
 // installed outside the list), removals (an exclusive harness: one plugin to install, one outside the list to uninstall and one record whose files are gone,
 // `present: false`, to clear), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
@@ -37,6 +60,17 @@ const harnessTarget = (id, harness, name, extra = {}) => ({ id, harness, name, r
 const plugin = (id, name, targets, distributions, extra = {}) => ({ id, name, source: `github.com/example/${id}`, policy: 'stable', pinned_version: '', targets, distributions, upstream_version: 'v' + (distributions[0]?.version ?? ''), ...extra });
 const installedPlugin = (id, name, version, managed = true) => ({ id: 'native-' + id, registry_id: managed ? id : undefined, name, version, path: `D:/plugins/${id}`, managed });
 const foundHarness = (harness, name, extra = {}) => ({ harness, name, executable: harness, version: '1.0.0', config_root: `D:/config/${harness}`, available: true, supported: true, ...extra });
+
+// A digest as the runtime knows it: 64 hex digits (the SHA-256 of the file). Here a hash of `seed`, which is the project and how many times its file was written.
+function digestOf(seed) {
+  let out = '';
+  for (let n = 0; out.length < 64; n++) {
+    let h = 2166136261;
+    for (const c of `${seed}/${n}`) h = Math.imul(h ^ c.codePointAt(0), 16777619);
+    out += (h >>> 0).toString(16).padStart(8, '0');
+  }
+  return out;
+}
 
 // A small project in the shape of `muro project info`, Marionette-like: three inputs, six choices, two records, two runs, the four prompts, two entries and four capabilities.
 // Tasks 7 and 8 read the same data: the history, the records, the choices and the graph.
@@ -62,6 +96,7 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' } : null, builtin },
     plugin: { name, slug, version: '0.5.0', description: `${name}, one plugin` },
     inputs, decisions,
+    instructions: [{ path: 'house-style.md', text: 'Keep sentences short.\n' }],
     records: [{ id: 'r1', date: '2026-11-10', subjects: ['design-taste'], text: 'One owner per output.', author: 'muro', binding: false }, { id: 'r2', date: '2026-11-12', subjects: ['office-docs'], text: 'Documents keep the source\'s limits.', author: 'you', binding: true }],
     history: [{ id: 'run-2', time: '2026-11-18T12:00:00Z', version: '0.5.0', status: 'completed', budget_usd: 2, engine: 'claude-code', pins: { 'taste-skill': 'v1.2.0' }, changelog: 'Moved taste-skill to v1.2.0.' }, { id: 'run-1', time: '2026-11-10T09:00:00Z', version: '0.4.0', status: 'completed', budget_usd: null, engine: null, pins: { 'taste-skill': 'v1.1.0' }, changelog: 'First harmonization.' }],
     changelog: '## 0.5.0\n\nMoved taste-skill to v1.2.0.\n', prompts: ['intake.md', 'harmonizer.md', 'delivery.md', 'classify.md'].map(file => ({ file, text: `# ${file}\n\nThe prompt.` })),
@@ -80,17 +115,35 @@ function projectInfo(name, slug, { builtin = false } = {}) {
       { part: 'Your instructions', path: 'custom-instructions/', detail: 'house-style.md' },
       { part: 'Built plugin', path: 'release/', detail: 'Ready to install on every harness, with its guide' },
     ],
-    digest: 'sha256:' + slug.padEnd(8, '0'),
+    digest: digestOf(slug + ':0'),
   };
 }
-// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and two documented examples.
+// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and 26 documented examples (two named, 24 generated).
 function withBigGraph(info) {
   const ids = Array.from({ length: 37 }, (_, i) => i === 5 ? 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30) : `capability-${String(i + 1).padStart(2, '0')}-design-system`);
   const entries = Array.from({ length: 15 }, (_, e) => ({ name: `${info.plugin.slug}-group-${e + 1}`, description: `Use when group ${e + 1} applies.`, capabilities: ids.filter((_, i) => i % 15 === e) }));
   const capabilities = ids.map((id, i) => ({ id, title: `Capability ${i + 1}`, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: `Capability ${i + 1}`, excludes: '' }], needs: i % 7 === 1 ? [{ capability: ids[i - 1], label: 'It reads the first', when: 'It reads the first', reason: 'Because.' }] : [], conflicts: i % 11 === 3 ? [ids[i + 1]] : [] }));
   const pick = id => ({ capability: id, intent: id + '-intent', reason: 'Fits.' });
   const example = (title, chosen) => ({ id: title, title, task: title, stack_tokens: [], status: 'selected', selections: chosen.map(pick), reason: 'Both.', questions: [], path: chosen, steps: chosen.map(id => ({ step: id, capability: id, intent: id + '-intent' })) });
-  return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]])] } };
+  // 24 more, so the list holds the 26 that Marionette's does. Each picks two capabilities spread across the whole of `ids` (the steps 5 and 11 apart, mod 37: never the same pair twice in a row, and the long name comes up in one).
+  const generated = Array.from({ length: 24 }, (_, k) => example(`Generated example ${String(k + 3).padStart(2, '0')}`, [ids[(k * 5 + 1) % 37], ids[(k * 11 + 19) % 37]]));
+  return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]]), ...generated] } };
+}
+// flags.oddNames: what a project file from elsewhere may name its things. React writes text, never markup; these prove it, and that two examples with one title stay two.
+export const ODD_TITLE = '<b>Odd</b> & "quoted" \'title\'', ODD_TASK = 'Make a <i>PDF</i> & "send" it', ODD_INTENT = '<i>pdf</i> & "intent"', ODD_OUTPUT = '<u>file</u> & "pdf"';
+function withOddNames(info) {
+  const capabilities = info.graph.capabilities.map(c => c.id === 'office-pdf' ? { ...c, outputs: [ODD_OUTPUT] } : c);
+  const examples = [
+    ...info.graph.examples,
+    { id: 'ex-3', title: 'A letter', task: 'Write a second letter', stack_tokens: [], status: 'selected', selections: [{ capability: 'office-docs', intent: 'office-docs-intent', reason: 'Another Word file.' }], reason: 'A second document.', questions: [], path: ['office-docs'], steps: [{ step: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent' }] },
+    { id: 'ex-4', title: ODD_TITLE, task: ODD_TASK, stack_tokens: [], status: 'selected', selections: [{ capability: 'office-pdf', intent: ODD_INTENT, reason: 'It makes the "PDF" <file>.' }], reason: 'One & only.', questions: [], path: ['office-pdf'], steps: [{ step: 'office-pdf', capability: 'office-pdf', intent: ODD_INTENT }] },
+  ];
+  return { ...info, graph: { ...info.graph, capabilities, examples } };
+}
+// flags.objectFields: the first record's text and the newest run's changelog are objects, where the file should hold text.
+function withObjectFields(info) {
+  const [first, ...records] = info.records, [newest, ...history] = info.history;
+  return { ...info, records: [{ ...first, text: { en: first.text } }, ...records], history: [{ ...newest, changelog: { en: newest.changelog } }, ...history] };
 }
 const summaryOf = (id, path, info, included = false) => ({ id, path, included, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
@@ -136,10 +189,11 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, projectChanged: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, emptyGraph: false, noEntries: false, oddNames: false, objectFields: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
+  Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '', staleDeletes: 0 });   // the knobs of the project writes
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
@@ -225,6 +279,308 @@ export function createTransport(scenario = 'default') {
     return bump();
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
+  // ---------- the write side of the projects ----------
+  // What the runtime does for create_project, project_job, edit_project, delete_project, project_updates, cancel_job and the shell's pick_folder (crates/muro-desktop-runtime/src/project_jobs.rs, ADR-0032),
+  // with its refusals in its own words and in its own order, each checked here by its own copy (never by the page's: the fake is the other side of the wire). A change of the package is an AI run, a job of kind
+  // "project" that goes on until a test ends it (behind.finish) or a flag makes it end by itself (flags.runEnds); what a run did is mechanical, as the factory's commit is. The fake judges nothing.
+  const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
+  // The phases of a project run that the runtime's cancel and the page depend on (project_jobs.rs), and the limit of a project run (jobs::run).
+  const AGENT_PHASE = 'AI intake and harmonization', SAVING_PHASE = 'Building and saving the project', PROJECT_RUN_MINUTES = 120;
+  const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
+  const OPERATIONS = ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions'];
+  const isControl = c => /\p{Cc}/u.test(c);
+  const nowSeconds = () => Math.floor(Date.now() / 1000);
+  const nowIso = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const encoded = text => new TextEncoder().encode(text).length;
+  // The runtime's `line`: one trimmed line of at most 200 characters, never empty.
+  const line = (value, what) => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if (!text) throw new Error(`${what} is required`);
+    if ([...text].length > 200 || [...text].some(isControl)) throw new Error(`${what} must be one line of at most 200 characters`);
+    return text;
+  };
+  // The runtime's `request_text`: optional, at most 4000 characters, line breaks and tabs allowed.
+  const requestText = (value, what) => {
+    const text = typeof value === 'string' ? value.trim() : '';
+    if ([...text].length > 4000) throw new Error(`${what} must be at most 4000 characters`);
+    if ([...text].some(c => isControl(c) && !'\n\t\r'.includes(c))) throw new Error(`${what} must be plain text`);
+    return text.replace(/\r\n/g, '\n');
+  };
+  const isSlug = slug => slug.length <= 64 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug);
+  // What `Path::is_absolute` takes on Windows, where the runtime runs: a drive and a separator, or a share.
+  const isAbsolute = path => /^[A-Za-z]:[\\/]/.test(path) || /^\\\\[^\\/]/.test(path);
+  const sameFile = path => String(path).replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();   // Windows: either slash, any case
+  // `validate_budget` and the runtime's default: a missing, null or non-numeric budget is 5.
+  const budgetOf = payload => {
+    const budget = typeof payload.budget_usd === 'number' && Number.isFinite(payload.budget_usd) ? payload.budget_usd : 5;
+    if (!(budget > 0 && budget <= 100)) throw new Error('The AI budget must be above 0 and at most 100 USD');
+    return budget;
+  };
+  const stepOf = (payload, fallback) => {
+    if (typeof payload.step !== 'string') return fallback;
+    if (!['patch', 'minor', 'major'].includes(payload.step)) throw new Error(`The version step must be patch, minor or major, not ${payload.step}`);
+    return payload.step;
+  };
+  const repositoryOf = value => {
+    if (value === null || value === undefined) return null;
+    const url = line(value.url, 'The repository address');
+    if (!url.startsWith('https://') || url.includes(' ')) throw new Error('The repository address must be an https:// address');
+    const given = field => (typeof value[field] === 'string' ? value[field].trim() : '');
+    return { url, branch: given('branch') ? line(given('branch'), 'The branch') : 'main', tag_prefix: given('tag_prefix') ? line(given('tag_prefix'), 'The tag prefix') : '' };
+  };
+  // An input: an https address without spaces, or the full path of a folder that is there.
+  const sourceOf = value => {
+    const text = line(value, 'Where the input comes from');
+    if (text.startsWith('https://')) {
+      if (text.length === 'https://'.length || /\s/u.test(text.slice('https://'.length))) throw new Error("An input's address must be an https:// address without spaces");
+      return text;
+    }
+    if (!isAbsolute(text)) throw new Error('An input is an https:// address or the full path of a folder on this computer');
+    if (flags.missingFolders.includes(text)) throw new Error(`The folder is missing: ${text}`);
+    return text;
+  };
+  const inputIdOf = from => (from.split('#')[0].split(/[\\/]/).filter(Boolean).pop() || 'input').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'input';
+  // `instruction_edits`: Markdown files under plain names, each written whole or (text null) removed.
+  const instructionEdits = value => {
+    if (!Array.isArray(value)) throw new Error('Name the instruction files to write or remove');
+    if (!value.length) throw new Error('Change at least one instruction file');
+    if (value.length > 50) throw new Error('At most 50 instruction files at once');
+    const edits = [];
+    for (const item of value) {
+      const path = typeof item?.path === 'string' ? item.path.trim() : '';
+      if (!path || encoded(path) > 200) throw new Error('An instruction file needs a name');
+      if (!path.toLowerCase().endsWith('.md')) throw new Error(`An instruction file is Markdown: its name ends in .md (${path})`);
+      for (const part of path.split('/')) {
+        if (!part || part === '.' || part === '..' || /[. ]$/.test(part) || [...part].some(c => isControl(c) || '\\:<>"|?*'.includes(c))) throw new Error(`An instruction file's name is plain folder and file names separated by / (${path})`);
+      }
+      if (edits.some(e => e.path.toLowerCase() === path.toLowerCase())) throw new Error(`The instruction file ${path} is named twice`);
+      const text = item.text === undefined ? null : item.text;
+      if (text !== null && typeof text !== 'string') throw new Error(`The text of ${path} must be text, or null to remove it`);
+      if (typeof text === 'string' && encoded(text) > 256 * 1024) throw new Error(`${path} is larger than 256 KiB`);
+      edits.push({ path, text });
+    }
+    return edits;
+  };
+  // The factory's `check_records`: what a record must be, and the records as they are kept.
+  const checkRecords = records => {
+    if (!Array.isArray(records)) throw new Error('The records must be a list');
+    const seen = new Set();
+    return records.map((record, index) => {
+      if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error(`Record ${index + 1} must be an object`);
+      const id = record.id;
+      if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(id)) throw new Error(`Record ${index + 1} needs an id of letters, digits, dots, dashes or underscores`);
+      if (seen.has(id)) throw new Error(`Two records have the id ${id}`);
+      seen.add(id);
+      if (typeof record.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(record.date)) throw new Error(`Record ${id} needs a date as YYYY-MM-DD`);
+      const [year, month, day] = record.date.split('-').map(Number), real = new Date(Date.UTC(year, month - 1, day));
+      if (real.getUTCFullYear() !== year || real.getUTCMonth() !== month - 1 || real.getUTCDate() !== day) throw new Error(`Record ${id} needs a real date`);
+      const subjects = record.subjects === undefined ? [] : record.subjects;
+      if (!Array.isArray(subjects) || !subjects.every(s => typeof s === 'string' && s.trim())) throw new Error(`Record ${id}: subjects must be a list of names`);
+      if (typeof record.text !== 'string' || !record.text.trim()) throw new Error(`Record ${id} needs a text`);
+      if ([...record.text].length > 20000) throw new Error(`Record ${id} is longer than 20000 characters`);
+      if (record.author !== 'muro' && record.author !== 'you') throw new Error(`Record ${id}: the author is muro or you`);
+      if (typeof record.binding !== 'boolean') throw new Error(`Record ${id}: binding must be true or false`);
+      return { id, date: record.date, subjects: subjects.map(s => s.trim()), text: record.text.trim(), author: record.author, binding: record.binding };
+    });
+  };
+  const withInstructions = (held, edits) => {
+    const files = structuredClone(held ?? []);
+    for (const { path, text } of edits) {
+      const at = files.findIndex(f => f.path === path);
+      if (text === null) { if (at < 0) throw new Error(`The instruction file ${path} is not in the project`); files.splice(at, 1); }
+      else if (at >= 0) files[at].text = text;
+      else files.push({ path, text });
+    }
+    return files;
+  };
+  const bumpVersion = (version, step) => {
+    const [major, minor, patch] = version.split('.').map(Number);
+    return step === 'major' ? `${major + 1}.0.0` : step === 'minor' ? `${major}.${minor + 1}.0` : step === 'none' ? version : `${major}.${minor}.${patch + 1}`;
+  };
+  // A project's file was written: it has another digest.
+  const rewrite = entry => { entry.writes = (entry.writes || 0) + 1; entry.info.digest = digestOf(`${entry.id}:${entry.writes}`); };
+  // What the factory's commit writes after a run, mechanically: the version, the run in the history, an entry of the changelog, the new digest.
+  const recordRun = (entry, { step, title, budget }) => {
+    const info = entry.info, version = bumpVersion(info.plugin.version, step), time = nowIso();
+    Object.assign(info.plugin, { version });
+    Object.assign(info.project, { version, changed: time });
+    info.history = [{ id: `${info.plugin.slug}-v${version}`, time, version, status: 'completed', budget_usd: budget, engine: 'claude-code', operation: title, pins: Object.fromEntries(info.inputs.map(i => [i.id, i.release || i.commit])), changelog: `${title}.` }, ...info.history];
+    info.changelog = `# ${info.plugin.name} ${version}\n\n- ${title}.\n\n${info.changelog}`;
+    rewrite(entry);
+  };
+  const agentCheck = () => { if ((reg.settings.ai?.harness ?? reg.settings.agent ?? 'claude-code') !== 'claude-code') throw new Error(NEEDS_CLAUDE); };
+  const ensureIdle = () => {
+    const going = jobs.find(j => j.status === 'running');
+    if (going) throw new Error(`Another AI run is in progress (${going.title ?? going.phase ?? 'an adaptation'}): wait for it to finish, or cancel it in Activity`);
+  };
+  const listedFile = id => {
+    const entry = projects.find(x => x.id === id);
+    if (!entry) throw new Error('That project is not in your list');
+    return entry;
+  };
+  const runningOn = id => jobs.some(j => j.status === 'running' && j.kind === 'project' && j.project_id === id);
+  const digestGiven = (digest, what) => { if (typeof digest !== 'string' || !/^[0-9a-fA-F]{64}$/.test(digest)) throw new Error(`Open the project again: the ${what} names no version of its file`); };
+  // The jobs, as the runtime lists them: the newest first (the runtime sorts by the time they began; the later one of two in the same second is the newer here).
+  const newestFirst = () => jobs.map((job, at) => [job, at]).sort(([a, i], [b, j]) => (Number(b.time) - Number(a.time)) || (j - i)).map(([job]) => job);
+  let runs = 0;
+  const effects = new Map();
+  function startRun(fields, effect) {
+    const id = `00000000-0000-4000-8000-${String(++runs).padStart(12, '0')}`;
+    const job = { id, kind: 'project', time: nowSeconds(), status: 'running', log_path: `D:/isolated/data/jobs/${id}/output.log`, ...fields };
+    jobs.push(job);
+    effects.set(id, effect);
+    if (flags.runEnds) setTimeout(() => settle(job, flags.runEnds), flags.runDelay);
+    return structuredClone(job);
+  }
+  // The end of a run: its status, the phase "Finished" and the message the runtime writes. A run that completes does its effect; one whose effect fails (an instruction file to remove that is not there) failed.
+  function settle(job, status, text) {
+    if (job.status !== 'running') return;
+    const effect = effects.get(job.id);
+    effects.delete(job.id);
+    const project = job.kind === 'project', created = job.operation === 'create';
+    const said = {
+      completed: !project ? 'Adapter validated and added to registry; review a new sync plan to install' : created ? 'The project was created and added to your list. Install it from its Install step' : 'The project was saved. Install it again from its Install step to bring the change to the harnesses',
+      failed: `${flags.runMessage || 'The AI run failed (exit code: 1); see output.log'}${project ? '. The project file was not changed' : ''}`,
+      // The runtime's own words: the agent's step says the AI run was cancelled, the others that the job was cancelled.
+      cancelled: project ? (job.phase === AGENT_PHASE ? 'The AI run was cancelled. The project file was not changed' : 'Job cancelled. The project file was not changed') : 'Job cancelled',
+      interrupted: 'Previous desktop session ended; inspect log and retry. No automatic installation.',
+    };
+    if (status === 'completed') {
+      try { effect?.(); } catch (error) { status = 'failed'; text = `${error.message}. The project file was not changed`; }
+    }
+    Object.assign(job, { status, phase: status === 'interrupted' ? job.phase : 'Finished', message: text ?? said[status] ?? 'Finished' });
+  }
+  // create_project {name, slug, author, folder, inputs: [{source}], request, repository?, budget_usd}
+  function createProject(p) {
+    agentCheck();
+    const name = line(p.name, 'The project name');
+    const slug = typeof p.slug === 'string' ? p.slug.trim() : '';
+    if (!isSlug(slug)) throw new Error('The plugin id is lowercase letters and digits joined by dashes, such as my-plugin');
+    if (slug === 'marionette') throw new Error(`The plugin id ${slug} is the project Muro ships: choose another`);
+    const author = line(p.author, 'The author');
+    const folder = line(p.folder, 'The folder');
+    if (!isAbsolute(folder)) throw new Error('Choose the folder with its full path');
+    if (flags.missingFolders.includes(folder)) throw new Error(`The folder is missing: ${folder}`);
+    const file = `${folder.replace(/[\\/]+$/, '')}/${slug}.mp`;
+    if (flags.existingFiles.some(f => sameFile(f) === sameFile(file)) || projects.some(x => sameFile(x.path) === sameFile(file))) throw new Error(`${file} already exists: choose another folder or plugin id`);
+    if (projects.some(x => x.id === slug)) throw new Error(`A project for ${slug} is already in your list`);
+    if (reg.plugins.some(x => x.id === slug)) throw new Error(`A plugin named ${slug} is already in your list: choose another plugin id`);
+    if (!Array.isArray(p.inputs)) throw new Error('Add at least one input');
+    if (!p.inputs.length) throw new Error('Add at least one input: a project is made from plugins and skills');
+    if (p.inputs.length > 20) throw new Error('At most 20 inputs at once');
+    const sources = [];
+    for (const input of p.inputs) {
+      const from = sourceOf(input?.source);
+      if (sources.includes(from)) throw new Error(`The input ${from} is named twice`);
+      sources.push(from);
+    }
+    requestText(p.request, 'The request');
+    const repository = repositoryOf(p.repository), budget = budgetOf(p);
+    ensureIdle();
+    const title = `New project ${name}`;
+    return startRun({ project_id: slug, operation: 'create', title, phase: 'Starting the project', budget_usd: budget, file, message: 'The AI makes the project; nothing is installed' }, () => {
+      const info = projectInfo(name, slug);
+      const inputs = sources.map(from => ({ id: inputIdOf(from), url: from.startsWith('https://') ? from : null, pin: 'release', release: 'v1.0.0', commit: '0123456789abcdef', license: 'MIT', paths: ['skills'], became: { capability: 1, 'always-on': 0, hook: 0, dropped: 0 } }));
+      Object.assign(info, { inputs, decisions: [], records: [], history: [], changelog: '', instructions: [] });
+      Object.assign(info.project, { author, repository, version: '0.1.0', builtin: false });
+      info.plugin.version = '0.1.0';
+      const entry = { id: slug, path: file, adapters: ['claude-code', 'codex'], info, writes: 0 };
+      projects.push(entry);
+      recordRun(entry, { step: 'none', title, budget });
+    });
+  }
+  // project_job {id, operation, digest, budget_usd, step?, request?, source?, input?, to?, instructions?}
+  function projectJob(p) {
+    const operation = typeof p.operation === 'string' ? p.operation : '';
+    if (!OPERATIONS.includes(operation)) throw new Error(`Unknown change ${operation}: it is one of ${OPERATIONS.join(', ')}`);
+    agentCheck();
+    const entry = listedFile(p.id);
+    digestGiven(p.digest, 'change');
+    if (p.digest !== entry.info.digest) throw new Error(CHANGED);
+    const budget = budgetOf(p), step = stepOf(p, operation === 'add_input' || operation === 'remove_input' ? 'minor' : 'patch');
+    ensureIdle();
+    const inputs = entry.info.inputs, known = id => inputs.some(i => i.id === id);
+    requestText(p.request, 'The request');
+    let title, change = () => {};
+    if (operation === 'harmonize') title = 'Harmonize again';
+    if (operation === 'add_input') {
+      const from = sourceOf(p.source);
+      title = `Add the input ${from}`;
+      change = () => entry.info.inputs.push({ id: inputIdOf(from), url: from.startsWith('https://') ? from : null, pin: 'release', release: 'v1.0.0', commit: '0123456789abcdef', license: 'MIT', paths: ['skills'], became: { capability: 1, 'always-on': 0, hook: 0, dropped: 0 } });
+    }
+    if (operation === 'remove_input') {
+      const id = line(p.input, 'The input');
+      if (!known(id)) throw new Error(`This project has no input ${id}`);
+      if (inputs.length <= 1) throw new Error(`A project needs at least one input: add another before removing ${id}`);
+      title = `Remove the input ${id}`;
+      change = () => { entry.info.inputs = entry.info.inputs.filter(i => i.id !== id); entry.info.decisions = entry.info.decisions.filter(d => d.source !== id); };
+    }
+    if (operation === 'move_pin') {
+      const id = line(p.input, 'The input');
+      if (!known(id)) throw new Error(`This project has no input ${id}`);
+      const to = typeof p.to === 'string' && p.to.trim() ? line(p.to.trim(), 'The release to move to') : '';
+      title = `Move ${id} to ${to || 'its newest release'}`;
+      change = () => { entry.info.inputs.find(i => i.id === id).release = to || 'v9.9.9'; };
+    }
+    if (operation === 'instructions') {
+      const edits = instructionEdits(p.instructions);
+      title = 'Harmonize the custom instructions';
+      change = () => { entry.info.instructions = withInstructions(entry.info.instructions, edits); };
+    }
+    return startRun({ project_id: p.id, operation, title, phase: 'Opening the project', budget_usd: budget, file: entry.path, message: 'The AI changes the project; the file is replaced only when the build succeeds' }, () => {
+      // The factory commits only a file that is still the one the run started from.
+      if (entry.info.digest !== p.digest) throw new Error(CHANGED);
+      change();
+      recordRun(entry, { step, title, budget });
+    });
+  }
+  // edit_project {id, digest, name?, author?, repository?, records?, changelog?}: offline, on the file the page read; repository null takes it away.
+  function editProject(p) {
+    const entry = listedFile(p.id);
+    digestGiven(p.digest, 'edit');
+    if (runningOn(entry.id)) throw new Error('An AI run is changing this project: wait for it to finish');
+    const set = {};
+    if (p.name !== null && p.name !== undefined) set.name = line(p.name, 'The project name');
+    if (p.author !== null && p.author !== undefined) set.author = line(p.author, 'The author');
+    if (p.repository !== undefined) set.repository = repositoryOf(p.repository);
+    if (p.records !== undefined && !Array.isArray(p.records)) throw new Error('The records must be a list');
+    if (p.changelog !== undefined && typeof p.changelog !== 'string') throw new Error('The changelog must be text');
+    if (!Object.keys(set).length && p.records === undefined && p.changelog === undefined) throw new Error('Nothing to change');
+    if (p.digest !== entry.info.digest) throw new Error(CHANGED);
+    const records = p.records === undefined ? undefined : checkRecords(p.records);
+    if (p.changelog !== undefined && encoded(p.changelog) > 1024 ** 2) throw new Error('The changelog must be text of at most 1 MiB');
+    Object.assign(entry.info.project, set, { changed: nowIso() });
+    if (records) entry.info.records = records;
+    if (p.changelog !== undefined) entry.info.changelog = !p.changelog || p.changelog.endsWith('\n') ? p.changelog : p.changelog + '\n';
+    rewrite(entry);
+    return { path: entry.path, digest: entry.info.digest };
+  }
+  // delete_project {id, revision}: the project leaves the list and its file is deleted (the runtime asks for the registry's revision, as every save does).
+  function deleteProject(p) {
+    if (p.id === 'marionette') throw new Error('The project Muro ships cannot be deleted');
+    const entry = listedFile(p.id);
+    if (runningOn(p.id)) throw new Error('An AI run is changing this project: wait for it to finish, or cancel it');
+    if (flags.staleDeletes > 0) { flags.staleDeletes--; reg.revision++; throw new Error(STALE); }   // the registry moved behind the page's back
+    if (p.revision !== reg.revision) throw new Error(STALE);
+    projects.splice(projects.indexOf(entry), 1);
+    flags.existingFiles = flags.existingFiles.filter(f => sameFile(f) !== sameFile(entry.path));
+    return bump();
+  }
+  // project_updates {id}: how each input's pin stands against its upstream (the first input is behind, at v9.9.9, the others are current).
+  function projectUpdates({ id }) {
+    const entry = listedFile(id);
+    if (flags.updatesError) throw new Error(flags.updatesError);
+    return { id, digest: entry.info.digest, inputs: entry.info.inputs.map((i, n) => ({ id: i.id, pin: i.pin, pinned: i.release || i.commit || '', upstream: n === 0 ? 'v9.9.9' : i.release || i.commit, status: n === 0 ? 'behind' : 'current', note: '' })) };
+  }
+  // cancel_job {id}: the runtime only asks the run to stop and says so; the run ends a moment later (here at once, unless flags.cancelHolds).
+  function cancelJob({ id }) {
+    const job = jobs.find(j => j.id === id);
+    if (!job) throw new Error('Job not found');
+    // The commit cannot be taken back half way: from the saving phase on the runtime refuses a cancel, and the run ends by itself.
+    if (job.kind === 'project' && job.phase === SAVING_PHASE) throw new Error('The run is building and saving the project: it can no longer be cancelled, and it ends by itself');
+    if (!flags.cancelHolds) settle(job, 'cancelled');
+    return { message: 'Cancellation requested; registry remains unchanged until validation completes' };
+  }
   // The runtime's simulate (plan 2, Tasks 3 and 5): the factory's `check` result plus the engine that answered. The fake decides nothing from the words of the task: the answer is the flag's.
   // The page names each run (`run`, as the runtime lets it: letters, digits, - and _, 64 at most) so it can ask for it to be stopped: `cancel_simulation {run}`.
   const running = new Map();
@@ -268,12 +624,18 @@ export function createTransport(scenario = 'default') {
     result.skipped_removals = skip ? removals : 0;
     return result;
   }
+  // An AI adaptation of a plugin: a job with no kind, no title and no project.
+  function startAdaptation({ id, harness, budget_usd }) {
+    const job = { id: 'job-' + (jobs.length + 1), plugin_id: id, harness, status: 'running', phase: 'harmonization', budget_usd, log_path: 'D:/isolated/data/jobs/log.txt', message: 'Started', time: ago(0) };
+    jobs.push(job);
+    return structuredClone(job);
+  }
   const request = async (action, payload = {}) => {
     calls.push({ action, payload: structuredClone(payload) });
     switch (action) {
       case 'snapshot': case 'scan': return snapshot();
       case 'discover': return structuredClone(data.found);
-      case 'jobs': return structuredClone(jobs);
+      case 'jobs': return structuredClone(newestFirst());
       case 'plan': if (flags.planDelay) await new Promise(done => setTimeout(done, flags.planDelay)); return makePlan(payload.target_id, payload.reinstall);
       case 'check': {
         if (flags.checkDelay) await new Promise(done => setTimeout(done, flags.checkDelay));
@@ -285,7 +647,16 @@ export function createTransport(scenario = 'default') {
       }
       case 'apply': return apply(payload);
       case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info, !!p.included));
-      case 'project': return structuredClone({ ...(flags.bigGraph ? withBigGraph(projectOf(payload.id).info) : projectOf(payload.id).info), included: !!projectOf(payload.id).included });
+      case 'project': {
+        const held = projectOf(payload.id);
+        let info = structuredClone(held.info);
+        if (flags.bigGraph) info = withBigGraph(info);
+        if (flags.emptyGraph) info = { ...info, graph: { entries: [], capabilities: [], examples: [] } };
+        if (flags.noEntries) info = { ...info, graph: { ...info.graph, entries: [] } };
+        if (flags.oddNames) info = withOddNames(info);
+        if (flags.objectFields) info = withObjectFields(info);
+        return { ...info, included: !!held.included };
+      }
       case 'open_project': {
         if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
         const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();
@@ -296,6 +667,11 @@ export function createTransport(scenario = 'default') {
         return summaryOf(id, added.path, info);
       }
       case 'install_project': return installProject(payload);
+      case 'create_project': return createProject(payload);
+      case 'project_job': return projectJob(payload);
+      case 'edit_project': return editProject(payload);
+      case 'delete_project': return deleteProject(payload);
+      case 'project_updates': return projectUpdates(payload);
       case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);
       case 'cancel_simulation': {
@@ -306,6 +682,7 @@ export function createTransport(scenario = 'default') {
       }
       case 'pick_file': { unknownShellAction(action); return { path: flags.pickPath }; }
       case 'open_folder': { unknownShellAction(action); return { opened: true }; }
+      case 'pick_folder': { unknownShellAction(action); return { path: flags.pickFolder }; }
       case 'save_plugin': {
         mutate(payload);
         if (payload.adopt) adopt(payload);
@@ -337,8 +714,8 @@ export function createTransport(scenario = 'default') {
         return bump();
       }
       case 'resolve': { const p = reg.plugins.find(p => p.id === payload.id); if (p) p.last_checked = ago(0); return bump(); }
-      case 'adapt': { const job = { id: 'job-' + (jobs.length + 1), plugin_id: payload.id, harness: payload.harness, status: 'running', phase: 'harmonization', budget_usd: payload.budget_usd, log_path: 'D:/isolated/data/jobs/log.txt', message: 'Started', time: ago(0) }; jobs.push(job); return structuredClone(job); }
-      case 'cancel_job': { const job = jobs.find(j => j.id === payload.id); if (job) Object.assign(job, { status: 'cancelled', message: 'Cancelled' }); return snapshot(); }
+      case 'adapt': return startAdaptation(payload);
+      case 'cancel_job': return cancelJob(payload);
       case 'open_custom_instructions': case 'custom_instructions': return structuredClone(instructions().find(i => i.plugin_id === payload.id));
       case 'maintenance': return { message: payload.kind === 'verify' ? 'Every stored build is intact' : 'Nothing to clean up', details: [] };
       // The runtime's env_present (plan 2, Task 5): whether the variable is set for the Muro process. The name is checked as the registry checks it; no value is ever returned.
@@ -360,6 +737,16 @@ export function createTransport(scenario = 'default') {
     settings(patch) { Object.assign(reg.settings, patch); reg.revision++; },
     check(message = 'Everything is in sync') { makePlan(); log('Background check', 'complete', message); },
     bump() { reg.revision++; },
+    /** The AI runs that go end, as the runtime ends them (completed, failed, cancelled or interrupted): a project made is listed, a change gives the file a new digest. The message defaults to the runtime's own. */
+    finish(status = 'completed', message) { for (const job of jobs.filter(j => j.status === 'running')) settle(job, status, message); },
+    /** The phase the runs that go are in ("AI intake and harmonization", "Building and saving the project"). */
+    phase(text) { for (const job of jobs.filter(j => j.status === 'running')) job.phase = text; },
+    /** A project's file is written by someone else (another window, a sync): the digest the page read is stale. */
+    touch(id) { rewrite(listedFile(id)); },
+    /** An AI adaptation another client started: the registry the page holds does not show it until the page reads again, and its own request is refused meanwhile. */
+    adapt(plugin = 'docs-writer', harness = 'opencode') { startAdaptation({ id: plugin, harness, budget_usd: 2 }); },
+    /** The digest of a project's file now. */
+    digest(id) { return listedFile(id).info.digest; },
   };
   return { request, calls, flags, behind };
 }

@@ -265,3 +265,39 @@ with it and is registered by the generated plugin, declared once in
 `delivery.json` and written by each adapter in its host's form. Proposed: the
 owner approved the design before the code; the explanatory text is not
 separately approved.
+
+## Desktop on Sigrid
+
+Manual note outside the generated index: [ADR-0031 — The desktop window moves
+from Imago to React on Sigrid](ADR-0031-desktop-on-sigrid.md) records the
+owner's decision of 2026-11-23 that the window is a React app on
+`@acaprino/sigrid`, replacing the Imago window in place, with `imago-shell` kept
+for the native window. It names what is lost (the ONI look, `imago-check`),
+the consequence for `develop` (no Sync page until the follow-up plans port it,
+and no merge into `main` meanwhile) and what was not verified. Proposed: the
+decision is the owner's; the explanatory text is not separately approved.
+
+## Desktop projects, write side
+
+Manual note outside the generated index: [ADR-0032 — Projects are made and
+changed in the desktop app](ADR-0032-desktop-projects-write-side.md) records the
+owner's requirement of 2026-11-21 ("è fondamentale poterli creare gestire
+aggiornare editare") and its implementation, the third plan of ADR-0028: a
+change of a package is an AI run of Claude Code committed by the factory under a
+digest guard, and the details, records and changelog are edited offline. It was
+written on a side branch as ADR-0030 and renumbered when its factory commands and
+runtime actions were taken over on 2026-11-23; its screens were written for the
+Imago window and are rewritten in React (ADR-0031). Proposed: the decisions are
+implementation choices, not separately approved.
+
+## Package MCP server
+
+Manual note outside the generated index: [ADR-0033 — A package's own MCP server,
+decided with the owner at harmonization](ADR-0033-package-mcp-server.md) records
+the owner's request of 2026-11-23 that Muro ask, at harmonization, what to do
+with the MCP servers a source ships. One answer is a package server named for the
+package, whose tools are declared in `delivery.json` and either forward to a tool
+of an absorbed server or run an absorbed command. The build refuses it without
+the recorded answer on the sources as pinned. Only Claude Code registers it for
+now. Proposed: the owner chose the approach and accepted the review's fixes; the
+explanatory text is not separately approved. No live host session has run.

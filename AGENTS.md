@@ -2,23 +2,57 @@
 
 ## Desktop UI ownership
 
-Desktop UI and native window primitives come from `@acaprino/imago` and
-`imago-shell`. Extend Imago for every component, layout, style and UI behaviour,
-including the graph renderer and layout. Muro owns only domain data, operations
-and screen composition; no private components, SVG renderer or CSS rules belong
-here. Keep the shell body stable across renders while a modal is open.
+The desktop UI is React on `@acaprino/sigrid` (owner decision of 2026-11-23,
+ADR-0031). Every component, layout, style and UI behaviour comes from Sigrid,
+the graph canvas included. Muro owns only domain data, operations and screen
+composition; it keeps no design system of its own: no components that restyle
+or repeat Sigrid's, no CSS rules beyond the Tailwind entry, no literal colours
+or sizes. What Sigrid lacks is asked of Sigrid. Keep the shell body stable
+across renders while a modal is open.
 
-Before UI work, read node_modules/@acaprino/imago/docs/design-file.md and the component or style files it references.
-Apply its tokens and confirmed design choices within the requested scope.
-Use the package's im- classes and --im- tokens. Build a control of your own from the tokens, never from literal colours or sizes.
-Report conflicts and keep unresolved choices explicit.
-Run npx imago-check before you say UI work is done.
+Every app of the suite (Daodan, Xiox, Shinatama, Mukade, Muro and the others on
+Sigrid) has the same look and feel (owner's rule of 2026-11-23): the same
+surfaces, shadows, spacing, type and motion, and the same component for the
+same need. Muro's own are only its layout, which follows its functions, its
+accent and its icon. Muro makes no component that draws: no stylesheet, no
+class, no primitive, no copy or restyling of a Sigrid part. Sigrid changes only
+when a component or primitive that a function needs is really missing, and then
+for every app; Muro's former look is never a reason to change it.
 
-Keep the npm and the Rust pins of Imago the same (`imago-check` reports a
-difference): a commit of Imago's `develop` while Muro waits for a release, the
-tag `v<x>` for a release of Muro, in `package.json`, `Cargo.toml` and both
-lockfiles (using-imago.md, section 1). `docs/imago-migration.md` records what
-Muro takes from Imago.
+The base of the window is Imago, the suite's shell in Xiox's style (window, title
+bar, frame, commands, palette, theme, notices), built with Sigrid: Muro brings
+only its screens, made of Sigrid's components, and has no frame, window or look
+of its own. What is missing in the shell is added to Imago, what is missing in a
+component is added to Sigrid. Until Imago's shell on Sigrid exists, Muro keeps
+its own composition of Sigrid's frame and adds none.
+
+Sigrid is not on npm. `package.json` names its GitHub Release tarball,
+`https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
+(first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
+in `docs/verification/`. Never a `file:` path to a checkout, and never a git
+dependency that runs `prepare`. The lockfile records the tarball's integrity;
+it is generated in CI by a throwaway workflow, never by an install here. That
+workflow was removed once the lockfile was committed: for the next dependency
+change restore it with `git show 72dc3ac:.github/workflows/lockfile.yml`.
+
+Native window primitives (glass and native theme, caption controls, navigation
+guard) stay with the Rust crate `imago-shell`, pinned in
+`apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`, until the owner moves
+them. The npm package `@acaprino/imago` stays for its window glue
+(`@acaprino/imago/shell`, with its Tauri adapter) and nothing else of it: keep
+its tag in `package.json` and `package-lock.json` equal to the Rust pin
+(`imago-check` is gone: compare them by hand).
+`docs/imago-migration.md` is the history of what Muro took from Imago.
+
+Before UI work, read `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
+(they ship in the package; `agents/catalog.json` lists every component and its
+props) and the component or style files they reference. Apply its tokens and
+confirmed design choices within the requested scope. Use its components and
+never build a control of your own (the suite's rule above). Report conflicts and keep unresolved choices explicit.
+Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done: it
+reads files and builds nothing. It needs the Sigrid package installed; the Tests
+workflow runs it ("Design rules (Sigrid)"), not blocking until its first output
+has been read (ADR-0031); where it was not run, say so.
 
 ## Product contract
 
@@ -216,7 +250,11 @@ installation, publication or replacement of existing dist output without request
   self-contained `GUIDE.html` at its root and in every standalone host skill.
   Initially show only the responsive navigable graph and a few controls for
   paths, intents and reset. Open brief intent descriptions and details on node
-  click; keep full catalog and commands available on demand.
+  click; keep full catalog and commands available on demand. The one exception
+  is the "API keys" panel of a package that declares `credentials` in
+  `delivery.json` (variable names and what each unlocks, never a value): visible
+  at once, ordered by `rank` alone, with the same names in each `INSTALL.md`
+  (owner, 2026-11-24; ADR-0010, amendment).
   Render actual packaged metadata and source pins without losing exclusions,
   constraints, dependencies, alternatives, conflicts, outputs, tools or checks.
   Meaning and collaboration rationale remain AI-authored; rendering/filtering
@@ -243,7 +281,7 @@ installation, publication or replacement of existing dist output without request
 - `delivery.json` (optional) and `prompts/delivery.md`: what each part of each
   source becomes in this package, decided by the host AI at intake and reviewed
   at harmonization: `decisions` of `{source, content, form, targets, reason}`
-  with form `capability`, `always-on`, `hook`, `mcp-server` or `dropped`, the `always_on`
+  with form `capability`, `always-on`, `hook`, `mcp-server`, `package-tool` or `dropped`, the `always_on`
   session text (the contributing sources' own words plus marked coexistence
   lines; at most 6000 characters for each source with an `always-on` decision,
   owner rule of 2026-11-12: the limit is proportional to the intakes that go
@@ -271,6 +309,32 @@ installation, publication or replacement of existing dist output without request
   that folder or one the release does not carry. A server the source only calls and does not
   ship stays a runtime dependency. Python never chooses a name or a host
   (ADR-0030).
+  Owner, 2026-11-23 ("muro deve chiedere cosa fare di eventuali server mcp"):
+  a package may have one MCP server of its own. `package_server` declares it as
+  data, `{name, children, tools}`: `children` are `mcp_servers` entries it starts
+  itself, and a tool either forwards to a child's tool, keeping its name,
+  description and schema, or runs a packaged command from an argv template, with
+  no shell. `server_choice` records the owner's answer, `{asked_on, answer,
+  given_on}`, and the form `package-tool` marks a command served as a tool.
+  Owner, 2026-11-24: servers are harmonized like plugins. The Harmonizer AI
+  records `server_review` in `delivery.json` (every tool and command it
+  compares, each with its `effect` and its fate, and a judgment with a reason
+  for every pair that overlaps), and the owner is asked only about the tools
+  that write or send which a package server serves or leaves out; the AI decides
+  the rest, with a reason on record and the list shown to the owner, and
+  never proceeds on its own choice for a tool that writes or sends; with no
+  owner to ask it writes `server_review` and no `package_server`. A doubt is
+  `undetermined`, which counts as writing or sending. Every caller checks the
+  shape and the closure; only `build` refuses a package that declares a server
+  or a package server without `server_review`, one judged on another commit,
+  and a package server whose answer is missing, does not cover a source its
+  gated tools use, was given on another commit of a serving source, or does not
+  show every tool that writes or sends which it serves or leaves out (ADR-0033,
+  amendment of 2026-11-24). One generic program
+  serves any declaration (`python muro.py tools-server`, reading
+  `package-server.json`), and Python never chooses a tool, a child or the
+  number of servers. Only Claude Code registers it for now: every other host
+  registers the absorbed servers as before until it is run live (ADR-0033).
 - `eval-cases.json` (optional): AI-authored requests with expected status and
   ordered capabilities. Use `expect.selections` to test the actual operation
   when a capability serves several intents or depends on a conditional prerequisite.
@@ -498,7 +562,12 @@ credit files in `notice_paths`, and explain in `omissions` each named file that
 stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
 ADR-0027). Write the pin and its release into each capability's `## Sources`
 line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
-each part of the source became and why, and review the earlier decisions. Record the release, the diff
+each part of the source became and why, and review the earlier decisions. When
+the source ships an MCP server, judge its tools again (`server_review` is judged on
+a commit, and the build refuses a package with a server whose record is judged on
+another one). When it serves a package server, copy the description and schema of
+each of its forwarded tools again from the new commit and ask the owner again: the
+build refuses the old answer on a new commit (ADR-0033). Record the release, the diff
 summary, the commands and their results in `docs/verification/`. A release
 proves packaging; say what was not executed.
 

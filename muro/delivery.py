@@ -7,10 +7,13 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .argv_template import literal_parts, template_errors
+from .credentials import ENV_NAME as _ENV_NAME, credential_errors, declared_credentials, in_order
 from .custom_instructions import metadata_errors, reference_errors, validate_binding
+from .server_review import release_errors, server_review_errors
 
 DELIVERY_FILE = "delivery.json"
-FORMS = ("capability", "always-on", "hook", "mcp-server", "dropped")
+FORMS = ("capability", "always-on", "hook", "mcp-server", "package-tool", "dropped")
 # Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
 # permanent place: one allowance for each source with an always-on decision (owner, 2026-11-12).
 # The allowance is sized so a real always-on source fits in its own words: content is never shortened to fit
@@ -36,12 +39,26 @@ _WIRING_OPTIONAL = {"timeout"}
 _SERVER_KEYS = {"name", "source", "run"}
 _SERVER_OPTIONAL = {"env"}
 _SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
-_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PACKAGE_ROOT = "<package_root>"
 # A packaged path inside a value: alone, after `--option=`, or in a list joined by `;` or `:`.
 _PACKAGED_PATH = re.compile(re.escape(_PACKAGE_ROOT) + r"/([^;:]*)")
 _RESERVED_ENV = ("PLUGIN_ROOT", "PLUGIN_DATA")   # an Agent Plugins host drops a server that sets them
 MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
+# One server for the whole package, its tools declared as data; the owner's answer that precedes it is recorded.
+_DOCUMENT_KEYS = {"decisions", "always_on", "hooks", "mcp_servers", "package_server", "server_choice",
+                  "server_review", "credentials", "custom_instructions"}
+_PACKAGE_SERVER_KEYS = {"name", "children", "tools"}
+_TOOL_KEYS = {"name", "source", "description", "input_schema"}
+_TOOL_OPTIONAL = {"annotations", "timeout", "env"}
+_TOOL_COMMANDS = {"forward", "run"}
+_TOOL_NAME = re.compile(r"[a-z][a-z0-9_]{0,39}")
+_FORWARDED_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")   # a forwarded tool keeps the child's name, whatever its spelling
+PACKAGE_SERVER_FILE = "package-server.json"   # the two sections the server reads at start, beside `muro.py`
+PACKAGE_SERVER_ACTION = "tools-server"
+PACKAGE_SERVER_HOSTS = ("claude-code",)   # registered there before its live run; the other hosts keep what they register today
+_CHOICE_KEYS = {"asked_on", "answer", "given_on"}
+_DATE = re.compile(r"\d{4}-\d{2}-\d{2}", re.ASCII)
+_COMMIT = re.compile(r"[0-9a-fA-F]{7,}")
 
 
 def load_delivery(package_dir: Path, *, packaged: bool = False) -> dict[str, Any] | None:
@@ -61,11 +78,29 @@ def mcp_servers(document: dict[str, Any] | None) -> list[dict[str, Any]]:
     return (document or {}).get("mcp_servers", []) or []
 
 
+def package_server(document: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The package's one declared server, or None: then every declared server registers as itself."""
+    return (document or {}).get("package_server")
+
+
+def server_sections(document: dict[str, Any] | None) -> dict[str, Any]:
+    """What the package server reads at start: its own declaration and the servers it may start as children."""
+    return {"package_server": package_server(document), "mcp_servers": mcp_servers(document)}
+
+
+def place_package_root(value: str, package_root: str) -> str:
+    return value.replace(_PACKAGE_ROOT, package_root)
+
+
+def placed_env(declared: dict[str, Any], package_root: str) -> dict[str, str]:
+    """What a declared server or tool adds to the environment, with the package root in place."""
+    return {name: place_package_root(value, package_root) for name, value in declared.get("env", {}).items()}
+
+
 def server_launch(server: dict[str, Any], package_root: str) -> dict[str, Any]:
     """One declared server as a program, its arguments and its environment, with the package root in place."""
-    place = lambda value: value.replace(_PACKAGE_ROOT, package_root)
-    return {"command": server["run"][0], "args": [place(part) for part in server["run"][1:]],
-            "env": {name: place(value) for name, value in server.get("env", {}).items()}}
+    return {"command": server["run"][0], "args": [place_package_root(part, package_root) for part in server["run"][1:]],
+            "env": placed_env(server, package_root)}
 
 
 def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -73,10 +108,19 @@ def placeholder_launches(document: dict[str, Any] | None) -> list[dict[str, Any]
     return [{"name": server["name"], **server_launch(server, _PACKAGE_ROOT)} for server in mcp_servers(document)]
 
 
+def registered_servers(document: dict[str, Any] | None, host: str) -> list[dict[str, Any]]:
+    """What a host registers: on a package-server host the package server stands for its children."""
+    declaration = package_server(document)
+    if declaration is None or host not in PACKAGE_SERVER_HOSTS:
+        return mcp_servers(document)
+    kept = [server for server in mcp_servers(document) if server["name"] not in declaration["children"]]
+    return [*kept, {"name": declaration["name"], "run": ["python", f"{_PACKAGE_ROOT}/muro.py", PACKAGE_SERVER_ACTION]}]
+
+
 def claude_code_mcp(document: dict[str, Any] | None, command: str) -> dict[str, Any] | None:
     """The `.mcp.json` a Claude Code plugin registers when enabled, or None when no server is declared."""
     root = f"${{CLAUDE_PLUGIN_ROOT}}/skills/{command}"
-    servers = {server["name"]: server_launch(server, root) for server in mcp_servers(document)}
+    servers = {server["name"]: server_launch(server, root) for server in registered_servers(document, "claude-code")}
     return {"mcpServers": servers} if servers else None
 
 
@@ -87,20 +131,43 @@ def agent_plugins_mcp(document: dict[str, Any] | None, package_root: str) -> dic
     return {"$schema": MCP_SCHEMA, "mcpServers": servers} if servers else None
 
 
+def _path_errors(label: str, source: str, values: list[str], package_dir: Path) -> list[str]:
+    errors = []
+    own = f"scripts/{source}/"
+    for value in values:
+        for relative in _PACKAGED_PATH.findall(value):
+            # Its own source's folder is all a server may name: a host that installs the servers as a
+            # package of their own (Hermes) carries nothing else.
+            if ".." in relative.split("/") or not (relative + "/").startswith(own):
+                errors.append(f"{label} names a path outside {own}: {relative}")
+            elif not (package_dir / relative).exists():
+                errors.append(f"{label} names a file that is not packaged: {relative}")
+    return errors
+
+
 def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> list[str]:
-    """A declared server must start from files the release carries. A path check, not a judgment."""
+    """A declared server, and a tool that runs a command, must start from files the release carries. A path check."""
     errors = []
     for server in mcp_servers(document):
-        own = f"scripts/{server['source']}/"
-        for value in [*server["run"], *server.get("env", {}).values()]:
-            for relative in _PACKAGED_PATH.findall(value):
-                # Its own source's folder is all a server may name: a host that installs the servers as a
-                # package of their own (Hermes) carries nothing else.
-                if ".." in relative.split("/") or not (relative + "/").startswith(own):
-                    errors.append(f"mcp server {server['name']} names a path outside {own}: {relative}")
-                elif not (package_dir / relative).exists():
-                    errors.append(f"mcp server {server['name']} names a file that is not packaged: {relative}")
+        errors += _path_errors(f"mcp server {server['name']}", server["source"],
+                               [*server["run"], *server.get("env", {}).values()], package_dir)
+    for tool in (package_server(document) or {}).get("tools", []):
+        if "run" in tool:
+            errors += _path_errors(f"package tool {tool['name']}", tool["source"],
+                                   [*literal_parts(tool["run"]), *tool.get("env", {}).values()], package_dir)
     return errors
+
+
+def package_server_gate_errors(document: dict[str, Any] | None, sources: list[dict[str, Any]]) -> list[str]:
+    """The build's gate, for a package that declares servers or a package server.
+
+    A package that declares them needs its `server_review`, judged on the commits now pinned. A package server is
+    released on the owner's answer only for the tools that write or send which it serves or leaves out (the answer
+    given on the sources as pinned, each such tool shown to the owner); one with no such tool needs no answer.
+    The checks are `muro.server_review.release_errors`: this is the build's name for them (ADR-0033, amendment of
+    2026-11-24, which narrows the gate of 2026-11-23 from every declared tool to those).
+    """
+    return release_errors(document, sources, owner=True)
 
 
 def _text(value: Any) -> bool:
@@ -117,6 +184,28 @@ def _run_errors(run: Any, label: str) -> list[str]:
     if any('"' in part for part in run[1:]):
         errors.append(f"{label}: a run argument must not contain a double quote")
     return errors
+
+
+def _program_errors(run: Any, label: str) -> list[str]:
+    """Codex and Hermes accept only a bare program name, and no host form substitutes the program."""
+    if isinstance(run, list) and run and isinstance(run[0], str) and _PACKAGE_ROOT in run[0]:
+        return [f"{label}: the program (first part of run) is a command on the host, never a "
+                f"{_PACKAGE_ROOT} path; pass the packaged file as an argument"]
+    return []
+
+
+def _env_errors(env: Any, label: str) -> list[str]:
+    """The environment of a server or of a command: plain names, text values, nothing a host sets itself."""
+    if not isinstance(env, dict):
+        return [f"{label}: env must be an object of names and text values"]
+    if any(not isinstance(key, str) or not _ENV_NAME.fullmatch(key) for key in env):
+        return [f"{label}: env names must be plain variable names"]
+    if any(not isinstance(value, str) for value in env.values()):
+        return [f"{label}: env values must be text"]
+    if any(key.upper() in _RESERVED_ENV for key in env):
+        return [f"{label}: env names {' and '.join(_RESERVED_ENV)} are reserved by the hosts, "
+                "which set them for the server"]
+    return []
 
 
 def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str]) -> list[str]:
@@ -144,30 +233,165 @@ def _server_errors(servers: Any, source_ids: set[str], server_sources: set[str])
         else:
             declared.add(source)
         errors += _run_errors(server["run"], f"mcp server {name}")
-        if isinstance(server["run"], list) and server["run"] and isinstance(server["run"][0], str) \
-                and _PACKAGE_ROOT in server["run"][0]:
-            # Codex and Hermes accept only a bare program name, and no host form substitutes the program.
-            errors.append(f"mcp server {name}: the program (first part of run) is a command on the host, never a "
-                          f"{_PACKAGE_ROOT} path; pass the packaged file as an argument")
-        env = server.get("env", {})
-        if not isinstance(env, dict):
-            errors.append(f"mcp server {name}: env must be an object of names and text values")
-        elif any(not isinstance(key, str) or not _ENV_NAME.fullmatch(key) for key in env):
-            errors.append(f"mcp server {name}: env names must be plain variable names")
-        elif any(not isinstance(value, str) for value in env.values()):
-            errors.append(f"mcp server {name}: env values must be text")
-        elif any(key.upper() in _RESERVED_ENV for key in env):
-            errors.append(f"mcp server {name}: env names {' and '.join(_RESERVED_ENV)} are reserved by the hosts, "
-                          "which set them for the server")
+        errors += _program_errors(server["run"], f"mcp server {name}")
+        errors += _env_errors(server.get("env", {}), f"mcp server {name}")
     for source in sorted(server_sources - declared):
         errors.append(f"source {source} has an mcp-server decision but declares no server")
     return errors
 
 
+def _tool_errors(tools: list, children: list[str], declared: dict[str, Any]) -> list[str]:
+    """The tools of the package server: each one's own shape, then the rules that hold between them."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    # The name a tool has before a collision is resolved: its child's own for a forwarded tool.
+    natural = [t["forward"].get("tool") if isinstance(t.get("forward"), dict) else t.get("name")
+               for t in tools if isinstance(t, dict)]
+    for tool in tools:
+        keys = set(tool) if isinstance(tool, dict) else set()
+        if not _TOOL_KEYS <= keys or keys - _TOOL_KEYS - _TOOL_OPTIONAL - _TOOL_COMMANDS \
+                or len(keys & _TOOL_COMMANDS) != 1:
+            errors.append("each package tool requires name, source, description and input_schema, exactly one of "
+                          "forward and run, and may add annotations, timeout and env")
+            continue
+        name = tool["name"]
+        label = f"package_server tool {name}"
+        spelling = _FORWARDED_NAME if "forward" in tool else _TOOL_NAME
+        if not isinstance(name, str) or not spelling.fullmatch(name):
+            errors.append(f"package_server tool name must match {spelling.pattern}: {name}")
+        elif name in seen:
+            errors.append(f"{label} is declared twice")
+        else:
+            seen.add(name)
+        if not _text(tool["source"]):
+            errors.append(f"{label}: source must be a source id")
+        if not _text(tool["description"]):
+            errors.append(f"{label}: description must be nonempty text")
+        schema = tool["input_schema"]
+        if "run" not in tool and (not isinstance(schema, dict) or schema.get("type") != "object"):
+            errors.append(f'{label}: input_schema must be an object with "type": "object"')
+        annotations = tool.get("annotations", {})
+        if not isinstance(annotations, dict) or any(not isinstance(value, bool) for value in annotations.values()):
+            errors.append(f"{label}: annotations values are true or false, in an object of hint names")
+        if "forward" in tool:
+            errors += [f"{label}: {key} applies to a run tool" for key in ("timeout", "env") if key in tool]
+            errors += _forward_errors(tool, label, children, declared, natural)
+            continue
+        if "timeout" in tool and (type(tool["timeout"]) is not int or tool["timeout"] < 1):
+            errors.append(f"{label}: timeout must be a positive number of whole seconds")
+        if "env" in tool:
+            errors += _env_errors(tool["env"], label)
+        errors += _run_errors(literal_parts(tool["run"]), label) + _program_errors(tool["run"], label)
+        errors += template_errors(tool["run"], schema, label)
+    return errors
+
+
+def _forward_errors(tool: dict, label: str, children: list[str], declared: dict[str, Any],
+                    natural: list) -> list[str]:
+    forward = tool["forward"]
+    if not isinstance(forward, dict) or set(forward) != {"server", "tool"} \
+            or not isinstance(forward["server"], str) or not _text(forward["tool"]):
+        return [f"{label}: forward must be an object with exactly server and tool, both text"]
+    server, child_tool = forward["server"], forward["tool"]
+    errors = []
+    if server not in children:
+        errors.append(f"{label}: forwards to a server that is not a child: {server}")
+    elif server in declared and tool["source"] != declared[server].get("source"):
+        errors.append(f"{label}: its source must be the source of its child {server}, "
+                      f"{declared[server].get('source')}")
+    if tool["name"] != child_tool and natural.count(child_tool) < 2:
+        errors.append(f"{label}: a forwarded tool keeps the child's tool name ({child_tool}) unless two tools of the "
+                      "server would share a name")
+    return errors
+
+
+def server_section_errors(sections: Any) -> list[str]:
+    """Every check of the package server's declaration that needs neither the capabilities nor the manifest."""
+    if not isinstance(sections, dict):
+        return ["the server sections must be an object with package_server and mcp_servers"]
+    declaration = sections.get("package_server")
+    if declaration is None:
+        return []
+    servers = sections.get("mcp_servers")
+    declared = {s["name"]: s for s in servers if isinstance(s, dict) and isinstance(s.get("name"), str)} \
+        if isinstance(servers, list) else {}
+    if not isinstance(declaration, dict) or set(declaration) != _PACKAGE_SERVER_KEYS:
+        return ["package_server requires exactly name, children and tools"]
+    name, children, tools = declaration["name"], declaration["children"], declaration["tools"]
+    errors: list[str] = []
+    if not isinstance(children, list) or any(not isinstance(child, str) for child in children):
+        errors.append("package_server children must be a list of server names")
+        children = []
+    else:
+        errors += [f"package_server children names a server that is not declared: {child}"
+                   for child in dict.fromkeys(children) if child not in declared]
+        errors += [f"package_server children names {child} twice" for child in dict.fromkeys(children)
+                   if children.count(child) > 1]
+    if not isinstance(name, str) or not _SERVER_NAME.fullmatch(name):
+        errors.append("package_server name must be lowercase letters, digits and hyphens, starting with a letter")
+    elif name in declared and name not in children:
+        errors.append(f"package_server name {name} shares its name with a registered server")
+    if not isinstance(tools, list) or not tools:
+        return errors + ["package_server tools must be a nonempty list of tool declarations"]
+    errors += _tool_errors(tools, children, declared)
+    forwarded = {tool["forward"].get("server") for tool in tools
+                 if isinstance(tool, dict) and isinstance(tool.get("forward"), dict)}
+    return errors + [f"child {child} has no tool that forwards to it: remove it from children or forward a tool"
+                     for child in dict.fromkeys(children) if child not in forwarded]
+
+
+def _tool_reference_errors(document: dict[str, Any], source_ids: set[str], tool_sources: set[str]) -> list[str]:
+    """The sources the package server's tools name, against the sources and the package-tool decisions."""
+    declaration = package_server(document)
+    tools = declaration.get("tools") if isinstance(declaration, dict) else None
+    errors: list[str] = []
+    runs: dict[str, str] = {}
+    for tool in tools if isinstance(tools, list) else []:
+        source = tool.get("source") if isinstance(tool, dict) else None
+        if not isinstance(source, str):
+            continue
+        if source not in source_ids:
+            errors.append(f"package_server tool {tool.get('name')} names unknown source {source}")
+        if "run" in tool:
+            runs.setdefault(source, str(tool.get("name")))
+    errors += [f"source {source} has no package-tool decision, and tool {tool} runs its commands"
+               for source, tool in runs.items() if source in source_ids and source not in tool_sources]
+    errors += [f"source {source} has a package-tool decision but no tool runs its commands"
+               for source in sorted(tool_sources - set(runs))]
+    return errors
+
+
+def _choice_errors(choice: Any, source_ids: set[str]) -> list[str]:
+    """The owner's recorded answer: a date, their words, and the evidence it was given on."""
+    if not isinstance(choice, dict) or set(choice) != _CHOICE_KEYS:
+        return ["server_choice requires exactly asked_on, answer and given_on"]
+    errors = []
+    if not isinstance(choice["asked_on"], str) or not _DATE.fullmatch(choice["asked_on"]):
+        errors.append("server_choice asked_on must be a date written YYYY-MM-DD")
+    if not _text(choice["answer"]):
+        errors.append("server_choice answer must be nonempty text, the owner's own words")
+    given = choice["given_on"]
+    if not isinstance(given, dict) or set(given) != {"sources", "shown"}:
+        return errors + ["server_choice given_on requires exactly sources and shown"]
+    sources = given["sources"]
+    if not isinstance(sources, dict):
+        errors.append("server_choice given_on sources must be an object of source ids and commits")
+        sources = {}
+    for source, commit in sources.items():
+        if source not in source_ids:
+            errors.append(f"server_choice given_on names unknown source {source}")
+        if not isinstance(commit, str) or not _COMMIT.fullmatch(commit):
+            errors.append(f"server_choice given_on: the commit of {source} must be at least 7 hex characters")
+    if not isinstance(given["shown"], list) or any(not _text(item) for item in given["shown"]):
+        errors.append("server_choice given_on shown must be a list of the tool and command names shown")
+    return errors
+
+
 def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -> list[str]:
     """Check shape, references and that every declared form has something behind it. Forms stay the AI's decision."""
-    if not isinstance(document, dict) or "decisions" not in document or set(document) - {"decisions", "always_on", "hooks", "mcp_servers", "custom_instructions"}:
-        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks, mcp_servers and custom_instructions"]
+    if not isinstance(document, dict) or "decisions" not in document or set(document) - _DOCUMENT_KEYS:
+        return ["delivery.json must be an object with decisions and only decisions, always_on, hooks, mcp_servers, "
+                "package_server, server_choice, server_review, credentials and custom_instructions"]
     custom = document.get("custom_instructions")
     if "custom_instructions" in document:
         errors = metadata_errors(custom)
@@ -185,6 +409,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     forms: set[str] = set()
     hook_targets: set[str] = set()
     server_sources: set[str] = set()
+    tool_sources: set[str] = set()
     for item in decisions:
         if not isinstance(item, dict) or set(item) != _DECISION_KEYS:
             errors.append("each decision requires exactly source, content, form, targets and reason")
@@ -206,7 +431,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
         for target in targets:
             if target not in known:
                 errors.append(f"decision for {source}: unknown capability {target}")
-        if form in ("capability", "hook", "mcp-server") and not targets:
+        if form in ("capability", "hook", "mcp-server", "package-tool") and not targets:
             errors.append(f"decision for {source}: form {form} needs at least one target capability")
         if form in ("dropped", "always-on") and targets:
             errors.append(f"decision for {source}: form {form} takes no targets")
@@ -214,6 +439,8 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
             hook_targets.update(t for t in targets if t in known)
         if form == "mcp-server" and isinstance(source, str):
             server_sources.add(source)
+        if form == "package-tool" and isinstance(source, str):
+            tool_sources.add(source)
     for missing in sorted(source_ids - decided_sources):
         errors.append(f"source {missing} has no delivery decision: every intake records what it became and why")
 
@@ -268,7 +495,12 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     for cap in capabilities:
         if cap.id not in hook_targets and any(h.get("policy") == "active" for h in cap.hooks):
             errors.append(f"capability {cap.id} declares an active hook but no hook decision targets it")
-    return errors + _server_errors(document.get("mcp_servers", []), source_ids, server_sources)
+    errors += _server_errors(document.get("mcp_servers", []), source_ids, server_sources)
+    errors += server_section_errors(server_sections(document))
+    errors += _tool_reference_errors(document, source_ids, tool_sources)
+    errors += server_review_errors(document, capabilities, source_ids)   # shape and closure; its presence is the build's
+    errors += credential_errors(document, set(known), source_ids)
+    return errors + (_choice_errors(document["server_choice"], source_ids) if "server_choice" in document else [])
 
 
 def unregistered_active_hooks(capabilities: list) -> list[str]:
@@ -371,17 +603,67 @@ _SERVER_CHANNELS = {
 }
 
 
+def _package_server_note(declaration: dict[str, Any], host: str, absorbed: bool) -> str:
+    """Where the package server is registered: only on the hosts of PACKAGE_SERVER_HOSTS, and on no other."""
+    name = declaration["name"]
+    if host not in PACKAGE_SERVER_HOSTS:
+        lead = "This host registers the absorbed servers as they are" if absorbed \
+            else "This host registers no server of this package"
+        return (f"{lead}: the package server `{name}` is registered only on Claude Code for now; "
+                "this host is added after a live run on it.")
+    children = ", ".join(f"`{child}`" for child in declaration["children"])
+    served = (f"starts {children} itself, on the first call that needs it, and serves the tools this package declares"
+              if children else "serves the commands this package declares")
+    moved = (" Their ids changed with the server's name: a permission rule saved for the old ids no longer matches."
+             if children else "")
+    inherits = (" A command one of its tools runs inherits the environment of the server process, credentials included."
+                if any("run" in tool for tool in declaration["tools"]) else "")
+    return f"The package server `{name}` {served}. Tools appear under the server `{name}`.{moved}{inherits}"
+
+
+def _keys_note(document: dict[str, Any] | None) -> str:
+    """The API keys the package's tools read, in the order the guide shows them: their names, what each unlocks, never a
+    value. It says nothing of how a host passes variables to a server: no run has shown it (ADR-0033, "Not run")."""
+    entries = in_order(declared_credentials(document))
+    if not entries:
+        return ""
+    lead = "The tools of this package read these environment variables. This file names them and never holds a value."
+    if any("rank" in entry for entry in entries):
+        lead += " The entries with a rank come first, in that order: get those first."
+    lines = []
+    for entry in entries:
+        facts = [_one_line(entry["service"]), "required" if entry["required"] else "optional"]
+        if "rank" in entry:
+            facts.append(f"rank {entry['rank']}")
+        lines.append(f"- `{entry['env']}` ({', '.join(facts)}): {_one_line(entry['unlocks'])}")
+    return "\n\n".join(["## Keys", lead, "\n".join(lines)])
+
+
+def _one_line(text: Any) -> str:
+    """An entry stays one list line whatever its text holds."""
+    return " ".join(str(text).split())
+
+
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
     """What this host's adapter registers by itself, and what it does not."""
-    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document)):
+    declaration = package_server(document)
+    keys = _keys_note(document)
+    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document) or declaration
+                            or keys):
         return ""
     notes = []
     channel = _SERVER_CHANNELS.get(host)
-    if mcp_servers(document) and channel:
-        names = ", ".join(f"`{server['name']}`" for server in mcp_servers(document))
-        notes.append(f"MCP server {names}: registered automatically through {channel}, and started from this "
-                     "package's own files. If a server with the same tools is already configured on this host "
-                     "(the original this package absorbed), remove it: two copies offer the same tools twice.")
+    servers = registered_servers(document, host)
+    server_note = ""
+    if servers and channel:
+        names = ", ".join(f"`{server['name']}`" for server in servers)
+        server_note = (f"MCP server {names}: registered automatically through {channel}, and started from this "
+                       "package's own files. If a server with the same tools is already configured on this host "
+                       "(the original this package absorbed), remove it: two copies offer the same tools twice.")
+    if declaration:
+        server_note = f"{server_note} {_package_server_note(declaration, host, bool(mcp_servers(document)))}".strip()
+    if server_note:
+        notes.append(server_note)
     if session_text(document):
         channels = {
             "claude-code": "a native `prompt.compose` module in `hooks/hooks.json`, adding a system-prompt section while preserving the host's other sections. Requires Claude Code mods (2.1.287+) enabled",
@@ -399,4 +681,6 @@ def install_note(document: dict[str, Any] | None, host: str, command: str) -> st
                      "Arguments are literal argv. Windows `.cmd`/`.bat` programs are rejected; declare the underlying executable and script directly.")
     elif document.get("hooks"):
         notes.append("This release's source command hooks target other hosts and do not run here.")
+    if keys:
+        notes.append(keys)   # last, so no note above falls under its heading
     return "\n\n" + "\n\n".join(notes) if notes else ""

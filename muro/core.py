@@ -18,6 +18,17 @@ RESERVED_COMMANDS = {
 
 SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 COMMIT_PATTERN = re.compile(r"^[a-f0-9]{40}$")
+# A name Windows reads as a device, with or without an extension: `CON`, `aux.txt`, `COM1.tar.gz`. No file or folder
+# can have one, so a plugin slug (it names the project file and the plugin's folders) and a member of a project file
+# (muro/project.py) cannot either.
+_WINDOWS_DEVICE = re.compile(r"(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])")
+
+
+def is_device_name(name: str) -> bool:
+    """Whether Windows reads `name` as a device: its part before the first dot is one."""
+    return bool(_WINDOWS_DEVICE.fullmatch(name.split(".", 1)[0]))
+
+
 # .svg is text (XML), not binary media
 BINARY_EXTS = {
     ".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4",
@@ -119,6 +130,8 @@ def validate_plugin_identity(plugin: dict[str, Any], installed_roots: list[Path]
         errors.append("plugin.slug is required")
     elif not SLUG_PATTERN.match(slug):
         errors.append(f"plugin.slug must be kebab-case (lowercase, hyphens): {slug}")
+    elif is_device_name(slug):
+        errors.append(f"plugin.slug '{slug}' is a name Windows keeps for a device: no folder can have it")
     elif slug in RESERVED_COMMANDS:
         errors.append(f"plugin.slug '{slug}' is a reserved host command")
     elif slug.startswith(("claude-", "anthropic-", "anthropics-", "cc-plugin-")) or slug in {"claude", "anthropic", "anthropics", "claude-code", "claude-mods", "synced", "anthropic-skills"}:

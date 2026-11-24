@@ -198,6 +198,33 @@ select the files it runs from and decide its delivery with the form `mcp-server`
 server the source only calls and does not ship is a runtime dependency of the
 capability that needs it. Either way `tools` names each operation a step calls.
 
+For each tool of a shipped server, record the same evidence in the `purpose` of
+the capability's `tools` entry, read from the code (a description can differ from
+what the code does, and the code wins): whether it creates, changes, spends or
+sends, what leaves the machine and to whom (the vendor, or a proxy that the key
+chooses), and what an argument or a handle of the caller can change (a path to
+write, an address a key is sent to). What the server does on every call (a usage
+event) is stated once, in the server's `mcp-server` decision, not for each tool.
+
+Record a source's command-line programs as evidence for harmonization,
+without choosing a form for them. For each program the methods run, note its
+commands, whether each is a read or write operation and what a write creates,
+changes, spends or sends, and which credentials it takes from the environment.
+Put it in the capability's `tools` and in `## Sources`. The capability keeps
+running the program as a command; whether a command also becomes a tool of a
+package server is decided at harmonization (the owner decides only the tools
+and commands that write or send).
+
+Record the credentials each source takes as evidence too, whatever carries the
+tool that reads them (a program, a server, a script). For every environment
+variable it reads that holds a key, a token or another secret, write its name
+only, never a value; what it unlocks; whether the part that reads it can run
+without it (required or optional); and how the source itself receives it (the
+variable, a file it reads, a managed alternative it falls back on). Put them in
+the capability's `tools` and in `## Sources`. Harmonization merges them into
+the package's `credentials` (Delivery protocol, "Credentials"); intake never
+chooses their order, which is the owner's.
+
 For each adopted hook use exactly `{event, action, tools, policy}`: a nonempty
 event/action description, an array of declared tool names and policy `manual`,
 `host-approved` or `active`. Describe the original trigger, changed files/external

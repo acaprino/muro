@@ -116,6 +116,42 @@ def _parse_files(content: str) -> tuple[dict[str, str], str]:
     return clean, notes if isinstance(notes, str) else ""
 
 
+# The owner's answer about a package server and what it declared on that answer: no unattended step writes them.
+_OWNER_KEYS = ("package_server", "server_choice")
+_NO_OWNER = (
+    "No owner can be asked in this run. Leave the `package_server` and `server_choice` keys of delivery.json "
+    "exactly as they are in the package directory, absent where absent: only the owner, asked in an attended "
+    "session, writes them, and a result that changes either is rejected. At harmonization (not at intake), when the "
+    "package declares an MCP server, write the `server_review` key of delivery.json yourself: it is your own record, "
+    "and the build refuses a package that declares a server without it. Where the file has no `package_server`, every "
+    "server stays registered as it is: give each server tool the fate `registered` and each command the fate "
+    "`command`. Where it already holds one, the owner's answer stands: give each tool the fate that package server "
+    "already gives it (`served` for a tool it declares, `left-out` for a tool of a child it does not declare, "
+    "`registered` for any other server's tool, `command` for a command), with `decided_by` `owner` for a tool that "
+    "writes or sends and is served or left out. Keep the text fields short.\n"
+)
+
+
+def _owner_keys(text: str) -> dict[str, Any] | None:
+    """The values of the owner's keys in a delivery.json, or None when the text is not an object."""
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return None
+    return {key: document.get(key) for key in _OWNER_KEYS} if isinstance(document, dict) else None
+
+
+def _refuse_owner_keys(files: dict[str, str], before: dict[str, Any]) -> None:
+    """Python compares and never chooses: the result's keys must equal the file's as they were before the step."""
+    after = _owner_keys(files["delivery.json"]) if "delivery.json" in files else None
+    changed = [key for key in _OWNER_KEYS if after is not None and after[key] != before[key]]  # unreadable: validation says so
+    if changed:
+        raise ValueError("; ".join(
+            f"delivery.json: {key} differs from the file on disk, and only the owner writes it: the owner must answer "
+            f"in an attended session, so write {key} exactly as on disk (leave it out where it is absent)"
+            for key in changed))
+
+
 def _write_files(files: dict[str, str], root: Path, allowed: Callable[[str], bool]) -> list[str]:
     rejected = [p for p in files if not allowed(p) or p.startswith("/") or ".." in p.split("/")]
     if rejected:
@@ -192,7 +228,11 @@ def run_step(step: str, source_id: str | None, manifest: dict, project_root: Pat
         if inventory(collect(project_root)) != input_snapshot:
             raise ValueError("custom-instructions changed during AI work; prepare again before writing results")
 
-    messages = [{"role": "user", "content": prompt + _contract(where, names)}]
+    contract = _contract(where, names) + (_NO_OWNER if step != "review" else "")
+    messages = [{"role": "user", "content": prompt + contract}]
+    delivery = project_root / "delivery.json"
+    owner_before = (_owner_keys(delivery.read_text(encoding="utf-8", errors="replace")) if delivery.is_file() else None) \
+        or dict.fromkeys(_OWNER_KEYS)
     failure = ""
     written_before: set[str] = set()
     for round_index in range(max(1, rounds)):
@@ -201,6 +241,7 @@ def run_step(step: str, source_id: str | None, manifest: dict, project_root: Pat
         verify_inputs()
         try:
             files, notes = _parse_files(content)
+            _refuse_owner_keys(files, owner_before)  # before anything is written: a refusal leaves the file as it was
             written = _write_files(files, root, allowed)
             # A repair round returns the complete set again: a file an earlier,
             # rejected round wrote and this round no longer names was a mistake,

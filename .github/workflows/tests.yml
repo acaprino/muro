@@ -79,15 +79,19 @@ jobs:
           npm ci
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           npm test
-      - name: Design rules
-        if: always()
-        run: npx imago-check
       - name: Type check
         if: always()
         run: npx tsc --noEmit
       - name: Frontend build
         if: always()
         run: npm run build
+      # Sigrid's design check (ADR-0031, decision 6): it reads apps/desktop/src and builds nothing, from the folder whose
+      # package.json lists Sigrid. Not blocking until its first output has been read; then the owner decides whether it
+      # gates (it exits 1 on a finding) and which exceptions go in a sigrid-check.config.json.
+      - name: Design rules (Sigrid)
+        if: always()
+        continue-on-error: true
+        run: npx --no sigrid-check apps/desktop/src
       # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
@@ -100,4 +104,15 @@ jobs:
       # Headless Edge through Playwright's msedge channel; the runner image ships Edge: there is no browser to cache.
       - name: Browser tests
         if: always()
-        run: node apps/desktop/tests/browser.mjs
+        # The screenshots in Git go first, so the artifact below holds only the pixels this run drew.
+        run: |
+          Remove-Item apps/desktop/tests/artifacts/*.png -ErrorAction SilentlyContinue
+          node apps/desktop/tests/browser.mjs
+      - name: Screenshots of the browser tests
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-screenshots
+          path: apps/desktop/tests/artifacts/*.png
+          retention-days: 7
+          if-no-files-found: warn

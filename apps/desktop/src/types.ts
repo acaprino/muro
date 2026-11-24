@@ -1,4 +1,3 @@
-import type { SimState } from './pages/project/graph.ts';
 export type Harness = 'claude-code'|'codex'|'opencode'|'pi'|'hermes'|'deepseek';
 export interface Distribution { harness: string; path: string; version: string; origin?:'native'|'muro'; source_revision?:string; custom_instructions_digest?:string }
 /** `project` is the id of the project (a `.mp` file) the plugin is the build of; a plugin without it is installed as its author ships it. */
@@ -17,7 +16,9 @@ export interface Registry { schema:number; revision:number; plugins:Plugin[]; ta
 export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean; plugin_name?:string|null; enabled?:boolean }
 export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
-export interface Job { id:string; plugin_id:string; harness:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string }
+/** An AI run of the runtime (`jobs`): an adaptation of a plugin (`plugin_id`, `harness`; no `kind`), or, with `kind` "project", a project made or changed (`project_id`, `operation`, `title`, `file`).
+ * `status` is running, completed, failed, cancelled or interrupted. `time` is when it started, in epoch seconds (the runtime sends a number; a text of digits is read the same). */
+export interface Job { id:string; kind?:'project'; plugin_id?:string; harness?:string; project_id?:string; operation?:string; title?:string; file?:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string|number }
 /** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan, and `errors` is the sources the last check could not resolve (null before any check). */
 export interface SyncTimes { checked:string|null; synced:string|null }
 export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; targets:Record<string,SyncTimes> }
@@ -28,17 +29,16 @@ export interface Discovered { harness:string; name:string; executable:string; ve
 export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean }
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
 export interface CheckResult { snapshot:Snapshot; plan:Plan; errors:{plugin_id:string;message:string}[] }
+/** A source the last check could not resolve, with the service's words. */
+export type CheckError = CheckResult['errors'][number];
+/** The review sheet that is open: a plan, and the harness it was made for (null for the whole plan). A one-harness plan is never the plan the note and the table read. */
+export interface Review { plan:Plan; target_id:string|null }
+/** An apply under way: the plan, how many operations it runs (the removals it leaves out are not counted) and the names of their plugins, for the note and the sheet. */
+export interface ApplyProgress { plan_id:string; total:number; names:string }
 export interface Autostart { supported:boolean; enabled:boolean; current:boolean }
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;
 export type Page = 'projects'|'sync'|'activity'|'settings';
-export type Filter = 'all'|'action';
-export type ActivityFilter = 'all'|'sync'|'ai'|'problems';
-/** An apply in progress: `index` operations are done of `total`, `name` lists the plugins it changes. */
-export interface Applying { index:number; total:number; name:string }
-/** The review sheet that is open: a plan, and the harness it was made for (null for the whole plan). A one-harness plan is never `plan` of the state. */
-export interface Review { plan:Plan; target_id:string|null }
-export interface SetupState { step:1|2|3; pick:Record<string,boolean>; keep:Record<string,boolean>; auto:boolean; autostart:boolean }
 /** `project.json` of a project file. */
 export interface ProjectMeta { schema:number; name:string; slug:string; version:string; author:string; created:string; changed:string; repository:{url:string;branch:string;tag_prefix:string}|null; builtin:boolean }
 /** What the action `projects` returns for each listed project: its id and file, then what `muro project info` knows in short (a count the runtime does not send is absent), or `error` when the file is missing or invalid. */
@@ -47,17 +47,24 @@ export type DecisionForm = 'capability'|'always-on'|'hook'|'dropped';
 export interface ProjectInput { id:string; url:string|null; pin:string; release:string|null; commit:string|null; license:string|null; paths:string[]; became:Record<DecisionForm,number> }
 export interface ProjectDecision { source:string; content:string; form:DecisionForm; targets:string[]; reason:string }
 export interface ProjectRecord { id:string; date:string; subjects:string[]; text:string; author:'muro'|'you'; binding:boolean }
-export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; pins:Record<string,string>; changelog:string }
+export interface ProjectRun { id:string; time:string; version:string; status:'completed'|'cancelled'|'failed'; budget_usd:number|null; engine:string|null; operation?:string; pins:Record<string,string>; changelog:string }
 /** One capability and one documented example as the guide's data model carries them (`guide_data`): the keys the graph reads are its own to name. */
 export interface GraphCapability { id:string; title:string; [key:string]:unknown }
 export interface GraphExample { [key:string]:unknown }
 /** What the action `project {id}` returns: `muro project info` of the file as it is, and `included`: whether it is the copy of the project Muro ships (the runtime says so; `project.builtin` is what the file claims of itself, and is not what decides). */
-export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
-export type ProjectStep = 'inputs'|'harmonize'|'graph'|'install';
-export type ProjectViewKind = 'records'|'choices'|'history'|'prompts';
-/** The open project page: which project, which step, step 2's view and filters (`dsrc` an input id or '', `dform` a form or 'all'), and step 3's simulation. Kept across renders and in the session. */
-export interface ProjectView { id:string; step:ProjectStep; view:ProjectViewKind; dsrc:string; dform:string; sim:SimState }
-/** What the Projects tab holds: the list, the information of the open project (`infoId` says whose), and which shell actions turned out to be missing. */
-export interface ProjectsState { list:ProjectSummary[]|null; loading:boolean; error:string|null; info:ProjectInfo|null; infoId:string|null; infoLoading:boolean; infoError:string|null; noPicker:boolean; noFolder:boolean }
-/** `plan` is always the last full plan, the one the strip and every column read from; `autostart`, `afilter` and `setup` belong to Settings, Activity and the first run. */
-export interface ViewState {page:Page; snapshot:Snapshot|null; discovered:Discovered[]; discovering:boolean; plan:Plan|null; checking:boolean; applying:Applying|null; review:Review|null; query:string; filter:Filter; afilter:ActivityFilter; busy:string|null; slow:Record<string,boolean>; error:string|null; checkErrors:CheckResult['errors']; discoveryError:string|null; maintenance:Maintenance|null; autostart:Autostart|null; setup:SetupState|null; projects:ProjectsState; project:ProjectView|null}
+export interface ProjectInfo { included?:boolean; project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; instructions?:InstructionFile[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+/** One of the owner's Markdown files under `custom-instructions/` as `muro project info` reads it: its path relative to that folder and its text. */
+export interface InstructionFile { path:string; text:string }
+/** The repository a project is published from: the https address, the branch and the prefix of its release tags. */
+export type ProjectRepository = { url:string; branch:string; tag_prefix:string };
+/** The changes of a project that an AI run makes (`project_job` `operation`), and the run that makes a new project. */
+export type ChangeOperation = 'harmonize'|'add_input'|'remove_input'|'move_pin'|'instructions';
+export type ProjectOperation = ChangeOperation|'create';
+/** How the version of a project moves after an AI run. */
+export type VersionStep = 'patch'|'minor'|'major';
+/** What a change of an instruction file says: the file written whole, or `text` null to remove it. */
+export type InstructionEdit = { path:string; text:string|null };
+/** How one input's pin stands against its upstream (`project_updates`, from `muro baseline`): `behind` names the newest release or commit in `upstream`. */
+export interface ProjectUpdate { id:string; pin:string; pinned:string; upstream:string|null; status:'current'|'behind'|'frozen'|'drifted'|'unknown'|'error'; note:string }
+/** The last update check of a project's inputs, for the file it was made on (`digest`). */
+export interface ProjectUpdates { id:string; digest:string; inputs:ProjectUpdate[] }

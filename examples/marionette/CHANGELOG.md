@@ -1,3 +1,13 @@
+# Marionette 0.6.0
+
+Marionette absorbs better-layout, Jakub Krehel's layout skill, as one new on-demand
+capability, `layout-structure`: it sets or reviews the layout of an interface in code
+(grouping and alignment, narrow and mobile viewports, safe areas, container queries,
+RTL mirroring, room for translated text) and reports findings with a severity and a
+verdict. The catalog goes from 37 to 38 capabilities and from 16 to 17 sources;
+nothing new acts in every session. The upstream has no release or tag, so the pin
+follows its head (672ae44a).
+
 # Marionette 0.5.0
 
 taste-skill is no longer part of Marionette, and the Figma step now works in

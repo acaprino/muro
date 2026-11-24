@@ -1,5 +1,12 @@
 # Desktop on Imago
 
+> **Historical since [ADR-0031](adr/ADR-0031-desktop-on-sigrid.md) (2026-11-23).** The desktop window moves to
+> React on `@acaprino/sigrid`, and this file describes the window it replaces. What stays true after the move is
+> the crate `imago-shell` (the native window, "The window" below and "The pin" for the Rust side). The rest (the
+> Imago tokens and look, `im-shell`, the keys, the icons and `npx imago-check`) goes with the Imago window, which
+> is gone. The npm package stays for its window glue, `@acaprino/imago/shell`, pinned to the same tag as the crate
+> ("The pin" below). The rules for UI work are now in AGENTS.md, "Desktop UI ownership".
+
 Muro's desktop is the canon of Imago (`docs/design-file.md` of the package): one window
 frame, `im-shell`, painted from strings by `renderShellFrame` and routed by `data-action`
 (`app.ts`). This file records what Muro takes from Imago and where its tests are; the

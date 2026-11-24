@@ -220,7 +220,8 @@ def test_discovery_entries_examples_and_eval_cases_cover_the_design_capabilities
     by_name = {entry["name"]: entry for entry in document["entries"]}
     assert by_name["marionette-product-design"]["capabilities"] == ["aesthetic-direction", "wireframe", "ui-prototype",
                                                                     "design-options", "html-deck"]
-    assert by_name["marionette-design-review"]["capabilities"] == ["design-review", "design-system-extract"]
+    assert by_name["marionette-design-review"]["capabilities"] == ["design-review", "layout-structure",
+                                                                      "design-system-extract"]
     for name in ("marionette-product-design", "marionette-design-review"):
         description = by_name[name]["description"]
         assert description.startswith("Use when") and "\n" not in description and len(description) <= 1024

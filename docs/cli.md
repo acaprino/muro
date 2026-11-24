@@ -283,6 +283,33 @@ claude -p "..." --mcp-config '{"mcpServers":{"muro":{"command":"python","args":[
 For Codex, declare the same `command`/`args` stdio server in its MCP
 configuration.
 
+### `python <package_root>/muro.py tools-server`
+
+Serves the package's declared tools over stdio; started by the host, not by a
+person. It is an action of the packaged launcher (`muro.py` at the root of a
+release and in each host's skill folder), not a subcommand of `muro`, and it
+has work to do only in a release whose `delivery.json` declares a
+`package_server` ([ADR-0033](adr/ADR-0033-package-mcp-server.md)). The adapter
+of a host that registers it writes this command as the server's entry; today
+that is Claude Code's `.mcp.json`.
+
+It reads `package-server.json` beside the launcher, which the build writes from
+the `package_server` and `mcp_servers` sections of `delivery.json`, and checks it
+with the function the build uses. A file that is missing, is not JSON or does
+not pass: it prints `package-server.json: <the first problem>` to stderr and
+exits `1`. Otherwise it answers `initialize`, `ping`, `tools/list` and
+`tools/call` until stdin closes (exit `0`), then stops its children and any
+running command.
+
+- `tools/list` is the declaration. Nothing is started to answer it.
+- A forwarded call starts the child server on its first call and keeps it for the
+  session. A `run` tool starts its command with the argv its template builds,
+  with no shell, no input, a timeout (120 seconds unless the tool declares one)
+  and its output cut at 100,000 characters.
+- When the host declares roots, the first `file://` root that is a directory is
+  the working directory of children and commands; otherwise the server's own.
+- A program is found on `PATH` and never in the working directory.
+
 ### `muro agent <intake|harmonize|review> [source-id] --model M [--api-base URL] [--api-key-env VAR] [--rounds N] [--manifest PATH]`
 
 Runs one AI-owned step through an OpenAI-compatible `/chat/completions`
@@ -329,6 +356,20 @@ names is removed, so a misnamed file cannot poison every later validation. For i
 the prompt (per-file and total budgets; what is not inlined is listed so the
 model reports it as a gap instead of guessing).
 
+No owner can be asked in this run (ADR-0033), so an `intake` or `harmonize` answer whose
+`delivery.json` holds a `package_server` or a `server_choice` that differs from the file as it was
+before the step is rejected before anything is written, with the key named and the instruction that
+the owner answers in an attended session. A key absent on both sides is equal; a file that already
+holds both keys keeps them. The same message goes back to the model as any rejected answer does,
+within `--rounds`.
+
+The validation of `harmonize` (and so of `muro absorb`, which builds right after it) includes the build's
+checks that need no owner: a package that declares an MCP server or a package server must carry its
+`server_review`, judged on the commits now pinned (ADR-0033, amendment of 2026-11-24). A missing or stale
+record is fed back to the model within `--rounds` instead of failing the build with no round left. With no
+owner to ask, the step writes `server_review` with every server `registered` and every command `command`,
+and no `package_server`: the question stays open and `absorb` registers the servers as they are.
+
 ```sh
 export MURO_API_KEY=…   # or OPENAI_API_KEY
 muro agent intake ponytail --manifest pkg/ponytail/sources.json \
@@ -356,6 +397,8 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
 ```
 
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
+
+(Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below.)
 
 The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
 everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
@@ -391,7 +434,10 @@ release's `sources.json` plugin slug and version and its capability ids must equ
 built from it" and what differs; a project with no release has nothing to disagree with. The desktop runs it
 before it installs a project's plugin.
 
-`unpack` writes into a new (or empty) folder only, all or nothing. A `.mp` from elsewhere is untrusted input:
+`unpack` writes into a new (or empty) folder only, all or nothing. It also refuses a member that is outside the layout above (the
+package files and folders, `project.json`, `records.json`, `history.json`, `CHANGELOG.md`, `inputs/` and `release/`): a `.mp` that
+carries `.claude/settings.json`, `.mcp.json` or a `CLAUDE.md` at its root is refused, because the folder it writes is where an AI run
+works and a coding agent reads its own configuration from there. A `.mp` from elsewhere is untrusted input:
 a member with an absolute path, a drive letter, `..`, a backslash, a colon, a control character, one of
 `< > " | ? *`, a name ending in a dot or space, a Windows device name (`CON`, `PRN`, `AUX`, `NUL`, `COM1`-`COM9`,
 `LPT1`-`LPT9`, with or without an extension), or that is a link, a device or encrypted is refused before
@@ -408,10 +454,11 @@ shows:
 | --- | --- |
 | `project` | `project.json` as it is |
 | `plugin` | `{name, slug, version, description}` of `sources.json` |
-| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, mcp-server, dropped}` |
+| `inputs` | per source `{id, url, pin, release, commit, license, paths, became}`: `url` is its public https address and `release` its published release, `null` when it has none (a local checkout path never shows); `paths` are its `selected_paths`; `became` counts its `delivery.json` decisions by form, `{capability, always-on, hook, mcp-server, package-tool, dropped}` |
 | `decisions` | the decisions of `delivery.json` as they are (empty without one) |
 | `records`, `history`, `changelog` | `records.json`'s records, `history.json`'s runs, `CHANGELOG.md` as text |
 | `prompts` | `[{file, text}]`: `intake.md`, `harmonizer.md`, `delivery.md` and `classify.md`, the package's own folder or else the factory's (`prompts_dir`, as the build resolves them) |
+| `instructions` | `[{path, text}]`: the owner's Markdown files under `custom-instructions/`, `path` relative to it, the text as written (a file that is not UTF-8 is refused) |
 | `graph` | `{entries, capabilities, examples}`: `entries` are the discovery entries `{name, description, capabilities}` (the description as a host reads it, with the sentence naming what the entry absorbs; empty without `entries.json`); `capabilities` and `examples` are the release guide's own data (`muro.guide.guide_data`: each capability with its title, body, intents, needs, conflicts, outputs, checks and check scope, and each example resolved to its steps), computed on the package as the file holds it, not on a release it may carry |
 | `files` | `[{part, path, detail}]`: the list "What this project file holds", with the project's own counts |
 | `digest` | the SHA-256 of the file |
@@ -434,6 +481,46 @@ muro project pack --manifest examples/marionette/sources.json --out marionette.m
   --sources-cache ~/.cache/muro-sources --release /tmp/stage
 muro project info marionette.mp
 ```
+
+### `muro project new` / `edit` / `commit`
+
+Writing a project ([ADR-0032](adr/ADR-0032-desktop-projects-write-side.md)). Python packs, records and guards; what the
+package means is the host AI's, which writes it between `new` (or `unpack`) and `commit`.
+
+```sh
+muro project new DIR --name N --slug S --author A [--version 0.1.0] [--repository URL [--branch B] [--tag-prefix P]]
+muro project edit FILE.mp --expect-digest SHA256 [--name N] [--author A] [--repository URL [--branch B] [--tag-prefix P] | --no-repository] [--records FILE.json] [--changelog FILE.md]
+muro project commit DIR --out FILE.mp (--expect-digest SHA256 | --create) --operation TEXT [--step patch|minor|major|none] [--summary FILE.md] [--engine E] [--budget USD]
+```
+
+`new` writes a new project's work folder (new or empty): `project.json` (schema 1, `builtin` false, `created` and `changed`
+now, in UTC), an empty `records.json`, `history.json` and `CHANGELOG.md`. It writes no package: `sources.json`, the
+capabilities, the router and the rest are the host AI's (intake and harmonization). It prints the folder.
+
+`edit` changes what a person owns, with no AI and no network: the name, the author and the repository of `project.json`
+(`changed` moves), every record of `records.json` (`{records: [...]}` or a bare list; each `{id, date, subjects, text, author:
+muro|you, binding}`, an id of letters, digits, `.`, `_` or `-`, unique, a real `YYYY-MM-DD` date, a nonempty text of at most
+20,000 characters) and the text of `CHANGELOG.md` (at most 1 MiB). The file is unpacked, changed and packed again with its own
+copies of the inputs (they fill a sources cache of the edit's own, stamped for each source as `sources.json` declares it) and
+its own release, which the package, unchanged, still matches. It is replaced only while it still has `--expect-digest`;
+otherwise "The project file changed since it was opened: open it again and repeat the change". Prints `{path, digest}`.
+
+`commit` turns a work folder into the project file, after the AI changed an unpacked project (`--expect-digest` of the file it
+was unpacked from) or wrote a new one (`--create`: refused where a file is). It refuses a folder without `sources.json` or
+`project.json`, and a plugin id that changed. What the project is (`project.json`'s identity), its history and its changelog are the
+desktop's, not the folder's: `commit` takes them from the project as the desktop holds it (the file it replaces), so an agent that
+rewrote them changes nothing. It refuses a folder whose `records.json` changes or removes a record of the owner's (`author: you`) or
+adds a record that is `binding`: the AI writes its own records (`author: muro`), never the owner's rules. The version moves by `--step` from the file's (default `patch`; a new project
+keeps its own). It builds the package with `build_release` (identity, catalog, router, delivery, prompts, intake goals,
+entries, the license and coverage gates of every source, every adapter), then appends the run to `history.json` (`{id:
+<slug>-v<version>, time, version, status: completed, budget_usd, engine, operation, pins: {source id: commit}, changelog}`), sets
+`project.json`'s version and `changed`, puts a new entry on top of `CHANGELOG.md` (`# <name> <version>`, the `--summary` text,
+then the mechanical differences as a list: inputs added, removed or moved, capabilities added or removed, instruction files
+added, changed or removed, and the catalog's size), packs the folder with that release and replaces the file under the same
+digest guard. An input the old file already carried at the same pin and selection is taken from its copy, not fetched. Nothing
+is written to `--out` unless all of it succeeds. Prints `{path, digest, version, run}`.
+
+All three exit `0` on success and `1` with the reason on stderr (`Project new|edit|commit failed: ...`).
 
 ### `muro project simulate` / `simulate-prepare` / `simulate-check`
 

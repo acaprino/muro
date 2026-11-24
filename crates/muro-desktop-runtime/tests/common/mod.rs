@@ -11,6 +11,12 @@
 //! also prepares a request (`simulate-prepare`) and validates an answer against a context (`simulate-check`)
 //! in the one way a test needs: the answer must copy the context. Every call is appended to `calls.ndjson`
 //! beside the script as `{"args": [...]}`.
+//!
+//! For the runs that make and change projects it also answers `project new` (a folder with a `project.json`
+//! naming what it was asked), `project unpack` (a folder with the descriptor's `instructions`, `{path: text}`,
+//! under `custom-instructions/`) and `project commit`: refused when `--expect-digest` is not the file's, or when
+//! the work folder holds `commit-fails`; waiting for a `go-commit` file beside the work folder when it holds
+//! `commit-waits`; else the file written as a descriptor with what the commit was asked under `committed`.
 #![allow(dead_code)]
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -110,6 +116,67 @@ elif args[:2] == ["project", "simulate"]:
         print(held["simulate_error"], file=sys.stderr)
         sys.exit(1)
     print(json.dumps(held.get("result", {"valid": True, "steps": []})))
+elif args[:2] == ["project", "edit"]:
+    # the descriptor takes the edit: a test reads back what the runtime asked for
+    mp = Path(args[2])
+    if option("--expect-digest") != hashlib.sha256(mp.read_bytes()).hexdigest():
+        print("Project edit failed: The project file changed since it was opened: open it again and repeat the change", file=sys.stderr)
+        sys.exit(1)
+    held = json.loads(mp.read_text(encoding="utf-8"))
+    edited = held.setdefault("edited", {})
+    for key in ("--name", "--author", "--repository", "--branch", "--tag-prefix"):
+        if option(key) is not None:
+            edited[key] = option(key)
+    if "--no-repository" in args:
+        edited["--no-repository"] = True
+    if option("--records") is not None:
+        edited["records"] = json.loads(Path(option("--records")).read_text(encoding="utf-8"))["records"]
+    if option("--changelog") is not None:
+        edited["changelog"] = Path(option("--changelog")).read_text(encoding="utf-8")
+    mp.write_text(json.dumps(held), encoding="utf-8")
+    print(json.dumps({"path": str(mp), "digest": hashlib.sha256(mp.read_bytes()).hexdigest()}))
+elif args[:2] == ["project", "new"]:
+    folder = Path(args[2])
+    folder.mkdir(parents=True)
+    asked = {"name": option("--name"), "slug": option("--slug"), "author": option("--author")}
+    (folder / "project.json").write_text(json.dumps(asked), encoding="utf-8")
+    print(folder)
+elif args[:2] == ["project", "unpack"]:
+    held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
+    out = Path(option("--out"))
+    out.mkdir(parents=True)
+    (out / "project.json").write_text(json.dumps(held.get("plugin", {})), encoding="utf-8")
+    for relative, text in held.get("instructions", {}).items():
+        target = out / "custom-instructions" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+    print(out)
+elif args[:2] == ["project", "commit"]:
+    work, out = Path(args[2]), Path(option("--out"))
+    if (work / "commit-waits").exists():
+        started = time.time()
+        while not (work.parent / "go-commit").exists() and time.time() - started < 60:
+            time.sleep(0.05)
+    if (work / "commit-fails").exists():
+        print("Project commit failed: the build failed", file=sys.stderr)
+        sys.exit(1)
+    if "--create" in args:
+        held = {"plugin": {"name": option("--name"), "slug": option("--slug"), "version": "0.1.0"}}
+    else:
+        if option("--expect-digest") != hashlib.sha256(out.read_bytes()).hexdigest():
+            print("Project commit failed: The project file changed since it was opened: open it again and repeat the change", file=sys.stderr)
+            sys.exit(1)
+        held = json.loads(out.read_text(encoding="utf-8"))
+    summary = option("--summary")
+    held["committed"] = {"operation": option("--operation"), "step": option("--step"),
+                         "summary": Path(summary).read_text(encoding="utf-8") if summary else None}
+    out.write_text(json.dumps(held), encoding="utf-8")
+    print(json.dumps({"path": str(out), "digest": hashlib.sha256(out.read_bytes()).hexdigest()}))
+elif args[:1] == ["baseline"]:
+    # exit 1: something moved, and the JSON is the report all the same
+    print(json.dumps({"baseline": [{"id": "alpha", "pin": "release", "pinned": "v1.0.0", "upstream": "v2.0.0", "status": "behind", "note": ""},
+                                   {"id": "beta", "pin": "head", "pinned": "abc", "upstream": "abc", "status": "current", "note": ""}]}))
+    sys.exit(1)
 else:
     print("unknown command", file=sys.stderr)
     sys.exit(2)

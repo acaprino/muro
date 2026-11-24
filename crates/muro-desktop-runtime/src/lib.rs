@@ -5,6 +5,7 @@ pub mod exec;
 pub mod factory;
 pub mod jobs;
 mod process_tree;
+pub mod project_jobs;
 pub mod projects;
 pub mod simulate;
 pub mod single_instance;
@@ -39,6 +40,11 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
         "install_project" => projects::install(data, &payload),
         "remove_project" => projects::remove(data, &payload),
         "open_folder" => projects::open_folder(data, &payload),
+        "create_project" => project_jobs::create(data, &payload),
+        "project_job" => project_jobs::change(data, &payload),
+        "edit_project" => project_jobs::edit(data, &payload),
+        "delete_project" => project_jobs::delete(data, &payload),
+        "project_updates" => project_jobs::updates(data, &payload),
         "env_present" => projects::env_present(&payload),
         "simulate" => simulate::simulate(data, &payload),
         "cancel_simulation" => simulate::cancel(data, &payload),

@@ -140,4 +140,5 @@ def test_manifest_declares_a_mode_for_every_source():
         "ai-design-skills": ("head", None),
         "explain-this": ("head", None),
         "text-humanizer": ("head", None),
+        "better-layout": ("head", None),
     }

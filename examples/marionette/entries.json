@@ -36,9 +36,10 @@
     },
     {
       "name": "marionette-design-review",
-      "description": "Use when checking and fixing an existing HTML design or web interface before it is shown or shipped: accessibility (contrast, keyboard, focus, labels), a generic AI-made look, visual hierarchy and spacing rhythm, missing hover, focus, disabled or loading states, or a full polish pass; or when extracting design tokens from a brand, codebase, site or screenshots into a tokens file, or listing the reusable components of a design as an inventory. Not for a code review of logic, for fact-checking content or for changes inside a design tool's file (Figma, FigCraft).",
+      "description": "Use when checking and fixing an existing HTML design or web interface before it is shown or shipped: accessibility (contrast, keyboard, focus, labels), a generic AI-made look, visual hierarchy and spacing rhythm, missing hover, focus, disabled or loading states, or a full polish pass; or setting or reviewing a layout in code (narrow and mobile viewports, RTL, translated text); or when extracting design tokens from a brand, codebase, site or screenshots into a tokens file, or listing the reusable components of a design as an inventory. Not for a code review of logic, for fact-checking content or for changes inside a design tool's file (Figma, FigCraft).",
       "capabilities": [
         "design-review",
+        "layout-structure",
         "design-system-extract"
       ],
       "absorbs": [
@@ -48,7 +49,8 @@
         "interaction-states-pass",
         "polish-pass",
         "design-system-extract",
-        "component-extract"
+        "component-extract",
+        "better-layout"
       ]
     },
     {

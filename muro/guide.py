@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 
 from .core import parse_router, validate_capabilities_and_router
+from .credentials import USED_BY, declared_credentials, in_order
 from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
 from .factory import prompts_dir
 from .routing import (catalog_digest, catalog_entries, resolve_selection, selection_step_id, step_capability,
@@ -85,6 +86,7 @@ _I18N: dict[str, dict[str, str]] = {
         "form_always-on": "text in every session",
         "form_hook": "active hook",
         "form_mcp-server": "MCP server registered by the plugin",
+        "form_package-tool": "tool of the package's MCP server",
         "form_dropped": "not carried",
         "always_on_h3": "Text added to every session",
         "always_on_note": "characters, paid by every session on hosts that register it.",
@@ -129,6 +131,24 @@ _I18N: dict[str, dict[str, str]] = {
         "status_caps": " capabilities",
         "status_idle": "Drag a node to move it, drag background to pan, scroll to zoom. Click a node for details.",
         "no_examples": "No illustrative path in this release.",
+        # The panel of API keys, rendered into the page and never into the script's data (keys_ prefix)
+        "keys_h2": "API keys",
+        "keys_note": "The tools of this package read these environment variables. This page lists their names, never a key.",
+        "keys_first_h3": "Get these first",
+        "keys_then_h3": "Then, in this order",
+        "keys_all_h3": "All keys",
+        "keys_col_env": "Variable",
+        "keys_col_service": "Service",
+        "keys_col_unlocks": "What it unlocks",
+        "keys_col_need": "Need",
+        "keys_col_used": "Used by",
+        "keys_required": "required",
+        "keys_optional": "optional",
+        "keys_route": "How it is received:",
+        "keys_used_sources": "Sources:",
+        "keys_used_capabilities": "Capabilities:",
+        "keys_used_tools": "Tools:",
+        "keys_none": "—",
     },
     "it": {
         "lang": "it",
@@ -193,6 +213,7 @@ _I18N: dict[str, dict[str, str]] = {
         "form_always-on": "testo in ogni sessione",
         "form_hook": "hook attivo",
         "form_mcp-server": "server MCP registrato dal plugin",
+        "form_package-tool": "strumento del server MCP del pacchetto",
         "form_dropped": "non incluso",
         "always_on_h3": "Testo aggiunto a ogni sessione",
         "always_on_note": "caratteri, pagati da ogni sessione sugli host che lo registrano.",
@@ -237,6 +258,23 @@ _I18N: dict[str, dict[str, str]] = {
         "status_caps": " capability",
         "status_idle": "Trascina un nodo per spostarlo, lo sfondo per muovere la mappa; scorri per zoomare. Clicca un nodo per i dettagli.",
         "no_examples": "Nessun percorso illustrativo in questa release.",
+        "keys_h2": "Chiavi API",
+        "keys_note": "Gli strumenti di questo pacchetto leggono queste variabili d’ambiente. La pagina ne elenca i nomi, mai una chiave.",
+        "keys_first_h3": "Da procurarsi per prime",
+        "keys_then_h3": "Poi, in quest’ordine",
+        "keys_all_h3": "Tutte le chiavi",
+        "keys_col_env": "Variabile",
+        "keys_col_service": "Servizio",
+        "keys_col_unlocks": "Cosa sblocca",
+        "keys_col_need": "Necessità",
+        "keys_col_used": "Usata da",
+        "keys_required": "obbligatoria",
+        "keys_optional": "facoltativa",
+        "keys_route": "Come viene ricevuta:",
+        "keys_used_sources": "Fonti:",
+        "keys_used_capabilities": "Capability:",
+        "keys_used_tools": "Strumenti:",
+        "keys_none": "—",
     },
 }
 
@@ -477,6 +515,91 @@ def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | 
     return '\n'.join(parts)
 
 
+# The style of the panel of API keys. It is added to the page only when the package declares credentials, so the
+# page of a package that declares none stays what it was, to the byte (the template holds its placeholder, empty).
+_KEYS_STYLE = """
+    .keys{max-width:1000px;margin:0 auto;padding:18px 25px 6px}
+    .keys>h2{font-size:22px;margin-bottom:6px}
+    .keys-note{font-size:12px;color:var(--muted)}
+    .keys h3{font-size:13px;margin:16px 0 8px}
+    .keys ol{list-style:none;margin:0;padding:0}
+    .keys ol li+li{margin-top:0}
+    .keys-first{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+    .keys-first li{padding:12px 14px;background:var(--white);border:2px solid var(--blue);border-radius:9px}
+    .keys-then{display:grid;gap:7px}
+    .keys-then li{padding:9px 12px;background:var(--white);border:1px solid var(--line);border-radius:7px}
+    .keys li p{font-size:12px;margin-top:6px}
+    .keys-rank{display:inline-block;min-width:22px;height:22px;margin-right:6px;padding:0 5px;border-radius:11px;background:var(--blue);color:#fff;font-size:11px;font-weight:650;line-height:22px;text-align:center}
+    .keys-need{display:inline-block;padding:0 7px;border:1px solid var(--line);border-radius:10px;color:var(--muted);font-size:11px;white-space:nowrap}
+    .keys-need.is-required{border-color:var(--blue);color:var(--blue)}
+    .keys-route{font-size:11px;color:var(--muted)}
+    .keys-scroll{overflow:auto;max-height:min(46vh,420px);background:var(--white);border:1px solid var(--line);border-radius:7px}
+    .keys table{width:100%;min-width:640px;border-collapse:collapse;font-size:12px}
+    .keys th,.keys td{padding:8px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+    .keys th{position:sticky;top:0;background:var(--pale);font-size:11px;white-space:nowrap}
+    .keys tr:last-child td{border-bottom:0}
+    @media(max-width:640px){.keys{padding:14px 13px 4px}.keys-first{grid-template-columns:1fr}}
+    @media print{.keys{max-width:none;padding:0}.keys-scroll{max-height:none;overflow:visible;border:0}.keys th{position:static}.keys-first li{break-inside:avoid}}"""
+
+
+def _key_need(entry: dict, tr: dict[str, str]) -> str:
+    return tr['keys_required'] if entry['required'] else tr['keys_optional']
+
+
+def _key_route(entry: dict, tr: dict[str, str]) -> str:
+    return (f'<span class="keys-route"><strong>{_text(tr["keys_route"])}</strong> {_text(entry["route"])}</span>'
+            if entry.get('route') else '')
+
+
+def _key_used(used_by: dict | None, tr: dict[str, str]) -> str:
+    """The lists a credential declares as used_by, one line for each, in a fixed order of the three groups."""
+    groups = [f'<span class="keys-used"><strong>{_text(tr["keys_used_" + group])}</strong> '
+              + ', '.join(f'<code>{_text(name)}</code>' for name in used_by[group]) + '</span>'
+              for group in USED_BY if (used_by or {}).get(group)]
+    return '<br>'.join(groups) or _text(tr['keys_none'])
+
+
+def _key_card(entry: dict, tr: dict[str, str]) -> str:
+    """One ranked credential, set apart: its rank, name, service, whether it is required, what it unlocks, how it comes."""
+    mark = ' is-required' if entry['required'] else ''
+    route = f'<p>{_key_route(entry, tr)}</p>' if entry.get('route') else ''
+    return (f'<li><span class="keys-rank">{_text(entry["rank"])}</span> <code>{_text(entry["env"])}</code> '
+            f'<strong>{_text(entry["service"])}</strong> <span class="keys-need{mark}">{_text(_key_need(entry, tr))}</span>'
+            f'<p>{_text(entry["unlocks"])}</p>{route}</li>')
+
+
+def _key_row(entry: dict, tr: dict[str, str]) -> str:
+    route = f'<br>{_key_route(entry, tr)}' if entry.get('route') else ''
+    return (f'<tr><td><code>{_text(entry["env"])}</code></td><td>{_text(entry["service"])}</td>'
+            f'<td>{_text(entry["unlocks"])}{route}</td><td>{_text(_key_need(entry, tr))}</td>'
+            f'<td>{_key_used(entry.get("used_by"), tr)}</td></tr>')
+
+
+def _keys_html(credentials: list[dict], tr: dict[str, str]) -> str:
+    """The panel of API keys: shown at once, outside the collapsed reference, and only for a package that declares them.
+
+    It displays the declared entries and nothing else: the ones with a rank first in rank order (the first three set
+    apart as the ones to get first), then a table of all of them. Nothing is inferred, filtered or reordered except
+    by `rank`. Without entries it is the empty string, and the page is the one the package always had.
+    """
+    if not credentials:
+        return ''
+    ordered = in_order(credentials)
+    ranked = [entry for entry in ordered if 'rank' in entry]
+    parts = ['<section class="keys" id="api-keys" aria-labelledby="api-keys-title">',
+             f'<h2 id="api-keys-title">{_text(tr["keys_h2"])}</h2>', f'<p class="keys-note">{_text(tr["keys_note"])}</p>']
+    for heading, group, name in ((tr['keys_first_h3'], ranked[:3], 'keys-first'), (tr['keys_then_h3'], ranked[3:], 'keys-then')):
+        if group:
+            parts += [f'<h3>{_text(heading)}</h3>', f'<ol class="{name}">' + ''.join(_key_card(e, tr) for e in group) + '</ol>']
+    heads = ''.join(f'<th scope="col">{_text(tr[name])}</th>' for name in
+                    ('keys_col_env', 'keys_col_service', 'keys_col_unlocks', 'keys_col_need', 'keys_col_used'))
+    parts += [f'<h3 id="api-keys-all">{_text(tr["keys_all_h3"])}</h3>',
+              '<div class="keys-scroll" tabindex="0" role="region" aria-labelledby="api-keys-all">',
+              f'<table><thead><tr>{heads}</tr></thead><tbody>' + ''.join(_key_row(e, tr) for e in ordered) + '</tbody></table>',
+              '</div>', '</section>']
+    return '\n'.join(parts) + '\n    '
+
+
 def _examples(dist: Path, rows: list, capabilities: dict, digest: str, stack_conflicts: list[list[str]] | None = None) -> list[dict]:
     """Validate AI-authored illustrative decisions; never invent example selections."""
     path = dist / 'guide-examples.json'
@@ -589,6 +712,7 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
     graph_library, graph_script = _graph_library()
     shown = guide_data(dist, plugin, sources)
     delivery, catalog, examples = shown['delivery'], shown['capabilities'], shown['examples']
+    credentials = declared_credentials(delivery)
     public_sources = shown['sources']
     data = {
         'plugin': shown['plugin'],
@@ -598,7 +722,9 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         'generated_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'examples': examples,
         'graph_library': graph_library,
-        'i18n': tr,
+        # The script reads its own strings only: the panel of API keys is rendered into the page, so its strings (and
+        # the credentials) never enter the data, and the data of a package that declares none is what it always was.
+        'i18n': {name: text for name, text in tr.items() if not name.startswith('keys_')},
     }
     serialized = json.dumps(data, ensure_ascii=False).replace('&', '\\u0026').replace('<', '\\u003c').replace('>', '\\u003e')
     serialized = serialized.replace('\u2028', '\\u2028').replace('\u2029', '\\u2029')
@@ -632,6 +758,8 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         '__MURO_DATA__': serialized,
         '__MURO_CONTENT__': '\n'.join(_capability_html(cap, catalog, tr) for cap in catalog) + '\n' + _examples_html(examples, tr) + '\n' + catalog_notes,
         '__MURO_SOURCES__': _sources_html(public_sources, delivery, tr),
+        '__MURO_KEYS__': _keys_html(credentials, tr),
+        '__MURO_KEYS_STYLE__': _KEYS_STYLE if credentials else '',
         '__MURO_GRAPH_LIBRARY__': graph_script,
     }
     template = GUIDE_TEMPLATE.read_text(encoding='utf-8')

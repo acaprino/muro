@@ -62,7 +62,9 @@ def _run_check_sources(manifest: dict, project_root: Path, offline_pins: bool) -
     return 0
 
 
-def _run_validate(manifest: dict, project_root: Path) -> int:
+def _run_validate(manifest: dict, project_root: Path, *, release: bool = False) -> int:
+    """Validate the package. `release` adds the checks the build makes on the AI's own records (a package that
+    declares servers has its `server_review`, judged on the pinned commits), never the owner's answer."""
     cap_dir = project_root / "capabilities"
     router_path = project_root / "ROUTER.md"
     capabilities = _load_capabilities(cap_dir)
@@ -85,6 +87,10 @@ def _run_validate(manifest: dict, project_root: Path) -> int:
         errs += unregistered_active_hooks(capabilities)
     else:
         errs += validate_delivery(delivery_doc, capabilities, source_ids)
+        if release:
+            from .server_review import release_errors
+            errs += release_errors(delivery_doc, [s for s in manifest.get("sources", []) if isinstance(s, dict)],
+                                   owner=False)
     # Without the repository only plain intake-only paths can be checked here; the build checks every match.
     from .factory import _helper_name, unpackaged_reference_errors
     for src in manifest.get("sources", []):
@@ -212,7 +218,7 @@ def _run_license_check(folder: Path) -> int:
 
 
 def _run_project(args: argparse.Namespace) -> int:
-    """`muro project pack|unpack|info|verify`: the `.mp` file (muro/project.py)."""
+    """`muro project pack|unpack|info|verify|new|edit|commit`: the `.mp` file (muro/project.py, muro/project_work.py)."""
     from . import project
     try:
         if args.project_command == "pack":
@@ -227,6 +233,8 @@ def _run_project(args: argparse.Namespace) -> int:
         elif args.project_command == "verify":
             project.verify(args.mp, args.cache or project.default_cache_root())
             _print_json({"verified": True})
+        elif args.project_command in _WRITE_COMMANDS:
+            return _run_project_write(args)
         else:
             read = project.summary if args.summary else project.info
             print(json.dumps(read(args.mp, args.cache or project.default_cache_root()),
@@ -235,6 +243,57 @@ def _run_project(args: argparse.Namespace) -> int:
     except (OSError, ValueError) as e:
         print(f"Project {args.project_command} failed: {e}", file=sys.stderr)
         return 1
+
+
+_WRITE_COMMANDS = ("new", "edit", "commit")
+
+
+def _repository_args(args: argparse.Namespace):
+    """The `repository` an edit or a new project asks for: kept (no option), taken away, or set."""
+    from . import project_work
+    if getattr(args, "no_repository", False):
+        if args.repository:
+            raise ValueError("--repository and --no-repository exclude each other")
+        return None
+    if args.repository:
+        return project_work.repository(args.repository, args.branch, args.tag_prefix)
+    if args.branch is not None or args.tag_prefix is not None:
+        raise ValueError("--branch and --tag-prefix need --repository")
+    return project_work._KEEP
+
+
+def _run_project_write(args: argparse.Namespace) -> int:
+    """`muro project new|edit|commit`: writing a project (muro/project_work.py)."""
+    from . import project_work
+    if args.project_command == "new":
+        repo = _repository_args(args)
+        print(project_work.new_workspace(args.folder, name=args.name, slug=args.slug, author=args.author,
+                                         repo=None if repo is project_work._KEEP else repo, version=args.version))
+        return 0
+    if args.project_command == "edit":
+        changes = {}
+        for key in ("name", "author"):
+            if getattr(args, key) is not None:
+                changes[key] = getattr(args, key)
+        repo = _repository_args(args)
+        if repo is not project_work._KEEP:
+            changes["repo"] = repo
+        if args.records is not None:
+            document = _read_json_file(args.records, "records")
+            changes["records"] = document.get("records") if isinstance(document, dict) else document
+        if args.changelog is not None:
+            changes["changelog"] = Path(args.changelog).read_text(encoding="utf-8")
+        _print_json(project_work.edit(args.mp, expect_digest=args.expect_digest, **changes))
+        return 0
+    summary = Path(args.summary).read_text(encoding="utf-8") if args.summary else ""
+    try:
+        _print_json(project_work.commit(args.folder, args.out, expect_digest=args.expect_digest, create=args.create,
+                                        step=args.step, operation=args.operation, summary=summary,
+                                        engine=args.engine, budget_usd=args.budget, slug=args.slug, name=args.name,
+                                        author=args.author))
+    except (KeyError, TypeError, AttributeError) as e:      # a package the AI wrote in a shape the build cannot read
+        raise ValueError(f"the package cannot be built: {type(e).__name__}: {e}") from None
+    return 0
 
 
 _SIMULATE_COMMANDS = ("simulate", "simulate-prepare", "simulate-check")
@@ -363,7 +422,9 @@ def _run_agent(step: str, source_id: str | None, manifest: dict, project_root: P
     if step == "intake":
         validate = lambda: _intake_check(manifest, project_root)
     else:
-        validate = lambda: _captured(lambda: _run_validate(manifest, project_root))
+        # `release`: the build's checks that need no owner, so a missing server review comes back to the model as an
+        # error it can repair, and not as a refusal of the build that follows `absorb` with no round left.
+        validate = lambda: _captured(lambda: _run_validate(manifest, project_root, release=True))
     try:
         return run_step(step, source_id, manifest, project_root,
                         api_base, model, api_key, rounds, validate)
@@ -549,7 +610,7 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("decisions", type=Path, help="The host AI's decisions JSON")
     p = sub.add_parser("project", help="The .mp project file: one zip with a package, its inputs and its release")
     project_sub = p.add_subparsers(dest="project_command", required=True,
-                                   metavar="pack|unpack|info|verify|simulate|simulate-prepare|simulate-check")
+                                   metavar="pack|unpack|info|verify|new|edit|commit|simulate|simulate-prepare|simulate-check")
     p = project_sub.add_parser("pack", parents=[common],
                                help="Pack a package, its sources at their pins and a built release into a .mp")
     p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
@@ -572,6 +633,43 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("mp", type=Path, help="The .mp file")
     p.add_argument("--cache", type=Path, metavar="DIR",
                    help="Where unpacked projects are kept (default: a per-user cache folder)")
+    # Writing a project: Python packs, records and guards; the package's meaning is the host AI's.
+    repo_options = argparse.ArgumentParser(add_help=False)
+    repo_options.add_argument("--repository", metavar="URL", help="The https address of the Git repository the project follows")
+    repo_options.add_argument("--branch", help="Its branch (default: main)")
+    repo_options.add_argument("--tag-prefix", help="The prefix of its release tags, such as my-plugin-v")
+    p = project_sub.add_parser("new", parents=[repo_options],
+                               help="Start a new project in a new folder: project.json and empty records, history "
+                                    "and changelog; the host AI writes the package")
+    p.add_argument("folder", type=Path, help="A new or empty folder")
+    p.add_argument("--name", required=True, help="The project's name")
+    p.add_argument("--slug", required=True, help="The plugin id, kebab-case")
+    p.add_argument("--author", required=True, help="Who owns the project")
+    p.add_argument("--version", default="0.1.0", help="The first version (default 0.1.0)")
+    p = project_sub.add_parser("edit", parents=[repo_options],
+                               help="Change a project's name, author, repository, records or changelog, offline, "
+                                    "while the file still has the digest it was read with")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--expect-digest", required=True, metavar="SHA256", help="The digest the file was read with")
+    p.add_argument("--name", help="The project's new name")
+    p.add_argument("--author", help="The project's new author")
+    p.add_argument("--no-repository", action="store_true", help="The project follows no repository any more")
+    p.add_argument("--records", type=Path, metavar="FILE", help="A JSON file with every record ({records: [...]})")
+    p.add_argument("--changelog", type=Path, metavar="FILE", help="The new text of CHANGELOG.md")
+    p = project_sub.add_parser("commit", help="Build a changed project, record the run and write its .mp file")
+    p.add_argument("folder", type=Path, help="The work folder: an unpacked project the host AI changed, or a new one")
+    p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
+    which = p.add_mutually_exclusive_group(required=True)
+    which.add_argument("--expect-digest", metavar="SHA256", help="The digest of the file the folder was unpacked from")
+    which.add_argument("--create", action="store_true", help="A new project: refuse to overwrite a file")
+    p.add_argument("--operation", required=True, help="What the run did, in a few words")
+    p.add_argument("--step", choices=("patch", "minor", "major", "none"), default="patch",
+                   help="How the version moves from the file's (default patch; a new project keeps its own)")
+    p.add_argument("--summary", type=Path, metavar="FILE", help="The AI's changelog text for this version")
+    p.add_argument("--engine", help="The agent that ran it, for the history")
+    p.add_argument("--budget", type=float, help="Its budget in USD, for the history")
+    for option, what in (("--slug", "plugin id"), ("--name", "name"), ("--author", "author")):
+        p.add_argument(option, help=f"With --create: the {what} the project was started with, which it must still have")
     # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
     where = argparse.ArgumentParser(add_help=False)
     where.add_argument("mp", nargs="?", type=Path, help="The .mp file (or name --manifest instead)")

@@ -514,6 +514,36 @@
       ],
       "reason": "Il passo vale per qualunque editor a canvas con variabili, stili, auto layout e componenti: le regole di design restano quelle della sorgente, le operazioni sono quelle dell'editor del file.",
       "questions": []
+    },
+    {
+      "title": "Layout mobile e RTL da sistemare",
+      "task": "La pagina checkout.tsx si rompe a 320px e quando la interfaccia è in arabo o in tedesco: sistema il layout nel codice, con il nostro Tailwind, senza cambiare colori e font.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "layout-structure",
+          "intent": "ui.layout-structure",
+          "reason": "Il risultato richiesto è la struttura del layout nel codice: raggruppamento, proprietà logiche per l'RTL, viewport stretto e testi più lunghi. Colori e font restano quelli del progetto."
+        }
+      ],
+      "reason": "Un solo passo: il metodo applica gli stessi principi per costruire e per verificare, e controlla da solo i casi a 320px, con zoom al 200%, in RTL e con una lingua lunga.",
+      "questions": []
+    },
+    {
+      "title": "Solo un rapporto sul layout",
+      "task": "Controlla il layout di src/components/Pricing.tsx (overflow, RTL, testi lunghi, viewport stretti) e dammi i problemi con la gravità e il verdetto. Non modificare niente.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "layout-structure",
+          "intent": "ui.layout-review",
+          "reason": "Serve un rapporto con posizione, gravità e verdetto, senza modifiche al codice."
+        }
+      ],
+      "reason": "La review di layout è un intento diverso dalla sistemazione: riporta soltanto. Non è la review dell'accessibilità né quella della logica del codice.",
+      "questions": []
     }
   ]
 }
