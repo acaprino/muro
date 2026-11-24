@@ -19,6 +19,13 @@ class, no primitive, no copy or restyling of a Sigrid part. Sigrid changes only
 when a component or primitive that a function needs is really missing, and then
 for every app; Muro's former look is never a reason to change it.
 
+The base of the window is Imago, the suite's shell in Xiox's style (window, title
+bar, frame, commands, palette, theme, notices), built with Sigrid: Muro brings
+only its screens, made of Sigrid's components, and has no frame, window or look
+of its own. What is missing in the shell is added to Imago, what is missing in a
+component is added to Sigrid. Until Imago's shell on Sigrid exists, Muro keeps
+its own composition of Sigrid's frame and adds none.
+
 Sigrid is not on npm. `package.json` names its GitHub Release tarball,
 `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
 (first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
