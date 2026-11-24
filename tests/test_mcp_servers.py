@@ -14,6 +14,7 @@ import pytest
 
 from muro import build_release
 from muro.delivery import MCP_SCHEMA, claude_code_mcp, server_launch, validate_delivery
+from review_helpers import ensure_review
 
 
 class Cap:
@@ -112,6 +113,7 @@ def declare(project, **over):
 
 
 def build(project, tmp_path):
+    ensure_review(project)       # a release with servers needs its server_review; these tests are about what it registers
     return build_release(project / "sources.json", project, tmp_path / "out")
 
 
@@ -354,6 +356,7 @@ def test_the_native_hermes_plugin_is_the_same_with_and_without_servers(portable_
     both["decisions"].append(decision("always-on", []))
     both["always_on"] = "Keep the complete scope."
     (portable_project / "delivery.json").write_text(json.dumps(both), encoding="utf-8")
+    ensure_review(portable_project)
     after = build_release(portable_project / "sources.json", portable_project, tmp_path / "after") / "adapters/hermes"
     for name in ("plugin.yaml", "__init__.py", "policy.md"):
         assert (before / name).read_bytes() == (after / name).read_bytes()

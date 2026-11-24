@@ -15,8 +15,19 @@ keyword checker, scoring script or fixed checklist to perform it for you.
   change must be listed with the collision that required it ("Changes for
   coexistence"); a rewrite without a recorded collision is a finding.
 - **Delivery decisions.** Every source has a decision; every decided form
-  (capability, always-on, hook, mcp-server, dropped) still has something real behind it,
+  (capability, always-on, hook, mcp-server, package-tool, dropped) still has something real behind it,
   and the reason recorded still matches what the source says.
+- **Server judgments.** Where `delivery.json` has a `server_review`, re-read it
+  against the pinned code, where the code wins over a description: each `effect`
+  against what the code does (a handle or an argument that decides where a key goes
+  or where a file is written, a file the tool can replace), each pair judgment and
+  its reason, the roster against the server's own tool list, every tool that the
+  package server serves or leaves out and whose effect is not `none` against the
+  owner's recorded answer (`server_choice`), and whether a tool left out still
+  satisfies a logical requirement of a capability. This review is anchored on the
+  record you read: a disagreement is a finding, not a verdict, and it does not
+  replace a blind second reading of an effect (descriptions only, no record), which
+  no command prepares yet.
 - **Harmonization records.** Merges, alternatives, handoffs and conflicts still
   describe the capabilities as they stand; a graph edge whose reason is gone is
   a finding. Role labels and manifest order still confer no authority.

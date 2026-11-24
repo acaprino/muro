@@ -243,7 +243,11 @@ installation, publication or replacement of existing dist output without request
   self-contained `GUIDE.html` at its root and in every standalone host skill.
   Initially show only the responsive navigable graph and a few controls for
   paths, intents and reset. Open brief intent descriptions and details on node
-  click; keep full catalog and commands available on demand.
+  click; keep full catalog and commands available on demand. The one exception
+  is the "API keys" panel of a package that declares `credentials` in
+  `delivery.json` (variable names and what each unlocks, never a value): visible
+  at once, ordered by `rank` alone, with the same names in each `INSTALL.md`
+  (owner, 2026-11-24; ADR-0010, amendment).
   Render actual packaged metadata and source pins without losing exclusions,
   constraints, dependencies, alternatives, conflicts, outputs, tools or checks.
   Meaning and collaboration rationale remain AI-authored; rendering/filtering
@@ -304,13 +308,22 @@ installation, publication or replacement of existing dist output without request
   itself, and a tool either forwards to a child's tool, keeping its name,
   description and schema, or runs a packaged command from an argv template, with
   no shell. `server_choice` records the owner's answer, `{asked_on, answer,
-  given_on}`, and the form `package-tool` marks a command served as a tool. When
-  a source ships a server the Harmonizer AI shows the owner the evidence and
-  asks, and never proceeds on its own choice; with no owner to ask it writes no
-  `package_server`. Every caller checks the shape; only `build` refuses a
-  package server whose answer is missing, does not cover a source its tools or
-  children use, was given on another commit of a serving source, or does not
-  show every tool it declares. One generic program
+  given_on}`, and the form `package-tool` marks a command served as a tool.
+  Owner, 2026-11-24: servers are harmonized like plugins. The Harmonizer AI
+  records `server_review` in `delivery.json` (every tool and command it
+  compares, each with its `effect` and its fate, and a judgment with a reason
+  for every pair that overlaps), and the owner is asked only about the tools
+  that write or send which a package server serves or leaves out; the AI decides
+  the rest, with a reason on record and the list shown to the owner, and
+  never proceeds on its own choice for a tool that writes or sends; with no
+  owner to ask it writes `server_review` and no `package_server`. A doubt is
+  `undetermined`, which counts as writing or sending. Every caller checks the
+  shape and the closure; only `build` refuses a package that declares a server
+  or a package server without `server_review`, one judged on another commit,
+  and a package server whose answer is missing, does not cover a source its
+  gated tools use, was given on another commit of a serving source, or does not
+  show every tool that writes or sends which it serves or leaves out (ADR-0033,
+  amendment of 2026-11-24). One generic program
   serves any declaration (`python muro.py tools-server`, reading
   `package-server.json`), and Python never chooses a tool, a child or the
   number of servers. Only Claude Code registers it for now: every other host
@@ -543,8 +556,10 @@ stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
 ADR-0027). Write the pin and its release into each capability's `## Sources`
 line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
 each part of the source became and why, and review the earlier decisions. When
-the source serves a package server, copy the description and schema of each of
-its forwarded tools again from the new commit and ask the owner again: the
+the source ships an MCP server, judge its tools again (`server_review` is judged on
+a commit, and the build refuses a package with a server whose record is judged on
+another one). When it serves a package server, copy the description and schema of
+each of its forwarded tools again from the new commit and ask the owner again: the
 build refuses the old answer on a new commit (ADR-0033). Record the release, the diff
 summary, the commands and their results in `docs/verification/`. A release
 proves packaging; say what was not executed.

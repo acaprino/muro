@@ -363,6 +363,13 @@ the owner answers in an attended session. A key absent on both sides is equal; a
 holds both keys keeps them. The same message goes back to the model as any rejected answer does,
 within `--rounds`.
 
+The validation of `harmonize` (and so of `muro absorb`, which builds right after it) includes the build's
+checks that need no owner: a package that declares an MCP server or a package server must carry its
+`server_review`, judged on the commits now pinned (ADR-0033, amendment of 2026-11-24). A missing or stale
+record is fed back to the model within `--rounds` instead of failing the build with no round left. With no
+owner to ask, the step writes `server_review` with every server `registered` and every command `command`,
+and no `package_server`: the question stays open and `absorb` registers the servers as they are.
+
 ```sh
 export MURO_API_KEY=…   # or OPENAI_API_KEY
 muro agent intake ponytail --manifest pkg/ponytail/sources.json \

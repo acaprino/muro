@@ -699,3 +699,109 @@ file. Fixtures prove mechanics only.
   nor the working directory it starts in.
 - That a permission rule saved for the old tool ids stops matching, as `INSTALL.md`
   says, was not verified on a host.
+
+## Amendment: server harmonization (2026-11-24)
+
+The owner changed this contract on 2026-11-24, in these words: "Voglio che i server MCP
+vengano armonizzati come i plugin: lo stesso passo dell'AI, con un motivo scritto per ogni
+scelta" and "Il mio gate (server_choice) solo per i tool che scrivono, o che mandano dati
+fuori dalla macchina. Gli altri li decide l'AI e registra il motivo." The owner answered "ok" and
+"sì" to the design and plan that followed, which this record reads as agreeing to the
+recommended options: the rule for an effect (below), the build refusing a package that
+declares servers without the record, and the AI writing the structure alone when no tool
+writes or sends. Asked afterwards to confirm those options by name, and told that the commit
+and the push would follow, the owner answered "cmmita" (commit) and changed none; this
+record reads that as confirming them. The header of this record still says `Proposed`: the owner said the first
+text was approved on 2026-11-23 and has not said whether that covers the text, so the
+header is not changed here. The design and the plan are outside the repository; the
+verification record is `docs/verification/`.
+
+This section replaces what it names and leaves the rest of the record as it was.
+
+**What it replaces.**
+
+- "The question to the owner" (design section 1): the owner is asked only about the tools
+  that write or send which a package server serves or leaves out. Every other tool is
+  decided by the Harmonizer AI, with a reason on record, and the owner is shown the list of
+  what it decided alone whenever it writes or changes `package_server`, with or without a
+  question. Never proceeding on its own choice holds for a tool that writes or sends.
+- The gate (design section 4) and ruling 4 of the implementation amendment ("the gate also
+  asks that every declared tool name is in `given_on.shown`"): the gate covers the tools
+  that write or send which the package server serves or leaves out, and `given_on.shown`
+  holds their ids (`<server>/<tool>`), not declared names. A package server with no such
+  tool has no `server_choice`. A tool whose server stays registered, and a command that
+  stays a shell step, are not covered: nothing changes for them (ADR-0030, choice A).
+- The anti-goal "a package without the declaration behaving differently from today": a
+  package that declares `mcp_servers` or a `package_server` now needs `server_review` to
+  build. `validate` and every other caller accept its absence; `build` refuses it.
+- "Unattended runs ... `absorb` finishes as it does today": `absorb` now finishes with every
+  server registered as it is and a `server_review`, and the question stays open. The
+  validation of the unattended harmonization includes the build's checks that need no
+  owner (the record's presence and `judged_on`), so a missing record gets a repair round
+  instead of failing the build.
+
+**The record.** `server_review` in `delivery.json`: a roster (each tool of each shipped
+server and the commands that are served or overlap a tool), each entry with its `effect`,
+its fate (`served`, `registered`, `command`, `left-out`) and a reason; and a judgment
+(`keep-both`, `merge`, `discard`) with a reason and evidence for every pair that overlaps.
+Its shape is in `prompts/delivery.md`, "The server review". It takes part in
+`catalog_digest` like the rest of the document.
+
+**The rule for an effect.** `none`, `writes`, `sends`, `writes-and-sends`, `undetermined`;
+only `none` skips the owner and the system fails closed (a doubt is `undetermined`, a
+missing value is an error). The rule is in `prompts/delivery.md`, "Effects of a tool", once.
+Spending is a `writes`; a file the tool can replace is a change; an argument or a handle
+that decides where a key goes or where a file is written counts as the highest effect it
+can reach; the code wins over a description. The rule adds no limit on what a tool sends:
+the gate is consent to exposure, and `basis` quotes what leaves in the source's words.
+
+**The checks.** `muro/server_review.py`, pure functions, called by `validate_delivery` for
+shape and closure and by `build` for presence, `judged_on` and the owner's coverage:
+exactly one of `overlaps` and `alone` for each entry (an empty `overlaps` list beside
+`alone` is read as `alone`: a model writes it for every tool that overlaps nothing); each overlap has one pair; the fates
+agree with the declaration (every declared tool has one entry that is `served`); a pair
+that holds a command is `keep-both`; a command is never `left-out`; a pair whose members are
+both left out is `keep-both`; a `left-out` server tool is named by no capability, in its
+`tools` or as code in its body (a word of prose is no reference: a real package said "do not
+transcribe the label" while a server tool was called `transcribe`); a gated
+tool that is served or left out has `decided_by: owner`; text fields are bounded in
+characters. They prove that the record is closed. They do not prove that the roster is
+complete, that an effect is right or that every similar pair was found: Python starts no
+server. A gate for a package server of commands only (no `mcp_servers`, no children) is the
+same function, because every declared tool has a roster entry.
+
+**Where a refusal holds.** A tool left out of the package server stays visible on every host
+that does not register it (today only Claude Code does, ADR-0033 "Not run"). The question
+says so, and `install_note` already says that those hosts register the absorbed servers
+as they are.
+
+**Measured by the paper runs of 2026-11-24** (one run each, one model, nothing started or
+installed; they are not tests of the product): the step run on Supads produced 62 roster
+entries (22 server tools and 40 commands) and 14 pairs; the closure checks found one
+inconsistency, a `discard` between two tools that were both left out; the cost was about
+750,000 tokens of agent and 22 minutes, and the record 80 KB, which is why the text fields
+are bounded. A second run on a made-up package with two servers produced a closed record at
+the first try. A blind reading of the 22 server tools from their descriptions alone agreed
+with the author's first table on all 22, and both were wrong on `job_status`, which the code
+reading found gated: it sends the vendor key to the address written in the handle. So the
+code wins over a description, and a descriptor-only reader is a consistency check, not a
+proof.
+
+### Not run (this amendment)
+
+- No Python of this amendment ran inside a harmonization or a build of a real package: the
+  checks run on fixtures. Outside the repository the module also ran on the record a model
+  wrote for Supads (with its 78 capabilities and a package server derived from the record)
+  and on the one for a made-up package; that run changed two of its rules (an empty
+  `overlaps` beside `alone`, and prose that names a tool), recorded in
+  `docs/verification/2026-11-24-server-harmonization.md`. Those records were written under a
+  draft of the step, not under the prompts as they now stand.
+- Supads was not harmonized again with these prompts: the paper run used a draft of the
+  step, and no package server was declared or built.
+- One run, one model for each of the three paper runs. The blind reading and the author of
+  its table are the same family of model and had the same rule in hand.
+- The server evals (`choose` and `effect` cases) are designed and not built.
+- A package with a `package_server` is still not to be released before the live Claude Code
+  run of the "Not run" list above; this amendment does not schedule it.
+- The record's size is bounded by a count of characters per field: the numbers (600, 400,
+  300, 600) were chosen from one measured run and may need to move.

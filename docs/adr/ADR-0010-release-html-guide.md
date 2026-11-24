@@ -31,7 +31,8 @@ retired_on: null
 retired_reason: null
 supersedes: []
 superseded_by: null
-changes: []
+changes:
+  - "2026-11-24: the guide shows the API keys a package declares, the one exception to its minimal first view."
 ---
 
 # ADR-0010: An offline HTML guide in every release
@@ -162,3 +163,56 @@ in addition to targeted guide tests. Record executed results and any omissions i
 The guide documents a release; it is not evidence that capabilities, hooks,
 external integrations or native host sessions have been executed. Valid HTML
 and a matching digest do not prove LLM authorship or general semantic accuracy.
+
+## Amendment of 2026-11-24: the guide shows the API keys a package's tools read
+
+Owner requirement, after a package that wraps many services (Supads names about
+85 to 90 distinct environment variables) showed none of them in its guide:
+"questo va nella guida chiaramente". The keys are shown in the guide, in plain
+view and in the order the owner gives, and in the install notes.
+
+Decision (implementation choice; the wording is not separately approved):
+
+- `delivery.json` takes an optional list `credentials`. An entry names an
+  environment variable (`env`), the `service` it belongs to, what it `unlocks` and
+  whether it is `required`, and may add a `rank`, a `route` (how the source itself
+  receives the key) and `used_by` (sources, capabilities, tools). There is no
+  field for a value: a key, a token or another secret has no place in the package,
+  and no error message repeats what an entry holds. The Harmonizer AI writes the
+  list from the intake evidence and orders it with the owner's own words. Python
+  (`muro/credentials.py`) checks shape and references and chooses no key, rank or
+  meaning (ADR-0003, ADR-0008). A name of a tool in `used_by` is checked only
+  against a roster the package records, and never fails without one.
+- A package that declares credentials has an "API keys" panel in its guide, in the
+  guide's language (English or Italian), visible at once: in `<main>`, before the
+  graph, outside the reference data a script hides and not inside a collapsed
+  section. It lists the entries with a rank in rank order, sets the first three
+  apart as the ones to get first, then shows a table of every entry (variable,
+  service, what it unlocks, need, used by). `rank` is the only reordering: nothing
+  is inferred, filtered or invented, in keeping with "Python copies and escapes
+  that evidence into HTML".
+- This is the one exception to "the initial screen is the graph only, with a few
+  controls". A package that declares no credentials gets exactly the guide it had:
+  the panel's markup and style enter the template through placeholders that are
+  empty for it, and its script data is unchanged (the panel's strings are not part
+  of it). A byte comparison with the commit before this change, on the same
+  package and a frozen clock, found the two pages identical.
+- Every `INSTALL.md` of a package that declares credentials has a "Keys" section,
+  before `## Install`, with the same names in the same order. It says that the
+  package's tools read those variables and describes no way for a host to pass
+  them to a server: no run has shown one (ADR-0033, "Not run").
+
+Cost. Nothing at run time: no call, no token, no hook, no prompt in a user's
+session. `delivery.json` is part of `catalog_digest` and of the context of every
+intake, harmonization and review prompt, so credentials move the digest and cost
+tokens in each of those: about 250 bytes an entry (an estimate), so 15 to 25 KB for
+the longest list known. The guide grows by the panel for a package that declares them and by
+nothing for any other.
+
+Evidence and limits: `tests/test_credentials.py`, `tests/test_release_guide.py`
+and `tests/test_package_server_delivery.py`, and
+[the verification record](../verification/2026-11-24-keys-in-the-guide.md). Not
+covered: the panel was not looked at in a browser (its markup and its place in the
+page were checked as a tree, not its look at desktop and narrow widths or with a
+keyboard); no package declares credentials yet, so the real list of Supads and its
+order are written at its next harmonization, with the owner.

@@ -62,7 +62,9 @@ def _run_check_sources(manifest: dict, project_root: Path, offline_pins: bool) -
     return 0
 
 
-def _run_validate(manifest: dict, project_root: Path) -> int:
+def _run_validate(manifest: dict, project_root: Path, *, release: bool = False) -> int:
+    """Validate the package. `release` adds the checks the build makes on the AI's own records (a package that
+    declares servers has its `server_review`, judged on the pinned commits), never the owner's answer."""
     cap_dir = project_root / "capabilities"
     router_path = project_root / "ROUTER.md"
     capabilities = _load_capabilities(cap_dir)
@@ -85,6 +87,10 @@ def _run_validate(manifest: dict, project_root: Path) -> int:
         errs += unregistered_active_hooks(capabilities)
     else:
         errs += validate_delivery(delivery_doc, capabilities, source_ids)
+        if release:
+            from .server_review import release_errors
+            errs += release_errors(delivery_doc, [s for s in manifest.get("sources", []) if isinstance(s, dict)],
+                                   owner=False)
     # Without the repository only plain intake-only paths can be checked here; the build checks every match.
     from .factory import _helper_name, unpackaged_reference_errors
     for src in manifest.get("sources", []):
@@ -416,7 +422,9 @@ def _run_agent(step: str, source_id: str | None, manifest: dict, project_root: P
     if step == "intake":
         validate = lambda: _intake_check(manifest, project_root)
     else:
-        validate = lambda: _captured(lambda: _run_validate(manifest, project_root))
+        # `release`: the build's checks that need no owner, so a missing server review comes back to the model as an
+        # error it can repair, and not as a refusal of the build that follows `absorb` with no round left.
+        validate = lambda: _captured(lambda: _run_validate(manifest, project_root, release=True))
     try:
         return run_step(step, source_id, manifest, project_root,
                         api_base, model, api_key, rounds, validate)

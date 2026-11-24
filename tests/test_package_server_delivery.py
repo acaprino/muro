@@ -15,10 +15,11 @@ from pathlib import Path
 import pytest
 
 from muro import build_release
-from muro.delivery import (FORMS, claude_code_mcp, package_server_gate_errors, server_section_errors, server_sections,
-                           validate_delivery)
+from muro.delivery import (FORMS, claude_code_mcp, install_note, package_server_gate_errors, server_section_errors,
+                           server_sections, validate_delivery)
 from muro.guide import _I18N
 from muro.jsonrpc import tool_result
+from review_helpers import ensure_review, reviewed, tool_id
 from test_package_server import Host
 
 
@@ -312,76 +313,109 @@ def declare(project, **over):
 
 
 def build(project, tmp_path):
+    ensure_review(project)       # a release with servers needs its server_review; most of these tests are about what it registers
     return build_release(project / "sources.json", project, tmp_path / "out")
 
 
-def declare_packaged(project, choice=True, **over):
+GATED = {"echo": "sends", "lookup": "writes"}      # both declared tools write or send: the owner decides them
+PINNED = "abc1234" + "0" * 33
+
+
+def declare_packaged(project, choice=True, effects=None, **over):
+    """A package server with a forwarded tool and a command, its review, and the owner's answer for what it gated."""
     options = {"tools": (FORWARD, {**RUN, "run": ["python", PACKAGED, "{q}"]}), **over}
     document = packaged(**options)
     document["mcp_servers"] = [{**SERVER, "run": ["python", PACKAGED, "--stdio"], "env": {}}]
     commit = json.loads((project / "sources.json").read_text(encoding="utf-8"))["sources"][0]["commit"]
+    document = reviewed(document, commit, effects)
     document["server_choice"]["given_on"]["sources"] = {"demo": commit[:8]}
+    document["server_choice"]["given_on"]["shown"] = [tool_id(t) for t in document["package_server"]["tools"]
+                                                      if (effects or {}).get(t["name"], "none") != "none"]
     if not choice:
         del document["server_choice"]
     (project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
     return document
 
 
-def test_the_build_refuses_a_package_server_without_the_owners_answer(portable_project, tmp_path):
-    declare_packaged(portable_project, choice=False)
+def test_the_build_refuses_a_package_server_without_the_owners_answer_when_a_tool_writes_or_sends(portable_project, tmp_path):
+    declare_packaged(portable_project, choice=False, effects=GATED)
     with pytest.raises(ValueError, match="needs the owner's recorded answer"):
         build(portable_project, tmp_path)
 
 
+def test_a_package_server_of_tools_that_neither_write_nor_send_needs_no_answer(portable_project, tmp_path):
+    # Amendment of 2026-11-24: the owner is asked only about what writes or sends; the AI decides the rest and says why.
+    declare_packaged(portable_project, choice=False)
+    assert (build(portable_project, tmp_path) / "package-server.json").is_file()
+
+
 def test_validation_alone_accepts_it(portable_project):
-    document = declare_packaged(portable_project, choice=False)
+    document = declare_packaged(portable_project, choice=False, effects=GATED)
     assert errors_for(document) == []                       # shape only: the gate is the build's
 
 
 def test_an_answer_given_on_another_commit_asks_again():
-    document = packaged()
+    document = reviewed(packaged(), "f" * 40, GATED)
     sources = [{"id": "demo", "commit": "f" * 40}]
+    document["server_choice"]["given_on"]["shown"] = ["stub/echo", "cmd/lookup"]
     assert package_server_gate_errors(document, sources) == [
-        "the owner's answer was given on demo at abc1234, now pinned at ffffffff: ask again"]
+        "server_review: the owner's answer was given on demo at abc1234, now pinned at ffffffff: ask again"]
     document["server_choice"]["given_on"]["sources"] = {}
-    assert package_server_gate_errors(document, sources) == ["the owner's answer does not cover source demo"]
-    assert package_server_gate_errors(served(), sources) == []
+    assert package_server_gate_errors(document, sources) == ["server_review: the owner's answer does not cover source demo"]
+    assert package_server_gate_errors(doc(), sources) == []     # no server, nothing to review
+    assert any("no server_review" in e for e in package_server_gate_errors(served(), sources))
 
 
 def test_the_gate_reads_the_recorded_commit_whatever_its_case_and_asks_for_the_answer_when_missing():
-    document = packaged()
-    document["server_choice"]["given_on"]["sources"] = {"demo": "ABC1234"}
-    assert package_server_gate_errors(document, [{"id": "demo", "commit": "abc1234" + "0" * 33}]) == []
+    document = reviewed(packaged(), "ABC1234", GATED)
+    document["server_choice"]["given_on"] = {"sources": {"demo": "ABC1234"}, "shown": ["stub/echo", "cmd/lookup"]}
+    sources = [{"id": "demo", "commit": PINNED}]
+    assert package_server_gate_errors(document, sources) == []
     del document["server_choice"]
-    assert package_server_gate_errors(document, []) == [
-        "the package server needs the owner's recorded answer (server_choice)"]
+    assert package_server_gate_errors(document, sources) == [
+        "server_review: the package server needs the owner's recorded answer (server_choice)"]
     assert package_server_gate_errors(None, []) == []
 
 
 def test_the_gate_asks_again_for_a_tool_the_answer_did_not_show():
-    # A tool added at an unchanged commit would otherwise build with no question, for tools that act on accounts.
-    document = packaged()
-    document["server_choice"]["given_on"]["shown"] = ["echo"]
-    sources = [{"id": "demo", "commit": "abc1234" + "0" * 33}]
-    assert package_server_gate_errors(document, sources) == ["the owner's answer does not cover tool lookup: ask again"]
+    # A gated tool added at an unchanged commit would otherwise build with no question, for tools that act on accounts.
+    document = reviewed(packaged(), "abc1234", GATED)
+    document["server_choice"]["given_on"]["shown"] = ["stub/echo"]
+    assert package_server_gate_errors(document, [{"id": "demo", "commit": PINNED}]) == [
+        "server_review: the owner's answer does not cover tool cmd/lookup: ask again"]
 
 
 def test_the_build_refuses_a_tool_the_answer_did_not_show(portable_project, tmp_path):
-    declare_packaged(portable_project)
+    declare_packaged(portable_project, effects=GATED)
     path = portable_project / "delivery.json"
     document = json.loads(path.read_text(encoding="utf-8"))
-    document["server_choice"]["given_on"]["shown"] = ["echo"]
+    document["server_choice"]["given_on"]["shown"] = ["stub/echo"]
     path.write_text(json.dumps(document), encoding="utf-8")
-    with pytest.raises(ValueError, match="the owner's answer does not cover tool lookup: ask again"):
+    with pytest.raises(ValueError, match="the owner's answer does not cover tool cmd/lookup: ask again"):
         build(portable_project, tmp_path)
 
 
-def test_the_gate_asks_for_each_source_a_tool_or_a_child_uses():
-    document = packaged(tools=(FORWARD, {**RUN, "source": "other"}))
-    document["server_choice"]["given_on"]["sources"] = {}
+def test_the_gate_asks_for_each_source_a_gated_tool_uses():
+    document = reviewed(packaged(tools=(FORWARD, {**RUN, "source": "other"})), {"demo": "f" * 40, "other": "e" * 40}, GATED)
+    document["server_choice"]["given_on"] = {"sources": {}, "shown": ["stub/echo", "cmd/lookup"]}
     sources = [{"id": "demo", "commit": "f" * 40}, {"id": "other", "commit": "e" * 40}]
     assert package_server_gate_errors(document, sources) == [
-        "the owner's answer does not cover source demo", "the owner's answer does not cover source other"]
+        "server_review: the owner's answer does not cover source demo",
+        "server_review: the owner's answer does not cover source other"]
+
+
+def test_a_package_server_of_commands_only_is_reviewed_and_gated_like_any_other():
+    # No absorbed server and no child: the commands it runs are where a write would be, and today's gate catches them.
+    declared = packaged(tools=({**RUN, "run": ["python", PACKAGED, "{q}"]},), children=())
+    del declared["mcp_servers"]
+    declared["decisions"] = [*doc()["decisions"], decision("package-tool", ["x"])]
+    sources = [{"id": "demo", "commit": PINNED}]
+    assert any("no server_review" in e for e in package_server_gate_errors(declared, sources))
+    document = reviewed(declared, PINNED, {"lookup": "writes"})
+    document["server_choice"]["given_on"] = {"sources": {"demo": "abc1234"}, "shown": []}
+    assert package_server_gate_errors(document, sources) == ["server_review: the owner's answer does not cover tool cmd/lookup: ask again"]
+    document["server_choice"]["given_on"]["shown"] = ["cmd/lookup"]
+    assert package_server_gate_errors(document, sources) == []
 
 
 def test_claude_code_registers_the_package_server_and_the_other_hosts_what_they_did(portable_project, tmp_path):
@@ -524,6 +558,7 @@ def test_a_package_server_with_no_absorbed_server_is_still_named_in_the_notes(po
     document = declare_packaged(portable_project, children=[], tools=({**RUN, "run": ["python", PACKAGED, "{q}"]},))
     document["decisions"] = [item for item in document["decisions"] if item["form"] != "mcp-server"]
     del document["mcp_servers"]
+    del document["server_review"]       # it listed the absorbed server that is no longer declared: build() writes a new one
     (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
     release = build(portable_project, tmp_path)
     claude = (release / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
@@ -543,18 +578,107 @@ def test_without_a_package_server_install_notes_are_what_they_were(portable_proj
         assert "package server" not in (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
 
 
+# --- The keys in INSTALL.md (owner, 2026-11-24: the API keys are shown in the guide and in the install notes) ------
+
+def with_keys(project, entries, **over):
+    """A delivery document that declares `credentials` and nothing that registers anything by itself."""
+    document = doc(credentials=entries, **over)
+    (project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    return document
+
+
+def credential(env, service, unlocks, required=True, **more):
+    return {"env": env, "service": service, "required": required, "unlocks": unlocks, **more}
+
+
+KEY_LIST = [credential("LAST_KEY", "Last service", "The last thing.", required=False),
+            credential("SECOND_KEY", "Second service", "The second thing.", rank=2),
+            credential("FIRST_KEY", "First service", "The first thing.", rank=1, route="Read from the variable."),
+            credential("OTHER_KEY", "Other service", "The other thing.", required=False)]
+KEYS_LEAD = ("The tools of this package read these environment variables. This file names them and never holds a "
+             "value.")
+RANKED = " The entries with a rank come first, in that order: get those first."
+
+
+def keys_section(text):
+    assert text.count("\n## Keys\n") == 1, text
+    return text.split("\n## Keys\n", 1)[1].split("\n## ", 1)[0]
+
+
+def test_every_install_note_lists_the_keys_in_order_and_never_a_value(portable_project, tmp_path):
+    with_keys(portable_project, KEY_LIST)
+    release = build(portable_project, tmp_path)
+    for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
+        note = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+        section = keys_section(note)
+        assert section.startswith(f"\n{KEYS_LEAD}{RANKED}\n\n"), host
+        assert [line for line in section.splitlines() if line.startswith("- ")] == [
+            "- `FIRST_KEY` (First service, required, rank 1): The first thing.",
+            "- `SECOND_KEY` (Second service, required, rank 2): The second thing.",
+            "- `LAST_KEY` (Last service, optional): The last thing.",
+            "- `OTHER_KEY` (Other service, optional): The other thing."], host
+        # Before the install command, which stays the last section of the file; and not a word of how a host
+        # passes variables to a server, which no run has shown.
+        assert "## Install" not in section and (host == "hermes" or note.index("## Keys") < note.index("## Install"))
+        assert not any(word in section.lower() for word in ("server", "inherit", "forward", "passes", "host "))
+
+
+def test_a_package_with_credentials_and_nothing_else_still_gets_its_keys_section(portable_project, tmp_path):
+    with_keys(portable_project, [credential("EXAMPLE_API_KEY", "Example", "Looking things up.")])
+    release = build(portable_project, tmp_path)
+    for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
+        note = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
+        assert keys_section(note).startswith(f"\n{KEYS_LEAD}\n\n- `EXAMPLE_API_KEY` (Example, required): Looking things up.")
+        assert "The entries with a rank" not in note        # nothing is ranked: nothing is "first"
+
+
+def test_the_keys_come_after_the_other_notes_so_no_note_falls_under_their_heading(portable_project, tmp_path):
+    document = with_keys(portable_project, KEY_LIST)
+    document["decisions"].append(decision("always-on", []))
+    document["always_on"] = "A fact for every session."
+    (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
+    note = (build(portable_project, tmp_path) / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
+    assert note.index("The declared policy in `policy.md`") < note.index("## Keys") < note.index("## Install")
+    assert "\n## " not in note.split("\n## Keys", 1)[0]
+
+
+def test_without_credentials_the_install_note_is_the_string_it_was():
+    base = doc(decisions=[*doc()["decisions"], decision("always-on", [])], always_on="A fact for every session.")
+    for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
+        before = install_note(base, host, "demo")
+        assert before and "Keys" not in before
+        assert install_note({**base, "credentials": []}, host, "demo") == before
+        assert install_note({**base, "credentials": "oops"}, host, "demo") == before
+    assert install_note(doc(), "claude-code", "demo") == "" == install_note(doc(credentials=[]), "claude-code", "demo")
+    assert install_note(None, "claude-code", "demo") == ""
+
+
+def test_every_entry_is_one_line_whatever_its_text_holds():
+    messy = credential("EXAMPLE_API_KEY", "Example\nservice\r\n   ", "Looks things up,\n\nin two\tparagraphs.", rank=1)
+    assert install_note(doc(credentials=[messy]), "claude-code", "demo") == (
+        f"\n\n## Keys\n\n{KEYS_LEAD}{RANKED}\n\n"
+        "- `EXAMPLE_API_KEY` (Example service, required, rank 1): Looks things up, in two paragraphs.")
+
+
 # --- The contract in words: the prompts, the ADR and the documents ---------------------------------------------
 
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 
 def test_the_harmonizer_prompt_asks_the_owner_about_servers():
-    text = (PROMPTS / "harmonizer.md").read_text(encoding="utf-8")
+    text = " ".join((PROMPTS / "harmonizer.md").read_text(encoding="utf-8").split())   # a re-wrapped line keeps its phrase
     for phrase in ("## Servers and tools", "ships an MCP server", "Never proceed on your own choice",
                    "read from the pinned source files", "an estimate", "no server is started", "as two lists",
-                   "only when there is no recorded answer or the evidence changed", "under its `name`",
-                   "With no owner to ask, write no `package_server`"):
+                   "only when there is no recorded answer or the evidence changed",
+                   # The server step of 2026-11-24: a record, a judgment for each pair, the owner only for what writes or sends.
+                   "`server_review`", "the code wins", "tools you decided alone", "6000 characters",
+                   "a pair that holds a command", "no logical requirement of a capability needs it",
+                   # With no owner the owner's keys stay as the file has them, and the review agrees with them.
+                   "With no owner to ask, leave `package_server` and `server_choice` exactly as the file has them",
+                   "every server tool is `registered` and every command is `command`",
+                   "Where it holds one, the owner's answer stands"):
         assert phrase in text, phrase
+    assert "under its `name`" not in text      # `shown` holds the ids of the tools that write or send, not declared names
 
 
 def test_the_delivery_prompt_states_the_declaration():
@@ -568,13 +692,33 @@ def test_the_delivery_prompt_states_the_declaration():
         assert phrase in text, phrase
     output = text.split("\n## Output", 1)[1]
     assert "`package_server`" in output and "`server_choice`" in output and "package-tool" in output
+    assert "`server_review`" in output
+
+
+def test_the_delivery_prompt_states_the_server_review_and_the_rule_for_an_effect_once():
+    text = " ".join((PROMPTS / "delivery.md").read_text(encoding="utf-8").split())
+    for phrase in ("## The server review", "## Effects of a tool", "`undetermined`", "A file the tool can replace is a change",
+                   "spends (credits, money: `writes`)", "the highest value", "case you would call marginal is a doubt",
+                   "`none` is the only value that skips the owner", "at most 600 characters",
+                   "Python checks shape, closure and these references"):
+        assert phrase in text, phrase
+    assert text.count("## Effects of a tool") == 1           # one copy of the rule: the evals read this section
+    package_server = text.split("## The package server", 1)[1].split("\n## ", 1)[0]
+    assert "id` of every such tool" in package_server and "A package server whose tools all have effect `none`" in package_server
 
 
 def test_the_intake_prompt_records_command_line_programs_as_evidence():
     text = (PROMPTS / "intake.md").read_text(encoding="utf-8")
     for phrase in ("command-line programs as evidence for harmonization", "read or write",
-                   "which credentials it takes from the environment", "without choosing a form"):
+                   "which credentials it takes from the environment", "without choosing a form",
+                   "For each tool of a shipped server, record the same evidence", "read from the code"):
         assert phrase in text, phrase
+
+
+def test_the_review_prompt_reexamines_the_server_judgments_and_names_every_form():
+    text = " ".join((PROMPTS / "review.md").read_text(encoding="utf-8").split())
+    assert "Server judgments" in text and "anchored on the record" in text
+    assert "(capability, always-on, hook, mcp-server, package-tool, dropped)" in text
 
 
 def test_the_contract_is_recorded():
@@ -597,6 +741,20 @@ def test_the_documents_name_the_form_and_record_what_was_not_run():
     for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which",
                    "environment variables that reach the server"):
         assert phrase in not_run, phrase
+
+
+def test_the_amendment_of_2026_11_24_records_what_it_replaces_and_what_was_not_run():
+    root = PROMPTS.parent
+    adr = " ".join((root / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8").split())
+    assert "## Amendment: server harmonization (2026-11-24)" in adr
+    amendment = adr.split("## Amendment: server harmonization (2026-11-24)", 1)[1]
+    for phrase in ("`server_review`", "ruling 4", "only about the tools that write or send", "fails closed", "decided alone",
+                   "gate for a package server of commands only", "Not run (this amendment)", "One run, one model",
+                   "the code wins over a description"):
+        assert phrase in amendment, phrase
+    agents = " ".join((root / "AGENTS.md").read_text(encoding="utf-8").split())
+    assert "`server_review`" in agents and "write or send" in agents
+    assert "does not cover a source" in agents       # still the gate's refusal for a source the answer never named
 
 
 def test_the_adr_says_what_ci_does_not_run_what_a_release_carries_and_the_condition_before_a_first_release():

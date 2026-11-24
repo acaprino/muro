@@ -116,52 +116,142 @@ is rejected.
 ## Servers and tools
 
 When a source of the package ships an MCP server (`delivery.json` declares an
-`mcp_servers` entry), the owner decides what the package does with its servers,
-and you ask before you write that part of `delivery.json`. A package whose
-sources ship no server is not asked, and nothing about it changes.
+`mcp_servers` entry), or the package declares a `package_server`, harmonize its
+tools as you harmonize capabilities: read them, compare them pairwise, decide each
+overlap and write the reason, grounded in the sources. A package whose sources ship
+no server and that declares no package server is not asked, and nothing about it
+changes.
+
+The owner decides, and you ask before you write that part of `delivery.json`,
+only about the tools that write or send (the rule is "Effects of a tool" in the
+Delivery protocol) which a package server would serve or leave out. Every other
+tool is yours to decide, with a reason on record and the list shown to the owner.
+Never proceed on your own choice for a tool that writes or sends.
+
+### Evidence
 
 Gather the evidence yourself. It is read from the pinned source files and the
-catalog, it is an estimate, and no server is started to get it. Show the owner:
+catalog, it is an estimate, and no server is started to get it. Where the code of a
+tool and its description, or a capability's account of it, differ, the code wins:
+say so. Record:
 
-- each shipped server: its tools, what each does and what it sends off the
-  machine, the estimated weight of its tool list (the bytes of its `tools/list`
-  answer), which capabilities call which tools, the tools no capability calls,
-  and what the server declares besides tools (resources, prompts, an
-  `instructions` text);
-- tools of different servers, or a server's tool and a command, that do the
-  same thing: say for each pair whether it is merged or one is left out, with a
-  reason grounded in the sources;
-- each command-line program the methods run: its commands as two lists, those
-  that read and those that write, and the credentials it takes from the
-  environment.
+- each shipped server: its tools, what each does and what it sends off the machine,
+  the estimated weight of its tool list (the bytes of its `tools/list` answer),
+  which capabilities name which tools, the tools no capability names, and what the
+  server declares besides tools (resources, prompts, an `instructions` text). A
+  capability also declares logical requirements (a name such as `scheduler` or
+  `video-analysis`) that the host maps to a real tool at run time: a tool no
+  capability names can still satisfy one. What the server does on every call (a
+  usage event, a log) is stated once, in the source's own words, in the server's
+  `mcp-server` decision, and never repeated for each tool;
+- each command-line program the methods run: its commands as two lists, those that
+  read and those that write, and the credentials it takes from the environment.
 
-Ask with the host's question tool where it has one. The choice is between every
-server registered as it is (what a release does without a package server) and
-one package server named for the package. For the package server the owner also
-decides which tools it serves, which commands become tools, and whether any
-server stays registered beside it. Give your recommendation and the weight of
-each option. Never proceed on your own choice.
+### The step, in order
 
-Record the answer in `delivery.json` as `server_choice`: `asked_on` (a date),
-`answer` (the owner's own words) and `given_on`. You author `given_on`: `sources`
-maps each serving source to the commit the answer was given on, and `shown`
-lists the names of what the owner was shown. Every tool the package server
-declares appears in it under its `name`: a command that becomes a tool is listed
-as that tool's name, not as the command line. The build refuses a package server
-whose answer does not cover every source its tools and children use at the
-commit now pinned, or does not show every tool it declares.
-The Delivery protocol, "The package server", says how to declare it.
+Write the result in `delivery.json` as `server_review`; the Delivery protocol, "The
+server review", gives its shape.
 
-Ask again only when there is no recorded answer or the evidence changed: a
-serving source pinned at another commit, also when no tool changed (that is the
-cost of binding the answer to a commit), or a tool or command the answer did
-not show. Otherwise show the recorded answer and keep it. After a re-pin, copy
-the description and schema of each child's tool again from the new commit.
+1. **Roster.** List every tool of every shipped server and, of the commands, only
+   those you serve as a tool or that overlap a tool or another command. Count the
+   server's tools from its source and say how many you found.
+2. **Effect.** For each entry write `effect` and `basis`, by the rule "Effects of a
+   tool". Start from the evidence intake recorded in the capability's `tools`, then
+   check it against the code. Recording that a tool sends data is not a limit on
+   it: quote what leaves in the source's words and add nothing.
+3. **Overlaps and pairs.** For each entry list the others that do the same or nearly
+   the same thing, or write `alone` with the reason nothing else does. For every such
+   pair write one judgment, with a reason and the source paths or sections you read:
+   - `keep-both`: they differ (say how: the recipient, the key, a flag, the folder)
+     or neither can give way. It is the only judgment for a pair that holds a
+     command (a command is a step a capability has the host run; no server exposes
+     it, so there is no code to merge, and discarding one changes what the source
+     prescribes, which only a recorded collision allows) and for a pair whose
+     members are both left out.
+   - `merge` or `discard`: one survives and serves everything the other did, under
+     every configuration the source offers (an environment variable that moves a
+     folder counts). The other is left out and no capability may name it
+     afterwards: where one did, change that body and record the collision. If the
+     choice would change who receives a piece of data, it is the owner's: write
+     `keep-both` and say so.
+   - Two forwarded tools with the same name cannot both keep it. Rename only when
+     names collide, record the collision, and change the bodies that name them.
+4. **Fate.** `served` (declared as a tool of the package server: a server tool is
+   forwarded unchanged, a command becomes a `run` tool), `registered` (its server
+   stays registered as itself), `command` (stays a shell step of a capability),
+   `left-out` (not exposed). A command is `served` or `command`, never `left-out`.
+   Before you leave a server tool out, check that no capability names it and that no
+   logical requirement of a capability needs it.
+5. **The question.** Ask once, and only when you propose a package server that
+   serves or leaves out at least one tool that writes or sends. If you propose none,
+   every server stays registered as it is, nothing changes and you ask nothing.
+   Ask with the host's question tool where it has one, in at most 6000 characters:
+   one row for each tool, grouped by provider, in the order recorded in
+   `credentials` (`rank`) when the package has one and otherwise in the order they
+   first appear (tools with no provider go together as "this machine"), and inside a
+   provider by effect. For each tool: what it changes, spends or sends (the source's
+   words), the key it uses, the fate you propose, your recommendation, and what in
+   the code the owner would want to know. Say two things plainly: a tool left out of
+   the package server stays visible on every host that does not register the
+   package server (today only Claude Code does), and exposure is all or nothing,
+   because a forwarded tool is served as it is and its arguments cannot be
+   restricted (a `run` tool can restrict one in its schema). Give your
+   recommendation and the weight of the package server's own tool list.
+   Whenever you write or change `package_server`, with or without a question, show
+   the owner the tools you decided alone, one line of reason each: it is how the
+   owner sees what the classification let through.
+6. **The record.** Write the answer as `server_choice`: `asked_on` (a date), `answer`
+   (the owner's own words) and `given_on`, where `sources` maps each source whose
+   tool the question covered to the commit the answer was given on, and `shown`
+   lists the ids of the tools the owner was shown. Python requires every tool that
+   writes or sends and that the package server serves or leaves out to be in
+   `shown`, with its source at the commit now pinned; a package server with no such
+   tool has no `server_choice`. The Delivery protocol, "The package server", says
+   how to declare the package server.
 
-With no owner to ask, write no `package_server`. An unattended run leaves the
-servers declared as intake left them and says in its notes that the question is
-open. Python checks the shape of the declaration and of the record; it never
-chooses a tool, a child or the number of servers.
+Ask again only when there is no recorded answer or the evidence changed: a serving
+source pinned at another commit (also when no tool changed: that is the cost of
+binding the answer to a commit), or a tool the answer did not show. Otherwise show
+the recorded answer and keep it. After a re-pin, judge again (`judged_on` must match
+the pinned commits) and copy the description and schema of each child's tool again
+from the new commit.
+
+With no owner to ask, leave `package_server` and `server_choice` exactly as the file
+has them, and write `server_review` yourself. Where the file has no `package_server`,
+every server tool is `registered` and every command is `command`, and you write no
+`server_choice`. Where it holds one, the owner's answer stands: give each tool the
+fate that package server already gives it (`served` for a tool it declares, `left-out`
+for a tool of a child it does not declare, `registered` for a tool of any other
+server, `command` for a command), with `decided_by: owner` for a tool that writes or
+sends and is served or left out. An unattended run leaves the servers as the owner
+or intake left them and says in its notes that the question is open. Python checks
+the shape and the closure of what you write; it cannot see a server's tools, so it
+never proves that the roster is complete or that an effect is right, and it never
+chooses a tool, a pair or the number of servers. Keep each text field short (one
+sentence, the quotation and where): the record is read in every harmonization prompt.
+
+## Credentials
+
+The API keys that the tools of the package read are declared in `credentials` of
+`delivery.json` (Delivery protocol, "Credentials"). The release shows the list at
+once in its guide, the one exception to the guide's minimal first view, and in
+`INSTALL.md`, so it is what a user reads first when setting the package up.
+
+Build it from the intake evidence of every source. A variable that several
+sources name is one entry that lists them all in `used_by`. Say what each key
+unlocks, whether it is required, and how the source itself receives it. Record
+names only. Never a key, a token or another secret.
+
+The order is the owner's. Write `rank` (`rank` 1 first) from the owner's own
+words, and never infer it from the catalog, from a source or from how many
+commands use a key. When the package has more than three credentials and no
+order is recorded, ask the owner once, with the host's question tool where it
+has one, and record the order they give as `rank` on the entries they name; the
+others carry no `rank` and follow in the order you declare them. Ask again only
+when the owner changes the order or a credential appears that it does not cover.
+With no owner to ask, write no `rank` that is not already recorded, and say in
+your notes that the order is open. Python checks shape and references and orders
+by `rank` alone; it never chooses a key, a rank or what a key unlocks.
 
 ## Step weight, replaced originals and eval cases
 

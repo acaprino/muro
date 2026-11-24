@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from .argv_template import literal_parts, template_errors
+from .credentials import ENV_NAME as _ENV_NAME, credential_errors, declared_credentials, in_order
 from .custom_instructions import metadata_errors, reference_errors, validate_binding
+from .server_review import release_errors, server_review_errors
 
 DELIVERY_FILE = "delivery.json"
 FORMS = ("capability", "always-on", "hook", "mcp-server", "package-tool", "dropped")
@@ -37,7 +39,6 @@ _WIRING_OPTIONAL = {"timeout"}
 _SERVER_KEYS = {"name", "source", "run"}
 _SERVER_OPTIONAL = {"env"}
 _SERVER_NAME = re.compile(r"[a-z][a-z0-9-]{0,63}")
-_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _PACKAGE_ROOT = "<package_root>"
 # A packaged path inside a value: alone, after `--option=`, or in a list joined by `;` or `:`.
 _PACKAGED_PATH = re.compile(re.escape(_PACKAGE_ROOT) + r"/([^;:]*)")
@@ -45,7 +46,7 @@ _RESERVED_ENV = ("PLUGIN_ROOT", "PLUGIN_DATA")   # an Agent Plugins host drops a
 MCP_SCHEMA = "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json"
 # One server for the whole package, its tools declared as data; the owner's answer that precedes it is recorded.
 _DOCUMENT_KEYS = {"decisions", "always_on", "hooks", "mcp_servers", "package_server", "server_choice",
-                  "custom_instructions"}
+                  "server_review", "credentials", "custom_instructions"}
 _PACKAGE_SERVER_KEYS = {"name", "children", "tools"}
 _TOOL_KEYS = {"name", "source", "description", "input_schema"}
 _TOOL_OPTIONAL = {"annotations", "timeout", "env"}
@@ -158,23 +159,15 @@ def packaged_path_errors(document: dict[str, Any] | None, package_dir: Path) -> 
 
 
 def package_server_gate_errors(document: dict[str, Any] | None, sources: list[dict[str, Any]]) -> list[str]:
-    """The build's gate: a package server is released only on the owner's answer, given on the sources as pinned."""
-    declaration = package_server(document)
-    if declaration is None:
-        return []
-    if "server_choice" not in document:
-        return ["the package server needs the owner's recorded answer (server_choice)"]
-    recorded = document["server_choice"]["given_on"]["sources"]
-    pinned = {source["id"]: source["commit"] for source in sources}
-    used = {tool["source"] for tool in declaration["tools"]}
-    used |= {server["source"] for server in mcp_servers(document) if server["name"] in declaration["children"]}
-    errors = [f"the owner's answer does not cover source {source}" for source in sorted(used - recorded.keys())]
-    errors += [f"the owner's answer was given on {source} at {commit}, now pinned at {pinned[source][:8]}: ask again"
-               for source, commit in recorded.items()
-               if source in pinned and not pinned[source].lower().startswith(commit.lower())]
-    shown = document["server_choice"]["given_on"]["shown"]   # a tool added at an unchanged commit needs the answer too
-    return errors + [f"the owner's answer does not cover tool {tool['name']}: ask again"
-                     for tool in declaration["tools"] if tool["name"] not in shown]
+    """The build's gate, for a package that declares servers or a package server.
+
+    A package that declares them needs its `server_review`, judged on the commits now pinned. A package server is
+    released on the owner's answer only for the tools that write or send which it serves or leaves out (the answer
+    given on the sources as pinned, each such tool shown to the owner); one with no such tool needs no answer.
+    The checks are `muro.server_review.release_errors`: this is the build's name for them (ADR-0033, amendment of
+    2026-11-24, which narrows the gate of 2026-11-23 from every declared tool to those).
+    """
+    return release_errors(document, sources, owner=True)
 
 
 def _text(value: Any) -> bool:
@@ -398,7 +391,7 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     """Check shape, references and that every declared form has something behind it. Forms stay the AI's decision."""
     if not isinstance(document, dict) or "decisions" not in document or set(document) - _DOCUMENT_KEYS:
         return ["delivery.json must be an object with decisions and only decisions, always_on, hooks, mcp_servers, "
-                "package_server, server_choice and custom_instructions"]
+                "package_server, server_choice, server_review, credentials and custom_instructions"]
     custom = document.get("custom_instructions")
     if "custom_instructions" in document:
         errors = metadata_errors(custom)
@@ -505,6 +498,8 @@ def validate_delivery(document: Any, capabilities: list, source_ids: set[str]) -
     errors += _server_errors(document.get("mcp_servers", []), source_ids, server_sources)
     errors += server_section_errors(server_sections(document))
     errors += _tool_reference_errors(document, source_ids, tool_sources)
+    errors += server_review_errors(document, capabilities, source_ids)   # shape and closure; its presence is the build's
+    errors += credential_errors(document, set(known), source_ids)
     return errors + (_choice_errors(document["server_choice"], source_ids) if "server_choice" in document else [])
 
 
@@ -626,10 +621,35 @@ def _package_server_note(declaration: dict[str, Any], host: str, absorbed: bool)
     return f"The package server `{name}` {served}. Tools appear under the server `{name}`.{moved}{inherits}"
 
 
+def _keys_note(document: dict[str, Any] | None) -> str:
+    """The API keys the package's tools read, in the order the guide shows them: their names, what each unlocks, never a
+    value. It says nothing of how a host passes variables to a server: no run has shown it (ADR-0033, "Not run")."""
+    entries = in_order(declared_credentials(document))
+    if not entries:
+        return ""
+    lead = "The tools of this package read these environment variables. This file names them and never holds a value."
+    if any("rank" in entry for entry in entries):
+        lead += " The entries with a rank come first, in that order: get those first."
+    lines = []
+    for entry in entries:
+        facts = [_one_line(entry["service"]), "required" if entry["required"] else "optional"]
+        if "rank" in entry:
+            facts.append(f"rank {entry['rank']}")
+        lines.append(f"- `{entry['env']}` ({', '.join(facts)}): {_one_line(entry['unlocks'])}")
+    return "\n\n".join(["## Keys", lead, "\n".join(lines)])
+
+
+def _one_line(text: Any) -> str:
+    """An entry stays one list line whatever its text holds."""
+    return " ".join(str(text).split())
+
+
 def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
     """What this host's adapter registers by itself, and what it does not."""
     declaration = package_server(document)
-    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document) or declaration):
+    keys = _keys_note(document)
+    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document) or declaration
+                            or keys):
         return ""
     notes = []
     channel = _SERVER_CHANNELS.get(host)
@@ -661,4 +681,6 @@ def install_note(document: dict[str, Any] | None, host: str, command: str) -> st
                      "Arguments are literal argv. Windows `.cmd`/`.bat` programs are rejected; declare the underlying executable and script directly.")
     elif document.get("hooks"):
         notes.append("This release's source command hooks target other hosts and do not run here.")
+    if keys:
+        notes.append(keys)   # last, so no note above falls under its heading
     return "\n\n" + "\n\n".join(notes) if notes else ""
