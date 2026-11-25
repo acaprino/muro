@@ -105,7 +105,7 @@ export function ReviewSheet() {
                 <Cluster key={`${o.plugin_id}-${o.kind}-${k}`} as="li" data-operation={o.kind} gap="md" align="start" wrap={false}>
                   <Badge tone={o.kind === 'remove' ? 'danger' : 'info'}>{KINDS[o.kind] ?? o.kind}</Badge>
                   <Column gap="xs">
-                    <Text variant="strong" pre>{o.name}</Text>
+                    <Text variant="strong" truncate>{o.name}</Text>
                     <Text variant="note" pre>{detailOf(o)}</Text>
                   </Column>
                 </Cluster>

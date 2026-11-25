@@ -33,7 +33,7 @@ export function RunsPanel({ data }: { data: ProjectData }) {
                 <Cluster>
                   <Text variant="strong" pre>{r.version || '—'}</Text>
                   {i === current ? <Badge variant="outline">current</Badge> : null}
-                  {tag ? <Text variant="note" pre><code>{tag}</code></Text> : null}
+                  {tag ? <Text mono truncate>{tag}</Text> : null}
                 </Cluster>
                 <Text as="p" variant="soft" pre>{r.changelog || '—'}</Text>
                 <DescriptionList

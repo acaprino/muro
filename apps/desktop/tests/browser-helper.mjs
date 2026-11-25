@@ -36,8 +36,9 @@ function fakeWindow() {
     unregisterCallback: () => {},
     invoke: async (command, args) => {
       window.native.push([command, args]);
+      if (command === 'plugin:imago-shell|set_glass') window.glass = args.glass;
       if (command === 'plugin:event|listen') (listeners[args.event] ??= []).push(args.handler);
-      return command === 'plugin:window|is_maximized' ? false : command === 'plugin:event|listen' ? 1 : null;
+      return command === 'plugin:window|is_maximized' ? false : command === 'plugin:event|listen' ? 1 : command === 'plugin:imago-shell|kept_glass' ? window.glass ?? null : null;
     },
   };
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
