@@ -333,7 +333,7 @@ await test('a refused save keeps the drawer and its values and says why inside i
   await save(s).click();
   const refusal = s.getByRole('alert').filter({ hasText: 'Version conflict' });
   await refusal.waitFor();
-  assert.match(await refusal.textContent(), /Not saved\./);
+  assert.match(await refusal.textContent(), /Not saved/);
   assert.equal(await field(s, 'name').inputValue(), 'Renamed <b>', 'the values stay');
   assert.equal(await save(s).isEnabled(), true, 'and the drawer can try again');
   assert.equal(await page.locator('[data-toasts]').getByText('Version conflict').count(), 0, 'it is not a notice: a notice would cover the buttons');
@@ -621,7 +621,7 @@ await test('the drawer of a plugin stays inside a window of 500 at 200% zoom (25
   }
 });
 
-await test('the drawer in a phone-width window, in the light theme', 'changes', { viewport: { width: 390, height: 844 }, colorScheme: 'light' }, async app => {
+await test('the drawer in a phone-width window, in the light theme', 'changes', { viewport: { width: 390, height: 844 }, theme: 'light' }, async app => {
   const { page } = app;
   const s = await openPlugin(page, 'Package');
   await fold(s, 'More').click();

@@ -1,15 +1,15 @@
 import * as React from 'react';
-import { Badge, Button, Count, Icon, Textarea } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Card, Cluster, Column, Count, Icon, Section, Text, Textarea } from '@acaprino/sigrid/primitives';
 import { Empty, FormField, ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { engineOf } from '../../model.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { noteTold, tellNote } from '../../state/project.ts';
 import { message, plural } from '../../words.ts';
 import { outputsOf, readAnswer } from './graph-model.ts';
 import type { Outcome } from './graph-model.ts';
-import { Heading, StepList } from './Details.tsx';
+import { GroupHeading, Sentences, StepList } from './Details.tsx';
 import type { ProjectData } from './data.ts';
 import { asking, noteText, whoLine } from './lines.ts';
 
@@ -86,21 +86,19 @@ export function ExamplesPanel({ data, onChosen }: ExamplesPanelProps) {
 
   if (!data.caps.length) return <Empty title="No decision graph" description="This project's plugin has no capabilities to choose between, so there is nothing to simulate." />;
   return (
-    <div className="flex flex-col gap-5">
-      <section aria-labelledby={`${ids}-try`} className="flex flex-col gap-2">
-        <h3 id={`${ids}-try`} className="flex items-center gap-2 text-sm font-semibold text-ink"><Icon name="ai" />Try a request</h3>
+    <Column gap="xl">
+      <Section level={3} title="Try a request" icon={<Icon name="ai" />}>
         <FormField id={boxId} label="Request to simulate" help="Write it as you would to your coding agent: the graph shows which branch it activates, and in what order." error={sim.error || undefined}>
           <Textarea rows={3} value={sim.task} aria-describedby={explain ? noteId : undefined} onChange={e => project.patchSim({ task: e.currentTarget.value, error: '' })} />
         </FormField>
-        <div className="flex flex-wrap items-center gap-2">
+        <Cluster>
           <Button id={goId} variant="outline" loading={running} loadingText={`Asking ${asking(engine)}…`} onClick={() => void simulate()}><Icon name="play" />Simulate</Button>
           {running ? <Button variant="ghost" onClick={cancel}>Cancel</Button> : null}
-        </div>
-        {explain ? <p id={noteId} className="text-xs text-ink-mute">{noteText(engine)}</p> : null}
+        </Cluster>
+        {explain ? <Text as="p" variant="note" id={noteId}>{noteText(engine)}</Text> : null}
         {sim.result && sim.example === null ? <Result outcome={sim.result} known={known} onCapability={toCapability} onClear={clear} /> : null}
-      </section>
-      <section aria-labelledby={`${ids}-examples`} className="flex flex-col gap-2">
-        <h3 id={`${ids}-examples`} className="flex items-center gap-2 text-sm font-semibold text-ink"><Icon name="tasks" />Documented examples <Count value={data.examples.length} label={data.examples.length === 1 ? 'example' : 'examples'} /></h3>
+      </Section>
+      <Section level={3} title="Documented examples" icon={<Icon name="tasks" />} end={<Count value={data.examples.length} label={data.examples.length === 1 ? 'example' : 'examples'} />}>
         {data.examples.length ? (
           <ItemList aria-label="Documented examples">
             {data.examples.map((e, i) => {
@@ -112,58 +110,56 @@ export function ExamplesPanel({ data, onChosen }: ExamplesPanelProps) {
                   current={sim.example === i}
                   onClick={() => choose(i)}
                   title={<span title={e.title}>{e.title}</span>}
-                  description={(
-                    <>
-                      {asked ? <span className="block truncate" title={asked}>{asked}</span> : null}
-                      {intents.length ? <span className="block truncate" title={intents.join(' → ')}>Intent {intents.map((x, k) => <React.Fragment key={k}>{k ? ' → ' : ''}<code className="font-mono">{x}</code></React.Fragment>)}</span> : null}
-                      {outs.length ? <span className="block truncate" title={outs.join(', ')}>Output {outs.join(', ')}</span> : null}
-                    </>
-                  )}
+                  description={asked ? <span title={asked}>{asked}</span> : undefined}
+                  facts={[
+                    ...(intents.length ? [{ text: <Text pre>Intent {intents.map((x, k) => <React.Fragment key={k}>{k ? ' → ' : ''}<code>{x}</code></React.Fragment>)}</Text> }] : []),
+                    ...(outs.length ? [{ text: <Text pre>Output {outs.join(', ')}</Text> }] : []),
+                  ]}
                 />
               );
             })}
           </ItemList>
-        ) : <p className="text-sm text-ink-mute">This project documents no example yet.</p>}
-      </section>
-    </div>
+        ) : <Text as="p" variant="muted">This project documents no example yet.</Text>}
+      </Section>
+    </Column>
   );
 }
 
 /** The outcome of a free-text request: the AI's decision (its status, the request, the steps in order, the reason and the questions), an answer that was no valid decision, or a call that did not run. */
 function Result({ outcome: o, known, onCapability, onClear }: { outcome: Outcome; known: Set<string>; onCapability(id: string): void; onClear(): void }) {
-  const clear = <div><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></div>;
-  const asked = <p className="text-sm text-ink-soft">“{o.asked}”</p>;
+  const clear = <Cluster><Button variant="ghost" size="sm" onClick={onClear}>Clear</Button></Cluster>;
+  const asked = <Text as="p" variant="soft" pre>“{o.asked}”</Text>;
   if (o.kind === 'failed') return (
-    <div role="alert" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div><Badge variant="destructive">Could not run</Badge></div>
+    <Card pad="md" gap="sm" role="alert">
+      <Cluster><Badge tone="danger">Could not run</Badge></Cluster>
       {asked}
-      <p className="text-sm font-semibold text-ink">The simulation could not run</p>
-      <p className="text-sm text-ink-soft">{o.message}</p>
-      <p className="text-xs text-ink-mute">Check the AI engine in Settings.</p>
+      <Text as="p" variant="strong">The simulation could not run</Text>
+      <Text as="p" variant="soft" pre>{o.message}</Text>
+      <Text as="p" variant="note">Check the AI engine in Settings.</Text>
       {clear}
-    </div>
+    </Card>
   );
   if (o.kind === 'invalid') return (
-    <div role="status" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div><Badge variant="destructive">Invalid answer</Badge></div>
+    <Card pad="md" gap="sm" role="status">
+      <Cluster><Badge tone="danger">Invalid answer</Badge></Cluster>
       {asked}
-      <p className="text-sm font-semibold text-ink">The AI's answer was not a valid decision</p>
-      {o.errors.length ? <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-ink-soft">{o.errors.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="text-xs text-ink-mute">No reason was given.</p>}
-      <p className="text-xs text-ink-mute">Nothing from it is shown on the graph.</p>
-      {o.who ? <p className="text-xs text-ink-mute">{whoLine(o.who)}</p> : null}
+      <Text as="p" variant="strong">The AI's answer was not a valid decision</Text>
+      {o.errors.length ? <Sentences items={o.errors} /> : <Text as="p" variant="note">No reason was given.</Text>}
+      <Text as="p" variant="note">Nothing from it is shown on the graph.</Text>
+      {o.who ? <Text as="p" variant="note">{whoLine(o.who)}</Text> : null}
       {clear}
-    </div>
+    </Card>
   );
   const status = o.status === 'selected' ? plural(o.steps.length, 'step') : o.status === 'no_match' ? 'No match' : 'Needs clarification';
   return (
-    <div role="status" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{status}</Badge>{o.stack.length ? <span className="text-xs text-ink-mute">With {o.stack.join(', ')}</span> : null}</div>
+    <Card pad="md" gap="sm" role="status">
+      <Cluster><Badge tone={o.status === 'selected' ? 'success' : 'warning'}>{status}</Badge>{o.stack.length ? <Text variant="note">With {o.stack.join(', ')}</Text> : null}</Cluster>
       {asked}
-      {o.steps.length ? <><Heading icon="listOrdered">Steps, in order</Heading><StepList steps={o.steps} known={known} onCapability={onCapability} /></> : null}
-      {o.reason ? <p className="text-sm text-ink-soft">{o.reason}</p> : null}
-      {o.questions.length ? <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-ink-soft">{o.questions.map((q, i) => <li key={i}>{q}</li>)}</ul> : null}
-      {o.who ? <p className="text-xs text-ink-mute">{whoLine(o.who)}</p> : null}
+      {o.steps.length ? <><GroupHeading icon="listOrdered">Steps, in order</GroupHeading><StepList steps={o.steps} known={known} onCapability={onCapability} /></> : null}
+      {o.reason ? <Text as="p" variant="soft" pre>{o.reason}</Text> : null}
+      {o.questions.length ? <Sentences items={o.questions} /> : null}
+      {o.who ? <Text as="p" variant="note">{whoLine(o.who)}</Text> : null}
       {clear}
-    </div>
+    </Card>
   );
 }

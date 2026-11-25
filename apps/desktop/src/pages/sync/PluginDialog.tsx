@@ -1,10 +1,10 @@
 import * as React from 'react';
-import { Button, Checkbox, Cluster, Column, Icon, Input, RadioGroup, RadioGroupItem, Select, Text } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Card, Cell, Checkbox, Cluster, Column, Icon, Input, RadioGroup, RadioGroupItem, Select, Text } from '@acaprino/sigrid/primitives';
+import { Dialog, Disclosure, FormField, Note } from '@acaprino/sigrid/components';
 import type { Distribution, Plan, Plugin, Snapshot, Target, Transport } from '../../types.ts';
 import { engineOf, harnessNames, versionOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';
@@ -164,17 +164,9 @@ const POLICIES: readonly { value: Plugin['policy']; label: string }[] = [
 ];
 const isPolicy = (value: string): value is Plugin['policy'] => POLICIES.some(p => p.value === value);
 
-/** A part of a form that opens and closes: a quiet button with its chevron and `aria-expanded`, and what it holds below. A label longer than the drawer is wide
- * ("Custom instructions · 1 Markdown file" in a window of 500 at 200%) ends in an ellipsis inside it, with the whole label as its title. */
+/** A part of a form that opens and closes, its fields one under the other. */
 export function Fold({ label, open, onToggle, children }: { label: string; open: boolean; onToggle(): void; children?: React.ReactNode }) {
-  return (
-    <Column gap="md">
-      <Button variant="ghost" size="sm" className="max-w-full self-start" title={label} aria-expanded={open} onClick={onToggle}>
-        <Icon name={open ? 'chevronDown' : 'chevron'} /><span className="min-w-0 truncate">{label}</span>
-      </Button>
-      {open ? <Column gap="md">{children}</Column> : null}
-    </Column>
-  );
+  return <Disclosure label={label} open={open} onOpenChange={onToggle}><Column gap="md">{children}</Column></Disclosure>;
 }
 
 export interface PluginFieldsProps {
@@ -215,22 +207,19 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
         help={saved ? 'Changing the source removes the prepared builds: check for updates or adapt again after saving.' : 'A repository or a folder on this computer. For a plugin in a folder of its repository, add #folder to the address.'}
         error={problems.source}
       >
-        <Input name="source" autoFocus autoComplete="off" spellCheck={false} className="font-mono" placeholder="https://github.com/owner/repository" value={form.source} onChange={e => onChange({ source: e.currentTarget.value })} />
+        <Input name="source" autoFocus autoComplete="off" spellCheck={false} placeholder="https://github.com/owner/repository" value={form.source} onChange={e => onChange({ source: e.currentTarget.value })} />
       </FormField>
       <FormField id={fieldId(ids, 'name')} label="Name" required error={problems.name}>
         <Input name="name" autoComplete="off" value={form.name} onChange={e => onChange({ name: e.currentTarget.value })} />
       </FormField>
       <Column gap="sm" role="group" aria-labelledby={fieldId(ids, 'targets')}>
-        <span id={fieldId(ids, 'targets')} className="text-sm font-medium text-ink">Install on</span>
+        <Text variant="strong" id={fieldId(ids, 'targets')}>Install on</Text>
         {targets.length ? targets.map(t => (
-          <div key={t.id} className="flex items-center gap-3">
-            <Checkbox id={fieldId(ids, `target-${t.id}`)} checked={form.targets.includes(t.id)} onCheckedChange={on => toggle(t.id, on === true)} />
-            <label htmlFor={fieldId(ids, `target-${t.id}`)} className="min-w-0 truncate text-sm text-ink" title={t.name}>{t.name}</label>
-          </div>
+          <Checkbox key={t.id} id={fieldId(ids, `target-${t.id}`)} label={t.name} checked={form.targets.includes(t.id)} onCheckedChange={on => toggle(t.id, on === true)} />
         )) : <Text as="p" variant="muted">No harness yet. Add one in Sync.</Text>}
       </Column>
       <Column gap="sm">
-        <span id={fieldId(ids, 'policy')} className="text-sm font-medium text-ink">Updates</span>
+        <Text variant="strong" id={fieldId(ids, 'policy')}>Updates</Text>
         <RadioGroup aria-labelledby={fieldId(ids, 'policy')} value={form.policy} onValueChange={value => { if (isPolicy(value)) onChange({ policy: value }); }}>
           {POLICIES.map(p => <RadioGroupItem key={p.value} value={p.value}>{p.label}</RadioGroupItem>)}
         </RadioGroup>
@@ -246,27 +235,27 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
           label="Custom instructions folder"
           help="Optional. Full path of a folder with your own .md notes, subfolders included. Leave empty to use the folder Muro keeps. After editing the files, adapt the plugin again."
         >
-          <Input name="custom_instructions_dir" autoComplete="off" spellCheck={false} className="font-mono" value={form.dir} onChange={e => onChange({ dir: e.currentTarget.value })} />
+          <Input name="custom_instructions_dir" autoComplete="off" spellCheck={false} value={form.dir} onChange={e => onChange({ dir: e.currentTarget.value })} />
         </FormField>
         <Column gap="sm" role="group" aria-labelledby={fieldId(ids, 'builds')}>
-          <span id={fieldId(ids, 'builds')} className="text-sm font-medium text-ink">Prepared builds</span>
+          <Text variant="strong" id={fieldId(ids, 'builds')}>Prepared builds</Text>
           <Text as="p" variant="muted">Leave empty: Check for updates or Adapt with AI fills this in. Add one by hand only for a build you made yourself.</Text>
           {form.builds.map((row, i) => (
-            <div key={row.key} role="group" aria-label={`Build ${i + 1}`} className="flex flex-col gap-3 rounded-md border border-line p-3">
+            <Card key={row.key} variant="quiet" pad="md" role="group" aria-label={`Build ${i + 1}`}>
               <FormField id={fieldId(ids, `build-${row.key}-harness`)} label="Harness">
                 <Select options={optionsFor(row.harness)} value={row.harness} onValueChange={harness => editBuild(row.key, { harness })} />
               </FormField>
               <FormField id={fieldId(ids, `build-${row.key}-path`)} label="Build folder">
-                <Input name="distribution_path" autoComplete="off" spellCheck={false} className="font-mono" value={row.path} onChange={e => editBuild(row.key, { path: e.currentTarget.value })} />
+                <Input name="distribution_path" autoComplete="off" spellCheck={false} value={row.path} onChange={e => editBuild(row.key, { path: e.currentTarget.value })} />
               </FormField>
               <FormField id={fieldId(ids, `build-${row.key}-version`)} label="Version">
                 <Input name="distribution_version" autoComplete="off" spellCheck={false} value={row.version} onChange={e => editBuild(row.key, { version: e.currentTarget.value })} />
               </FormField>
-              <Button variant="outline" size="sm" className="self-start" aria-label={`Remove build ${i + 1}`} onClick={() => removeBuild(row.key)}><Icon name="delete" />Remove build</Button>
-            </div>
+              <Cell align="start"><Button variant="outline" size="sm" aria-label={`Remove build ${i + 1}`} onClick={() => removeBuild(row.key)}><Icon name="delete" />Remove build</Button></Cell>
+            </Card>
           ))}
           {problems.builds ? <RefusalLine>{problems.builds}</RefusalLine> : null}
-          <Button ref={add} variant="outline" size="sm" className="self-start" onClick={addBuild}><Icon name="plus" />Add build</Button>
+          <Cell align="start"><Button ref={add} variant="outline" size="sm" onClick={addBuild}><Icon name="plus" />Add build</Button></Cell>
         </Column>
       </Fold>
     </>
@@ -499,17 +488,17 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
     title = `Adapt ${label} with AI`;
     description = said;
     body = (
-      <form key="adapt" id={adaptId} noValidate className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); startAdapt(); }}>
+      <form key="adapt" id={adaptId} noValidate onSubmit={e => { e.preventDefault(); startAdapt(); }}><Column gap="lg">
         <Text as="p" variant="muted">Your custom instructions are read with the source: the AI decides how to fit them in and records why.</Text>
         <FormField id={fieldId(ids, 'harness')} label="For harness">
           <Select options={ADAPT_HARNESSES} value={ui.harness} onValueChange={harness => patchUi({ harness })} />
         </FormField>
         <FormField id={fieldId(ids, 'budget')} label="Maximum budget (USD)" help="Checked between turns: the run can end slightly above it." error={ui.budgetProblem}>
-          <Input name="budget" autoFocus inputMode="decimal" autoComplete="off" className="max-w-40 tabular-nums" value={ui.budget} onChange={e => patchUi({ budget: e.currentTarget.value, budgetProblem: null })} />
+          <Input name="budget" autoFocus inputMode="decimal" autoComplete="off" value={ui.budget} onChange={e => patchUi({ budget: e.currentTarget.value, budgetProblem: null })} />
         </FormField>
         {!codex && stop ? <RefusalLine>{stop}</RefusalLine> : null}
         {fault ? <RefusalLine>{fault.text}</RefusalLine> : null}
-      </form>
+      </Column></form>
     );
     footer = (
       <React.Fragment key="adapt">
@@ -538,18 +527,18 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
     title = label;
     description = plugin?.project ? 'The build of one of your projects.' : 'Installed as its author ships it.';
     body = gone ? <RefusalLine>This plugin is no longer in your list.</RefusalLine> : (
-      <form key="form" id={formId} noValidate onSubmit={submit} className="flex flex-col gap-4">
+      <form key="form" id={formId} noValidate onSubmit={submit}><Column gap="lg">
         <PluginFields ids={ids} form={form} onChange={change} problems={problems} targets={targets} saved advanced={ui.advanced} onAdvanced={advanced => patchUi({ advanced })} />
         <Column gap="sm" as="section" aria-label="Custom instructions">
           {instructions?.error ? <RefusalLine>{instructions.error}</RefusalLine> : null}
-          {stale.length ? <p className="text-sm text-warning">{`Instructions changed. Adapt again for: ${stale.map(h => harnessNames[h] ?? h).join(', ')}.`}</p> : null}
+          {stale.length ? <Note tone="warning" announce={false} title={<Text>{`Instructions changed. Adapt again for: ${stale.map(h => harnessNames[h] ?? h).join(', ')}.`}</Text>} /> : null}
           <Fold label={`Custom instructions · ${files.length ? plural(files.length, 'Markdown file') : 'none yet'}`} open={ui.notes} onToggle={() => patchUi({ notes: !ui.notes })}>
             <Text as="p" variant="muted">Your own Markdown notes. The AI reads them with the source when it adapts this plugin.</Text>
-            {folder ? <code className="font-mono text-sm break-all text-ink">{folder}</code> : null}
-            {files.length ? <ul className="flex flex-col gap-1">{files.map(file => <li key={file} className="font-mono text-sm break-all text-ink-soft">{file}</li>)}</ul> : null}
-            <Button variant="outline" size="sm" className="self-start" loading={working === 'reload'} loadingText="Reading…" disabled={working !== null && working !== 'reload'} onClick={reload}><Icon name="refresh" />Reload files</Button>
+            {folder ? <Text pre><code>{folder}</code></Text> : null}
+            {files.length ? <Column as="ul" gap="xs">{files.map(file => <li key={file}><Text variant="soft" pre><code>{file}</code></Text></li>)}</Column> : null}
+            <Cell align="start"><Button variant="outline" size="sm" loading={working === 'reload'} loadingText="Reading…" disabled={working !== null && working !== 'reload'} onClick={reload}><Icon name="refresh" />Reload files</Button></Cell>
           </Fold>
-          <p role="status" className="text-xs text-ink-mute empty:hidden">{ui.status}</p>
+          <Text as="p" variant="note" role="status">{ui.status}</Text>
         </Column>
         <Fold label="More" open={ui.more} onToggle={() => patchUi({ more: !ui.more })}>
           <Cluster gap="sm">
@@ -557,12 +546,12 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
             <Button id={fieldId(ids, 'adapt-open')} variant="outline" disabled={working !== null} onClick={openAdapt}><Icon name="ai" />Adapt with AI</Button>
             <Button variant="outline" loading={working === 'reinstall'} loadingText="Planning…" disabled={working !== null && working !== 'reinstall'} onClick={planReinstall}>Plan a reinstall</Button>
             <Button variant="outline" loading={working === 'folder'} loadingText="Opening…" disabled={working !== null && working !== 'folder'} onClick={openFolder}>Open instructions folder</Button>
-            <Button id={fieldId(ids, 'remove-open')} variant="outline" className="text-destructive" disabled={working !== null} onClick={() => patchUi({ view: 'remove', fault: null })}><Icon name="delete" />Remove from my list</Button>
+            <Button id={fieldId(ids, 'remove-open')} variant="outline" disabled={working !== null} onClick={() => patchUi({ view: 'remove', fault: null })}><Icon name="delete" />Remove from my list</Button>
           </Cluster>
         </Fold>
         {fault ? (fault.saving ? <NotSaved text={fault.text} /> : <RefusalLine>{fault.text}</RefusalLine>) : null}
-        {!dirty ? <p className="text-xs text-ink-mute">Nothing has changed yet.</p> : null}
-      </form>
+        {!dirty ? <Text as="p" variant="note">Nothing has changed yet.</Text> : null}
+      </Column></form>
     );
     footer = gone ? <Button key="gone" variant="outline" onClick={() => onOpenChange(false)}>Close</Button> : (
       <React.Fragment key="form">

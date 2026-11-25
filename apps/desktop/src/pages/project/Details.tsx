@@ -1,6 +1,7 @@
 import * as React from 'react';
-import { Badge, Button, Icon } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Column, Heading, Icon, Text } from '@acaprino/sigrid/primitives';
 import type { IconName } from '@acaprino/sigrid/primitives';
+import { DescriptionList } from '@acaprino/sigrid/components';
 import type { ProjectInput } from '../../types.ts';
 import type { Selected } from '../../state/project.ts';
 import { outputsOf } from './graph-model.ts';
@@ -48,69 +49,64 @@ export function Details({ shown, data, onSelect }: DetailsProps) {
 }
 
 // ---------- the parts ----------
-/** A heading inside the inspector, with its icon (R6). */
-export function Heading({ icon, children }: { icon: IconName; children: React.ReactNode }) {
-  return <h4 className="flex items-center gap-2 text-xs font-semibold text-ink"><Icon name={icon} />{children}</h4>;
+/** A heading over a group, with its icon (R6). */
+export function GroupHeading({ icon, children }: { icon: IconName; children: React.ReactNode }) {
+  return <Heading size="label" level={4} icon={<Icon name={icon} />}>{children}</Heading>;
 }
-function Fact({ name, children }: { name: string; children: React.ReactNode }) {
-  return <div className="flex min-w-0 flex-col gap-0.5"><dt className="text-xs text-ink-mute">{name}</dt><dd className="min-w-0 text-sm text-ink">{children}</dd></div>;
-}
-/** A capability or an input named in the inspector: pressing it shows that one. A long id is cut, and its whole name is its hint and its accessible name. */
+/** A capability or an input named in the inspector: pressing it shows that one. Its whole name is its hint and, unless `label` says more, its accessible name. */
 export function ItemLink({ id, label, onPress }: { id: string; label?: string | undefined; onPress(id: string): void }) {
-  return (
-    <Button variant="link" size="sm" className="h-auto max-w-full px-0 py-0.5" aria-label={label ?? id} onClick={() => onPress(id)}>
-      <span className="truncate" title={id}>{id}</span>
-    </Button>
-  );
+  return <Button variant="link" size="xs" title={id} aria-label={label ?? id} onClick={() => onPress(id)}>{id}</Button>;
 }
-const none = <span className="text-ink-mute">—</span>;
+const none = <Text variant="muted">—</Text>;
+/** Sentences in a list. */
+export const Sentences = ({ items }: { items: readonly string[] }) => <Column as="ul" gap="xs">{items.map((item, i) => <li key={i}><Text variant="soft" pre>{item}</Text></li>)}</Column>;
 
 /** The steps of a decision, in order: the capability of each (a link to it when the graph has it), the intent it answers, and why it is there. A prerequisite the runtime added has no intent and no reason of its own. */
 export function StepList({ steps, known, onCapability }: { steps: SimStep[]; known: Set<string>; onCapability(id: string): void }) {
   return (
-    <ol aria-label="Steps, in order" className="flex flex-col gap-3">
+    <Column as="ol" gap="md" aria-label="Steps, in order">
       {steps.map((s, i) => (
-        <li key={`${i}:${s.step_id}`} className="flex gap-3">
-          <span aria-hidden="true" className="w-5 shrink-0 text-end text-sm font-semibold text-ink tabular-nums">{i + 1}</span>
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2">
-              {known.has(s.capability) ? <ItemLink id={s.capability} label={`Step ${i + 1}: ${s.capability}`} onPress={onCapability} /> : <span className="truncate text-sm font-medium text-ink" title={s.capability}>{s.capability}</span>}
-              {s.intent ? <code className="min-w-0 truncate font-mono text-xs text-ink-soft" title={s.intent}>{s.intent}</code> : null}
+        <Cluster key={`${i}:${s.step_id}`} as="li" gap="md" align="start" wrap={false}>
+          <Text variant="strong" aria-hidden="true">{i + 1}</Text>
+          <Column gap="xs">
+            <Cluster>
+              {known.has(s.capability) ? <ItemLink id={s.capability} label={`Step ${i + 1}: ${s.capability}`} onPress={onCapability} /> : <Text variant="strong" pre>{s.capability}</Text>}
+              {s.intent ? <Text variant="soft" pre><code>{s.intent}</code></Text> : null}
               {s.added_as_prerequisite ? <Badge variant="secondary">Prerequisite</Badge> : null}
-            </div>
-            {s.reason ? <p className="text-xs text-ink-mute">{s.reason}</p> : s.added_as_prerequisite ? <p className="text-xs text-ink-mute">A prerequisite the plugin declares, added before the step that needs it.</p> : null}
-          </div>
-        </li>
+            </Cluster>
+            {s.reason ? <Text as="p" variant="note">{s.reason}</Text> : s.added_as_prerequisite ? <Text as="p" variant="note">A prerequisite the plugin declares, added before the step that needs it.</Text> : null}
+          </Column>
+        </Cluster>
       ))}
-    </ol>
+    </Column>
   );
 }
 
 function ExampleDetails({ example: e, data, known, onCapability }: { example: Example; data: ProjectData; known: Set<string>; onCapability(id: string): void }) {
   const outs = outputsOf(e, data.caps);
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h3 className="text-base font-semibold text-ink">{e.title}</h3>
-        {e.task ? <p className="text-sm text-ink-soft">“{e.task}”</p> : null}
-        {e.stack.length ? <p className="text-xs text-ink-mute">With {e.stack.join(', ')}</p> : null}
-      </div>
-      {e.status !== 'selected' ? <div><Badge variant="secondary">{e.status === 'no_match' ? 'No match' : 'Needs clarification'}</Badge></div> : null}
+    <Column gap="lg">
+      <Column gap="xs">
+        <Heading size="small"><Text pre>{e.title}</Text></Heading>
+        {e.task ? <Text as="p" variant="soft" pre>“{e.task}”</Text> : null}
+        {e.stack.length ? <Text as="p" variant="note">With {e.stack.join(', ')}</Text> : null}
+      </Column>
+      {e.status !== 'selected' ? <Cluster><Badge tone="warning">{e.status === 'no_match' ? 'No match' : 'Needs clarification'}</Badge></Cluster> : null}
       {e.steps.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="listOrdered">Steps, in order</Heading>
+        <Column as="section">
+          <GroupHeading icon="listOrdered">Steps, in order</GroupHeading>
           <StepList steps={e.steps} known={known} onCapability={onCapability} />
-        </section>
+        </Column>
       ) : null}
       {outs.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="tag">Produces</Heading>
-          <div className="flex flex-wrap gap-1">{outs.map(o => <Badge key={o} variant="outline">{o}</Badge>)}</div>
-        </section>
+        <Column as="section">
+          <GroupHeading icon="tag">Produces</GroupHeading>
+          <Cluster gap="xs">{outs.map(o => <Badge key={o} variant="outline">{o}</Badge>)}</Cluster>
+        </Column>
       ) : null}
-      {e.reason ? <p className="text-sm text-ink-soft">{e.reason}</p> : null}
-      {e.questions.length ? <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-ink-soft">{e.questions.map((q, i) => <li key={i}>{q}</li>)}</ul> : null}
-    </div>
+      {e.reason ? <Text as="p" variant="soft" pre>{e.reason}</Text> : null}
+      {e.questions.length ? <Sentences items={e.questions} /> : null}
+    </Column>
   );
 }
 
@@ -120,37 +116,39 @@ function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: Project
   const entry = data.entries.find(e => e.capabilities.includes(c.id)), from = sourcesOf(data.decisions, c.id);
   const toInput = (id: string) => onSelect({ kind: 'input', id });
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h3 className="truncate text-base font-semibold text-ink" title={c.id}>{c.id}</h3>
-        {c.title && c.title !== c.id ? <p className="text-sm text-ink-soft">{c.title}</p> : null}
-      </div>
-      <dl className="flex flex-col gap-2">
-        <Fact name="Role">{c.role || none}</Fact>
-        <Fact name="Entry">{entry ? <><span className="block">{entry.name}</span>{entry.description ? <span className="block text-xs text-ink-mute">{entry.description}</span> : null}</> : none}</Fact>
-        <Fact name="Comes from">{from.length ? <span className="flex flex-wrap gap-x-3">{from.map(s => <ItemLink key={s} id={s} label={`Input ${s}`} onPress={toInput} />)}</span> : none}</Fact>
-      </dl>
+    <Column gap="lg">
+      <Column gap="xs">
+        <Heading size="small"><Text pre>{c.id}</Text></Heading>
+        {c.title && c.title !== c.id ? <Text as="p" variant="soft">{c.title}</Text> : null}
+      </Column>
+      <DescriptionList
+        items={[
+          { name: 'Role', value: c.role || none },
+          { name: 'Entry', value: entry ? <Column gap="xs"><Text pre>{entry.name}</Text>{entry.description ? <Text variant="note">{entry.description}</Text> : null}</Column> : none },
+          { name: 'Comes from', value: from.length ? <Cluster gap="xs">{from.map(s => <ItemLink key={s} id={s} label={`Input ${s}`} onPress={toInput} />)}</Cluster> : none },
+        ]}
+      />
       {c.intents.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="ai">Activates when the request means</Heading>
-          <ul className="flex flex-col gap-2">
+        <Column as="section">
+          <GroupHeading icon="ai">Activates when the request means</GroupHeading>
+          <Column as="ul">
             {c.intents.map((i, k) => (
-              <li key={`${k}:${i.id}`} className="flex min-w-0 flex-col gap-0.5">
-                <code className="truncate font-mono text-xs text-ink" title={i.id}>{i.id}</code>
-                {i.description ? <span className="text-xs text-ink-soft">{i.description}</span> : null}
-                {i.excludes ? <span className="text-xs text-ink-mute">Not for: {i.excludes}</span> : null}
-              </li>
+              <Column key={`${k}:${i.id}`} as="li" gap="xs">
+                <Text pre><code>{i.id}</code></Text>
+                {i.description ? <Text variant="note">{i.description}</Text> : null}
+                {i.excludes ? <Text variant="note">Not for: {i.excludes}</Text> : null}
+              </Column>
             ))}
-          </ul>
-        </section>
+          </Column>
+        </Column>
       ) : null}
       {c.outputs.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="tag">Produces</Heading>
-          <div className="flex flex-wrap gap-1">{c.outputs.map((o, k) => <Badge key={`${k}:${o}`} variant="outline">{o}</Badge>)}</div>
-        </section>
+        <Column as="section">
+          <GroupHeading icon="tag">Produces</GroupHeading>
+          <Cluster gap="xs">{c.outputs.map((o, k) => <Badge key={`${k}:${o}`} variant="outline">{o}</Badge>)}</Cluster>
+        </Column>
       ) : null}
-    </div>
+    </Column>
   );
 }
 
@@ -162,40 +160,42 @@ const formOf = (form: string): string => Object.hasOwn(FORMS, form) ? FORMS[form
 function InputDetails({ input, data, known, onCapability }: { input: ProjectInput; data: ProjectData; known: Set<string>; onCapability(id: string): void }) {
   const pin = pinnedOf(input), parts = becameParts(input), targets = targetsOf(data.decisions, input.id), choices = data.decisions.filter(d => d.source === input.id);
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex min-w-0 flex-col gap-1">
-        <h3 className="truncate text-base font-semibold text-ink" title={input.id}>{input.id}</h3>
-        <p className="truncate text-xs text-ink-mute" title={input.url ?? ''}>{input.url || 'Local source'}</p>
-      </div>
-      <dl className="flex flex-col gap-2">
-        <Fact name="Pinned to"><span className="block">{pin.title}</span><span className="block text-xs text-ink-mute">{pin.line}</span></Fact>
-        <Fact name="License">{input.license || none}</Fact>
-        <Fact name="What it became">{parts.length ? parts.join(' · ') : <span className="text-ink-mute">Not harmonized yet</span>}</Fact>
-      </dl>
-      <section className="flex flex-col gap-2">
-        <Heading icon="structure">Capabilities it went to</Heading>
+    <Column gap="lg">
+      <Column gap="xs">
+        <Heading size="small"><Text pre>{input.id}</Text></Heading>
+        <Text as="p" variant="note" pre>{input.url || 'Local source'}</Text>
+      </Column>
+      <DescriptionList
+        items={[
+          { name: 'Pinned to', value: <Column gap="xs"><Text>{pin.title}</Text><Text variant="note" pre>{pin.line}</Text></Column> },
+          { name: 'License', value: input.license || none },
+          { name: 'What it became', value: parts.length ? parts.join(' · ') : <Text variant="muted">Not harmonized yet</Text> },
+        ]}
+      />
+      <Column as="section">
+        <GroupHeading icon="structure">Capabilities it went to</GroupHeading>
         {targets.length ? (
-          <ul className="flex flex-col">
-            {targets.map(id => <li key={id} className="min-w-0">{known.has(id) ? <ItemLink id={id} onPress={onCapability} /> : <span className="text-sm text-ink-soft">{id}</span>}</li>)}
-          </ul>
-        ) : <p className="text-sm text-ink-mute">None: no choice of this input went to a capability.</p>}
-      </section>
+          <Column as="ul" gap="xs">
+            {targets.map(id => <li key={id}>{known.has(id) ? <ItemLink id={id} onPress={onCapability} /> : <Text variant="soft" pre>{id}</Text>}</li>)}
+          </Column>
+        ) : <Text as="p" variant="muted">None: no choice of this input went to a capability.</Text>}
+      </Column>
       {choices.length ? (
-        <section className="flex flex-col gap-2">
-          <Heading icon="labels">Its choices</Heading>
-          <ul className="flex flex-col gap-3">
+        <Column as="section">
+          <GroupHeading icon="labels">Its choices</GroupHeading>
+          <Column as="ul" gap="md">
             {choices.map((d, i) => (
-              <li key={i} className="flex min-w-0 flex-col gap-0.5">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <Column key={i} as="li" gap="xs">
+                <Cluster>
                   <Badge variant="secondary">{formOf(d.form)}</Badge>
-                  <span className="min-w-0 truncate font-mono text-xs text-ink" title={d.content}>{d.content}</span>
-                </div>
-                {d.reason ? <span className="text-xs text-ink-mute">{d.reason}</span> : null}
-              </li>
+                  <Text pre><code>{d.content}</code></Text>
+                </Cluster>
+                {d.reason ? <Text variant="note">{d.reason}</Text> : null}
+              </Column>
             ))}
-          </ul>
-        </section>
+          </Column>
+        </Column>
       ) : null}
-    </div>
+    </Column>
   );
 }

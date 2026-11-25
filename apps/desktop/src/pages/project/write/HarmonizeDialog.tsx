@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Button, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Column, Input, Text, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField, Note } from '@acaprino/sigrid/components';
 import type { ChangeOperation, ProjectInfo, VersionStep } from '../../../types.ts';
 import { text } from '../../../model.ts';
 import { useRegistry } from '../../../state/registry.tsx';
@@ -110,9 +110,9 @@ export function useRunForm({ id, info, open, onOpenChange }: ChangeDialogProps, 
   };
 }
 
-/** A sentence the dialog says in place, on the soft fill of an error: the runtime's refusal, or why no run can start. */
+/** A sentence a surface says in place, as an error: the runtime's refusal, or why no run can start. */
 export function RefusalLine({ children }: { children: React.ReactNode }) {
-  return <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{children}</p>;
+  return <Note tone="error" title={<Text>{children}</Text>} />;
 }
 
 /** The fields every change has, after the dialog's own: the request in words, the version step, who runs it and at what cost, the budget, and what the runtime said. */
@@ -122,16 +122,16 @@ export function RunFields({ form }: { form: RunForm }) {
       <FormField label="Your request" help={REQUEST_HINT} error={form.errors.request}>
         <Textarea rows={3} value={form.request} onChange={e => form.setRequest(e.currentTarget.value)} />
       </FormField>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">Version</span>
+      <Column>
+        <Text variant="strong">Version</Text>
         <ToggleGroup value={form.step} onValueChange={form.setStep} aria-label="Version">
           {VERSION_STEPS.map(s => <ToggleGroupItem key={s.value} value={s.value}>{s.label}</ToggleGroupItem>)}
         </ToggleGroup>
-        <p className="text-xs text-ink-mute">{STEP_HINT}</p>
-      </div>
-      {form.stop ? <RefusalLine>{form.stop}</RefusalLine> : <p className="text-sm text-ink-soft">{AI_RUN_NOTE}</p>}
+        <Text as="p" variant="note">{STEP_HINT}</Text>
+      </Column>
+      {form.stop ? <RefusalLine>{form.stop}</RefusalLine> : <Text as="p" variant="soft">{AI_RUN_NOTE}</Text>}
       <FormField label="Maximum budget (USD)" help={BUDGET_HINT} error={form.errors.budget}>
-        <Input inputMode="decimal" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} className="max-w-40 tabular-nums" />
+        <Input inputMode="decimal" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} />
       </FormField>
       {form.failure ? <RefusalLine>{form.failure}</RefusalLine> : null}
     </>
@@ -144,9 +144,9 @@ export function RunFooter({ form, submit, destructive = false, cancelFirst = fal
   return (
     <>
       <Button variant="outline" disabled={form.busy} autoFocus={cancelFirst} onClick={() => form.onOpenChange(false)}>Cancel</Button>
-      <span title={form.stop ?? undefined}>
+      <Column title={form.stop ?? undefined}>
         <Button type="submit" form={form.formId} variant={destructive ? 'destructive' : 'default'} disabled={form.stop !== null} title={form.stop ?? undefined} loading={form.busy} loadingText="Starting…">{submit}</Button>
-      </span>
+      </Column>
     </>
   );
 }
@@ -154,8 +154,8 @@ export function RunFooter({ form, submit, destructive = false, cancelFirst = fal
 /** The `<form>` of a dialog of a change: Enter in a field submits it, and `onSubmit` decides whether anything is sent. */
 export function RunFormBody({ form, onSubmit, children }: { form: RunForm; onSubmit(): void; children?: React.ReactNode }) {
   return (
-    <form id={form.formId} noValidate className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); onSubmit(); }}>
-      {children}
+    <form id={form.formId} noValidate onSubmit={e => { e.preventDefault(); onSubmit(); }}>
+      <Column gap="lg">{children}</Column>
     </form>
   );
 }

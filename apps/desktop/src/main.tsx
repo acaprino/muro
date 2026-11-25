@@ -1,4 +1,4 @@
-import { request, onShown } from './api.ts';
-import { mount } from './mount.tsx';
+import { request } from './api.ts';
+import { start } from './start.tsx';
 
-mount(document.querySelector<HTMLElement>('#app')!, request, onShown);
+start(document.querySelector<HTMLElement>('#app')!, request);

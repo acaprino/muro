@@ -2,6 +2,7 @@
 // process, however many pages a file opens. open(scenario, options) returns {page, errors, calls, flags, close};
 // close() ends the page and the last close ends the browser and the server, and it fails the run when the page raised an error.
 // options.clock installs Playwright's clock before the page loads: page.clock.fastForward(ms) then runs its timers (the 30 s refresh).
+// The page runs in a window that only pretends to be Tauri's (`fakeWindow`), as the program is: it has the three buttons and its foot at every width.
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -24,12 +25,32 @@ async function start() {
 const stop = async () => { await browser?.close(); server?.kill(); browser = server = starting = undefined; };
 process.on('exit', () => server?.kill());
 
-/** options: viewport, colorScheme, reducedMotion, query (appended to the harness URL after ?scenario=). */
+/** Tauri's window as the page finds it: it answers every call and writes it down in `window.native`. `window.shown()` is the crate's word that the window was shown again (`window-shown`). */
+function fakeWindow() {
+  const handlers = [], listeners = {};
+  window.native = [];
+  window.shown = () => { for (const handler of listeners['window-shown'] ?? []) handlers[handler]({ event: 'window-shown', id: 1, payload: null }); };
+  window.__TAURI_INTERNALS__ = {
+    metadata: { currentWindow: { label: 'main' }, currentWebview: { label: 'main', windowLabel: 'main' } },
+    transformCallback: callback => handlers.push(callback) - 1,
+    unregisterCallback: () => {},
+    invoke: async (command, args) => {
+      window.native.push([command, args]);
+      if (command === 'plugin:event|listen') (listeners[args.event] ??= []).push(args.handler);
+      return command === 'plugin:window|is_maximized' ? false : command === 'plugin:event|listen' ? 1 : null;
+    },
+  };
+  window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
+}
+
+/** options: viewport, colorScheme (Windows' own), theme (the choice kept; the window is dark without one), reducedMotion (reduce: a drawer that still slides in is not where it will be), query (appended to the harness URL after ?scenario=). */
 export async function open(scenario = 'default', options = {}) {
   refs++;
   try { await (starting ||= start()); } catch (e) { refs--; await stop(); throw e; }
-  const page = await browser.newPage({ viewport: options.viewport || { width: 1512, height: 982 }, colorScheme: options.colorScheme || 'dark', reducedMotion: options.reducedMotion || 'no-preference' });
+  const page = await browser.newPage({ viewport: options.viewport || { width: 1512, height: 982 }, colorScheme: options.colorScheme || 'dark', reducedMotion: options.reducedMotion || 'reduce' });
   if (options.clock) await page.clock.install();
+  await page.addInitScript(fakeWindow);
+  if (options.theme) await page.addInitScript(theme => { if (!localStorage.getItem('muro.theme')) localStorage.setItem('muro.theme', theme); }, options.theme);
   const errors = [];
   page.on('pageerror', e => { errors.push(e.message); console.error('page error:', e.message); });
   await page.goto(`${base}/tests/harness.html?scenario=${encodeURIComponent(scenario)}${options.query || ''}`);

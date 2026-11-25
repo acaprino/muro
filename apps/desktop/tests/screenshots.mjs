@@ -17,7 +17,7 @@ await mkdir(out, { recursive: true });
 const shot = async (page, name, height) => { await delay(250); await page.screenshot({ path: `${out}/${name}.png`, clip: height ? { x: 0, y: 0, width: 1440, height } : undefined }); console.log(`${out}/${name}.png`); };
 const SIZE = { width: 1440, height: 940 };
 async function demo(scenario, scheme, body) {
-  const app = await open(scenario, { viewport: SIZE, colorScheme: scheme, reducedMotion: 'reduce' });
+  const app = await open(scenario, { viewport: SIZE, theme: scheme, reducedMotion: 'reduce' });
   try { await body(app.page); } finally { await app.close(); }
 }
 /** The window has read the registry once: the footer says what it holds. */

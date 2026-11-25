@@ -61,7 +61,7 @@ const sideways = page => page.evaluate(() => {
 });
 const finish = (page, status = 'completed', text) => page.evaluate(([s, t]) => window.behind.finish(s, t), [status, text]);
 /** Focus is on the heading of the list, where it goes when the button it was on is gone or off (a button that is not there cannot take it back). */
-const onHeading = page => page.waitForFunction(() => document.activeElement?.tagName === 'H1' && document.activeElement.textContent === 'Projects');
+const onHeading = page => page.waitForFunction(() => document.activeElement?.closest('h1')?.textContent === 'Projects');
 const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
 
 // ---------- the dialog ----------

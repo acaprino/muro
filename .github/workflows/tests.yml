@@ -85,13 +85,14 @@ jobs:
       - name: Frontend build
         if: always()
         run: npm run build
-      # Sigrid's design check (ADR-0031, decision 6): it reads apps/desktop/src and builds nothing, from the folder whose
-      # package.json lists Sigrid. Not blocking until its first output has been read; then the owner decides whether it
-      # gates (it exits 1 on a finding) and which exceptions go in a sigrid-check.config.json.
+      # The design check of Sigrid (ADR-0031, decision 6) reads apps/desktop/src and builds nothing, from the folder whose
+      # package.json lists Sigrid; Imago's reads the "imago" block of package.json. Both gate.
       - name: Design rules (Sigrid)
         if: always()
-        continue-on-error: true
         run: npx --no sigrid-check apps/desktop/src
+      - name: Shell rules (Imago)
+        if: always()
+        run: npx --no imago-check
       # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
@@ -116,3 +117,98 @@ jobs:
           path: apps/desktop/tests/artifacts/*.png
           retention-days: 7
           if-no-files-found: warn
+      # Every screen in both schemes, wide and narrow: they are looked at, not compared.
+      - name: Photographs of every screen
+        if: always()
+        run: node apps/desktop/tests/shots.mjs
+      - name: Keep the photographs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-shots
+          path: apps/desktop/tests/shots/*.png
+          retention-days: 7
+          if-no-files-found: warn
+
+  # The program as a release hands it out (build-release.bat, without the install), and what its window
+  # does on a real WebView2. The artifact `muro-desktop` is the portable folder: it keeps its data beside itself, so
+  # trying it touches no installed Muro.
+  program:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Cargo cache key
+        id: cargo-key
+        run: |
+          $info = rustc -vV
+          if ($LASTEXITCODE) { exit 1 }
+          $release = ($info | Select-String '^release: (\S+)').Matches[0].Groups[1].Value
+          $commit = ($info | Select-String '^commit-hash: (\w{9})').Matches[0].Groups[1].Value
+          $pins = Select-String -Path Cargo.lock -Pattern '^(source|checksum) = ' | ForEach-Object Line
+          $lock = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($pins -join "`n"))).Substring(0, 20).ToLower()
+          "toolchain=$release-$commit" >> $env:GITHUB_OUTPUT
+          "lock=$lock" >> $env:GITHUB_OUTPUT
+      - name: Restore the compiled Rust dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-release-${{ steps.cargo-key.outputs.toolchain }}-${{ steps.cargo-key.outputs.lock }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-${{ steps.cargo-key.outputs.toolchain }}-
+      - name: Inno Setup
+        # build-release.bat asks for it in CI; most Windows images have it.
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") -and -not (Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE) { exit 1 }
+          }
+      - name: Build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cmd /c "build-release.bat --ci --no-install"
+          if ($LASTEXITCODE) { exit 1 }
+          Remove-Item release/installer -Recurse -ErrorAction SilentlyContinue
+      - name: The program
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-desktop
+          path: release
+          retention-days: 14
+          if-no-files-found: error
+      - name: The program on a real window
+        timeout-minutes: 12
+        run: ./.github/scripts/desktop-smoke.ps1 -Exe "$PWD/release/Muro.exe" -Data "$env:RUNNER_TEMP/muro-data" -Out "$env:RUNNER_TEMP/muro-window"
+      # The engine chooses its port here: this test runs two copies of Muro at a time.
+      - name: Closing, quitting and the worker (native-shell.mjs)
+        if: ${{ !cancelled() && hashFiles('release/Muro.exe') != '' }}
+        timeout-minutes: 8
+        run: |
+          $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          New-Item -Path $policy -Force | Out-Null
+          New-ItemProperty -Path $policy -Name Muro.exe -Value '--remote-debugging-port=0' -Force | Out-Null
+          $env:MURO_DESKTOP_EXE = "$PWD/release/Muro.exe"
+          node apps/desktop/tests/native-shell.mjs
+      - name: Pictures of the window
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-window
+          path: ${{ runner.temp }}/muro-window
+          retention-days: 7
+          if-no-files-found: ignore

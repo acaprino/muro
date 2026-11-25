@@ -8,7 +8,7 @@ import { Empty } from '@acaprino/sigrid/components';
 export function Moved({ page }: { page: string }) {
   return (
     <Empty
-      className="h-full px-4 py-6"
+      fill
       title={`${page} is moving to the new window`}
       description="Until it arrives, the background worker goes on checking your registry; with automatic sync on it also applies the changes, removals aside. In the tray, Sync now applies them at once, and Pause or Resume turns automatic sync off or on."
     />

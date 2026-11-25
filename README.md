@@ -370,7 +370,7 @@ npx tsc --noEmit
 node apps/desktop/tests/browser.mjs
 ```
 
-The two tests that drive the real executable, `native.mjs` and `native-shell.mjs`, are described in [the desktop app in detail](docs/desktop.md#verification).
+The test that drives the real executable, `native-shell.mjs`, is described in [the desktop app in detail](docs/desktop.md#verification).
 
 For source and packaging changes, also run `--check-sources` and stage a fresh release with `--build --out <fresh-directory>`. Use `--check-sources --offline-pins` to check manifest pins and local repositories offline. For changes to the routing prompt or catalog, use `--prepare-eval` and score the host AI's decisions with `--score-eval <decisions.json>`.
 

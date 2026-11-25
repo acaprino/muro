@@ -1,6 +1,6 @@
 import * as React from 'react';
 import type { Job } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
 import { endedBetween, isRunning, outcomeOf, runningJob, upsertJob } from './jobs.ts';
@@ -64,7 +64,7 @@ export function ProjectJobsProvider({ children }: { children?: React.ReactNode }
     setSettled(n => n + 1);
     for (const job of ended) {
       const outcome = outcomeOf(job);
-      if (outcome) say.current(outcome.text, outcome.error ? 'error' : undefined);
+      if (outcome) say.current(outcome.text, outcome.error ? { kind: 'error' } : undefined);
     }
   }, []);
 

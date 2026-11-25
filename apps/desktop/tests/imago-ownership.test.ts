@@ -17,12 +17,10 @@ async function files(directory: string): Promise<string[]> {
 const code = async () => (await files(source)).filter(path => /\.tsx?$/.test(path));
 const name = (path: string) => relative(source, path).replace(/\\/g, '/');
 
-test('desktop appearance is imported from Sigrid, with no application stylesheet rules (ADR-0031)', async () => {
-  const styles = (await files(source)).filter(path => path.endsWith('.css'));
-  assert.equal(styles.length, 1);
-  const css = await readFile(styles[0], 'utf8');
-  assert.match(css, /@import "@acaprino\/sigrid\/theme\.css";/);
-  assert.doesNotMatch(css, /[{}]/, 'the entry imports and declares sources: it holds no rule of its own');
+test('desktop appearance is Sigrid\'s: no stylesheet and no class of the application (ADR-0031)', async () => {
+  assert.deepEqual((await files(source)).filter(path => path.endsWith('.css')), []);
+  for (const path of await code()) assert.doesNotMatch(await readFile(path, 'utf8'), /\b\w*[cC]lassName\b|classList/, name(path));
+  assert.match(await readFile(join(source, 'start.tsx'), 'utf8'), /import '@acaprino\/sigrid\/styles\.css';/);
 });
 
 test('the application has no private SVG renderer, inline style or HTML string, in a .ts or a .tsx file', async () => {
@@ -32,20 +30,25 @@ test('the application has no private SVG renderer, inline style or HTML string, 
   }
 });
 
-// The window glue (window controls, zoom, the guard of the browser's own keys) is the one thing the desktop still takes from Imago (ADR-0031 and the plan R0
-// ruling). Sigrid 4.x has a Tauri entry (`@acaprino/sigrid/tauri`) that matches the imago-shell crate on reading, but it has not run against the crate, so the
-// glue has not moved yet (window.ts). Nothing else of Imago, in particular none of its markup, graph or UI modules, is imported.
-test('the only Imago the application imports is the window glue: its shell module and the Tauri adapter', async () => {
-  const allowed = new Set(['@acaprino/imago/shell', '@acaprino/imago/tauri']);
-  const found: string[] = [];
+/** The modules a file imports, each with the names it takes from it. */
+function imports(text: string): { from: string; names: string[] }[] {
+  const found = [...text.matchAll(/import\s+(?:type\s+)?(?:\{([^}]*)\}\s+from\s+|[\w*\s]+from\s+)?['"]([^'"]+)['"]/g)]
+    .map(match => ({ from: match[2], names: (match[1] ?? '').split(',').map(part => part.trim().replace(/^type\s+/, '').split(/\s+as\s+/)[0]).filter(Boolean) }));
+  return [...found, ...[...text.matchAll(/import\(\s*['"]([^'"]+)['"]/g)].map(match => ({ from: match[1], names: [] }))];
+}
+// The window, the bar, the frame, the palette, the notices and the theme are Imago's: what it draws with Sigrid's parts, no file of Muro's imports.
+const SHELL = ['AppShell', 'TitleBar', 'WindowControls', 'CommandPalette', 'CommandsProvider', 'Toasts', 'useSchemeCommands', 'applyKeptScheme', 'applyTheme', 'applyDensity', 'applyFont', 'colorTheme', 'MotionProvider', 'WordsProvider', 'useDesktopGuard'];
+test('the shell is Imago\'s: nothing it draws or wires is imported from Sigrid, and nothing of the window from Tauri', async () => {
+  const entries = new Set<string>();
   for (const path of await code()) {
-    const text = await readFile(path, 'utf8');
-    for (const match of text.matchAll(/(?:from\s+|import\(\s*|import\s+)['"](@acaprino\/imago[^'"]*)['"]/g)) {
-      found.push(match[1]);
-      assert.ok(allowed.has(match[1]), `${name(path)} imports ${match[1]}`);
+    for (const { from, names } of imports(await readFile(path, 'utf8'))) {
+      if (from.startsWith('@acaprino/imago')) entries.add(from);
+      if (from.startsWith('@acaprino/sigrid')) assert.deepEqual(names.filter(taken => SHELL.includes(taken)), [], `${name(path)} imports a part of the shell`);
+      assert.notEqual(from, '@acaprino/sigrid/tauri', name(path));
+      if (from.startsWith('@tauri-apps/')) assert.deepEqual([name(path), from], ['api.ts', '@tauri-apps/api/core'], 'only the request to the service');
     }
   }
-  assert.ok(found.includes('@acaprino/imago/shell'), 'the glue is still where the window controls and the zoom are mounted');
+  assert.deepEqual([...entries], ['@acaprino/imago'], 'Imago has one entry');
 });
 
 test('the graph adapter contains domain data and leaves all geometry to Sigrid', async () => {

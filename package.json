@@ -10,10 +10,23 @@
     "desktop:build": "cargo build -p muro-desktop-runtime --bins --release && cd apps/desktop && tauri build --no-bundle",
     "test": "node --experimental-strip-types --test apps/desktop/tests/*.test.ts"
   },
+  "imago": {
+    "src": ["apps/desktop/src"],
+    "tests": ["apps/desktop/tests"],
+    "cargo": "apps/desktop/src-tauri/Cargo.toml",
+    "app": "muro",
+    "icons": {
+      "apps/desktop/src-tauri/icons/icon.ico": "icon.ico",
+      "apps/desktop/src-tauri/icons/icon.png": "icon.png",
+      "apps/desktop/src-tauri/icons/32x32.png": "32x32.png",
+      "apps/desktop/src-tauri/icons/128x128.png": "128x128.png",
+      "apps/desktop/src-tauri/icons/128x128@2x.png": "256x256.png"
+    }
+  },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",
-    "@acaprino/imago": "git+https://github.com/acaprino/imago.git#v0.4.1",
-    "@acaprino/sigrid": "https://github.com/acaprino/sigrid/releases/download/v6.0.0/acaprino-sigrid-6.0.0.tgz",
+    "@acaprino/imago": "https://github.com/acaprino/imago/releases/download/v1.0.1/acaprino-imago-1.0.1.tgz",
+    "@acaprino/sigrid": "https://github.com/acaprino/sigrid/releases/download/v6.6.0/acaprino-sigrid-6.6.0.tgz",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
@@ -22,10 +35,8 @@
     "typescript": "7.0.2",
     "vite": "8.3.5",
     "@playwright/test": "1.64.1",
-    "@tailwindcss/vite": "4.3.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "@vitejs/plugin-react": "6.2.1",
-    "tailwindcss": "4.3.5"
+    "@vitejs/plugin-react": "6.2.1"
   }
 }

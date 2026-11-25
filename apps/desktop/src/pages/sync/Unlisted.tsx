@@ -1,8 +1,9 @@
 import * as React from 'react';
-import { Badge, Button, Count, Icon, RadioGroup, RadioGroupItem, Section } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Column, Count, Icon, RadioGroup, RadioGroupItem, Section, Text } from '@acaprino/sigrid/primitives';
+import { SettingRow } from '@acaprino/sigrid/components';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { exclusiveMode, filesMissing, listing, unlisted } from '../../model.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
 import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
@@ -52,7 +53,7 @@ export function useAddToList(): { add(installed: InstalledPlugin, target: Target
 /** What is said when a plugin was added to the list. */
 export const added = (installed: InstalledPlugin): string => `${installed.name} added to your list.`;
 
-/** The line a plugin outside the list has: its version, the harness, and that its files are gone when its record says so. One text node, which the line's `title` repeats when it is cut. */
+/** The line a plugin outside the list has: its version, the harness, and that its files are gone when its record says so. */
 const lineOf = (installed: InstalledPlugin, target: Target): string => `${installed.version} · on ${target.name}${filesMissing(installed)}`;
 
 export function Unlisted() {
@@ -100,34 +101,38 @@ export function Unlisted() {
 
   return (
     <Section title="Installed, not in your list" icon={<Icon name="download" />} end={<Count value={items.length} label={items.length === 1 ? 'plugin' : 'plugins'} />}>
-      <p id={note} className="text-xs text-ink-mute">Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own panel.</p>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <RadioGroup aria-label="Plugins that are not in my list" aria-describedby={note} orientation="horizontal" className="flex-wrap gap-y-2" value={mode === 'mixed' ? '' : mode} onValueChange={value => void setRule(value === 'remove')}>
+      <Text as="p" variant="note" id={note}>Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own panel.</Text>
+      <Cluster gap="lg">
+        <RadioGroup aria-label="Plugins that are not in my list" aria-describedby={note} orientation="horizontal" value={mode === 'mixed' ? '' : mode} onValueChange={value => void setRule(value === 'remove')}>
           <RadioGroupItem value="keep">Leave alone</RadioGroupItem>
           <RadioGroupItem value="remove">Uninstall, asking first</RadioGroupItem>
         </RadioGroup>
-        {mode === 'mixed' ? <span className="text-xs text-ink-mute">Differs per harness</span> : null}
-      </div>
+        {mode === 'mixed' ? <Text variant="note">Differs per harness</Text> : null}
+      </Cluster>
       {failure ? <RefusalLine>{failure}</RefusalLine> : null}
-      <ul className="flex flex-col divide-y divide-line">
+      <Column as="ul" gap="xs">
         {items.map(({ target, plugin }) => {
-          const line = lineOf(plugin, target), key = `${target.id}:${plugin.id}`;
+          const key = `${target.id}:${plugin.id}`;
           return (
-            <li key={key} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 py-2">
-              <div className="min-w-0 flex-1 basis-40">
-                <p className="truncate text-sm font-medium text-ink" title={plugin.name}>{plugin.name}</p>
-                <p className="truncate text-xs text-ink-mute" title={line}>{line}</p>
-              </div>
-              {target.exclusive
-                ? <Badge variant="outline" className="max-w-full text-destructive" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
-                : <span className="text-xs text-ink-mute">Left alone</span>}
-              {listable(plugin)
-                ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>
-                : <span className="min-w-0 basis-full text-xs text-ink-mute">{NO_FOLDER}</span>}
+            <li key={key}>
+              <SettingRow
+                label={<Text variant="strong" pre>{plugin.name}</Text>}
+                description={<Text pre>{lineOf(plugin, target)}{listable(plugin) ? '' : ` ${NO_FOLDER}`}</Text>}
+                control={(
+                  <Cluster justify="end">
+                    {target.exclusive
+                      ? <Badge tone="warning" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
+                      : <Text variant="note">Left alone</Text>}
+                    {listable(plugin)
+                      ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>
+                      : null}
+                  </Cluster>
+                )}
+              />
             </li>
           );
         })}
-      </ul>
+      </Column>
     </Section>
   );
 }

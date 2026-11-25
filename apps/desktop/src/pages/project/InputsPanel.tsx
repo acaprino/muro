@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Count, Icon } from '@acaprino/sigrid/primitives';
+import { Cluster, Column, Count, Icon, Section, Text } from '@acaprino/sigrid/primitives';
 import { Empty, ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { useProject } from '../../state/useProject.tsx';
 import { becameParts, instructionsOf, pinnedOf } from './data.ts';
@@ -25,7 +25,6 @@ export interface InputsPanelProps {
 export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPanelProps) {
   const project = useProject();
   const { running } = useJobs();
-  const ids = React.useId();
   const selected = project.view?.selected ?? null;
   const busy = busyReason(running);
   function choose(id: string): void {
@@ -34,10 +33,9 @@ export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPan
     if (!on) onChosen();
   }
   return (
-    <div className="flex flex-col gap-5">
-      <section aria-labelledby={`${ids}-inputs`} className="flex flex-col gap-2">
-        <h3 id={`${ids}-inputs`} className="flex items-center gap-2 text-sm font-semibold text-ink"><Icon name="importExport" />What goes in <Count value={data.inputs.length} label={data.inputs.length === 1 ? 'input' : 'inputs'} /></h3>
-        <p className="text-xs text-ink-mute">The plugins and skills this project absorbs, each pinned to a release or a commit. Choose one to see on the graph what it became.</p>
+    <Column gap="xl">
+      <Section level={3} title="What goes in" icon={<Icon name="importExport" />} end={<Count value={data.inputs.length} label={data.inputs.length === 1 ? 'input' : 'inputs'} />}>
+        <Text as="p" variant="note">The plugins and skills this project absorbs, each pinned to a release or a commit. Choose one to see on the graph what it became.</Text>
         {data.inputs.length ? (
           <ItemList aria-label="Inputs">
             {data.inputs.map((input, i) => {
@@ -49,32 +47,27 @@ export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPan
                     current={selected?.kind === 'input' && selected.id === input.id}
                     onClick={() => choose(input.id)}
                     title={<span title={input.id}>{input.id}</span>}
-                    description={(
-                      <>
-                        <span className="block truncate" title={source}>{source}</span>
-                        <span className="block truncate">{pin.title} · {pin.line} · {input.license || 'No license named'}</span>
-                        <span className="block truncate">{parts.length ? `Became ${parts.join(' · ')}` : 'Not harmonized yet'}</span>
-                      </>
-                    )}
+                    description={<span title={source}>{source}</span>}
+                    facts={[
+                      { text: <Text pre>{`${pin.title} · ${pin.line} · ${input.license || 'No license named'}`}</Text> },
+                      { text: <Text pre>{parts.length ? `Became ${parts.join(' · ')}` : 'Not harmonized yet'}</Text> },
+                    ]}
                   />
-                  <li className="flex flex-wrap gap-2 px-3 pb-2">
+                  <Cluster as="li" pad="sm">
                     <GatedButton off={busy ?? (frozen ? FROZEN_PIN : null)} variant="outline" size="xs" aria-label={`Move pin of ${input.id}`} onClick={() => onPin(input.id, false)}>Move pin…</GatedButton>
                     {removable ? <GatedButton off={busy} variant="outline" size="xs" aria-label={`Remove ${input.id}`} onClick={() => onPin(input.id, true)}>Remove…</GatedButton> : null}
-                  </li>
+                  </Cluster>
                 </React.Fragment>
               );
             })}
           </ItemList>
         ) : <Empty title="No input yet" description="A project absorbs the plugins and skills it lists here." />}
-      </section>
-      <section aria-labelledby={`${ids}-notes`} className="flex flex-col gap-1">
-        <h3 id={`${ids}-notes`} className="flex items-center gap-2 text-sm font-semibold text-ink"><Icon name="rename" />Custom instructions</h3>
-        <p className="text-sm text-ink">{instructionsOf(data.info)}</p>
-        <p className="text-xs text-ink-mute">Your own Markdown notes. The AI reads them with the inputs and decides how they fit.</p>
-        <div className="pt-1">
-          <GatedButton off={busy} variant="outline" size="sm" onClick={onInstructions}>Instructions…</GatedButton>
-        </div>
-      </section>
-    </div>
+      </Section>
+      <Section level={3} title="Custom instructions" icon={<Icon name="rename" />}>
+        <Text as="p" pre>{instructionsOf(data.info)}</Text>
+        <Text as="p" variant="note">Your own Markdown notes. The AI reads them with the inputs and decides how they fit.</Text>
+        <Cluster><GatedButton off={busy} variant="outline" size="sm" onClick={onInstructions}>Instructions…</GatedButton></Cluster>
+      </Section>
+    </Column>
   );
 }

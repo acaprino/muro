@@ -1,7 +1,7 @@
 # Muro desktop: harness manager, plugin sync and updater
 
-The desktop interface is a React app on Sigrid (`@acaprino/sigrid`) and its Windows frame is the Rust crate
-`imago-shell` ([ADR-0031](adr/ADR-0031-desktop-on-sigrid.md), owner decision of 2026-11-23). The React window took the place
+The desktop interface is a React app in Imago's shell (`@acaprino/imago`, with the Rust crate `imago-shell` for the
+window), its screens made of Sigrid's parts (`@acaprino/sigrid`; [ADR-0031](adr/ADR-0031-desktop-on-sigrid.md)). The React window took the place
 of the Imago window and is not complete: it has the Projects page, where a project is read, simulated and now also made and
 changed ([Changing a project](#changing-a-project)), and **Sync**, **Activity**, **Settings** and the first run are not in it
 yet (the plans R1 to R3, kept outside this repository, are meant to bring them back). Until they are, a person cannot review
@@ -13,26 +13,24 @@ old window took from Imago, kept as history.
 ## The window
 
 One window with four tabs, **Projects**, **Sync**, **Activity** and **Settings**. It opens on Sync, which says it is moving;
-only Projects is built. It is Sigrid's `AppShell` (title bar, status row, content, inspector, footer) in Muro's accent
-(hue 170, the one the Imago window had).
+only Projects is built. It is Imago's `AppWindow` (title bar, status row, content, inspector, actions, foot) in Muro's accent
+(hue 170).
 
 **The frame.**
 
 - The title bar has Muro's mark and name, the four tabs (under 860 px wide they move to a row under the bar), the
-  **Commands** button and the window's three buttons. Sigrid draws them and knows no window API: `window.ts` wires them to
-  the native window with Imago's window glue (`@acaprino/imago/shell` and its Tauri adapter: the caption buttons and Snap
-  Layouts, the zoom, kept per machine as `muro.zoom`, and, in a release build, the guard of the browser's own keys).
+  **Commands** button and the window's three buttons. The shell draws them and wires them to the crate: the caption buttons
+  and Snap Layouts, the zoom, kept per machine as `muro.zoom`, and, in a release build, the guard of the browser's own keys.
 - The status row says the state of the sync in words (*No harness*, *Not checked yet*, *N changes waiting*, *Needs
   attention*, *A harness cannot be read*, *Sources not checked* or *In sync*), the last check and the next one, and how many
-  harnesses Muro manages. The footer says whether automatic sync is on, the last sync and the size of the list, and the key
-  of the palette. Both read the snapshot and the check the registry recorded, so a window opened after the background worker
+  harnesses Muro manages. The foot says whether automatic sync is on, the last sync and the size of the list, and, with room, the
+  keys that work. Both read the snapshot and the check the registry recorded, so a window opened after the background worker
   checked says what the worker found.
-- `Ctrl+K` opens the command palette: **Check now** (listed and dimmed until the Sync page returns), the four pages and the
-  theme choices.
-- The theme is **Follow Windows**, **Light theme** or **Dark theme**, chosen in the palette and kept in the WebView's own
-  storage (`muro.theme`); `set_window_theme` tells the native window. The page paints an opaque ground: Sigrid has no
-  translucent mode, so the acrylic of the Windows 11 window no longer shows through, and the look is Sigrid's one (the ONI
-  look of the Imago window is gone).
+- `Ctrl+K` opens the command palette: **Check now**, the four pages and the theme choices. `Ctrl+F` says that no page has a
+  search yet, and `F6` goes to the next region.
+- The theme is **Light theme**, **Dark theme** or **System theme**, chosen in the palette; dark until one is chosen. The choice
+  is kept in the WebView's own storage (`muro.theme`) and by the crate, which shows it before the first frame. The surfaces
+  are opaque.
 - The window reads the registry again when it is shown from the tray, when it gets the focus and every 30 seconds while it
   has the focus, unless a request of the person is waiting.
 
@@ -301,19 +299,16 @@ node apps/desktop/tests/browser.mjs   # MURO_UI_PORT=<port> when 1422 is taken
 node apps/desktop/tests/screenshots.mjs   # the README screenshots, from demo data
 cargo build -p muro-desktop-runtime --bins
 cargo build -p muro-desktop --features custom-protocol   # embeds the frontend `npm run build` made
-node apps/desktop/tests/native.mjs   # MURO_CDP_PORT=<port> when 9227 is taken
-node apps/desktop/tests/native-shell.mjs   # MURO_CDP_PORT=<port> when 9228 is taken
+node apps/desktop/tests/shots.mjs   # every screen, in apps/desktop/tests/shots
 python muro_build.py --manifest examples/marionette/sources.json --validate
 ```
 
-The Python tests that do not name Marionette (`python -m pytest -q -m "not marionette"`) run in the Tests workflow on GitHub, and the ones that do run in the Marionette workflow; the Rust tests, `npm test`, the type check, the frontend build, Sigrid's design check (`sigrid-check`, not blocking until its first output has been read) and the browser tests of the `desktop` job run in Tests.
+The Python tests that do not name Marionette (`python -m pytest -q -m "not marionette"`) run in the Tests workflow on GitHub, and the ones that do run in the Marionette workflow; the Rust tests, `npm test`, the type check, the frontend build, Sigrid's design check (`sigrid-check`), Imago's (`imago-check`), the browser tests and the photographs of every screen (`shots.mjs`, the artifact `muro-shots`) of the `desktop` job run in Tests.
 
-- **`npm test`** runs Node's test runner over `apps/desktop/tests/*.test.ts`, as plain functions: the model (`model.test.ts`), the request queue, the theme, the state the project workspace keeps across a reload (`project-state.test.ts`), the graph model and the scene made for Sigrid's canvas (`graph-model.test.ts`, `graph-scene.test.ts`), what the workspace reads of a project and the lines it writes from it, such as the engine note and the runs (`project-data.test.ts`), the write side of a project (`project-write.test.ts`: the shapes of the requests, the checks of what is typed with the runtime's wording, the runs, and the refusals of the fake service's write actions), the fake service (`fake-transport.test.ts`), Imago's zoom with Muro's storage key (`imago-zoom.test.ts`) and the rules for the sources (`imago-ownership.test.ts`: the stylesheet only imports Sigrid, no inline style, SVG or HTML string, and Imago is imported for the window glue only).
+- **`npm test`** runs Node's test runner over `apps/desktop/tests/*.test.ts`, as plain functions: the model (`model.test.ts`), the request queue, what the page imports (`imago-ownership.test.ts`), the state the project workspace keeps across a reload (`project-state.test.ts`), the graph model and the scene made for Sigrid's canvas (`graph-model.test.ts`, `graph-scene.test.ts`), what the workspace reads of a project and the lines it writes from it, such as the engine note and the runs (`project-data.test.ts`), the write side of a project (`project-write.test.ts`: the shapes of the requests, the checks of what is typed with the runtime's wording, the runs, and the refusals of the fake service's write actions), the fake service (`fake-transport.test.ts`), Imago's zoom with Muro's storage key (`imago-zoom.test.ts`) and the rules for the sources (`imago-ownership.test.ts`: the stylesheet only imports Sigrid, no inline style, SVG or HTML string, and Imago is imported for the window glue only).
 - **`browser-shell.mjs`** (the frame, the theme, the palette, the refresh of the registry) and **`browser-workspace.mjs`** (the list of projects and the workspace), and three files for the write side of a project: **`browser-write-ai.mjs`** (the AI dialogs, the job card and the action bar), **`browser-write-edit.mjs`** (the details and the decision records edited by hand) and **`browser-write-new.mjs`** (a new project, and deleting one); `browser.mjs` runs the five one after the other. They start the Vite dev server and headless Edge (Playwright's `msedge` channel) and drive the real window against `fake-transport.js`, a fake of the registry service that keeps its rules: revision conflicts, blockers, `allow_blocked`, removals only on a harness without a blocker and only when confirmed (`confirm_removals` or `skip_removals`), and, for the write side, a stale digest refused, one AI run at a time, a new project never written over an existing file and the shipped project not deletable. Its runs end by themselves or when a test says so: no Claude Code runs behind it. They prove the window, not the service. `screenshots.mjs` draws the Projects list, the workspace (dark and light) and a simulation from the fake's `projects` scenario; CI does not run it, and it has not been run on the React window yet.
-- **`native.mjs`** drives the real executable over the WebView2 debugging port, against the real Tauri `request` command, the real registry service and a real OpenCode profile in a temporary folder. It was written for the Imago window: it walks the first run and the Sync page (pick the harness, add a plugin, Check now, Apply all, a second Check), which the React window does not have yet, so it does not pass on it. It uses a Run value of its own name and deletes it.
-- **`native-shell.mjs`** drives the same executable but calls the shell's `request` command from the page, not the interface: start with Windows, close to the tray, `--background`, the worker, a second launch and the quit path. It asks the window to close the way Windows does (`WM_CLOSE`) and reads whether the window shows from user32. Its section 8 reads Sync's note and status row of the Imago window, which this window does not have. The tray menu itself is a native menu that no test reaches.
-- Neither native test has been run against the React window.
+- **`native-shell.mjs`** drives the real executable over the WebView2 debugging port (the job `program` of Tests runs it on the release program) but calls the shell's `request` command from the page, not the interface: start with Windows, close to the tray, `--background`, the worker, a second launch and the quit path. It asks the window to close the way Windows does (`WM_CLOSE`) and reads whether the window shows from user32. The tray menu, the place kept and the theme are in `.github/scripts/desktop-smoke.ps1`, which the same job runs; its artifacts are `muro-desktop` (the program) and `muro-window` (pictures of the real window).
 
 - **The Rust tests of Projects** (`cargo test -p muro-registry -p muro-desktop-runtime`): the list and the AI settings of the registry, and, in the runtime, `projects` (a stand-in factory), `simulate` (the exact command lines of both harnesses, the readers of their output, the API engine through a local endpoint, cancellation) and `real_factory` (a `.mp` packed by the real factory, listed, installed on a temporary OpenCode target, planned, replaced and simulated through a local endpoint).
 
-The two native tests, as they were run on the Imago window, prove the app/configuration boundary; they do not prove that an OpenCode agent loaded and executed a plugin, and none of them is a real sign-in to Windows. See the dated verification records for real host checks and remaining limits: the Projects tab ([2026-11-20](verification/2026-11-20-desktop-projects-read.md)) was not run with a real Claude Code, Codex or API for a free-text simulation, and whether Codex runs an MCP tool in `exec` without an approval prompt is unverified. The write side of a project in the React window ([2026-11-23](verification/2026-11-23-project-write-react.md)) was not run with a real Claude Code either, nor on a Windows window. No personal harness installation is required by these tests.
+The native test proves the app/configuration boundary; it does not prove that an OpenCode agent loaded and executed a plugin, and it is not a real sign-in to Windows. See the dated verification records for real host checks and remaining limits: the Projects tab ([2026-11-20](verification/2026-11-20-desktop-projects-read.md)) was not run with a real Claude Code, Codex or API for a free-text simulation, and whether Codex runs an MCP tool in `exec` without an approval prompt is unverified. The write side of a project in the React window ([2026-11-23](verification/2026-11-23-project-write-react.md)) was not run with a real Claude Code either, nor on a Windows window. No personal harness installation is required by these tests.

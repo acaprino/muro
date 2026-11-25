@@ -11,6 +11,7 @@ target/
 .marionette/
 .scratch/
 apps/desktop/src-tauri/resources/
+apps/desktop/tests/shots/
 
 # assembled by build-release.bat
 release/

@@ -1,9 +1,9 @@
 import * as React from 'react';
-import { Button, Input, Textarea } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Cluster, Column, Input, Text, Textarea } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField, Note } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRepository } from '../../../types.ts';
 import { text } from '../../../model.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
 import { REPOSITORY_FIELDS, busyReason, checkRepository, checkText, editPayload, repositoryOf, runningOn } from './jobs.ts';
@@ -19,7 +19,7 @@ export const useBlocked = (id: string): string | null => busyReason(runningOn(us
 
 /** What the runtime refused, or the page could not send, shown as it was said: a box in the window that failed, with a word that says it besides the colour. */
 export function NotSaved({ text: said }: { text: string }) {
-  return <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive"><span className="font-medium">Not saved. </span>{said}</p>;
+  return <Note tone="error" title="Not saved">{said}</Note>;
 }
 
 /** An edit by hand of the project `id`, on the file `info` shows. */
@@ -177,14 +177,14 @@ export function DetailsDialog({ id, info, open, onOpenChange }: DetailsDialogPro
         </>
       )}
     >
-      <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-4">
+      <form id={formId} noValidate onSubmit={submit}><Column gap="lg">
         <FormField label="Name" required error={fault(problems.name)}>
           <Input name="name" autoComplete="off" autoFocus value={form.name} onChange={e => change({ name: e.currentTarget.value })} />
         </FormField>
         <FormField label="Author" required error={fault(problems.author)}>
           <Input name="author" autoComplete="off" value={form.author} onChange={e => change({ author: e.currentTarget.value })} />
         </FormField>
-        <div role="group" aria-label="Repository" className="flex flex-col gap-4">
+        <Column role="group" aria-label="Repository" gap="lg">
           {REPOSITORY_FIELDS.map(field => (
             <FormField key={field.key} label={field.label} help={field.hint} error={fault(problems.repository[field.key])}>
               <Input
@@ -199,17 +199,17 @@ export function DetailsDialog({ id, info, open, onOpenChange }: DetailsDialogPro
             </FormField>
           ))}
           {form.repository.url.trim() ? (
-            <div>
+            <Cluster>
               <Button variant="outline" size="sm" onClick={() => { change({ repository: NO_REPOSITORY }); firstUrl.current?.focus(); }}>Take the repository away</Button>
-            </div>
+            </Cluster>
           ) : null}
-        </div>
+        </Column>
         <FormField label="Changelog" help="CHANGELOG.md of the project: one entry per version. Muro writes one at each harmonization; you can edit it.">
-          <Textarea name="changelog" rows={10} spellCheck={false} className="max-h-80 font-mono" value={form.changelog} onChange={e => change({ changelog: e.currentTarget.value })} />
+          <Textarea name="changelog" rows={10} spellCheck={false} value={form.changelog} onChange={e => change({ changelog: e.currentTarget.value })} />
         </FormField>
-        {edit.blocked ? <p role="status" className="text-xs text-ink-mute">{edit.blocked}</p> : !dirty ? <p className="text-xs text-ink-mute">Nothing has changed yet.</p> : null}
+        {edit.blocked ? <Text as="p" variant="note" role="status">{edit.blocked}</Text> : !dirty ? <Text as="p" variant="note">Nothing has changed yet.</Text> : null}
         {edit.error ? <NotSaved text={edit.error} /> : null}
-      </form>
+      </Column></form>
     </Dialog>
   );
 }

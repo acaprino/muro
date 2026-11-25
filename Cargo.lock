@@ -1513,12 +1513,13 @@ dependencies = [
 
 [[package]]
 name = "imago-shell"
-version = "0.4.1"
-source = "git+https://github.com/acaprino/imago?tag=v0.4.1#3dbbe92fa953395034651c5c946256d929d15beb"
+version = "1.0.1"
+source = "git+https://github.com/acaprino/imago?tag=v1.0.1#d9523e78e54efd1180c585142eec148e99051a6e"
 dependencies = [
  "serde",
  "serde_json",
  "tauri",
+ "tauri-plugin",
  "webview2-com",
  "windows-core",
  "windows-sys 0.61.2",
@@ -1949,8 +1950,8 @@ dependencies = [
 name = "muro-desktop"
 version = "0.0.0"
 dependencies = [
- "imago-shell",
  "anyhow",
+ "imago-shell",
  "muro-desktop-runtime",
  "muro-registry",
  "serde_json",
@@ -3524,9 +3525,9 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin"
-version = "2.7.4"
+version = "2.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c18076d9b04211cb4899387aab97497e8edd0d02cd21710623afcdde27145d1"
+checksum = "67fb21a77e8f94e8beb3325e583102488659365af0a3948b7ea244c5b779c291"
 dependencies = [
  "anyhow",
  "glob",
@@ -3686,7 +3687,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

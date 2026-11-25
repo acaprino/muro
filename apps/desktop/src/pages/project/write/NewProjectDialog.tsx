@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { Button, Icon, Input, Textarea } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Cell, Column, Input, Text, Textarea } from '@acaprino/sigrid/primitives';
+import { Dialog, Disclosure, FormField } from '@acaprino/sigrid/components';
 import type { ProjectRepository, ProjectSummary } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message, unknownTo } from '../../../words.ts';
 import {
@@ -11,6 +11,7 @@ import {
 } from './jobs.ts';
 import type { Listed } from './jobs.ts';
 import { useJobs } from './useJobs.tsx';
+import { RefusalLine } from './HarmonizeDialog.tsx';
 
 /** The dialog of a new project: what a person tells the AI to make one plugin of (ADR-0032). It checks what only needs what was typed, in the runtime's own words (`jobs.ts`), and sends
  * `create_project`; the runtime checks the rest before it pays for a run (that the folder is there, that no file of that name exists, that no run goes), and its sentence is shown as it comes.
@@ -125,7 +126,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
       if (path) setForm(f => ({ ...f, folder: path }));
     } catch (e) {
       if (unknownTo(e, 'pick_folder')) { noFolderShell = true; setNoPicker(true); }
-      else notify(message(e), 'error');
+      else notify(message(e), { kind: 'error' });
     } finally { setPicking(false); }
   }
 
@@ -160,51 +161,52 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
         </>
       )}
     >
-      <form id={formId} noValidate className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); void submit(); }}>
+      <form id={formId} noValidate onSubmit={e => { e.preventDefault(); void submit(); }}><Column gap="lg">
         <FormField id={fieldId('name')} label="Name" error={say('name')}>
           <Input autoFocus autoComplete="off" placeholder="My plugin" value={form.name} onChange={e => changeName(e.currentTarget.value)} onBlur={() => touch('name')} />
         </FormField>
         <FormField id={fieldId('slug')} label="Plugin id" help="Lowercase letters and digits joined by dashes: how the harnesses name the plugin. It cannot change later." error={say('slug')}>
-          <Input autoComplete="off" spellCheck={false} className="font-mono" placeholder="my-plugin" value={form.slug} onChange={e => changeSlug(e.currentTarget.value)} onBlur={() => touch('slug')} />
+          <Input autoComplete="off" spellCheck={false} placeholder="my-plugin" value={form.slug} onChange={e => changeSlug(e.currentTarget.value)} onBlur={() => touch('slug')} />
         </FormField>
         <FormField id={fieldId('author')} label="Author" error={say('author')}>
           <Input autoComplete="off" {...text('author')} />
         </FormField>
-        <div className="flex flex-col gap-2">
+        <Column>
           <FormField id={fieldId('folder')} label="Save in folder" help="The project is one file in this folder, named after the plugin id." error={say('folder')}>
-            <Input autoComplete="off" spellCheck={false} className="font-mono" {...text('folder')} />
+            <Input autoComplete="off" spellCheck={false} {...text('folder')} />
           </FormField>
-          {noPicker ? <p className="text-xs text-ink-mute">This version of Muro cannot open a folder dialog yet: type the path.</p> : <Button variant="outline" size="sm" className="self-start" loading={picking} loadingText="Choosing…" onMouseDown={keepFocus} onClick={() => void chooseFolder()}>Choose folder…</Button>}
-        </div>
+          {noPicker ? <Text as="p" variant="note">This version of Muro cannot open a folder dialog yet: type the path.</Text> : <Cell align="start"><Button variant="outline" size="sm" loading={picking} loadingText="Choosing…" onMouseDown={keepFocus} onClick={() => void chooseFolder()}>Choose folder…</Button></Cell>}
+        </Column>
         <FormField
           id={fieldId('inputs')}
           label="Inputs"
           help="One per line: a repository address (https://…; a folder of it after #) or the full path of a folder on this computer. What the inputs do, the plugin does."
           error={say('inputs')}
         >
-          <Textarea rows={4} spellCheck={false} className="font-mono" {...text('inputs')} />
+          <Textarea rows={4} spellCheck={false} {...text('inputs')} />
         </FormField>
         <FormField id={fieldId('request')} label="Your request (optional)" help="In your words: what to take from the inputs, how to fit them together. The AI reads it with the inputs." error={say('request')}>
           <Textarea rows={3} {...text('request')} />
         </FormField>
-        <div className="flex flex-col gap-4">
-          <Button variant="ghost" size="sm" className="self-start" aria-expanded={repositoryOpen} onMouseDown={keepFocus} onClick={() => setForm(f => ({ ...f, repositoryOpen: !repositoryOpen }))}>
-            <Icon name={repositoryOpen ? 'chevronDown' : 'chevron'} />Repository (optional)
-          </Button>
-          {repositoryOpen ? REPOSITORY_FIELDS.map(r => (
-            <FormField key={r.key} id={fieldId(r.key)} label={r.label} help={r.hint} error={say(r.key)}>
-              <Input autoComplete="off" spellCheck={false} placeholder={r.placeholder} value={form.repository[r.key]} onChange={e => changeRepository(r.key, e.currentTarget.value)} onBlur={() => touch(r.key)} />
-            </FormField>
-          )) : null}
+        <div onMouseDown={e => { if (e.target instanceof Element && e.target.closest('[data-slot="disclosure-row"]')) keepFocus(e); }}>
+          <Disclosure label="Repository (optional)" open={repositoryOpen} onOpenChange={open => setForm(f => ({ ...f, repositoryOpen: open }))}>
+            <Column gap="lg">
+              {REPOSITORY_FIELDS.map(r => (
+                <FormField key={r.key} id={fieldId(r.key)} label={r.label} help={r.hint} error={say(r.key)}>
+                  <Input autoComplete="off" spellCheck={false} placeholder={r.placeholder} value={form.repository[r.key]} onChange={e => changeRepository(r.key, e.currentTarget.value)} onBlur={() => touch(r.key)} />
+                </FormField>
+              ))}
+            </Column>
+          </Disclosure>
         </div>
         <FormField id={fieldId('budget')} label="Maximum budget (USD)" help={BUDGET_HINT} error={say('budget')}>
           <Input autoComplete="off" inputMode="decimal" {...text('budget')} />
         </FormField>
-        <p className="text-xs text-ink-mute">{words.does} {AI_RUN_NOTE}</p>
-        {refusal ? <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{refusal}</p> : null}
-        {busy ? <p role="status" className="text-sm text-ink-mute">{busy}</p> : null}
-        {failure ? <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{failure}</p> : null}
-      </form>
+        <Text as="p" variant="note">{words.does} {AI_RUN_NOTE}</Text>
+        {refusal ? <RefusalLine>{refusal}</RefusalLine> : null}
+        {busy ? <Text as="p" variant="muted" role="status">{busy}</Text> : null}
+        {failure ? <RefusalLine>{failure}</RefusalLine> : null}
+      </Column></form>
     </Dialog>
   );
 }

@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { Button } from '@acaprino/sigrid/primitives';
+import { Button, Column, Text } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { ProjectSummary, Snapshot, Transport } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
 import { SHIPPED_ID, deletePayload } from './jobs.ts';
+import { RefusalLine } from './HarmonizeDialog.tsx';
 
 /** The words of a listed project: the name its file gives it, else its plugin's, else its id. */
 export const nameOf = (p: ProjectSummary): string => p.project?.name || p.plugin?.name || p.id;
@@ -85,12 +86,12 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfte
       )}
     >
       {shipped ? null : (
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-ink-mute">The file that is deleted</span>
-          <code className="font-mono text-sm break-all text-ink">{project.path}</code>
-        </div>
+        <Column gap="xs">
+          <Text variant="note">The file that is deleted</Text>
+          <Text pre><code>{project.path}</code></Text>
+        </Column>
       )}
-      {failure ? <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{failure}</p> : null}
+      {failure ? <RefusalLine>{failure}</RefusalLine> : null}
     </Dialog>
   );
 }
