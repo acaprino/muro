@@ -201,7 +201,7 @@ Each registry plugin has a persistent instruction folder. By default it is `data
 1. Save `instructions.json` using the exact plugin ID returned by `registry`:
 
    ```json
-   {"id":"marionette","create":true}
+   {"id":"docs-writer","create":true}
    ```
 
 2. Create or inspect the folder with the native CLI:
@@ -223,7 +223,7 @@ Each registry plugin has a persistent instruction folder. By default it is `data
 4. Start an adaptation using `job.json`:
 
    ```json
-   {"id":"marionette","harness":"codex","agent":"claude-code","budget_usd":2}
+   {"id":"docs-writer","harness":"codex","agent":"claude-code","budget_usd":2}
    ```
 
    ```powershell

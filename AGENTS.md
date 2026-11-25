@@ -119,7 +119,7 @@ content, a tool's purpose may say that data leaves, and the host's permissions
 and the user's instructions stay authoritative; intake, harmonization and
 capability bodies never add a restriction the source does not state.
 
-Owner correction of 2026-11-17 ("marionette ha tutto!", "fai in modo che non
+Owner correction of 2026-11-17 ("[il pacchetto] ha tutto!", "fai in modo che non
 accada mai più questa perdita di tempo"): a source is absorbed with every file
 its method uses at run time: its kit, its scripts, its checks, its gate, its
 images. A capability that tells the host a part of its source is "not packaged"
@@ -141,9 +141,12 @@ own a request that a capability also answers: harmonization names the one owner
 there, in a marked line, and a live session checks it.
 
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
-a package of their own, never part of Muro: the example is `examples/marionette/`
-(`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, plugin
-identity `marionette`). Paths below that name those files are relative to a
+a package of their own, never part of Muro: a package is a directory
+(`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, its own
+plugin identity) that lives in its own repository, with its own tests, CI and
+release, and is built with Muro at a pinned ref. This repository holds no
+package: the factory's tests use the invented one in `tests/fixtures/package/`.
+Paths below that name those files are relative to a
 package directory. Keep package-specific knowledge (named dependencies, domain
 rules) out of `muro/` and `prompts/`. Prompts and the shipped runtime come from
 the factory unless the package directory has its own (ADR-0011).
@@ -192,8 +195,8 @@ installation, publication or replacement of existing dist output without request
 - `muro/coverage.py` and `coverage.json` in the intake workbench: what the pinned
   commit holds outside `selected_paths` (`left_out`) and which of those files
   and folders the selected files name (`referenced`). Owner correction of
-  2026-11-17, after Marionette built a flat page by hand because taste-skill
-  travelled as 11 files of 1,631 ("marionette ha tutto!", "ma è un problema di
+  2026-11-17, after a package built a flat page by hand because taste-skill
+  travelled as 11 files of 1,631 ("[il pacchetto] ha tutto!", "ma è un problema di
   muro allora"): a source is absorbed with every file its method uses at run
   time. The intake AI completes `selected_paths` from that evidence and has the
   intake prepared again. A capability never tells the host that part of its
@@ -364,7 +367,7 @@ installing a generated plugin is the consent, so a release may register by
 itself what its package declares in `delivery.json`: text for every session,
 hooks with policy `active` and, since 2026-11-21, the MCP servers a source
 ships (ADR-0030). May is not should. Same day, on a design system
-prompt offered to Marionette: it "non deve fagocitare tutto" in a package that
+prompt offered to a package: it "non deve fagocitare tutto" in a package that
 is "multi theme, context e intent"; it becomes capabilities found from context,
 harmonized with the others, and "questo è anche il tipo di sensibilità che mi
 aspetto da Muro" for every new intake. So the form of each absorbed part is an AI
@@ -391,11 +394,11 @@ After a policy upgrade, Hermes needs a new session because resumed sessions may
 retain their persisted prompt. Do not claim refresh from registration alone.
 TokenEconomizer's hooks are still `host-approved` and registered on the user's
 request by its capability: activating them by default is an open delivery
-decision, not yet run live. Marionette's first active source hook was
+decision, not yet run live. The first active source hook of a real package was
 taste-skill's finish gate on `Stop` (2026-11-17): it exited at once where no
 build was armed, and was run live on Claude Code, not on Codex. The owner
 removed taste-skill on 2026-11-19 ("la ritengo troppo prescrittiva e
-costrittiva"), and Marionette registers no hook since. A catalog with
+costrittiva"), and that package registers no hook since. A catalog with
 an active hook is refused by the runtime without its `delivery.json`: a test
 fixture that copies a package's capabilities copies that document too
 (`tests/routing_helpers.py`, `copy_delivery`).
@@ -470,17 +473,17 @@ the suite runs in GitHub Actions, not on the developer machine, where it took ab
 hour against about two minutes on a runner. Locally run only the targeted tests
 of what changed, then push the branch and read the run.
 
-Owner rule of 2026-11-22 ("Muro non deve avere test su Marionette"): Muro's own CI and
-release never run Marionette checks, so a problem of the package (a source that moved)
+Owner rule of 2026-11-22 ("Muro non deve avere test su [il pacchetto]"): Muro's own CI and
+release never run a package's checks, so a problem of a package (a source that moved)
 cannot block them. The `Tests` workflow, which is Muro's Verify run (`.github/workflows/tests.yml`: every push to
 and pull request to `develop`, or `gh workflow run tests.yml --ref <branch>`; never the
 `develop` -> `main` pull request or `main`, whose commit the push to `develop` already
-verified) runs the Python tests that do not name Marionette (`-m "not marionette"`:
-`tests/conftest.py` marks every test module that names it) and the desktop job. The
-tests that name it (`-m marionette`), the manifest validation, the source check, the
-package build and the default-project pack run in `.github/workflows/marionette.yml`
-(when Marionette's paths change, or `gh workflow run marionette.yml --ref <branch>`);
-the gate of its own release stays in `release-marionette.yml`. The release of Muro
+verified) runs every Python test and the desktop job: no test names a package, nothing is
+deselected, and a test that needs a whole package borrows the neutral fixture
+`tests/fixtures/package/` (`tests/routing_helpers.py`: `FIXTURE`, `copy_fixture`), whose
+sources are remotes that do not exist, so it is validated and never fetched or built. A
+package's own tests, its manifest validation, its source check, its build and the gate of
+its release run in the package's repository, against a Muro checkout at a pinned ref. The release of Muro
 (`release.yml`) runs no package test or check and bundles no package (owner decision of
 2026-11-25, below): `build-release.bat` runs `scripts/desktop_resources.py`, which stages
 the private Python and the factory and nothing else. Muro ships no project and reserves no
@@ -494,14 +497,16 @@ package reaches the factory only as data given by whoever uses it (a manifest pa
 repository address). The records of what was decided and verified (`docs/adr/`,
 `docs/verification/`, `docs/releases/`, `docs/frd/`, `docs/mockups/`) keep the names they
 were written with (owner's answer of the same day: "Solo ciò che esegue"). Add nothing new
-that names a package. What still does is on its way out, in this order: the factory tests
-move to a neutral fixture and back into the `Tests` run; the package under `examples/`,
-its own tests and its two workflows move to the package's repository; the passages of
-this file that name it are rewritten with the thing they describe.
+that names a package. The rule is applied in full: the factory tests run on the neutral
+fixture, inside the `Tests` run; the package that lived under `examples/`, its own tests
+and its two workflows are in the package's repository; and no passage of this file names
+a package.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
-examples/marionette/sources.json --validate`. For source/build changes also run
-the same command with `--check-sources` and verify a fresh staged
+tests/fixtures/package/sources.json --validate`. For source/build changes also run
+the same command with `--check-sources --offline-pins` (the fixture's remotes do not
+exist, so it is never fetched or built), and with a real package's manifest run
+`--check-sources` and verify a fresh staged
 release. Source checks contact pinned Git remotes. Run targeted tests first for
 new behavior and preserve failure/success evidence in docs/verification/.
 
@@ -547,7 +552,8 @@ exit codes and examples is docs/cli.md; keep it current when a command changes.
   (skill descriptions it reads before invoking), not in `INSTALL.md` or a body.
 
 Live host recipe (Claude Code, leaves the owner's configuration untouched):
-stage a release with `--build --out <scratch>`, then in an empty test project run
+stage a release of a real package with `--manifest <package>/sources.json --build
+--out <scratch>`, then in an empty test project run
 `claude -p "<request>" --plugin-dir <scratch>/<slug>/adapters/claude-code
 --permission-mode dontAsk --allowedTools "Skill" --output-format stream-json
 --verbose --max-budget-usd 2 --no-session-persistence`. Read the transcript for
@@ -576,7 +582,8 @@ the method uses at run time, declare binary media in `media_paths` with its
 credit files in `notice_paths`, and explain in `omissions` each named file that
 stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
 ADR-0027). Write the pin and its release into each capability's `## Sources`
-line and into `tests/test_<source>_intake.py`. Record in `delivery.json` what
+line and into the package's own test of that source, which lives with the
+package. Record in `delivery.json` what
 each part of the source became and why, and review the earlier decisions. When
 the source ships an MCP server, judge its tools again (`server_review` is judged on
 a commit, and the build refuses a package with a server whose record is judged on
@@ -589,28 +596,21 @@ proves packaging; say what was not executed.
 ## Releasing
 
 Two products are released, each with its own tag: Muro from this repository, a package from its own public
-repository (Marionette from `acaprino/marionette`; owner request of 2026-11-19, ADR-0011 amendment).
+repository (owner request of 2026-11-19, ADR-0011 amendment). This repository releases only Muro.
 
 - The factory and its desktop app, `muro-v<version>` (version in `muro/__init__.py`, `__version__`): released
   at every merge of `develop` into `main` by `.github/workflows/release.yml` (see "Git"). The GitHub Release
   carries `Muro-<version>-windows-x64.zip`, the portable folder `build-release.bat` makes. Do not bump
   `__version__` or create `muro-v*` tags by hand.
-- A package, `<slug>-v<version>` (version in its `sources.json`, `plugin.version`; Marionette is
-  `marionette-v<version>`). Merging a package version change into Muro's `main` requests its release.
-  1. Bump the package version on `develop`. A package changes version whenever its catalog, policy or
-     packaged files changed: hosts cache an installed plugin by version.
-  2. Write `docs/releases/<tag>.md`: what changed for a user, the verification results, and what was not
-     executed. Without that file the notes carry only the version and the Muro commit it was built from.
-  3. On the commit to release run `python -m pytest -q`, `--validate` and `--check-sources`, and stage a
-     fresh build with `--build --out <scratch>`.
-  4. Merge the `plugin.version` change into Muro's `main`. `Release Marionette` starts automatically,
-     runs the tests, validates the manifest and its sources, and builds the package. It pushes `marionette/`
-     and `releases/<tag>.md` to `release/<tag>` in `acaprino/marionette`, where a workflow opens the PR.
-     The existing `workflow_dispatch` remains available for recovery from Actions on `main`. A published tag is preserved. The push uses `MARIONETTE_DEPLOY_KEY`.
-  5. The owner merges the pull request: `acaprino/marionette` then publishes the tag and the GitHub release
-     with `<slug>-<version>.zip` and its SHA-256. `marionette-v0.2.0` to `marionette-v0.4.0` stay among this
-     repository's releases.
-  6. Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
+- A package, `<slug>-v<version>` (version in its `sources.json`, `plugin.version`), is released from its own
+  repository by its own workflow, which builds it with Muro at a pinned ref and publishes the tag and
+  `<slug>-<version>.zip` with its SHA-256 there. Nothing in this repository builds, tags or publishes a package;
+  the package releases published here before the package had its own repository stay among this repository's
+  releases. A package changes version whenever its catalog, policy or packaged files changed: hosts cache an
+  installed plugin by version. Its release notes say what changed for a user, the verification results, and
+  what was not executed. On the commit to release, the package's tests, `--validate` and `--check-sources` pass
+  and a fresh build is staged with `--build --out <scratch>`. A published tag is preserved.
+- Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
 
 The README header shows `docs/assets/branding/muro-logo.png`. Keep that
 line and that file when rewriting the README.

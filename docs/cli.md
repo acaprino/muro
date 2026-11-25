@@ -1,6 +1,6 @@
 # The `muro` command line
 
-Muro has two parts. The desktop app is the harness manager, plugin sync and updater ([desktop app](desktop.md), [its CLI](desktop-cli.md)). The factory is the harmonizer: it absorbs pinned skills and plugins into one package with a catalog, a coordinator and a release for every harness, as it does for Marionette. This page is about the factory.
+Muro has two parts. The desktop app is the harness manager, plugin sync and updater ([desktop app](desktop.md), [its CLI](desktop-cli.md)). The factory is the harmonizer: it absorbs pinned skills and plugins into one package with a catalog, a coordinator and a release for every harness. This page is about the factory.
 
 One CLI drives the factory. It runs as `muro` (after an editable install), as
 `python -m muro`, or through the legacy flag interface (`python muro_build.py
@@ -54,7 +54,7 @@ intake-only path references. Prints `OK: capabilities and ROUTER.md valid` or
 one error per line.
 
 ```sh
-muro validate --manifest examples/marionette/sources.json
+muro validate --manifest tests/fixtures/package/sources.json
 ```
 
 ### `muro check-sources [--manifest PATH] [--offline-pins]`
@@ -72,7 +72,7 @@ pinned Git remotes; `--offline-pins` checks manifest shape and local
 repositories only.
 
 ```sh
-muro check-sources --manifest examples/marionette/sources.json
+muro check-sources --manifest <package>/sources.json
 ```
 
 ### `muro build [--manifest PATH] [--out DIR] [--host-root DIR]...`
@@ -83,8 +83,8 @@ manifest (or under `--out`). Refuses an output that already exists. Each
 collisions.
 
 ```sh
-muro build --manifest examples/marionette/sources.json --out /tmp/stage
-# Built /tmp/stage/marionette
+muro build --manifest <package>/sources.json --out /tmp/stage
+# Built /tmp/stage/<slug>
 ```
 
 ### `muro intake <source-id> [--manifest PATH]`
@@ -100,7 +100,7 @@ an `intake.goal` (for a new source, add it — or scaffold a new package with
 `muro init`). Prints the workbench path.
 
 ```sh
-muro intake ponytail --manifest examples/marionette/sources.json
+muro intake <source-id> --manifest <package>/sources.json
 ```
 
 ### `muro harmonize [--manifest PATH]`
@@ -138,7 +138,7 @@ Re-pinning stays the documented procedure (AGENTS.md, "Adding or re-pinning a
 source"); this command changes no manifest.
 
 ```sh
-muro baseline --manifest examples/marionette/sources.json --json
+muro baseline --manifest <package>/sources.json --json
 ```
 
 ### `muro eval prepare [--manifest PATH]` / `muro eval score DECISIONS [--manifest PATH]`
@@ -190,7 +190,7 @@ pi recipes are their adapters' own commands, not yet run on real hosts
 (ADR-0022, Open).
 
 ```sh
-muro install /tmp/stage/marionette/adapters/claude-code \
+muro install /tmp/stage/<slug>/adapters/claude-code \
   --harness claude-code --home ~/.claude-test
 ```
 
@@ -206,10 +206,10 @@ it. Claude Code (`claude plugin marketplace add owner/repo`), Codex and the
 desktop app then find the plugin from the repository's address. Every file is
 read before any is written: a folder that is not inside the repository, or
 holds no built Claude Code or Codex adapter, writes nothing and exits `1`.
-The `Release Marionette` workflow runs it in `acaprino/marionette`.
+It is made for the release workflow of a package that publishes its build in a folder of its own repository.
 
 ```sh
-muro marketplace ./package marionette
+muro marketplace ./package my-package
 # Wrote package/.claude-plugin/marketplace.json
 # Wrote package/.agents/plugins/marketplace.json
 ```
@@ -326,7 +326,7 @@ file contents, names or membership; no command infers their meaning itself.
 If the Markdown changes while the model works, the step stops with
 `custom-instructions changed during AI work; prepare again before writing results`
 before writing that round's files. See [custom instructions](custom-instructions.md) for folder
-layout, removal, runtime retention and a complete Marionette example.
+layout, removal, runtime retention and a complete example.
 
 - `--model` (required): the model id the endpoint serves.
 - `--api-base`: base URL, default `https://api.openai.com/v1`. Plain `http`
@@ -471,15 +471,15 @@ otherwise.
 
 `info --summary` is what a list of projects shows: `{project, plugin: {name, slug, version}, inputs,
 capabilities, entries, examples, records, runs, digest}` (the counts) and none of the capability bodies that make the full
-`info` large (610 KB for Marionette). The counts are the full `info`'s own. A file that is missing or invalid is
+`info` large (610 KB for a large real package). The counts are the full `info`'s own. A file that is missing or invalid is
 `{"error": reason}` on stdout with exit `0`, so one bad file never hides the others from a list (the desktop
 runs it once per listed project and reads the full `info` only for the project it opens).
 
 ```sh
-muro build --manifest examples/marionette/sources.json --out /tmp/stage
-muro project pack --manifest examples/marionette/sources.json --out marionette.mp \
+muro build --manifest <package>/sources.json --out /tmp/stage
+muro project pack --manifest <package>/sources.json --out my-package.mp \
   --sources-cache ~/.cache/muro-sources --release /tmp/stage
-muro project info marionette.mp
+muro project info my-package.mp
 ```
 
 ### `muro project new` / `edit` / `commit`
@@ -547,7 +547,7 @@ The package is a `.mp` file (unpacked once per SHA-256 of its content into `--ca
 `simulate-prepare` prints `{"context": {"task", "stack_tokens", "catalog_digest"}, "prompt": "..."}`. The
 `context` is what the AI's answer must copy exactly. The `prompt` is built by the function that builds the prompt of
 an eval case (`muro eval prepare`): the permanent session policy, the one context, the compact catalog and the
-classification rules, after a short instruction to answer with one JSON object. For Marionette it is about 80,000
+classification rules, after a short instruction to answer with one JSON object. For a large real package it is about 80,000
 characters. `--stack` tokens (`stack:*`, repeatable) are inputs: with no project to look at, nothing is detected.
 
 `simulate-check` takes that context and the AI's answer (two JSON files) and prints one of:
@@ -581,10 +581,10 @@ invalid answer (`valid` false). Cost: one request carrying the whole prompt; not
 
 ```sh
 export MURO_API_KEY=…
-muro project simulate marionette.mp --task "Convert the Word document to PDF" --model gpt-5.2
-muro project simulate-prepare marionette.mp --task "Landing page with scroll animations" --stack stack:gsap > prepared.json
+muro project simulate my-package.mp --task "Convert the Word document to PDF" --model gpt-5.2
+muro project simulate-prepare my-package.mp --task "Landing page with scroll animations" --stack stack:gsap > prepared.json
 # the host AI classifies with the prompt in prepared.json, saves that file's context as context.json and its answer as answer.json
-muro project simulate-check marionette.mp --context context.json --answer answer.json
+muro project simulate-check my-package.mp --context context.json --answer answer.json
 ```
 
 The mechanics are covered by tests against fixtures and a scripted endpoint; no claim is made about any model's
