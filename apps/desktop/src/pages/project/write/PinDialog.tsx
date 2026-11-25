@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Icon, Input } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Badge, Button, Cluster, Column, Icon, Input, Text } from '@acaprino/sigrid/primitives';
+import { DescriptionList, Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectUpdate, ProjectUpdates } from '../../../types.ts';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
@@ -103,21 +103,18 @@ export function PinDialog(props: PinDialogProps) {
     >
       <RunFormBody form={form} onSubmit={submit}>
         {held ? (
-          <dl className="flex flex-col gap-1 text-sm">
-            <div className="flex min-w-0 gap-3"><dt className="w-20 shrink-0 text-ink-mute">Pinned to</dt><dd className="min-w-0 text-ink">{pin ? `${pin.title} · ${pin.line}` : ''}</dd></div>
-            <div className="flex min-w-0 gap-3"><dt className="w-20 shrink-0 text-ink-mute">Source</dt><dd className="min-w-0 break-all font-mono text-xs text-ink">{held.url || 'Local source'}</dd></div>
-          </dl>
+          <DescriptionList items={[{ name: 'Pinned to', value: pin ? `${pin.title} · ${pin.line}` : '' }, { name: 'Source', value: held.url || 'Local source', code: true }]} />
         ) : null}
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <Column>
+          <Cluster>
             <Button variant="outline" size="sm" loading={check.busy} loadingText="Checking…" onClick={() => void checkUpdates()}><Icon name="refresh" />Check for updates</Button>
-            <span role="status" className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-mute">
+            <Cluster role="status">
               {update ? <Badge variant="secondary">{updateLine(update)}</Badge> : null}
-              {update?.note && update.status !== 'unknown' && update.status !== 'error' ? <span className="min-w-0">{update.note}</span> : null}
-            </span>
-          </div>
+              {update?.note && update.status !== 'unknown' && update.status !== 'error' ? <Text variant="note">{update.note}</Text> : null}
+            </Cluster>
+          </Cluster>
           {check.error ? <RefusalLine>{check.error}</RefusalLine> : null}
-        </div>
+        </Column>
         <FormField label="Move to" help="A published release or a commit. Leave it empty for the newest release (the latest commit, for an input without releases)." error={toError}>
           <Input
             autoFocus
@@ -125,7 +122,6 @@ export function PinDialog(props: PinDialogProps) {
             placeholder="v2.0.0"
             autoComplete="off"
             spellCheck={false}
-            className="font-mono"
             onChange={e => { typed.current = true; setTo(e.currentTarget.value); setToError(undefined); }}
           />
         </FormField>

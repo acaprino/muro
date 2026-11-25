@@ -122,16 +122,16 @@ export function RunFields({ form }: { form: RunForm }) {
       <FormField label="Your request" help={REQUEST_HINT} error={form.errors.request}>
         <Textarea rows={3} value={form.request} onChange={e => form.setRequest(e.currentTarget.value)} />
       </FormField>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">Version</span>
+      <Column>
+        <Text variant="strong">Version</Text>
         <ToggleGroup value={form.step} onValueChange={form.setStep} aria-label="Version">
           {VERSION_STEPS.map(s => <ToggleGroupItem key={s.value} value={s.value}>{s.label}</ToggleGroupItem>)}
         </ToggleGroup>
-        <p className="text-xs text-ink-mute">{STEP_HINT}</p>
-      </div>
-      {form.stop ? <RefusalLine>{form.stop}</RefusalLine> : <p className="text-sm text-ink-soft">{AI_RUN_NOTE}</p>}
+        <Text as="p" variant="note">{STEP_HINT}</Text>
+      </Column>
+      {form.stop ? <RefusalLine>{form.stop}</RefusalLine> : <Text as="p" variant="soft">{AI_RUN_NOTE}</Text>}
       <FormField label="Maximum budget (USD)" help={BUDGET_HINT} error={form.errors.budget}>
-        <Input inputMode="decimal" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} className="max-w-40 tabular-nums" />
+        <Input inputMode="decimal" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} />
       </FormField>
       {form.failure ? <RefusalLine>{form.failure}</RefusalLine> : null}
     </>
@@ -154,8 +154,8 @@ export function RunFooter({ form, submit, destructive = false, cancelFirst = fal
 /** The `<form>` of a dialog of a change: Enter in a field submits it, and `onSubmit` decides whether anything is sent. */
 export function RunFormBody({ form, onSubmit, children }: { form: RunForm; onSubmit(): void; children?: React.ReactNode }) {
   return (
-    <form id={form.formId} noValidate className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); onSubmit(); }}>
-      {children}
+    <form id={form.formId} noValidate onSubmit={e => { e.preventDefault(); onSubmit(); }}>
+      <Column gap="lg">{children}</Column>
     </form>
   );
 }

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Checkbox, Input, Textarea } from '@acaprino/sigrid/primitives';
+import { Button, Checkbox, Cluster, Column, Input, Text, Textarea } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRecord } from '../../../types.ts';
 import { useNotify } from '@acaprino/imago';
@@ -109,26 +109,26 @@ function RecordDialog({ id, info, records, target, open, onClose }: Props & { op
         </>
       )}
     >
-      <form id={`${ids}-form`} noValidate onSubmit={submit} className="flex flex-col gap-4">
+      <form id={`${ids}-form`} noValidate onSubmit={submit}><Column gap="lg">
         <FormField label="Date" required error={tried && missing.date ? 'Choose the date of the decision.' : null}>
           <Input type="date" name="date" value={form.date} onChange={e => change({ date: e.currentTarget.value })} />
         </FormField>
         <FormField label="About" help="The capabilities or inputs this decision is about, separated by commas.">
-          <Input name="subjects" autoComplete="off" spellCheck={false} className="font-mono" placeholder="capability-id, input-id" value={form.subjects} onChange={e => change({ subjects: e.currentTarget.value })} />
+          <Input name="subjects" autoComplete="off" spellCheck={false} placeholder="capability-id, input-id" value={form.subjects} onChange={e => change({ subjects: e.currentTarget.value })} />
         </FormField>
         <FormField label="Decision" required help="What was decided, and why." error={tried && missing.text ? 'Write the decision and its reason.' : null}>
           <Textarea name="text" rows={6} value={form.text} onChange={e => change({ text: e.currentTarget.value })} />
         </FormField>
-        <div className="flex items-start gap-3">
+        <Cluster gap="md" align="start" wrap={false}>
           <Checkbox id={`${ids}-binding`} aria-describedby={`${ids}-binding-help`} checked={form.binding} onCheckedChange={next => change({ binding: next === true })} />
-          <div className="flex flex-col gap-0.5">
-            <label htmlFor={`${ids}-binding`} className="text-sm font-medium text-ink">Binding</label>
-            <span id={`${ids}-binding-help`} className="text-xs text-ink-mute">The next harmonization follows it, and stops rather than break it.</span>
-          </div>
-        </div>
-        {edit.blocked ? <p role="status" className="text-xs text-ink-mute">{edit.blocked}</p> : null}
+          <Column gap="xs">
+            <label htmlFor={`${ids}-binding`}><Text variant="strong">Binding</Text></label>
+            <Text variant="note" id={`${ids}-binding-help`}>The next harmonization follows it, and stops rather than break it.</Text>
+          </Column>
+        </Cluster>
+        {edit.blocked ? <Text as="p" variant="note" role="status">{edit.blocked}</Text> : null}
         {said ? <NotSaved text={said} /> : null}
-      </form>
+      </Column></form>
     </Dialog>
   );
 }
@@ -173,7 +173,7 @@ function DeleteDialog({ id, info, records, target, open, onClose, focusAfterDele
         </>
       )}
     >
-      {edit.blocked ? <p role="status" className="text-xs text-ink-mute">{edit.blocked}</p> : null}
+      {edit.blocked ? <Text as="p" variant="note" role="status">{edit.blocked}</Text> : null}
       {edit.error ? <NotSaved text={edit.error} /> : null}
     </Dialog>
   );

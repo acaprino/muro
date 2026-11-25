@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Icon, Input, Textarea } from '@acaprino/sigrid/primitives';
+import { Button, Card, Cluster, Heading, Icon, Input, Text, Textarea } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { InstructionFile } from '../../../types.ts';
 import { checkInstructions, instructionDiff, operationWords } from './jobs.ts';
@@ -73,8 +73,8 @@ export function InstructionsDialog(props: ChangeDialogProps) {
         {rows.length ? rows.map((row, i) => {
           const named = row.path.trim();
           return (
-            <div key={row.key} role="group" aria-labelledby={`${ids}-head-${row.key}`} className="flex flex-col gap-3 rounded-lg border border-line p-3">
-              <h3 id={`${ids}-head-${row.key}`} className="truncate font-mono text-sm font-medium text-ink" title={named || 'New file'}>{named || 'New file'}</h3>
+            <Card key={row.key} variant="quiet" pad="md" role="group" aria-labelledby={`${ids}-head-${row.key}`}>
+              <Heading size="small" id={`${ids}-head-${row.key}`}><Text pre>{named || 'New file'}</Text></Heading>
               <FormField label="File name" id={`${ids}-path-${row.key}`} help={i === 0 ? 'Markdown, such as house-style.md or team/tone.md.' : undefined}>
                 <Input
                   autoFocus={i === 0}
@@ -82,22 +82,21 @@ export function InstructionsDialog(props: ChangeDialogProps) {
                   placeholder="house-style.md"
                   autoComplete="off"
                   spellCheck={false}
-                  className="font-mono"
                   onChange={e => change(row.key, { path: e.currentTarget.value })}
                 />
               </FormField>
               <FormField label="Text">
-                <Textarea rows={6} value={row.text} className="max-h-80" onChange={e => change(row.key, { text: e.currentTarget.value })} />
+                <Textarea rows={6} value={row.text} onChange={e => change(row.key, { text: e.currentTarget.value })} />
               </FormField>
-              <div>
+              <Cluster>
                 <Button variant="outline" size="sm" aria-label={`Remove file ${named || '(new)'}`} onClick={() => removeRow(row.key)}><Icon name="delete" />Remove file</Button>
-              </div>
-            </div>
+              </Cluster>
+            </Card>
           );
-        }) : <p className="text-sm text-ink-mute">This project has no instruction file yet.</p>}
-        <div>
+        }) : <Text as="p" variant="muted">This project has no instruction file yet.</Text>}
+        <Cluster>
           <Button ref={add} variant="outline" size="sm" autoFocus={!rows.length} onClick={addRow}><Icon name="plus" />Add file</Button>
-        </div>
+        </Cluster>
         {error ? <RefusalLine>{error}</RefusalLine> : null}
         <RunFields form={form} />
       </RunFormBody>
