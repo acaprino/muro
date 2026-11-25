@@ -180,6 +180,24 @@ await test('the palette opens with Ctrl+K and from the bar; it goes to a page, a
   assert.deepEqual(await texts(currentTab(page)), ['Activity']);
 });
 
+// ---------- the glass ----------
+await test('Settings has the glass of the window, off at first; a press makes it glass and tells the window, and the palette says so', 'default', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await tab(page, 'Settings').click();
+  const glass = content(page).getByRole('switch', { name: 'Glass' });
+  assert.equal(await glass.getAttribute('aria-checked'), 'false', 'the window is not glass until the person chooses');
+  assert.equal(await page.evaluate(() => window.native.filter(([command]) => command === 'plugin:imago-shell|set_glass').length), 0, 'nothing is told at the start');
+  await content(page).getByText('Settings is moving to the new window').waitFor();
+  await glass.click();
+  await page.waitForFunction(() => document.documentElement.dataset.material === 'glass');
+  await page.waitForFunction(() => window.native.some(([command]) => command === 'plugin:imago-shell|set_glass'));
+  assert.deepEqual(await page.evaluate(() => window.native.filter(([command]) => command === 'plugin:imago-shell|set_glass').map(([, args]) => args)), [{ glass: true }]);
+  await page.screenshot({ path: shots + '/shell-glass.png' });
+  await page.keyboard.press('Control+k');
+  assert.equal(await options(page).filter({ hasText: 'Glass' }).getAttribute('aria-checked'), 'true', 'the command of the look is checked');
+});
+
 // ---------- the registry, read again ----------
 await test('the window reads the registry again when the crate says it is shown (window-shown) and when it gets the focus, and asks for no plan', 'changes', {}, async app => {
   const { page } = app;
