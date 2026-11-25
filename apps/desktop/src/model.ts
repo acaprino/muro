@@ -78,6 +78,10 @@ export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
   const quiet=summary.kind==='ok'||summary.kind==='blocked';
   return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':summary.kind,unreadable};
 }
+/** What an enabled harness holds that it cannot load itself (the `warnings` of its inventory), each with its harness. The service read around it: the harness is listed and managed all the same, so this is told beside the sync state and never takes its place. */
+export function harnessWarnings(snapshot:Snapshot):{target:Target;message:string}[] {
+  return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>(snapshot.inventory.find(i=>i.target_id===target.id)?.warnings??[]).map(message=>({target,message})));
+}
 /** Whether two plans ask for the same operations (harness, plugin, kind, versions), in any order. */
 export function sameOperations(a:Plan|null,b:Plan|null):boolean {
   if(!a||!b||a.operations.length!==b.operations.length) return false;

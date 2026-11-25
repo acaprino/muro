@@ -225,6 +225,27 @@ await test('a harness that cannot be read is never in sync: the note names it, t
   await page.screenshot({ path: shots + '/sync-unreadable.png' });
 });
 
+// Owner, 2026-11-25, "Muro deve funzionare": one marketplace of Codex whose folder was gone made the whole harness read as "cannot be read".
+await test('a harness that holds a marketplace it cannot load is read all the same: the note says its changes, and a warning names the marketplace', 'changes', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await app.flags({ brokenMarketplace: true });
+  await check(app);
+  assert.equal(await kind(page), 'changes', 'the harness was read: its changes are ready');
+  assert.equal(await content(page).getByText('cannot be read').count(), 0);
+  assert.equal(await head(page, 'Codex isolated test').getByText('Cannot be read', { exact: true }).count(), 0);
+  const warning = page.locator('#harness-warnings');
+  await warning.waitFor();
+  const said = await warning.textContent();
+  for (const words of ['Codex isolated test holds an entry that cannot be loaded', 'Codex isolated test: The marketplace i-have-adhd points to a folder that is gone: D:/Projects/gone/i-have-adhd', 'still installs, updates and removes its plugins']) {
+    assert.ok(said.includes(words), `${words}: ${said}`);
+  }
+  await page.screenshot({ path: shots + '/sync-broken-marketplace.png' });
+  await app.flags({ brokenMarketplace: false });
+  await check(app);
+  assert.equal(await warning.count(), 0, 'a check that no longer finds it takes the warning away');
+});
+
 await test('a source the check could not resolve is listed with the service\'s words, and the plan stays', 'changes', {}, async app => {
   const { page } = app;
   await ready(page);

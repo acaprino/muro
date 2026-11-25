@@ -9,11 +9,11 @@ import * as React from 'react';
 import { Button, Card, Cluster, Column, Heading, Icon, Split, Text } from '@acaprino/sigrid/primitives';
 import { Empty, Note } from '@acaprino/sigrid/components';
 import type { Snapshot } from '../../types.ts';
-import { syncHeadline } from '../../model.ts';
+import { harnessWarnings, syncHeadline } from '../../model.ts';
 import { plural } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { useSync } from './useSync.tsx';
-import { noteOf, timesLine, type NoteTone } from './words.ts';
+import { nameList, noteOf, timesLine, type NoteTone } from './words.ts';
 import { SyncTable } from './SyncTable.tsx';
 import { ReviewSheet } from './ReviewSheet.tsx';
 import { PluginDialog } from './PluginDialog.tsx';
@@ -63,6 +63,7 @@ export function Sync({ openHarness }: SyncProps) {
         </Card>
       ) : <SyncNote snapshot={snapshot} />}
       <CheckErrors snapshot={snapshot} />
+      <HarnessWarnings snapshot={snapshot} />
       {listEmpty ? (
         <Card variant="quiet" pad="xl">
           <Empty title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
@@ -109,6 +110,25 @@ function CheckErrors({ snapshot }: { snapshot: Snapshot }) {
       title={<Text>{plural(errors.length, 'source')} could not be checked</Text>}
       items={errors.map(e => <><Text variant="strong">{nameOf(e.plugin_id)}</Text>: {e.message}</>)}
     />
+  );
+}
+
+/** What a harness holds that it cannot load itself (model.ts `harnessWarnings`: a marketplace of Codex whose folder is gone), in the service's words. Muro read around it, so the
+ * harness is listed and managed and the sync note says its state; this says what to repair there, and stays until a check no longer finds it. */
+function HarnessWarnings({ snapshot }: { snapshot: Snapshot }) {
+  const warnings = harnessWarnings(snapshot);
+  if (!warnings.length) return null;
+  const names = [...new Set(warnings.map(w => w.target.name))];
+  return (
+    <Note
+      id="harness-warnings"
+      tone="warning"
+      announce={false}
+      title={<Text>{nameList(names)} {names.length > 1 ? 'hold' : 'holds'} {warnings.length > 1 ? 'entries' : 'an entry'} that cannot be loaded</Text>}
+      items={warnings.map(w => <><Text variant="strong">{w.target.name}</Text>: {w.message}</>)}
+    >
+      <Text>Muro read what is installed there from the harness's own files, and still installs, updates and removes its plugins. Repair or remove the entry in the harness to clear this.</Text>
+    </Note>
   );
 }
 

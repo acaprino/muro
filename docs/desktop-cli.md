@@ -44,7 +44,7 @@ Run these commands from the portable folder in PowerShell:
 .\tools\muroctl.exe request scan
 ```
 
-`snapshot` returns the registry, observed inventory and activity as JSON. `registry` reads only the desired configuration. `status` returns `{"revision":N,"settings":{...},"sync":{...}}` (the registry revision, its settings and the recorded sync state) from `registry.json` and `sync-status.json` alone: it scans nothing and, unlike every other action, it does not take the writer lock, so it answers while a check or a save holds the registry. The tray and the background worker read it; use it to poll. `scan` refreshes plugin inventories; an incomplete inventory remains an error rather than becoming an empty list.
+`snapshot` returns the registry, observed inventory and activity as JSON. `registry` reads only the desired configuration. `status` returns `{"revision":N,"settings":{...},"sync":{...}}` (the registry revision, its settings and the recorded sync state) from `registry.json` and `sync-status.json` alone: it scans nothing and, unlike every other action, it does not take the writer lock, so it answers while a check or a save holds the registry. The tray and the background worker read it; use it to poll. `scan` refreshes plugin inventories; an incomplete inventory remains an error rather than becoming an empty list. An inventory that is complete can carry `warnings`: what the harness holds that it cannot load itself and Muro read around, each in a sentence (a marketplace of Codex whose folder is gone).
 
 For an isolated registry:
 

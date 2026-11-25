@@ -5,6 +5,7 @@
 //   rejectSave, rejectSettings   the next save_* / settings request fails with a version conflict
 //   blockPlan                    every plan carries one blocker besides its operations
 //   unreadable                   the first harness cannot be read (incomplete inventory)
+//   brokenMarketplace            the first harness holds a marketplace it cannot load: it is read all the same (complete inventory), with the service's warning
 //   checkErrors                  check reports a source it could not resolve
 //   checkDelay, applyDelay (ms)  check / apply take that long; rejectApply makes apply fail
 //   autostartUnsupported         autostart answers supported:false
@@ -189,7 +190,7 @@ function scenarioData(scenario) {
 
 export function createTransport(scenario = 'default') {
   const data = scenarioData(scenario), calls = [];
-  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, emptyGraph: false, noEntries: false, oddNames: false, objectFields: false, projectChanged: false };
+  const flags = { rejectSave: false, rejectSettings: false, blockPlan: false, unreadable: false, brokenMarketplace: false, checkErrors: false, checkDelay: 0, planDelay: 0, applyDelay: 0, rejectApply: false, autostartUnsupported: false, instructionFiles: [], instructionStale: false, staleSettings: 0, pickPath: 'D:/Projects/extra/Notes.mp', noShellActions: false, rejectInstall: false, installLeavesTargets: false, simulate: 'selected', simulateDelay: 0, simulateError: '', bigGraph: false, emptyGraph: false, noEntries: false, oddNames: false, objectFields: false, projectChanged: false };
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
@@ -201,7 +202,8 @@ export function createTransport(scenario = 'default') {
   const log = (action, status, message) => activity.push({ id: 'a' + ++activityNumber + 'x', time: ago(0), action, status, message });
   const inventory = t => {
     if (flags.unreadable && t.id === reg.targets[0]?.id) return { target_id: t.id, complete: false, error: 'Configuration folder not found', supported: true, plugins: [] };
-    return { target_id: t.id, complete: true, error: null, supported: true, plugins: installed[t.id] || [] };
+    const warnings = flags.brokenMarketplace && t.id === reg.targets[0]?.id ? ['The marketplace i-have-adhd points to a folder that is gone: D:/Projects/gone/i-have-adhd'] : [];
+    return { target_id: t.id, complete: true, error: null, warnings, supported: true, plugins: installed[t.id] || [] };
   };
   const instructions = () => reg.plugins.map(p => ({ plugin_id: p.id, path: p.custom_instructions_dir || 'D:/isolated/data/custom-instructions/' + p.id, files: flags.instructionFiles, digest: 'fixture-digest', stale_harnesses: flags.instructionStale ? [reg.targets.find(t => p.targets.includes(t.id))?.harness].filter(Boolean) : [] }));
   const snapshot = () => structuredClone({ registry: reg, inventory: reg.targets.map(inventory), activity, sync, jobs, data_dir: 'D:/isolated/data', custom_instructions: instructions() });

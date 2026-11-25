@@ -14,7 +14,8 @@ export interface Registry { schema:number; revision:number; plugins:Plugin[]; ta
 /** `present` is false for a Claude Code record whose files are gone (its `installPath` is not a folder); a harness that does not say, or an entry without the field, has them.
  * `plugin_name` is the name the harness installed it under (what its manifest calls it), as the service reads it from the entry: null where the harness lists a plugin by its folder or its source. `enabled` is absent where the harness does not say. */
 export interface InstalledPlugin { id:string; registry_id?:string; name:string; version:string; path:string; managed:boolean; present?:boolean; plugin_name?:string|null; enabled?:boolean }
-export interface Inventory { target_id:string; complete:boolean; error:string|null; plugins:InstalledPlugin[]; supported:boolean }
+/** `warnings`: what the harness holds that it cannot load itself and the service read around, each in a sentence (a marketplace of Codex whose folder is gone): the inventory is complete all the same. Absent in a record written before the field existed. */
+export interface Inventory { target_id:string; complete:boolean; error:string|null; warnings?:string[]; plugins:InstalledPlugin[]; supported:boolean }
 export interface Activity { id:string; time:string; action:string; status:string; message:string }
 /** An AI run of the runtime (`jobs`): an adaptation of a plugin (`plugin_id`, `harness`; no `kind`), or, with `kind` "project", a project made or changed (`project_id`, `operation`, `title`, `file`).
  * `status` is running, completed, failed, cancelled or interrupted. `time` is when it started, in epoch seconds (the runtime sends a number; a text of digits is read the same). */
