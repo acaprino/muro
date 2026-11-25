@@ -9,14 +9,14 @@ import pytest
 from muro import build_release, parse_capabilities, validate_plugin_identity
 from muro.adapters import _skill
 from muro.guide import write_release_guide
+from routing_helpers import FIXTURE
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 
 
 def test_install_policy_auto_default_vs_confirm_mode_in_skill_md():
-    caps = parse_capabilities(MARIONETTE / "capabilities")
-    base_plugin = {"slug": "marionette", "name": "Marionette", "command": "marionette", "version": "0.1.0"}
+    caps = parse_capabilities(FIXTURE / "capabilities")
+    base_plugin = {"slug": "pressroom", "name": "Pressroom", "command": "pressroom", "version": "0.1.0"}
 
     auto_skill = _skill(base_plugin, "opencode", capabilities=caps)
     assert "runtime dependency that is missing" in auto_skill
@@ -34,7 +34,7 @@ def test_install_policy_auto_default_vs_confirm_mode_in_skill_md():
 def test_offline_pins_validates_manifest_and_local_repos_while_disclosing_skipped_remotes(tmp_path):
     script = ROOT / "muro_build.py"
     run = subprocess.run(
-        [sys.executable, str(script), "--manifest", str(MARIONETTE / "sources.json"), "--check-sources", "--offline-pins"],
+        [sys.executable, str(script), "--manifest", str(FIXTURE / "sources.json"), "--check-sources", "--offline-pins"],
         capture_output=True, text=True, encoding="utf-8",
     )
     assert run.returncode == 0, run.stderr
@@ -42,7 +42,7 @@ def test_offline_pins_validates_manifest_and_local_repos_while_disclosing_skippe
 
     # Malformed SHA or invalid pin mode still fails closed under --offline-pins
     bad_manifest = tmp_path / "sources.json"
-    data = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))
+    data = json.loads((FIXTURE / "sources.json").read_text(encoding="utf-8"))
     data["sources"][0]["commit"] = "not-a-sha"
     bad_manifest.write_text(json.dumps(data), encoding="utf-8")
     bad_run = subprocess.run(

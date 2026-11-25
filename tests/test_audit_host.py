@@ -30,7 +30,7 @@ def packaged_marionette(tmp_path):
     for name in ("ROUTER.md", "sources.json", "entries.json"):
         shutil.copy2(MARIONETTE / name, pkg / name)
     copy_prompts(pkg)
-    copy_delivery(pkg)
+    copy_delivery(pkg, MARIONETTE)
     shutil.copytree(ROOT / "muro", pkg / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (pkg / "muro.py").write_text(
         "from pathlib import Path\nimport sys\npackage = Path(__file__).resolve().parent\n"

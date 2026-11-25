@@ -23,7 +23,7 @@ def coordinator(tmp_path):
     shutil.copytree(PACKAGE / "capabilities", package / "capabilities")
     shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
     copy_prompts(package)
-    copy_delivery(package)
+    copy_delivery(package, PACKAGE)
     return Coordinator(package, tmp_path / "consumer")
 
 

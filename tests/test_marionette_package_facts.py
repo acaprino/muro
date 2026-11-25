@@ -137,3 +137,10 @@ def test_manifest_declares_a_mode_for_every_source():
         "better-layout": ("head", None),
         "charles-skills": ("head", None),
     }
+
+
+def test_the_guide_documents_at_least_ten_examples():
+    # Split from test_simulate::test_prepare_gives_the_context_the_guide_computes_for_every_documented_example,
+    # whose mechanics now run on the fixture package: the count measures this package, not the simulator.
+    examples = json.loads((PACKAGE / "guide-examples.json").read_text(encoding="utf-8"))["examples"]
+    assert len(examples) >= 10

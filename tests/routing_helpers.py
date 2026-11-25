@@ -4,11 +4,22 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# An invented package that validates as a whole (tests/test_fixture_package.py): eight capabilities, entries,
+# a session policy, guide examples and eval cases, with remotes that do not exist. Read it in place; write
+# only in a copy (`copy_fixture`).
+FIXTURE = Path(__file__).resolve().parent / "fixtures" / "package"
 INTENTS = 'intents: [{"id":"testing.verify","description":"Verify the requested test artifact.","excludes":[]}]\ntools: []\nhooks: []\nconflicts: []\n'
 ROUTER_HEADER = "| id | role | when | after | outputs | intents |\n|---|---|---|---|---|---|\n"
 
 
-def copy_delivery(package, source=ROOT / "examples" / "marionette"):
+def copy_fixture(destination):
+    """A copy of the fixture package that a test may change, with the prompts a release carries beside it."""
+    copy_prompts(destination)      # its stand-in guide example is replaced by the fixture's own just below
+    shutil.copytree(FIXTURE, destination, dirs_exist_ok=True, ignore=shutil.ignore_patterns(".*"))
+    return destination
+
+
+def copy_delivery(package, source=FIXTURE):
     """What a copied catalog needs beside capabilities and router once it declares an active hook.
 
     The runtime refuses such a catalog without its delivery document (ADR-0016), and the document

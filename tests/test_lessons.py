@@ -30,7 +30,7 @@ def pkg(tmp_path):
     for name in ("ROUTER.md", "sources.json"):
         shutil.copy2(MARIONETTE / name, root / name)
     copy_prompts(root)
-    copy_delivery(root)
+    copy_delivery(root, MARIONETTE)
     return root
 
 

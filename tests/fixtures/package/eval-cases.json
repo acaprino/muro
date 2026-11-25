@@ -1,0 +1,153 @@
+{
+  "cases": [
+    {
+      "id": "check-facts",
+      "task": "Check the facts in draft.md against the report it cites.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "fact-check"
+        ]
+      }
+    },
+    {
+      "id": "angle-only",
+      "task": "Which way into the subject of urban beekeeping is worth taking for readers who have never kept bees? Only the angle, no outline.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "story-brief"
+        ],
+        "selections": [
+          {
+            "capability": "story-brief",
+            "intent": "story.angle"
+          }
+        ]
+      },
+      "why": "The same capability plans a whole story; the request stops at the angle."
+    },
+    {
+      "id": "new-story-newsletter",
+      "task": "Write this week's newsletter edition about a new story on urban beekeeping. We have no angle yet.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "story-brief",
+          "newsletter-edition"
+        ],
+        "selections": [
+          {
+            "capability": "story-brief",
+            "intent": "story.brief"
+          },
+          {
+            "capability": "newsletter-edition",
+            "intent": "story.newsletter-edition",
+            "needs": [
+              {
+                "requires": "story-brief",
+                "applies": true
+              }
+            ]
+          }
+        ]
+      },
+      "why": "A new story with no angle: the conditional prerequisite applies."
+    },
+    {
+      "id": "digest-newsletter",
+      "task": "Write this week's newsletter edition as a digest of the three stories we published last week.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "newsletter-edition"
+        ],
+        "selections": [
+          {
+            "capability": "newsletter-edition",
+            "intent": "story.newsletter-edition",
+            "needs": [
+              {
+                "requires": "story-brief",
+                "applies": false
+              }
+            ]
+          }
+        ]
+      },
+      "why": "Published stories have their angle: the conditional prerequisite does not apply."
+    },
+    {
+      "id": "extract-then-convert",
+      "task": "Extract the text of manuscript.pdf, then convert chapter-3.docx to EPUB.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "manuscript-files",
+          "manuscript-files"
+        ],
+        "selections": [
+          {
+            "capability": "manuscript-files",
+            "step_id": "manuscript-files#1",
+            "intent": "files.extraction"
+          },
+          {
+            "capability": "manuscript-files",
+            "step_id": "manuscript-files#2",
+            "intent": "files.conversion"
+          }
+        ]
+      }
+    },
+    {
+      "id": "scroll-with-gsap",
+      "task": "Decide how the river story moves while scrolling and build it; the project uses GSAP.",
+      "stack_tokens": [
+        "stack:gsap"
+      ],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "pacing-spec",
+          "scroll-build-gsap"
+        ],
+        "selections": [
+          {
+            "capability": "pacing-spec",
+            "intent": "story.pacing"
+          },
+          {
+            "capability": "scroll-build-gsap",
+            "intent": "story.scroll-build"
+          }
+        ]
+      }
+    },
+    {
+      "id": "launch-party",
+      "task": "Book a venue for the launch party.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "no_match",
+        "capabilities": []
+      }
+    },
+    {
+      "id": "make-it-better",
+      "task": "Make it better.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "needs_clarification",
+        "capabilities": []
+      },
+      "why": "Nothing says which artifact or which outcome."
+    }
+  ]
+}

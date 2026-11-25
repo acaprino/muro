@@ -65,7 +65,7 @@ def coordinator(tmp_path):
     shutil.copytree(MARIONETTE / "capabilities", pkg / "capabilities")
     shutil.copy2(MARIONETTE / "ROUTER.md", pkg / "ROUTER.md")
     copy_prompts(pkg)
-    copy_delivery(pkg)
+    copy_delivery(pkg, MARIONETTE)
     return Coordinator(pkg, tmp_path / "consumer")
 
 

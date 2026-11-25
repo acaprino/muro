@@ -17,7 +17,7 @@ from muro.cli import main
 from muro.core import parse_router
 from muro.entries import entry_description
 from muro.factory import PROMPT_FILES
-from routing_helpers import INTENTS, ROOT, ROUTER_HEADER, copy_prompts
+from routing_helpers import FIXTURE, INTENTS, ROOT, ROUTER_HEADER, copy_prompts
 from test_apache_notice_gate import filled
 from test_custom_instructions import deliver
 from test_regressions import MIT
@@ -1035,14 +1035,15 @@ def test_the_guide_page_carries_exactly_the_data_guide_data_returns(portable_pro
     assert data["delivery"] is None                                      # this fixture declares no delivery
 
 
-def test_guide_data_reads_the_real_marionette_package_as_a_package_folder():
-    package = ROOT / "examples" / "marionette"
+def test_guide_data_reads_a_package_folder_with_delivery_examples_and_several_sources():
+    package = FIXTURE                                                    # a package folder, not a built release
     manifest = json.loads((package / "sources.json").read_text(encoding="utf-8"))
     data = guide.guide_data(package, manifest["plugin"], manifest["sources"], packaged=False)
     assert [cap["id"] for cap in data["capabilities"]] == [row.id for row in parse_router(package / "ROUTER.md")]
-    assert data["delivery"] == json.loads((package / "delivery.json").read_text(encoding="utf-8"))
+    assert data["delivery"] == json.loads((package / "delivery.json").read_text(encoding="utf-8")) and data["delivery"]
     assert len(data["examples"]) == len(json.loads((package / "guide-examples.json").read_text(encoding="utf-8"))["examples"])
     assert [source["id"] for source in data["sources"]] == [source["id"] for source in manifest["sources"]]
+    assert len(data["capabilities"]) > 1 and len(data["examples"]) > 1 and len(data["sources"]) > 1
     assert all("repo_path" not in source for source in data["sources"])
 
 

@@ -22,7 +22,7 @@ def marionette_pkg(tmp_path):
     shutil.copy2(MARIONETTE / "ROUTER.md", pkg / "ROUTER.md")
     shutil.copy2(MARIONETTE / "sources.json", pkg / "sources.json")
     copy_prompts(pkg)
-    copy_delivery(pkg)
+    copy_delivery(pkg, MARIONETTE)
     return pkg
 
 

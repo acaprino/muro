@@ -1,0 +1,45 @@
+{
+  "decisions": [
+    {
+      "source": "editorial-desk",
+      "content": "skills/** and checklists/** (story and series planning, the newsletter edition, manuscript file operations, the fact check)",
+      "form": "capability",
+      "targets": [
+        "story-brief",
+        "series-concept",
+        "newsletter-edition",
+        "manuscript-files",
+        "fact-check"
+      ],
+      "reason": "Breadth: each procedure applies only when its own outcome is asked. Timing: on demand. Fit: five roles; the selected files define no hook and no text for every session."
+    },
+    {
+      "source": "scroll-stories",
+      "content": "skills/scroll-stories/SKILL.md (pacing limits, the GSAP and the CSS-only build)",
+      "form": "capability",
+      "targets": [
+        "pacing-spec",
+        "scroll-build-gsap",
+        "scroll-build-css"
+      ],
+      "reason": "Breadth: only stories that move while scrolling. Timing: on demand. Fit: one specification role and two stack variants of one build role."
+    },
+    {
+      "source": "custom-instructions/plain-words.md",
+      "content": "The whole file: three rules on how any answer is written",
+      "form": "always-on",
+      "targets": [],
+      "reason": "Breadth: the owner wrote it for every answer, whatever the task. Timing: before any classification. Fit: three short rules that add no procedure and own no output, carried in the owner's own words; the original file is read at intake only."
+    }
+  ],
+  "always_on": "Write for a reader who is new to the subject. Give every number with its unit. Say what was not checked.",
+  "custom_instructions": {
+    "digest": "578a6fada0ba4ed7ccdf94a3845475fb2f9ae9dc58223be64d8e10de0e9b5cf6",
+    "files": {
+      "custom-instructions/plain-words.md": "b6bd640bbb597f77d4af244a5a4cfcab9e288e57acb262e1f87fb106ee53cca4"
+    },
+    "intake_only_paths": [
+      "custom-instructions/plain-words.md"
+    ]
+  }
+}

@@ -16,7 +16,6 @@ from test_cli import git, make_repo, manifest_for, review_package
 from test_regressions import MIT
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def licensed_repo(tmp_path, tags=("v1.0.0",)):
@@ -122,7 +121,7 @@ def test_mcp_initialize_list_and_call():
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
         {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
         {"jsonrpc": "2.0", "id": 3, "method": "tools/call",
-         "params": {"name": "validate", "arguments": {"manifest": "examples/marionette/sources.json"}}},
+         "params": {"name": "validate", "arguments": {"manifest": "tests/fixtures/package/sources.json"}}},
         {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "no-such-tool", "arguments": {}}},
         {"jsonrpc": "2.0", "id": 5, "method": "nonsense/method"},
     ])

@@ -31,7 +31,7 @@ def coordinator(tmp_path):
     for directory in ("capabilities", "prompts"):
         shutil.copytree((PACKAGE if directory == "capabilities" else ROOT) / directory, package / directory)
     shutil.copy2(PACKAGE / "ROUTER.md", package / "ROUTER.md")
-    copy_delivery(package)
+    copy_delivery(package, PACKAGE)
     return Coordinator(package, tmp_path / "consumer")
 
 

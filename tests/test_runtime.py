@@ -19,7 +19,7 @@ def package(tmp_path):
     shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
     shutil.copy2(PACKAGE / "ROUTER.md", root / "ROUTER.md")
     copy_prompts(root)
-    copy_delivery(root)
+    copy_delivery(root, PACKAGE)
     return root
 
 
