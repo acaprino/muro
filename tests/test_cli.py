@@ -1,6 +1,5 @@
 """Tests for the `muro` subcommand CLI, the baseline report and the review preparation."""
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -10,9 +9,9 @@ import pytest
 from muro.baseline import _newest_stable, baseline_report
 from muro.cli import main
 from muro.factory import review_prompt
+from routing_helpers import FIXTURE, copy_fixture
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def git(path, *args):
@@ -74,10 +73,10 @@ def test_baseline_unreadable_tag_scheme_is_unknown():
 
 
 def test_subcommand_and_legacy_validate_agree(capsys):
-    assert main(["validate", "--manifest", str(PACKAGE / "sources.json")]) == 0
+    assert main(["validate", "--manifest", str(FIXTURE / "sources.json")]) == 0
     modern = capsys.readouterr().out
-    assert main(["--manifest", str(PACKAGE / "sources.json"), "--validate"]) == 0
-    assert capsys.readouterr().out == modern
+    assert main(["--manifest", str(FIXTURE / "sources.json"), "--validate"]) == 0
+    assert capsys.readouterr().out == modern and modern.startswith("OK")
 
 
 def test_unknown_command_is_rejected():
@@ -111,13 +110,8 @@ def test_baseline_cli_json_and_exit_codes(tmp_path, capsys):
 
 
 def review_package(tmp_path):
-    root = tmp_path / "package"
-    root.mkdir()
-    shutil.copytree(PACKAGE / "capabilities", root / "capabilities")
-    shutil.copytree(PACKAGE / "custom-instructions", root / "custom-instructions")
-    for name in ("ROUTER.md", "sources.json", "delivery.json", "entries.json", "guide-examples.json"):
-        shutil.copy2(PACKAGE / name, root / name)
-    return root
+    """A whole package to review, in a folder the review may write in."""
+    return copy_fixture(tmp_path / "package")
 
 
 def test_review_prompt_bundles_recorded_decisions(tmp_path):

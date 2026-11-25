@@ -31,14 +31,14 @@ file hashes include line endings. This repository's `.gitattributes` does so.
 
 4. Run `--validate`, `--check-sources` and `--build --out <fresh-directory>` with the same `--manifest`. Review the generated `GUIDE.html` and install the complete adapter using its `INSTALL.md`.
 
-Example commands for the repository's Marionette package:
+The same steps as commands, where `<package>` is your package's directory:
 
 ```sh
-python muro_build.py --manifest examples/marionette/sources.json --harmonize
+python muro_build.py --manifest <package>/sources.json --harmonize
 # Let the host AI perform the handoff above before continuing.
-python muro_build.py --manifest examples/marionette/sources.json --validate
-python muro_build.py --manifest examples/marionette/sources.json --check-sources
-python muro_build.py --manifest examples/marionette/sources.json --build --out .scratch/my-custom-marionette
+python muro_build.py --manifest <package>/sources.json --validate
+python muro_build.py --manifest <package>/sources.json --check-sources
+python muro_build.py --manifest <package>/sources.json --build --out .scratch/my-custom-package
 ```
 
 Use a new output directory for the next build. Preparation and build execute no
@@ -111,10 +111,9 @@ For session policy, inspect the standalone adapter's launcher:
 python <release>/adapters/codex/skills/<command>/muro.py session-context
 ```
 
-For Marionette the `<command>` is `marionette`. Its source rule lives in
-[`recap-adhd.md`](../examples/marionette/custom-instructions/recap-adhd.md).
-It requests progress updates during work; it does not add a routing step or
-replace the existing rule against redundant closing recaps. Validation proves
+`<command>` is the package's command (`plugin.command` in its `sources.json`).
+The recap rule of step 1, delivered as session policy, requests progress updates
+during work and adds no routing step. Validation proves
 binding and packaging, not that every model will follow every instruction.
 
 ## Delivery metadata for package authors

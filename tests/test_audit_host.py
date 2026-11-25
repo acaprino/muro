@@ -12,25 +12,26 @@ from pathlib import Path
 
 from muro import build_release
 from muro.runtime import Coordinator
-from routing_helpers import copy_delivery, copy_prompts, response
+from routing_helpers import FIXTURE, copy_delivery, copy_prompts, response
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 # Claude Code 2.1.322 persisted p4's 29.4 KB plan output to a file instead of showing it inline.
 # The exact host threshold is not documented; this bound keeps a wide margin under it, and the
 # live reruns recorded in docs/verification/ are the real check. It applies to the focused view:
-# the full catalog grows with every absorbed source (26 KB at 18 capabilities).
+# the full catalog grows with every absorbed source (26 KB at 18 capabilities). The fixture package
+# is small, so the bound means something only at the size of a real package, which asserts it itself.
 INLINE_LIMIT = 20000
 
 
-def packaged_marionette(tmp_path):
+def packaged(tmp_path, source=FIXTURE):
+    """A package as a host holds it: catalog, entries, delivery, the runtime and its one-file launcher."""
     pkg = tmp_path / "pkg"
     pkg.mkdir()
-    shutil.copytree(MARIONETTE / "capabilities", pkg / "capabilities")
+    shutil.copytree(source / "capabilities", pkg / "capabilities")
     for name in ("ROUTER.md", "sources.json", "entries.json"):
-        shutil.copy2(MARIONETTE / name, pkg / name)
+        shutil.copy2(source / name, pkg / name)
     copy_prompts(pkg)
-    copy_delivery(pkg)
+    copy_delivery(pkg, source)
     shutil.copytree(ROOT / "muro", pkg / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     (pkg / "muro.py").write_text(
         "from pathlib import Path\nimport sys\npackage = Path(__file__).resolve().parent\n"
@@ -47,13 +48,13 @@ def run(pkg, consumer, *args):
 
 
 def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
-    pkg = packaged_marionette(tmp_path)
+    pkg = packaged(tmp_path)
     consumer = tmp_path / "consumer"
     consumer.mkdir()
-    task = "Disegna in Figma la landing page di Lumo. Non abbiamo ancora una struttura dei contenuti."
+    task = "Scrivi l'edizione della newsletter su una storia nuova. Non abbiamo ancora un taglio."
     full = run(pkg, consumer, "plan", "--compact", "--task", task)
     # The full catalog grows with every source; the focused view is what a host skill asks for.
-    out = run(pkg, consumer, "plan", "--compact", "--focus", "visual-direction,design-guidance,canvas-design", "--task", task)
+    out = run(pkg, consumer, "plan", "--compact", "--focus", "story-brief,series-concept,newsletter-edition", "--task", task)
     assert len(out.encode("utf-8")) < INLINE_LIMIT < 30000, len(out.encode("utf-8"))
     brief_all = run(pkg, consumer, "plan", "--compact", "--brief", "--task", task)
     assert len(brief_all.encode("utf-8")) < len(out.encode("utf-8")) < len(full.encode("utf-8"))
@@ -63,10 +64,10 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     assert data["context"]["task"] == task
     assert len(data["context"]["catalog_digest"]) == 64
     assert len(data["instructions"]) < 800 and "SKILL.md" in data["instructions"]  # a pointer, not the rules
-    assert data["classification_path"].endswith(str(Path(".marionette") / "classification.json"))
+    assert data["classification_path"].endswith(str(Path(".pressroom") / "classification.json"))
     entries = {e["id"]: e for e in json.loads(full)["catalog"]}
-    assert len(entries) == 43
-    in_focus = ("visual-direction", "design-guidance", "canvas-design")
+    assert len(entries) == 8
+    in_focus = ("story-brief", "series-concept", "newsletter-edition")
     full_part = {e["id"]: e for e in data["catalog"] if "id" in e}
     assert set(full_part) == set(in_focus)
     for name in in_focus:
@@ -74,7 +75,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
     # The rest is indexed by discovery entry (2026-11-14): the per-capability index grew by ~540 bytes
     # with every capability and crossed the bound at 34. Entries are what the harmonizing AI authored.
     authored = {e["description"]: e for e in
-                json.loads((MARIONETTE / "entries.json").read_text(encoding="utf-8"))["entries"]}
+                json.loads((FIXTURE / "entries.json").read_text(encoding="utf-8"))["entries"]}
     groups = [e for e in data["catalog"] if "id" not in e]
     listed = [cap for group in groups for cap in group["capabilities"]]
     assert set(listed) | set(in_focus) == set(entries)       # nothing is hidden from the classifier
@@ -85,7 +86,7 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
         # Live run of 2026-11-14: a group that carried its entry's skill name was read as "another skill's
         # work" and left out of the plan. A group is part of this catalog and names no skill.
         assert group["brief"] is True and set(group) == {"brief", "description", "capabilities", "absorbs"}
-        assert group["absorbs"] == source["absorbs"] and "marionette-" not in json.dumps(group["capabilities"])
+        assert group["absorbs"] == source["absorbs"] and "pressroom-" not in json.dumps(group["capabilities"])
         assert group["capabilities"] == [cap for cap in source["capabilities"] if cap not in in_focus]
     index = json.loads(brief_all)["catalog"]
     assert all(e["brief"] is True and "id" not in e for e in index) and len(index) == len(authored)
@@ -100,38 +101,38 @@ def test_compact_plan_fits_inline_and_keeps_what_the_ai_needs(tmp_path):
         for key in ("after", "conflicts", "hooks", "reads", "needs"):
             assert entry.get(key, ["x"]) != [], (entry["id"], key)
         assert entry.get("when") != "—"
-    assert entries["canvas-design"]["needs"][0]["capability"] == "visual-direction"
-    assert entries["gsap-scrolltrigger"]["when"] == "stack:gsap"
-    assert entries["css-scroll"]["conflicts"] == ["gsap-scrolltrigger"]
-    assert not (consumer / ".marionette").exists()  # still writes nothing
+    assert entries["newsletter-edition"]["needs"][0]["capability"] == "story-brief"
+    assert entries["scroll-build-gsap"]["when"] == "stack:gsap"
+    assert entries["scroll-build-css"]["conflicts"] == ["scroll-build-gsap"]
+    assert not (consumer / ".pressroom").exists()  # still writes nothing
 
     # The host writes the decision with its file tool, then calls plan on ONE line.
-    decision = response(data, ["visual-direction", "canvas-design"])
+    decision = response(data, ["story-brief", "newsletter-edition"])
     path = Path(data["classification_path"])
     path.parent.mkdir(parents=True)
     path.write_text(json.dumps(decision, ensure_ascii=False), encoding="utf-8")
     nxt = json.loads(run(pkg, consumer, "plan", "--task", task, "--classification", str(path)))
-    assert nxt == {"mode": "confirm", "task": task, "plan": ["visual-direction", "canvas-design"]}
-    assert (consumer / ".marionette" / ".gitignore").read_text(encoding="utf-8").strip() == "*"
+    assert nxt == {"mode": "confirm", "task": task, "plan": ["story-brief", "newsletter-edition"]}
+    assert (consumer / ".pressroom" / ".gitignore").read_text(encoding="utf-8").strip() == "*"
 
 
 def test_python_api_still_returns_the_full_catalog_and_prompt(tmp_path):
-    pkg = packaged_marionette(tmp_path)
-    full = Coordinator(pkg, tmp_path / "consumer").propose("Converti report.docx in PDF", set())
+    pkg = packaged(tmp_path)
+    full = Coordinator(pkg, tmp_path / "consumer").propose("Converti capitolo.docx in PDF", set())
     assert "semantic decision" in full["instructions"]
     assert any(entry["hooks"] == [] for entry in full["catalog"])
 
 
 def test_state_dir_is_gitignored_on_first_write(tmp_path):
-    pkg = packaged_marionette(tmp_path)
+    pkg = packaged(tmp_path)
     consumer = tmp_path / "consumer"
     c = Coordinator(pkg, consumer)
-    task = "Create workbook and convert it"
+    task = "Check the facts of the draft and convert it"
     req = c.propose(task, set())
-    route = response(req, ["office-authoring", "office-files"])
+    route = response(req, ["fact-check", "manuscript-files"])
     plan = c.propose(task, set(), classification=route)["plan"]
     c.confirm(task, plan)
-    assert (consumer / ".marionette" / ".gitignore").read_text(encoding="utf-8").strip() == "*"
+    assert (consumer / ".pressroom" / ".gitignore").read_text(encoding="utf-8").strip() == "*"
 
 
 def test_skill_embeds_rules_uses_one_line_calls_and_preapproves_them_on_claude_code(portable_project, tmp_path):

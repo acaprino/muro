@@ -1,0 +1,77 @@
+{
+  "examples": [
+    {
+      "title": "Fact check of a draft",
+      "task": "Check the facts in draft.md against the report it cites.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "fact-check",
+          "intent": "story.fact-check",
+          "reason": "The request is to verify the claims of an existing draft."
+        }
+      ],
+      "reason": "One step: the draft exists and only its claims are checked.",
+      "questions": []
+    },
+    {
+      "title": "A scroll story from the brief to the build",
+      "task": "Plan a new story about river restoration, decide how it moves while scrolling and build it in our project, which uses GSAP.",
+      "stack_tokens": [
+        "stack:gsap"
+      ],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "story-brief",
+          "intent": "story.brief",
+          "reason": "A new story needs its reader, angle, outline and voice first."
+        },
+        {
+          "capability": "pacing-spec",
+          "intent": "story.pacing",
+          "reason": "The request leaves the movement open, so it is specified before any code."
+        },
+        {
+          "capability": "scroll-build-gsap",
+          "intent": "story.scroll-build",
+          "reason": "The project uses GSAP and the movement is to be implemented."
+        }
+      ],
+      "reason": "The brief, then the pacing, then the code. A path the AI chose for this request, not a rule for every story.",
+      "questions": []
+    },
+    {
+      "title": "Two operations on manuscript files",
+      "task": "Extract the text of manuscript.pdf, then convert chapter-3.docx to EPUB.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "manuscript-files",
+          "step_id": "manuscript-files#1",
+          "intent": "files.extraction",
+          "reason": "The PDF is read as source material and stays unchanged."
+        },
+        {
+          "capability": "manuscript-files",
+          "step_id": "manuscript-files#2",
+          "intent": "files.conversion",
+          "reason": "The chapter changes format, not content."
+        }
+      ],
+      "reason": "Two operations of one capability are two steps, each with its own checks.",
+      "questions": []
+    },
+    {
+      "title": "A request outside the catalog",
+      "task": "Book a venue for the launch party.",
+      "stack_tokens": [],
+      "status": "no_match",
+      "selections": [],
+      "reason": "Nothing in this catalog books venues; no capability is selected.",
+      "questions": []
+    }
+  ]
+}

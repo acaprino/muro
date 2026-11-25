@@ -1,0 +1,44 @@
+{
+  "entries": [
+    {
+      "name": "pressroom-stories",
+      "description": "Use when planning a story or its angle, planning a series of stories, or writing one edition of a newsletter around a story. Not for building scroll movement in code.",
+      "capabilities": [
+        "story-brief",
+        "series-concept",
+        "newsletter-edition"
+      ],
+      "absorbs": [
+        "story-planner",
+        "series-bible",
+        "newsletter-kit"
+      ]
+    },
+    {
+      "name": "pressroom-scroll",
+      "description": "Use when deciding what moves while a reader scrolls a story, or implementing that movement with GSAP ScrollTrigger or with CSS scroll timelines only.",
+      "capabilities": [
+        "pacing-spec",
+        "scroll-build-gsap",
+        "scroll-build-css"
+      ],
+      "absorbs": [
+        "scroll-pacing",
+        "scroll-gsap",
+        "scroll-css"
+      ]
+    },
+    {
+      "name": "pressroom-desk",
+      "description": "Use when reading, editing or converting an existing manuscript file, or checking the factual claims of a draft against its sources. Not for planning a new story.",
+      "capabilities": [
+        "manuscript-files",
+        "fact-check"
+      ],
+      "absorbs": [
+        "manuscript-tools",
+        "fact-checker"
+      ]
+    }
+  ]
+}

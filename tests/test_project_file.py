@@ -17,7 +17,7 @@ from muro.cli import main
 from muro.core import parse_router
 from muro.entries import entry_description
 from muro.factory import PROMPT_FILES
-from routing_helpers import INTENTS, ROOT, ROUTER_HEADER, copy_prompts
+from routing_helpers import FIXTURE, INTENTS, ROOT, ROUTER_HEADER, copy_prompts
 from test_apache_notice_gate import filled
 from test_custom_instructions import deliver
 from test_regressions import MIT
@@ -270,6 +270,20 @@ def test_a_package_without_records_history_or_changelog_gets_empty_ones(tmp_path
     assert json.loads((folder / "records.json").read_text(encoding="utf-8")) == {"records": []}
     assert json.loads((folder / "history.json").read_text(encoding="utf-8")) == {"runs": []}
     assert (folder / "CHANGELOG.md").read_text(encoding="utf-8") == ""
+
+
+def test_pack_writes_the_version_of_sources_json_into_the_packed_project_json(tmp_path, package, cache, capsys):
+    """The version lives once, in sources.json: a release bumps it there and nowhere else."""
+    stale = {**PROJECT_JSON, "version": "0.0.1"}
+    assert PLUGIN["version"] != stale["version"]
+    (package / "project.json").write_text(json.dumps(stale, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    code = main(["project", "pack", "--manifest", str(package / "sources.json"), "--out", str(tmp_path / "t.mp"),
+                 "--sources-cache", str(cache)])
+    assert code == 0, capsys.readouterr().err
+    packed = json.loads((project.unpack(tmp_path / "t.mp", tmp_path / "out") / "project.json").read_text(encoding="utf-8"))
+    assert packed == {**stale, "version": PLUGIN["version"]}
+    assert list(packed) == list(stale)                                   # same fields, same order: only the version moved
+    assert json.loads((package / "project.json").read_text(encoding="utf-8"))["version"] == "0.0.1"   # the source is not touched
 
 
 def test_pack_refuses_a_package_that_fails_validation(tmp_path, package):
@@ -1035,14 +1049,15 @@ def test_the_guide_page_carries_exactly_the_data_guide_data_returns(portable_pro
     assert data["delivery"] is None                                      # this fixture declares no delivery
 
 
-def test_guide_data_reads_the_real_marionette_package_as_a_package_folder():
-    package = ROOT / "examples" / "marionette"
+def test_guide_data_reads_a_package_folder_with_delivery_examples_and_several_sources():
+    package = FIXTURE                                                    # a package folder, not a built release
     manifest = json.loads((package / "sources.json").read_text(encoding="utf-8"))
     data = guide.guide_data(package, manifest["plugin"], manifest["sources"], packaged=False)
     assert [cap["id"] for cap in data["capabilities"]] == [row.id for row in parse_router(package / "ROUTER.md")]
-    assert data["delivery"] == json.loads((package / "delivery.json").read_text(encoding="utf-8"))
+    assert data["delivery"] == json.loads((package / "delivery.json").read_text(encoding="utf-8")) and data["delivery"]
     assert len(data["examples"]) == len(json.loads((package / "guide-examples.json").read_text(encoding="utf-8"))["examples"])
     assert [source["id"] for source in data["sources"]] == [source["id"] for source in manifest["sources"]]
+    assert len(data["capabilities"]) > 1 and len(data["examples"]) > 1 and len(data["sources"]) > 1
     assert all("repo_path" not in source for source in data["sources"])
 
 

@@ -11,7 +11,6 @@ import threading
 import uuid
 import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
-import shutil
 from pathlib import Path
 
 import pytest
@@ -21,11 +20,10 @@ from muro.cli import main
 from muro.delivery import load_delivery, session_text
 from muro.evals import prepare_eval
 from muro.mcp import call_tool, tool_definitions
-from routing_helpers import INTENTS, ROUTER_HEADER, copy_prompts
+from routing_helpers import FIXTURE, INTENTS, ROUTER_HEADER, copy_fixture, copy_prompts
 from test_release_guide import read_guide
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 PLUGIN = {"slug": "muro", "name": "Muro", "command": "muro", "version": "0.1.0"}
 
 
@@ -67,11 +65,9 @@ def make_mp(package_dir, out):
 
 @pytest.fixture(scope="module")
 def guide(tmp_path_factory):
-    """Marionette's guide as a release writes it: the digest and the steps of every documented example."""
+    """The fixture package's guide as a release writes it: the digest and the steps of every documented example."""
     from muro.guide import write_release_guide
-    copy = tmp_path_factory.mktemp("guide") / "marionette"
-    shutil.copytree(MARIONETTE, copy, ignore=shutil.ignore_patterns(".muro"))
-    shutil.copytree(ROOT / "prompts", copy / "prompts")
+    copy = copy_fixture(tmp_path_factory.mktemp("guide") / "package")
     manifest = json.loads((copy / "sources.json").read_text(encoding="utf-8"))
     _, parsed = read_guide(write_release_guide(copy, manifest["plugin"], manifest["sources"]))
     return parsed.payload
@@ -131,22 +127,24 @@ def key(monkeypatch):
 # --- prepare --------------------------------------------------------------------------------------
 
 def test_prepare_gives_the_context_the_guide_computes_for_every_documented_example(guide):
-    assert len(guide["examples"]) >= 10
+    authored = json.loads((FIXTURE / "guide-examples.json").read_text(encoding="utf-8"))["examples"]
+    assert [example["title"] for example in guide["examples"]] == [example["title"] for example in authored]
+    assert any(example["stack_tokens"] for example in guide["examples"])    # a stack is part of the context
     for example in guide["examples"]:
-        prepared = simulate.prepare(MARIONETTE, example["task"], example["stack_tokens"])
+        prepared = simulate.prepare(FIXTURE, example["task"], example["stack_tokens"])
         assert prepared["context"] == {"task": example["task"], "stack_tokens": sorted(example["stack_tokens"]),
                                        "catalog_digest": guide["catalog_digest"]}
         assert set(prepared) == {"context", "prompt"}
 
 
 def test_the_prompt_for_a_request_is_built_like_the_prompt_for_a_case(tmp_path):
-    prepared = simulate.prepare(MARIONETTE, "Convert my Word document to PDF", [])
-    case_prompt = (prepare_eval(MARIONETTE, tmp_path / "eval") / "PROMPT.md").read_text(encoding="utf-8")
+    prepared = simulate.prepare(FIXTURE, "Convert my chapter to EPUB", [])
+    case_prompt = (prepare_eval(FIXTURE, tmp_path / "eval") / "PROMPT.md").read_text(encoding="utf-8")
     prompt = prepared["prompt"]
     # The catalog and the rules are the very text a case is given.
     assert prompt.split("## Catalog\n\n", 1)[1] == case_prompt.split("## Catalog\n\n", 1)[1]
     # So is the permanent session policy.
-    policy = session_text(load_delivery(MARIONETTE))
+    policy = session_text(load_delivery(FIXTURE))
     assert policy
     assert f"## Permanent session policy\n\n{policy}\n\n" in prompt and f"## Permanent session policy\n\n{policy}\n\n" in case_prompt
     # The one context is shown whole, and nothing of an expectation can reach it.
@@ -183,10 +181,10 @@ def test_prepare_is_rerunnable_and_writes_nothing(package):
 
 def test_check_of_a_documented_example_gives_its_steps_in_order(guide):
     for example in guide["examples"]:
-        context = simulate.prepare(MARIONETTE, example["task"], example["stack_tokens"])["context"]
+        context = simulate.prepare(FIXTURE, example["task"], example["stack_tokens"])["context"]
         answer = {**context, "status": example["status"], "selections": example["selections"],
                   "reason": example["reason"], "questions": example["questions"]}
-        result = simulate.check(MARIONETTE, context, answer)
+        result = simulate.check(FIXTURE, context, answer)
         assert result["valid"] is True, (example["title"], result)
         assert result["status"] == example["status"]
         assert [s["step_id"] for s in result["steps"]] == [s["step"] for s in example["steps"]]
@@ -217,8 +215,8 @@ def test_the_order_is_the_runtimes_not_the_answers(package):
 
 
 def test_simulate_rejects_an_answer_with_a_capability_outside_the_catalog():
-    context = simulate.prepare(MARIONETTE, "Do something with a made-up capability", [])["context"]
-    result = simulate.check(MARIONETTE, context, decision(context, ids=["ghost-capability"]))
+    context = simulate.prepare(FIXTURE, "Do something with a made-up capability", [])["context"]
+    result = simulate.check(FIXTURE, context, decision(context, ids=["ghost-capability"]))
     assert result == {"valid": False, "errors": ["Unknown capability in AI classification: ghost-capability"]}
 
 
@@ -487,7 +485,7 @@ def test_the_mcp_tools_return_what_the_functions_return(tmp_path, package, monke
     monkeypatch.setattr(project, "default_cache_root", lambda: tmp_path / "cache")
     mp = make_mp(package, tmp_path / "project.mp")
     code, text = call_tool("simulate_prepare", {"project": str(mp), "task": "Synthesize the evidence",
-                                                "stack": ["stack:gsap"]}, MARIONETTE / "sources.json")
+                                                "stack": ["stack:gsap"]}, FIXTURE / "sources.json")
     assert code == 0 and json.loads(text) == prepared
     assert [p.name for p in (tmp_path / "cache").iterdir()] == [project.digest(mp)]
     # A request the factory refuses comes back as a tool error with the reason.
