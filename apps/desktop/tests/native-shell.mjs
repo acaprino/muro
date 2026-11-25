@@ -237,8 +237,8 @@ try {
 
   // 5a. The window that was hidden reads the registry again when it is shown: what the worker did meanwhile shows. Hidden,
   // the page asks nothing by itself, so its calls of the shell's command (which go over ipc.localhost) are counted.
-  const asked = () => first.page.evaluate(() => performance.getEntriesByType('resource').filter(e => new URL(e.name).host === 'ipc.localhost' && new URL(e.name).pathname === '/request').length);
-  const askedHidden = await asked();
+  const calls = () => first.page.evaluate(() => performance.getEntriesByType('resource').filter(e => new URL(e.name).host === 'ipc.localhost' && new URL(e.name).pathname === '/request').length);
+  const callsHidden = await calls();
 
   // 5b. One Muro for each data directory. Started again while it waits in the tray, Muro shows the
   // window of the one that runs; the new process ends by itself, with no error and no second backend.
@@ -247,7 +247,7 @@ try {
   assert.deepEqual([again.ended, again.code, again.output], [true, 0, ''], `second start: ${JSON.stringify(again)}`);
   assert.ok(again.took < 5000, `second start took ${again.took} ms`);
   await until('first window shown by the second start', () => windowOf(first.app, 'look').visible, 5000);
-  await until('the window shown again reads the registry again', async () => await asked() > askedHidden, 10000);
+  await until('the window shown again reads the registry again', async () => await calls() > callsHidden, 10000);
   results.push('a window that is shown again reads the registry again');
   assert.equal(backends(data), 1, 'a second backend was started');
   results.push('a second start for the same data directory ends with 0 and shows the window that runs');
