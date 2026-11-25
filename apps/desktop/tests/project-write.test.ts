@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import type { Job } from '../src/types.ts';
 import {
   ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, PROJECT_RUN_MINUTES, REPOSITORY_FIELDS, SAVING_PHASE,
-  SHIPPED_ID, VERSION_STEPS,
+  VERSION_STEPS,
   agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
   defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
   operationWords, outcomeOf, parseBudget, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
@@ -22,8 +22,7 @@ const CHANGE_OPERATIONS = ['harmonize', 'add_input', 'remove_input', 'move_pin',
 const DIGEST = 'a'.repeat(64);
 
 // ---------- what a person types ----------
-test('the constants are the runtime\'s: the shipped project, the default and the largest budget, and the agent it needs', () => {
-  assert.equal(SHIPPED_ID, 'marionette');
+test('the constants are the runtime\'s: the default and the largest budget, and the agent it needs', () => {
   assert.equal(DEFAULT_BUDGET, 5);
   assert.equal(MAX_BUDGET, 100);
   assert.equal(NEEDS_CLAUDE, 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.');
@@ -37,10 +36,9 @@ test('the constants are the runtime\'s: the shipped project, the default and the
   assert.equal(SAVING_PHASE, 'Building and saving the project');
 });
 
-test('a plugin id is kebab-case, not the shipped project\'s, and not one already listed, in the runtime\'s words', () => {
+test('a plugin id is kebab-case and not one already listed, in the runtime\'s words', () => {
   for (const good of ['my-plugin', ' my-plugin ', 'x2-y3', 'a', 'a'.repeat(64)]) assert.equal(checkSlug(good), null, good);
   for (const bad of ['My Plugin', '', '   ', '-a', 'a-', 'a--b', 'a_b', 'a b', 'A', 'caffè', 'a'.repeat(65)]) assert.equal(checkSlug(bad), BAD_SLUG, JSON.stringify(bad));
-  assert.equal(checkSlug('marionette'), 'The plugin id marionette is the project Muro ships: choose another');
   assert.equal(checkSlug('notes', ['notes']), 'A project for notes is already in your list');
   assert.equal(checkSlug('notes', { projects: ['other'], plugins: ['notes'] }), 'A plugin named notes is already in your list: choose another plugin id');
   assert.equal(checkSlug('notes', { projects: ['other'] }), null);
@@ -301,7 +299,7 @@ test('the outcome of a run is said in the runtime\'s words: its title and its me
 });
 
 // ---------- the fake service: the runtime's writes and refusals ----------
-const harmonize = (fake: any, over: Record<string, unknown> = {}) => ({ id: 'marionette', operation: 'harmonize', digest: fake.behind.digest('marionette'), budget_usd: 5, step: 'patch', request: '', ...over });
+const harmonize = (fake: any, over: Record<string, unknown> = {}) => ({ id: 'sample', operation: 'harmonize', digest: fake.behind.digest('sample'), budget_usd: 5, step: 'patch', request: '', ...over });
 const NEW_PROJECT = { name: 'Docs Kit', slug: 'docs-kit', author: 'me', folder: 'D:/Projects', inputs: [{ source: 'https://github.com/example/docs' }, { source: 'D:/Skills/writing' }], request: '', repository: null, budget_usd: 5 };
 const ids = async (fake: any) => (await fake.request('projects') as any[]).map(p => p.id);
 const jobsOf = (fake: any) => fake.request('jobs') as Promise<any[]>;
@@ -309,10 +307,10 @@ const later = (ms: number) => new Promise(done => setTimeout(done, ms));
 
 test('a change is refused as the runtime refuses it, before any run starts, and a project has a digest of 64 hex digits', async () => {
   const fake = createTransport('projects');
-  const digest = fake.behind.digest('marionette');
+  const digest = fake.behind.digest('sample');
   assert.match(digest, /^[0-9a-f]{64}$/);
   assert.equal((await fake.request('projects') as any[])[0].digest, digest);
-  assert.equal((await fake.request('project', { id: 'marionette' }) as any).digest, digest);
+  assert.equal((await fake.request('project', { id: 'sample' }) as any).digest, digest);
   const refused = async (patch: Record<string, unknown>, said: RegExp | string) => {
     const attempt = fake.request('project_job', harmonize(fake, patch));
     await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, { message: said }));
@@ -333,7 +331,7 @@ test('a change is refused as the runtime refuses it, before any run starts, and 
   await refused({ operation: 'instructions', instructions: [] }, 'Change at least one instruction file');
   await refused({ operation: 'instructions', instructions: [{ path: 'notes.txt', text: '' }] }, 'An instruction file is Markdown: its name ends in .md (notes.txt)');
   assert.deepEqual(await jobsOf(fake), [], 'nothing was started');
-  assert.equal(fake.behind.digest('marionette'), digest, 'and the file is as it was');
+  assert.equal(fake.behind.digest('sample'), digest, 'and the file is as it was');
 });
 
 test('Codex is refused before a run, for a change and for a new project', async () => {
@@ -350,12 +348,12 @@ test('one AI run goes at a time, an adaptation counts, and the project that is b
   assert.match(started.id, /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
   assert.deepEqual(
     [started.kind, started.status, started.project_id, started.operation, started.title, started.phase, started.budget_usd, started.file, typeof started.time],
-    ['project', 'running', 'marionette', 'harmonize', 'Harmonize again', 'Opening the project', 5, 'D:/Muro/data/projects/marionette.mp', 'number']);
+    ['project', 'running', 'sample', 'harmonize', 'Harmonize again', 'Opening the project', 5, 'D:/Muro/data/projects/sample.mp', 'number']);
   assert.match(started.log_path, /output\.log$/);
   const second = /^Another AI run is in progress \(Harmonize again\): wait for it to finish, or cancel it in Activity$/;
   await assert.rejects(fake.request('project_job', harmonize(fake)), { message: second });
   await assert.rejects(fake.request('create_project', NEW_PROJECT), { message: second });
-  await assert.rejects(fake.request('edit_project', { id: 'marionette', digest: fake.behind.digest('marionette'), name: 'X' }), { message: 'An AI run is changing this project: wait for it to finish' });
+  await assert.rejects(fake.request('edit_project', { id: 'sample', digest: fake.behind.digest('sample'), name: 'X' }), { message: 'An AI run is changing this project: wait for it to finish' });
   assert.equal((await jobsOf(fake)).length, 1);
   fake.behind.finish();
   const [done] = await jobsOf(fake);
@@ -369,18 +367,18 @@ test('one AI run goes at a time, an adaptation counts, and the project that is b
 
 test('a run that completes writes the file as the factory does: the version, the history, the changelog and a new digest, and the old digest is stale', async () => {
   const fake = createTransport('projects');
-  const before: any = await fake.request('project', { id: 'marionette' });
+  const before: any = await fake.request('project', { id: 'sample' });
   const oldDigest = before.digest;
   await fake.request('project_job', harmonize(fake));
-  assert.equal(fake.behind.digest('marionette'), oldDigest, 'the file is not written while the run goes');
+  assert.equal(fake.behind.digest('sample'), oldDigest, 'the file is not written while the run goes');
   fake.behind.finish();
-  const after: any = await fake.request('project', { id: 'marionette' });
+  const after: any = await fake.request('project', { id: 'sample' });
   assert.notEqual(after.digest, oldDigest);
-  assert.equal(after.digest, fake.behind.digest('marionette'));
+  assert.equal(after.digest, fake.behind.digest('sample'));
   assert.deepEqual([after.plugin.version, after.project.version], ['0.5.1', '0.5.1']);
   assert.equal(after.history.length, before.history.length + 1);
-  assert.deepEqual([after.history[0].id, after.history[0].version, after.history[0].operation, after.history[0].engine, after.history[0].budget_usd], ['marionette-v0.5.1', '0.5.1', 'Harmonize again', 'claude-code', 5]);
-  assert.ok(after.changelog.startsWith('# Marionette 0.5.1\n\n- Harmonize again.\n\n## 0.5.0'));
+  assert.deepEqual([after.history[0].id, after.history[0].version, after.history[0].operation, after.history[0].engine, after.history[0].budget_usd], ['sample-v0.5.1', '0.5.1', 'Harmonize again', 'claude-code', 5]);
+  assert.ok(after.changelog.startsWith('# Sample 0.5.1\n\n- Harmonize again.\n\n## 0.5.0'));
   await assert.rejects(fake.request('project_job', harmonize(fake, { digest: oldDigest })), { message: CHANGED });
   assert.ok(await fake.request('project_job', harmonize(fake)), 'on the digest the answer left it goes');
 });
@@ -390,7 +388,7 @@ test('each operation does its mechanical part when it completes, and a minor or 
   const go = async (patch: Record<string, unknown>): Promise<any> => {
     await fake.request('project_job', harmonize(fake, patch));
     fake.behind.finish();
-    return fake.request('project', { id: 'marionette' });
+    return fake.request('project', { id: 'sample' });
   };
   let info = await go({ operation: 'add_input', source: 'https://github.com/example/new-skills#skills', step: undefined });
   assert.equal(info.plugin.version, '0.6.0', 'an input added is a minor step by default');
@@ -409,38 +407,38 @@ test('each operation does its mechanical part when it completes, and a minor or 
   info = await go({ operation: 'harmonize', step: 'major' });
   assert.equal(info.plugin.version, '1.0.0');
   assert.equal(info.history.length, 2 + 6);
-  assert.equal(info.history[0].id, 'marionette-v1.0.0');
+  assert.equal(info.history[0].id, 'sample-v1.0.0');
   // the only input of a project is not removed
   await go({ operation: 'remove_input', input: 'superpowers' });
   await go({ operation: 'remove_input', input: 'new-skills' });
   await assert.rejects(fake.request('project_job', harmonize(fake, { operation: 'remove_input', input: 'taste-skill' })), { message: 'A project needs at least one input: add another before removing taste-skill' });
   // a file to remove that is not there fails the run, and the file is as it was
-  const digest = fake.behind.digest('marionette');
+  const digest = fake.behind.digest('sample');
   await fake.request('project_job', harmonize(fake, { operation: 'instructions', instructions: [{ path: 'gone.md', text: null }] }));
   fake.behind.finish();
   const [failed] = await jobsOf(fake);
   assert.deepEqual([failed.status, failed.message], ['failed', 'The instruction file gone.md is not in the project. The project file was not changed']);
-  assert.equal(fake.behind.digest('marionette'), digest);
+  assert.equal(fake.behind.digest('sample'), digest);
 });
 
 test('a run ends by itself when a flag says so, a run that failed says why and leaves the file as it was, and a file written meanwhile fails the run', async () => {
   const fake = createTransport('projects');
-  const digest = fake.behind.digest('marionette');
+  const digest = fake.behind.digest('sample');
   Object.assign(fake.flags, { runEnds: 'failed', runDelay: 5, runMessage: 'The factory build failed' });
   const started: any = await fake.request('project_job', harmonize(fake));
   assert.equal(started.status, 'running', 'the answer that starts it says it goes');
   await later(60);
   const [failed] = await jobsOf(fake);
   assert.deepEqual([failed.id, failed.status, failed.phase, failed.message], [started.id, 'failed', 'Finished', 'The factory build failed. The project file was not changed']);
-  assert.equal(fake.behind.digest('marionette'), digest);
+  assert.equal(fake.behind.digest('sample'), digest);
   fake.flags.runEnds = 'completed';
   await fake.request('project_job', harmonize(fake));
   await later(60);
   assert.equal((await jobsOf(fake))[0].status, 'completed');
-  assert.notEqual(fake.behind.digest('marionette'), digest);
+  assert.notEqual(fake.behind.digest('sample'), digest);
   fake.flags.runEnds = '';
   await fake.request('project_job', harmonize(fake));
-  fake.behind.touch('marionette');
+  fake.behind.touch('sample');
   fake.behind.finish();
   const [stale] = await jobsOf(fake);
   assert.deepEqual([stale.status, stale.message], ['failed', `${CHANGED}. The project file was not changed`]);
@@ -451,12 +449,12 @@ test('a run ends by itself when a flag says so, a run that failed says why and l
 
 test('a run is cancelled as the runtime does: the request says so at once and the run ends, unless it holds', async () => {
   const fake = createTransport('projects');
-  const digest = fake.behind.digest('marionette');
+  const digest = fake.behind.digest('sample');
   const started: any = await fake.request('project_job', harmonize(fake));
   assert.deepEqual(await fake.request('cancel_job', { id: started.id }), { message: 'Cancellation requested; registry remains unchanged until validation completes' });
   const [cancelled] = await jobsOf(fake);
   assert.deepEqual([cancelled.status, cancelled.phase, cancelled.message], ['cancelled', 'Finished', 'Job cancelled. The project file was not changed']);
-  assert.equal(fake.behind.digest('marionette'), digest);
+  assert.equal(fake.behind.digest('sample'), digest);
   await assert.rejects(fake.request('cancel_job', { id: 'nope' }), { message: 'Job not found' });
   fake.flags.cancelHolds = true;
   const held: any = await fake.request('project_job', harmonize(fake));
@@ -468,7 +466,7 @@ test('a run is cancelled as the runtime does: the request says so at once and th
 
 test('a cancelled run says it in the words of the phase it was in, and in the phase where the project is saved the cancel is ignored', async () => {
   const fake = createTransport('projects');
-  const digest = fake.behind.digest('marionette');
+  const digest = fake.behind.digest('sample');
   const cancel = async (phase: string | null) => {
     const started: any = await fake.request('project_job', harmonize(fake));
     if (phase) fake.behind.phase(phase);
@@ -490,7 +488,7 @@ test('a cancelled run says it in the words of the phase it was in, and in the ph
   assert.deepEqual([saving.status, saving.phase], ['running', SAVING_PHASE], 'the cancel was refused');
   fake.behind.finish();
   assert.equal((await jobsOf(fake))[0].status, 'completed');
-  assert.notEqual(fake.behind.digest('marionette'), digest);
+  assert.notEqual(fake.behind.digest('sample'), digest);
   // An adaptation another client started: the page is not told, its own request is refused, and it says "Job cancelled" whatever it was doing.
   fake.behind.adapt('docs-writer', 'opencode');
   const [adaptation] = await jobsOf(fake);
@@ -507,13 +505,13 @@ test('a delete refused as stale moves the registry on, so a second request carri
   const revision = ((await fake.request('snapshot')) as any).registry.revision;
   fake.flags.staleDeletes = 1;
   await assert.rejects(fake.request('delete_project', { id: 'notes', revision }), { message: 'Registry revision changed; refresh before saving' });
-  assert.deepEqual(await ids(fake), ['marionette', 'notes'], 'a refused delete deletes nothing');
+  assert.deepEqual(await ids(fake), ['sample', 'notes'], 'a refused delete deletes nothing');
   const read = ((await fake.request('snapshot')) as any).registry.revision;
   assert.equal(read, revision + 1);
   assert.equal(fake.flags.staleDeletes, 0);
   const saved: any = await fake.request('delete_project', { id: 'notes', revision: read });
   assert.equal(saved.registry.revision, read + 1);
-  assert.deepEqual(await ids(fake), ['marionette']);
+  assert.deepEqual(await ids(fake), ['sample']);
 });
 
 test('the runs are listed newest first, whatever their kind', async () => {
@@ -529,7 +527,7 @@ test('a new project is refused before the run for what the runtime refuses, list
   const fake = createTransport('projects');
   fake.flags.missingFolders = ['D:/Missing'];
   const cases: [Record<string, unknown>, RegExp][] = [
-    [{ slug: 'My Plugin' }, /lowercase letters and digits joined by dashes/], [{ slug: 'marionette' }, /is the project Muro ships/], [{ name: '  ' }, /^The project name is required$/],
+    [{ slug: 'My Plugin' }, /lowercase letters and digits joined by dashes/], [{ name: '  ' }, /^The project name is required$/],
     [{ author: '' }, /^The author is required$/], [{ folder: 'relative/folder' }, /^Choose the folder with its full path$/], [{ folder: 'D:/Missing' }, /^The folder is missing: D:\/Missing$/],
     [{ inputs: [] }, /^Add at least one input: a project is made from plugins and skills$/], [{ inputs: [{ source: 'http://github.com/o/r' }] }, /^An input is an https:\/\/ address or the full path/],
     [{ inputs: [{ source: 'D:/Missing' }] }, /^The folder is missing: D:\/Missing$/], [{ inputs: [{ source: 'https://a/b' }, { source: 'https://a/b' }] }, /^The input https:\/\/a\/b is named twice$/],
@@ -544,9 +542,9 @@ test('a new project is refused before the run for what the runtime refuses, list
   assert.deepEqual(await jobsOf(fake), [], 'no run was started');
   const started: any = await fake.request('create_project', NEW_PROJECT);
   assert.deepEqual([started.operation, started.title, started.project_id, started.phase, started.file, started.budget_usd], ['create', 'New project Docs Kit', 'docs-kit', 'Starting the project', 'D:/Projects/docs-kit.mp', 5]);
-  assert.deepEqual(await ids(fake), ['marionette'], 'listed when it ends, not before');
+  assert.deepEqual(await ids(fake), ['sample'], 'listed when it ends, not before');
   fake.behind.finish();
-  assert.deepEqual(await ids(fake), ['marionette', 'docs-kit']);
+  assert.deepEqual(await ids(fake), ['sample', 'docs-kit']);
   assert.equal((await jobsOf(fake))[0].message, 'The project was created and added to your list. Install it from its Install step');
   const made: any = await fake.request('project', { id: 'docs-kit' });
   assert.deepEqual([made.project.name, made.project.author, made.project.version, made.plugin.version, made.inputs.map((i: any) => i.id), made.history.length], ['Docs Kit', 'me', '0.1.0', '0.1.0', ['docs', 'writing'], 1]);
@@ -557,27 +555,27 @@ test('a new project is refused before the run for what the runtime refuses, list
   fake.flags.runEnds = 'failed';
   await fake.request('create_project', { ...NEW_PROJECT, slug: 'second', folder: 'D:/Elsewhere' });
   await later(30);
-  assert.deepEqual(await ids(fake), ['marionette', 'docs-kit']);
+  assert.deepEqual(await ids(fake), ['sample', 'docs-kit']);
 });
 
 test('an edit by hand changes only what it names, on the digest the last write left, and is refused in the factory\'s words', async () => {
   const fake = createTransport('projects');
-  const first = fake.behind.digest('marionette');
+  const first = fake.behind.digest('sample');
   const record = { id: 'mine-1', date: '2026-11-21', subjects: [' office-docs '], text: ' Keep the Word output first. ', author: 'you', binding: true };
-  const done: any = await fake.request('edit_project', { id: 'marionette', digest: first, name: 'Marionette Plus', repository: null, records: [record], changelog: '# 1.0' });
-  assert.deepEqual([done.path, done.digest], ['D:/Muro/data/projects/marionette.mp', fake.behind.digest('marionette')]);
+  const done: any = await fake.request('edit_project', { id: 'sample', digest: first, name: 'Sample Plus', repository: null, records: [record], changelog: '# 1.0' });
+  assert.deepEqual([done.path, done.digest], ['D:/Muro/data/projects/sample.mp', fake.behind.digest('sample')]);
   assert.notEqual(done.digest, first);
-  const info: any = await fake.request('project', { id: 'marionette' });
-  assert.deepEqual([info.project.name, info.project.repository, info.project.author], ['Marionette Plus', null, 'acaprino']);
+  const info: any = await fake.request('project', { id: 'sample' });
+  assert.deepEqual([info.project.name, info.project.repository, info.project.author], ['Sample Plus', null, 'acaprino']);
   assert.deepEqual(info.records, [{ id: 'mine-1', date: '2026-11-21', subjects: ['office-docs'], text: 'Keep the Word output first.', author: 'you', binding: true }]);
   assert.equal(info.changelog, '# 1.0\n', 'the file ends with a line break');
-  await assert.rejects(fake.request('edit_project', { id: 'marionette', digest: first, name: 'Stale' }), { message: CHANGED });
-  const second: any = await fake.request('edit_project', { id: 'marionette', digest: done.digest, repository: { url: 'https://github.com/o/r', branch: '', tag_prefix: 'r-v' } });
+  await assert.rejects(fake.request('edit_project', { id: 'sample', digest: first, name: 'Stale' }), { message: CHANGED });
+  const second: any = await fake.request('edit_project', { id: 'sample', digest: done.digest, repository: { url: 'https://github.com/o/r', branch: '', tag_prefix: 'r-v' } });
   assert.notEqual(second.digest, done.digest);
-  assert.deepEqual(((await fake.request('project', { id: 'marionette' })) as any).project.repository, { url: 'https://github.com/o/r', branch: 'main', tag_prefix: 'r-v' });
+  assert.deepEqual(((await fake.request('project', { id: 'sample' })) as any).project.repository, { url: 'https://github.com/o/r', branch: 'main', tag_prefix: 'r-v' });
   const digest = second.digest;
   const refused = async (patch: Record<string, unknown>, said: string | RegExp) => {
-    const attempt = fake.request('edit_project', { id: 'marionette', digest, ...patch });
+    const attempt = fake.request('edit_project', { id: 'sample', digest, ...patch });
     await (typeof said === 'string' ? assert.rejects(attempt, { message: said }) : assert.rejects(attempt, { message: said }));
   };
   await refused({}, 'Nothing to change');
@@ -590,20 +588,19 @@ test('an edit by hand changes only what it names, on the digest the last write l
   await refused({ records: [record, record] }, 'Two records have the id mine-1');
   await refused({ records: [{ ...record, author: 'bot' }] }, 'Record mine-1: the author is muro or you');
   await refused({ changelog: 5 }, 'The changelog must be text');
-  await assert.rejects(fake.request('edit_project', { id: 'marionette', name: 'X' }), { message: 'Open the project again: the edit names no version of its file' });
+  await assert.rejects(fake.request('edit_project', { id: 'sample', name: 'X' }), { message: 'Open the project again: the edit names no version of its file' });
   await assert.rejects(fake.request('edit_project', { id: 'nope', digest, name: 'X' }), { message: 'That project is not in your list' });
-  assert.equal(fake.behind.digest('marionette'), digest, 'a refused edit writes nothing');
-  assert.deepEqual(((await fake.request('edit_project', { id: 'marionette', digest, records: [] })) as any).path, 'D:/Muro/data/projects/marionette.mp');
-  assert.deepEqual(((await fake.request('project', { id: 'marionette' })) as any).records, [], 'every record deleted');
+  assert.equal(fake.behind.digest('sample'), digest, 'a refused edit writes nothing');
+  assert.deepEqual(((await fake.request('edit_project', { id: 'sample', digest, records: [] })) as any).path, 'D:/Muro/data/projects/sample.mp');
+  assert.deepEqual(((await fake.request('project', { id: 'sample' })) as any).records, [], 'every record deleted');
 });
 
-test('a project is deleted with the registry revision the page read; the shipped one and one that is being changed are not', async () => {
+test('a project is deleted with the registry revision the page read, and one that is being changed is not; no project is kept from it', async () => {
   const fake = createTransport('projects');
   fake.flags.pickPath = 'D:/Notes/Notes.mp';
   await fake.request('open_project', { path: 'D:/Notes/Notes.mp' });
-  assert.deepEqual(await ids(fake), ['marionette', 'notes']);
+  assert.deepEqual(await ids(fake), ['sample', 'notes']);
   const revision = ((await fake.request('snapshot')) as any).registry.revision;
-  await assert.rejects(fake.request('delete_project', { id: 'marionette', revision }), { message: 'The project Muro ships cannot be deleted' });
   await assert.rejects(fake.request('delete_project', { id: 'nope', revision }), { message: 'That project is not in your list' });
   await assert.rejects(fake.request('delete_project', { id: 'notes', revision: revision + 5 }), { message: 'Registry revision changed; refresh before saving' });
   await assert.rejects(fake.request('delete_project', { id: 'notes' }), { message: 'Registry revision changed; refresh before saving' });
@@ -612,20 +609,24 @@ test('a project is deleted with the registry revision the page read; the shipped
   fake.behind.finish('cancelled');
   const saved: any = await fake.request('delete_project', { id: 'notes', revision });
   assert.equal(saved.registry.revision, revision + 1, 'the answer is the registry, saved');
-  assert.deepEqual(await ids(fake), ['marionette']);
+  assert.deepEqual(await ids(fake), ['sample']);
+  // The list reserves no id and no place: the project that was first in it goes the same way.
+  const emptied: any = await fake.request('delete_project', { id: 'sample', revision: saved.registry.revision });
+  assert.equal(emptied.registry.revision, revision + 2);
+  assert.deepEqual(await ids(fake), []);
   assert.ok(await fake.request('create_project', { ...NEW_PROJECT, slug: 'notes', folder: 'D:/Notes' }), 'its file is gone: a new project may take the name');
 });
 
 test('the update check says which input is behind, and fails as the upstream does; the folder dialog answers a folder, null or "unknown"', async () => {
   const fake = createTransport('projects');
-  const report: any = await fake.request('project_updates', { id: 'marionette' });
-  assert.equal(report.id, 'marionette');
-  assert.equal(report.digest, fake.behind.digest('marionette'), 'the check names the file it was made on');
+  const report: any = await fake.request('project_updates', { id: 'sample' });
+  assert.equal(report.id, 'sample');
+  assert.equal(report.digest, fake.behind.digest('sample'), 'the check names the file it was made on');
   assert.deepEqual(report.inputs.map((i: any) => i.status), ['behind', 'current', 'current']);
   assert.deepEqual([report.inputs[0].id, report.inputs[0].upstream], ['taste-skill', 'v9.9.9']);
   await assert.rejects(fake.request('project_updates', { id: 'nope' }), { message: 'That project is not in your list' });
   fake.flags.updatesError = 'Could not reach github.com';
-  await assert.rejects(fake.request('project_updates', { id: 'marionette' }), { message: 'Could not reach github.com' });
+  await assert.rejects(fake.request('project_updates', { id: 'sample' }), { message: 'Could not reach github.com' });
   assert.deepEqual(await fake.request('pick_folder'), { path: 'D:/Projects' });
   fake.flags.pickFolder = null;
   assert.deepEqual(await fake.request('pick_folder'), { path: null }, 'a dialog closed without a folder');

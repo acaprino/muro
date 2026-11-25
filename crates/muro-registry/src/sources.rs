@@ -246,7 +246,7 @@ fn find(h: &str, source: &Path) -> Result<Found> {
     }
 }
 /// A Muro build published in a folder of its repository (`<folder>/adapters/<harness>`, as
-/// acaprino/marionette holds `marionette/`): the address of the repository is then enough, for
+/// a package's own repository holds it in a folder of its name): the address of the repository is then enough, for
 /// every harness, also the ones without a marketplace. Several such folders are not chosen from.
 fn in_a_folder(h: &str, source: &Path) -> Result<Found> {
     let base = source.canonicalize()?;
@@ -760,18 +760,18 @@ mod tests {
     }
     #[test]
     fn a_package_repository_is_found_from_its_address_through_its_root_marketplaces() {
-        // acaprino/marionette: the build in marionette/, the marketplaces `muro marketplace` writes
-        // at the root. Pi, OpenCode and Hermes have no marketplace there: their builds are found in
+        // A package's own repository: the build in a folder of its name, the marketplaces `muro marketplace`
+        // writes at the root. Pi, OpenCode and Hermes have no marketplace there: their builds are found in
         // the folder (the tests on a build in a folder below).
         let t = tempfile::tempdir().unwrap();
         let s = t.path();
         put(
             &s.join(".claude-plugin/marketplace.json"),
-            r#"{"name":"marionette","plugins":[{"name":"marionette","source":"./marionette/adapters/claude-code","version":"0.5.2"}]}"#,
+            r#"{"name":"sample","plugins":[{"name":"sample","source":"./sample/adapters/claude-code","version":"0.5.2"}]}"#,
         );
         put(
             &s.join(".agents/plugins/marketplace.json"),
-            r#"{"name":"marionette","plugins":[{"name":"marionette","source":{"source":"local","path":"./marionette/adapters/codex"}}]}"#,
+            r#"{"name":"sample","plugins":[{"name":"sample","source":{"source":"local","path":"./sample/adapters/codex"}}]}"#,
         );
         for (harness, manifest) in [
             ("claude-code", ".claude-plugin/plugin.json"),
@@ -779,32 +779,32 @@ mod tests {
             ("pi", "package.json"),
         ] {
             put(
-                &s.join("marionette/adapters").join(harness).join(manifest),
-                r#"{"name":"marionette","version":"0.5.2"}"#,
+                &s.join("sample/adapters").join(harness).join(manifest),
+                r#"{"name":"sample","version":"0.5.2"}"#,
             );
         }
         assert_eq!(
             found(s),
             [
-                dist("claude-code", "marionette/adapters/claude-code", "0.5.2"),
-                dist("codex", "marionette/adapters/codex", "0.5.2"),
-                dist("pi", "marionette/adapters/pi", "0.5.2")
+                dist("claude-code", "sample/adapters/claude-code", "0.5.2"),
+                dist("codex", "sample/adapters/codex", "0.5.2"),
+                dist("pi", "sample/adapters/pi", "0.5.2")
             ]
         );
-        assert_eq!(found(&s.join("marionette")).len(), 3);
+        assert_eq!(found(&s.join("sample")).len(), 3);
     }
-    // Owner, 2026-11-21, on Sync refusing Marionette from https://github.com/acaprino/marionette
-    // ("è praticamente inutilizzabile"): the repository as marionette-v0.5.1 left it, the build in
-    // marionette/ and no marketplace at the root.
+    // Owner, 2026-11-21, on Sync refusing a package from the address of its own repository
+    // ("è praticamente inutilizzabile"): the repository as a release left it, the build in a folder of
+    // the package's name and no marketplace at the root.
     #[test]
     fn a_muro_build_in_a_folder_of_the_source_is_found_from_the_source_alone() {
         let t = tempfile::tempdir().unwrap();
         let s = t.path();
-        put(&s.join("README.md"), "Marionette");
-        put(&s.join("releases/marionette-v0.5.1.md"), "Notes");
+        put(&s.join("README.md"), "Sample");
+        put(&s.join("releases/sample-v0.5.1.md"), "Notes");
         put(
-            &s.join("marionette/.claude-plugin/plugin.json"),
-            r#"{"name":"marionette","version":"0.5.1"}"#,
+            &s.join("sample/.claude-plugin/plugin.json"),
+            r#"{"name":"sample","version":"0.5.1"}"#,
         );
         for (harness, manifest) in [
             ("claude-code", ".claude-plugin/plugin.json"),
@@ -812,16 +812,16 @@ mod tests {
             ("pi", "package.json"),
         ] {
             put(
-                &s.join("marionette/adapters").join(harness).join(manifest),
-                r#"{"name":"marionette","version":"0.5.1"}"#,
+                &s.join("sample/adapters").join(harness).join(manifest),
+                r#"{"name":"sample","version":"0.5.1"}"#,
             );
         }
         assert_eq!(
             found(s),
             [
-                dist("claude-code", "marionette/adapters/claude-code", "0.5.1"),
-                dist("codex", "marionette/adapters/codex", "0.5.1"),
-                dist("pi", "marionette/adapters/pi", "0.5.1")
+                dist("claude-code", "sample/adapters/claude-code", "0.5.1"),
+                dist("codex", "sample/adapters/codex", "0.5.1"),
+                dist("pi", "sample/adapters/pi", "0.5.1")
             ]
         );
     }

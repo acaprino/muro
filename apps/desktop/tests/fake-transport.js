@@ -14,7 +14,7 @@
 //             noShellActions     pick_file and open_folder fail as a shell that does not know them yet (the service's "Unknown registry action")
 //             rejectInstall      install_project fails ("no build for <harness>"); installLeavesTargets: it builds the plugin but leaves its targets alone (a runtime older than the window)
 //             projectChanged     every plan blocks the plugin of a project on each harness it is on with "Project file changed: open the project again" (the registry's words for a build older than its file); an install_project clears it
-//             remove_project     {id, revision} takes the project off the list, never the default one (a project with `included: true`, as the runtime flags the copy Muro ships)
+//             remove_project     {id, revision} takes the project off the list
 //             simulate           what `simulate` answers: 'selected' (a prerequisite and a chosen step), 'no_match', 'clarify' (needs_clarification, with its questions) or
 //                                'invalid' ({valid:false, errors}); simulateError (a message) makes the call fail as the runtime does (no key, endpoint unreachable, harness
 //                                missing); simulateDelay (ms) makes it take that long. The answer carries the engine of the settings (`ai`), as the runtime adds it.
@@ -49,7 +49,7 @@
 //   not changed", phase "AI intake and harmonization") and between the steps of the run ("Job cancelled. The project file was not changed").
 // Scenarios: default (one harness, no plugin), changes (one plugin to update, one harness found), unlisted (a plugin
 // installed outside the list), removals (an exclusive harness: one plugin to install, one outside the list to uninstall and one record whose files are gone,
-// `present: false`, to clear), projects (two harnesses, a plugin installed as published with no version for one of them, and the project Marionette
+// `present: false`, to clear), projects (two harnesses, a plugin installed as published with no version for one of them, and one project
 // not yet installed on any), recorded / recorded-ok / recorded-errors / recorded-unseen (a check the window did not make: one change
 // waiting, nothing to do, a source not checked, a removal no cell shows), two-harnesses (a change on each of two harnesses), first-run (no harness, two found,
 // one with an installed plugin), demo (the data of the documentation screenshots), demo-synced (the same, everything
@@ -72,7 +72,7 @@ function digestOf(seed) {
   return out;
 }
 
-// A small project in the shape of `muro project info`, Marionette-like: three inputs, six choices, two records, two runs, the four prompts, two entries and four capabilities.
+// A small project in the shape of `muro project info`: three inputs, six choices, two records, two runs, the four prompts, two entries and four capabilities.
 // Tasks 7 and 8 read the same data: the history, the records, the choices and the graph.
 function projectInfo(name, slug, { builtin = false } = {}) {
   const decisions = [
@@ -93,7 +93,7 @@ function projectInfo(name, slug, { builtin = false } = {}) {
   const need = (capability, label) => ({ capability, label, when: label, reason: 'It reads what the other makes.' });
   const pick = (capability, reason) => ({ capability, intent: capability + '-intent', reason });
   return {
-    project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' } : null, builtin },
+    project: { schema: 1, name, slug, version: '0.5.0', author: builtin ? 'acaprino' : 'you', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: builtin ? { url: 'https://github.com/owner/sample', branch: 'main', tag_prefix: 'sample-v' } : null, builtin },
     plugin: { name, slug, version: '0.5.0', description: `${name}, one plugin` },
     inputs, decisions,
     instructions: [{ path: 'house-style.md', text: 'Keep sentences short.\n' }],
@@ -118,14 +118,14 @@ function projectInfo(name, slug, { builtin = false } = {}) {
     digest: digestOf(slug + ':0'),
   };
 }
-// The graph at the size of Marionette (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and 26 documented examples (two named, 24 generated).
+// A graph of a large project (flags.bigGraph): 37 capabilities in 15 entries, one name far longer than the rest, conditions and conflicts, and 26 documented examples (two named, 24 generated).
 function withBigGraph(info) {
   const ids = Array.from({ length: 37 }, (_, i) => i === 5 ? 'a-capability-whose-name-is-far-longer-than-any-other-capability-of-this-project-' + 'x'.repeat(30) : `capability-${String(i + 1).padStart(2, '0')}-design-system`);
   const entries = Array.from({ length: 15 }, (_, e) => ({ name: `${info.plugin.slug}-group-${e + 1}`, description: `Use when group ${e + 1} applies.`, capabilities: ids.filter((_, i) => i % 15 === e) }));
   const capabilities = ids.map((id, i) => ({ id, title: `Capability ${i + 1}`, role: 'worker', when: '—', after: [], outputs: [], intents: [{ id: id + '-intent', description: `Capability ${i + 1}`, excludes: '' }], needs: i % 7 === 1 ? [{ capability: ids[i - 1], label: 'It reads the first', when: 'It reads the first', reason: 'Because.' }] : [], conflicts: i % 11 === 3 ? [ids[i + 1]] : [] }));
   const pick = id => ({ capability: id, intent: id + '-intent', reason: 'Fits.' });
   const example = (title, chosen) => ({ id: title, title, task: title, stack_tokens: [], status: 'selected', selections: chosen.map(pick), reason: 'Both.', questions: [], path: chosen, steps: chosen.map(id => ({ step: id, capability: id, intent: id + '-intent' })) });
-  // 24 more, so the list holds the 26 that Marionette's does. Each picks two capabilities spread across the whole of `ids` (the steps 5 and 11 apart, mod 37: never the same pair twice in a row, and the long name comes up in one).
+  // 24 more, so the list holds 26. Each picks two capabilities spread across the whole of `ids` (the steps 5 and 11 apart, mod 37: never the same pair twice in a row, and the long name comes up in one).
   const generated = Array.from({ length: 24 }, (_, k) => example(`Generated example ${String(k + 3).padStart(2, '0')}`, [ids[(k * 5 + 1) % 37], ids[(k * 11 + 19) % 37]]));
   return { ...info, graph: { entries, capabilities, examples: [example('Two of many', [ids[5], ids[36]]), example('Another two', [ids[0], ids[20]]), ...generated] } };
 }
@@ -145,7 +145,7 @@ function withObjectFields(info) {
   const [first, ...records] = info.records, [newest, ...history] = info.history;
   return { ...info, records: [{ ...first, text: { en: first.text } }, ...records], history: [{ ...newest, changelog: { en: newest.changelog } }, ...history] };
 }
-const summaryOf = (id, path, info, included = false) => ({ id, path, included, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
+const summaryOf = (id, path, info) => ({ id, path, project: info.project, plugin: { name: info.plugin.name, slug: info.plugin.slug, version: info.plugin.version }, inputs: info.inputs.length, capabilities: info.graph.capabilities.length, entries: info.graph.entries.length, examples: info.graph.examples.length, records: info.records.length, runs: info.history.length, digest: info.digest });
 
 function scenarioData(scenario) {
   const idle = { last_check: null, last_sync: null, revision: null, pending: null, blockers: null, errors: null, targets: {} };
@@ -159,7 +159,7 @@ function scenarioData(scenario) {
     case 'recorded-ok': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0) };
     case 'recorded-errors': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0, { errors: 1 }) };
     case 'recorded-unseen': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] }, sync: recorded(1) };
-    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'marionette', path: 'D:/Muro/data/projects/marionette.mp', adapters: ['claude-code', 'codex', 'opencode'], included: true, info: projectInfo('Marionette', 'marionette', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
+    case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'sample', path: 'D:/Muro/data/projects/sample.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Sample', 'sample', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'removals': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false), { ...installedPlugin('ghost', 'ghost', '1.0.0', false), present: false }] } };
@@ -169,13 +169,13 @@ function scenarioData(scenario) {
       const done = scenario === 'demo-synced';
       const targets = [harnessTarget('claude', 'claude-code', 'Claude Code', { root: 'C:/Users/you/.claude', exclusive: true }), harnessTarget('codex', 'codex', 'Codex', { root: 'C:/Users/you/.codex' }), harnessTarget('opencode', 'opencode', 'OpenCode', { root: 'C:/Users/you/.config/opencode' })];
       const plugins = [
-        plugin('marionette', 'Marionette', ['claude', 'codex', 'opencode'], [build('claude-code', '0.4.0'), build('codex', '0.4.0'), build('opencode', '0.4.0')], { source: 'github.com/acaprino/marionette', upstream_version: 'v0.4.0' }),
+        plugin('sample', 'Sample', ['claude', 'codex', 'opencode'], [build('claude-code', '0.4.0'), build('codex', '0.4.0'), build('opencode', '0.4.0')], { source: 'github.com/owner/sample', upstream_version: 'v0.4.0' }),
         plugin('commit-helper', 'commit-helper', ['claude', 'codex'], [build('claude-code', '2.1.0'), build('codex', '2.1.0')], { upstream_version: 'v2.1.0' }),
         plugin('test-runner', 'test-runner', ['opencode'], [build('opencode', '1.0.4')], { policy: 'pinned', pinned_version: '1.0.4', upstream_version: 'v1.0.4' }),
         plugin('docs-writer', 'docs-writer', ['claude', 'opencode'], [build('claude-code', '1.2.0'), ...(done ? [build('opencode', '1.2.0')] : [])], { upstream_version: 'v1.2.0' }),
         plugin('sql-companion', 'sql-companion', [], [], { policy: 'head', upstream_version: '' }),
       ];
-      const installed = { claude: [installedPlugin('marionette', 'Marionette', done ? '0.4.0' : '0.3.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0'), installedPlugin('docs-writer', 'docs-writer', '1.2.0'), ...(done ? [] : [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)])], codex: [installedPlugin('marionette', 'Marionette', '0.4.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0')], opencode: [installedPlugin('marionette', 'Marionette', '0.4.0'), ...(done ? [installedPlugin('test-runner', 'test-runner', '1.0.4'), installedPlugin('docs-writer', 'docs-writer', '1.2.0')] : [])] };
+      const installed = { claude: [installedPlugin('sample', 'Sample', done ? '0.4.0' : '0.3.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0'), installedPlugin('docs-writer', 'docs-writer', '1.2.0'), ...(done ? [] : [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)])], codex: [installedPlugin('sample', 'Sample', '0.4.0'), installedPlugin('commit-helper', 'commit-helper', '2.1.0')], opencode: [installedPlugin('sample', 'Sample', '0.4.0'), ...(done ? [installedPlugin('test-runner', 'test-runner', '1.0.4'), installedPlugin('docs-writer', 'docs-writer', '1.2.0')] : [])] };
       const [checkedAgo, syncedAgo] = done ? [3, 3] : [14, 1500];
       const synced = { claude: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, codex: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, opencode: { checked: ago(checkedAgo), synced: ago(syncedAgo) } };
       const jobs = done ? [] : [{ id: 'job-1', plugin_id: 'docs-writer', harness: 'opencode', status: 'running', phase: 'harmonization', budget_usd: 2, log_path: 'C:/Users/you/Muro/data/jobs/job-1/log.txt', message: 'Claude Code is adapting the plugin for OpenCode.', time: ago(3) }];
@@ -270,11 +270,10 @@ export function createTransport(scenario = 'default') {
     reg.revision++;
     return { plugin_id: made.id };
   }
-  // The runtime's remove_project {id, revision}: the entry leaves the list and nothing else; the default project stays ("The default project stays in the list").
+  // The runtime's remove_project {id, revision}: the entry leaves the list and nothing else.
   function removeProject(payload) {
     mutate(payload);
     projectOf(payload.id);
-    if (payload.id === 'marionette') throw new Error('The default project stays in the list');
     projects.splice(projects.findIndex(p => p.id === payload.id), 1);
     return bump();
   }
@@ -456,7 +455,6 @@ export function createTransport(scenario = 'default') {
     const name = line(p.name, 'The project name');
     const slug = typeof p.slug === 'string' ? p.slug.trim() : '';
     if (!isSlug(slug)) throw new Error('The plugin id is lowercase letters and digits joined by dashes, such as my-plugin');
-    if (slug === 'marionette') throw new Error(`The plugin id ${slug} is the project Muro ships: choose another`);
     const author = line(p.author, 'The author');
     const folder = line(p.folder, 'The folder');
     if (!isAbsolute(folder)) throw new Error('Choose the folder with its full path');
@@ -557,7 +555,6 @@ export function createTransport(scenario = 'default') {
   }
   // delete_project {id, revision}: the project leaves the list and its file is deleted (the runtime asks for the registry's revision, as every save does).
   function deleteProject(p) {
-    if (p.id === 'marionette') throw new Error('The project Muro ships cannot be deleted');
     const entry = listedFile(p.id);
     if (runningOn(p.id)) throw new Error('An AI run is changing this project: wait for it to finish, or cancel it');
     if (flags.staleDeletes > 0) { flags.staleDeletes--; reg.revision++; throw new Error(STALE); }   // the registry moved behind the page's back
@@ -646,7 +643,7 @@ export function createTransport(scenario = 'default') {
         return { snapshot: snapshot(), plan, errors };
       }
       case 'apply': return apply(payload);
-      case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info, !!p.included));
+      case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info));
       case 'project': {
         const held = projectOf(payload.id);
         let info = structuredClone(held.info);
@@ -655,13 +652,13 @@ export function createTransport(scenario = 'default') {
         if (flags.noEntries) info = { ...info, graph: { ...info.graph, entries: [] } };
         if (flags.oddNames) info = withOddNames(info);
         if (flags.objectFields) info = withObjectFields(info);
-        return { ...info, included: !!held.included };
+        return info;
       }
       case 'open_project': {
         if (!/\.mp$/i.test(String(payload.path))) throw new Error('Not a Muro project file: ' + payload.path);
         const file = String(payload.path).split(/[\\/]/).pop().replace(/\.mp$/i, ''), id = file.toLowerCase();
         const known = projects.find(p => p.id === id);
-        if (known) return summaryOf(known.id, known.path, known.info, !!known.included);
+        if (known) return summaryOf(known.id, known.path, known.info);
         const info = projectInfo(file, id), added = { id, path: payload.path, adapters: ['claude-code', 'codex'], info };
         projects.push(added);
         return summaryOf(id, added.path, info);

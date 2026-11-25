@@ -253,12 +253,12 @@ test('a column the record cannot describe is unseen, and never ok',()=>{
  s.inventory[0].plugins[0].version='2';t.enabled=false;assert.equal(harnessState(t,s,null).kind,'paused');
 });
 
-// Owner, 2026-11-21: Marionette read "HEAD" and "No version" in Sync, which said neither what it was on nor what was missing.
+// Owner, 2026-11-21: a plugin read "HEAD" and "No version" in Sync, which said neither what it was on nor what was missing.
 test('a plugin on its latest commit shows the versions its builds declare and the commit, never HEAD',()=>{
  const head:Plugin={...plugin,policy:'head',upstream_version:'HEAD',upstream_revision:'4ae20142bd43bfdd98d1e3762d8fc1d8730bd177'};
  assert.deepEqual(versionOf(head),{version:'2',commit:'@4ae2014'});
  assert.deepEqual(versionOf({...head,distributions:[]}),{version:'@4ae2014',commit:''});
- assert.deepEqual(versionOf({...plugin,upstream_version:'marionette-v0.5.1'}),{version:'marionette-v0.5.1',commit:''});
+ assert.deepEqual(versionOf({...plugin,upstream_version:'sample-v0.5.1'}),{version:'sample-v0.5.1',commit:''});
  assert.deepEqual(versionOf(plugin),{version:'',commit:''});
  const folder:Plugin={...plugin,upstream_version:'local',distributions:[{harness:'codex',path:'/a',version:'1.0.0'},{harness:'pi',path:'/b',version:'1.0.0'}]};
  assert.deepEqual(versionOf(folder),{version:'1.0.0',commit:''});

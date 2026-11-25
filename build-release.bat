@@ -226,7 +226,6 @@ if not defined MUKADE_REV (echo [ERROR] Mukade revision not read from crates\mur
 if exist "%STAGING%\" rmdir /s /q "%STAGING%"
 
 echo     private Python and the current factory
-rem Muro builds nothing of Marionette: this takes its latest published release (acaprino/marionette) and checks its SHA-256.
 python scripts\desktop_resources.py --out "%STAGING%\resources" || goto :sub_fail
 rem Tauri's build checks that its resource folder exists; the package uses the fresh copy above.
 if not exist "apps\desktop\src-tauri\resources\" xcopy /e /i /q "%STAGING%\resources" "apps\desktop\src-tauri\resources" >nul || goto :sub_fail

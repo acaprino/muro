@@ -7,16 +7,16 @@ import { createTransport, ODD_TITLE } from './fake-transport.js';
 test('the fake service ends a delayed run that is cancelled, and refuses a run that is not running or has no name', async () => {
   const fake = createTransport('projects');
   fake.flags.simulateDelay = 5000;
-  const run = fake.request('simulate', { id: 'marionette', task: 'x', run: 'r-1' });
+  const run = fake.request('simulate', { id: 'sample', task: 'x', run: 'r-1' });
   assert.deepEqual(await fake.request('cancel_simulation', { run: 'r-1' }), { status: 'cancelling' });
   await assert.rejects(run, /was cancelled/);
   await assert.rejects(fake.request('cancel_simulation', { run: 'r-1' }), /not running/);
-  await assert.rejects(fake.request('simulate', { id: 'marionette', task: 'x' }), /Invalid run ID/);
+  await assert.rejects(fake.request('simulate', { id: 'sample', task: 'x' }), /Invalid run ID/);
 });
 
 test('the flags that shape the next project answer: no graph, no entry, odd names, objects where text belongs; the stored project never changes', async () => {
   const fake = createTransport('projects');
-  const project = () => fake.request('project', { id: 'marionette' }) as Promise<any>;
+  const project = () => fake.request('project', { id: 'sample' }) as Promise<any>;
   const plain = await project();
   fake.flags.emptyGraph = true;
   assert.deepEqual((await project()).graph, { entries: [], capabilities: [], examples: [] });

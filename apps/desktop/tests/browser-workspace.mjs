@@ -29,16 +29,16 @@ const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/
 /** The tabs are Sigrid's `ToolbarTab`s, in the title bar or in the row under it on a narrow window: buttons marked `aria-current="page"`, not `role=tab`. */
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); };
-const openMarionette = async page => {
+const openSample = async page => {
   await goProjects(page);
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
 };
 const panelOf = page => page.locator('[data-slot="content-split-aside"]');
 const graphPane = page => page.locator('section[aria-labelledby="graph-heading"]');
-const canvas = (page, name = 'Marionette') => page.getByRole('tree', { name: `Decision graph of ${name}` });
+const canvas = (page, name = 'Sample') => page.getByRole('tree', { name: `Decision graph of ${name}` });
 const node = (page, id) => page.locator(`[data-slot="graph-node"][data-node-id="${id}"]`);
-const DESIGN = 'entry:0:marionette-design', OFFICE = 'entry:1:marionette-office';
+const DESIGN = 'entry:0:sample-design', OFFICE = 'entry:1:sample-office';
 /** The inspector while it shows something: docked (an `aside`, `hidden` when closed) or, under 1000px, a panel over the end of the graph. */
 const inspector = page => page.locator('[data-inspector-form]:not([hidden])');
 const segment = (page, name) => page.locator('[data-slot="toggle-group-item"]').filter({ hasText: new RegExp(`^${name}$`) });
@@ -87,17 +87,18 @@ const unnamed = page => page.evaluate(() => [...document.querySelectorAll('butto
 await test('the list says what each project is, what is installed as published, and opening one shows the three regions side by side', 'projects', {}, async app => {
   const { page } = app;
   await goProjects(page);
-  const line = page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Marionette' });
+  const line = page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Sample' });
   await line.waitFor();
   const text = await line.textContent();
-  for (const fact of ['0.5.0', 'Included with Muro', 'D:/Muro/data/projects/marionette.mp', '3 inputs · 4 capabilities']) assert.ok(text.includes(fact), `the row says ${fact}: ${text}`);
-  assert.equal(await page.getByRole('button', { name: /^Remove .* from the list$/ }).count(), 0, 'the project Muro ships stays in the list');
+  for (const fact of ['0.5.0', 'D:/Muro/data/projects/sample.mp', '3 inputs · 4 capabilities']) assert.ok(text.includes(fact), `the row says ${fact}: ${text}`);
+  assert.equal(await line.getByRole('button', { name: 'Remove Sample from the list', exact: true }).count(), 1, 'every project can leave the list');
+  assert.equal(await line.getByRole('button', { name: 'Delete Sample…', exact: true }).count(), 1, 'and every project can be deleted');
   await page.getByRole('heading', { name: /Installed as published/, level: 2 }).waitFor();
   assert.match(await page.getByRole('list', { name: 'Installed as published' }).textContent(), /commit-helper.*Needs a build for Codex/);
   await page.screenshot({ path: shots + '/workspace-list.png' });
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
-  assert.deepEqual((await callsOf(app, 'project')).map(c => c.payload), [{ id: 'marionette' }]);
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  assert.deepEqual((await callsOf(app, 'project')).map(c => c.payload), [{ id: 'sample' }]);
   await canvas(page).waitFor();
   assert.equal(await inspector(page).count(), 0, 'nothing selected: the inspector is closed and the graph takes its room');
   await row(page, 'A landing page').click();
@@ -138,13 +139,13 @@ await test('Remove from list asks first and removes only the entry; a project na
   assert.equal(asked.length, 1);
   assert.equal(asked[0].payload.id, odd.toLowerCase());
   assert.equal(typeof asked[0].payload.revision, 'number');
-  assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Marionette', exact: true }).count(), 1, 'the project Muro ships is what is left');
+  assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Sample', exact: true }).count(), 1, 'the other project is what is left');
 });
 
 // ---------- the graph ----------
 await test('the graph opens with every entry closed, each saying how many it hides; an entry opens to show its capabilities', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await canvas(page).waitFor();
   await node(page, DESIGN).waitFor();
   assert.equal(await node(page, DESIGN).getAttribute('aria-label'), 'design, closed, hides 2');
@@ -157,7 +158,7 @@ await test('the graph opens with every entry closed, each saying how many it hid
   await node(page, 'cap:design-review').click();
   await inspector(page).getByRole('heading', { name: 'Capability', level: 2 }).waitFor();
   const details = await inspector(page).textContent();
-  for (const fact of ['design-review', 'worker', 'marionette-design', 'Activates when the request means', 'Review a finished design', 'Not for: Building one']) assert.ok(details.includes(fact), `the details say ${fact}`);
+  for (const fact of ['design-review', 'worker', 'sample-design', 'Activates when the request means', 'Review a finished design', 'Not for: Building one']) assert.ok(details.includes(fact), `the details say ${fact}`);
   // What it needs is a line of the canvas, no longer words of the details: dashed, with the AI's label of the condition drawn while one of its ends is chosen, and heard.
   assert.equal(details.includes('on a condition'), false, 'the details no longer write the lines out');
   await drawnLines(page, DASHED).filter({ hasText: 'A design exists' }).waitFor({ state: 'attached' });
@@ -172,12 +173,12 @@ await test('the graph opens with every entry closed, each saying how many it hid
   assert.match(await inspector(page).textContent(), /Produces\s*design-brief/);
 });
 
-await test('a graph the size of Marionette (37 capabilities, 15 entries): the first view keeps names readable, starts at the first entry and cuts none at its edge; an example opens the entries of its steps, numbers them and brings them in sight', 'projects', {}, async app => {
+await test('a graph of a large project (37 capabilities, 15 entries): the first view keeps names readable, starts at the first entry and cuts none at its edge; an example opens the entries of its steps, numbers them and brings them in sight', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ bigGraph: true });
-  await openMarionette(page);
+  await openSample(page);
   await canvas(page).waitFor();
-  const first = 'entry:0:marionette-group-1';
+  const first = 'entry:0:sample-group-1';
   // Visible: Sigrid shows the canvas only once its first view is fitted.
   await node(page, first).waitFor();
   await frames(page);
@@ -217,7 +218,7 @@ await test('a graph the size of Marionette (37 capabilities, 15 entries): the fi
   // No press on "Fit the view": a new light opens the entries of its steps and asks the canvas to bring them into the view (Workspace.tsx, Sigrid's `focus`).
   await inSight(page, `cap:${long}`);
   await inSight(page, 'cap:capability-37-design-system');
-  for (const id of ['entry:5:marionette-group-6', 'entry:6:marionette-group-7']) await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', id);
+  for (const id of ['entry:5:sample-group-6', 'entry:6:sample-group-7']) await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', id);
   // The canvas numbers the path: the step in dots and in the name a screen reader hears.
   assert.equal(await node(page, `cap:${long}`).getAttribute('aria-label'), `${long}, step 1`);
   assert.equal(await node(page, 'cap:capability-37-design-system').getAttribute('aria-label'), 'capability-37-design-system, step 2');
@@ -232,7 +233,7 @@ await test('a graph the size of Marionette (37 capabilities, 15 entries): the fi
 // ---------- the examples and the simulator ----------
 await test('each example says its request, its intents and its outputs; a click lights its path, opens its entry and shows its steps in the details', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   assert.equal(await segment(page, 'Examples').getAttribute('aria-pressed'), 'true', 'a project opens on its examples');
   const landing = row(page, 'A landing page'), letter = row(page, 'A letter');
   const lines = async r => texts(r.locator('[data-slot="item-row-description"], [data-slot="item-row-fact"]'));
@@ -291,7 +292,7 @@ await test('each example says its request, its intents and its outputs; a click 
 
 await test('the simulator: an empty request is refused in place, the note names the engine once, an answer lights its steps, and Cancel stops waiting', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const box = page.getByRole('textbox', { name: 'Request to simulate' }), go = page.getByRole('button', { name: 'Simulate' });
   const note = page.getByText(/^Free-text requests use Claude Code on this computer, with its own credentials\. Each costs up to \$0\.50 a request\. Documented examples run no AI\.$/);
   await note.waitFor();
@@ -308,7 +309,7 @@ await test('the simulator: an empty request is refused in place, the note names 
   assert.deepEqual(await texts(result.locator('ol[aria-label="Steps, in order"] > li')), ['1office-pdfPrerequisiteA prerequisite the plugin declares, added before the step that needs it.', '2office-docsoffice-docs-intentThe request asks for a Word file.']);
   await result.getByText('Asked Claude Code · $0.12 · 4.2 s', { exact: true }).waitFor();
   const sent = (await callsOf(app, 'simulate')).at(-1).payload;
-  assert.equal(sent.id, 'marionette'); assert.equal(sent.task, 'Write a letter'); assert.match(sent.run, /^[A-Za-z0-9_-]{1,64}$/);
+  assert.equal(sent.id, 'sample'); assert.equal(sent.task, 'Write a letter'); assert.match(sent.run, /^[A-Za-z0-9_-]{1,64}$/);
   await numbered(page, 'office-pdf', 1);
   await numbered(page, 'office-docs', 2);
   assert.equal(await note.count(), 0, 'the note is said once in a session');
@@ -329,7 +330,7 @@ await test('the simulator: an empty request is refused in place, the note names 
   await tab(page, 'Sync').click();
   await page.waitForFunction(run => window.calls.some(c => c.action === 'cancel_simulation' && c.payload.run === run), third);
   await tab(page, 'Projects').click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await page.getByRole('textbox', { name: 'Request to simulate' }).inputValue(), 'A third letter', 'what was typed is kept');
   assert.equal(await page.getByRole('button', { name: 'Simulate' }).getAttribute('aria-busy'), null, 'coming back, nothing is waited for');
 });
@@ -337,7 +338,7 @@ await test('the simulator: an empty request is refused in place, the note names 
 // ---------- the inputs ----------
 await test('choosing an input shows it, and opens the entries of the capabilities its decisions target and marks those capabilities on the graph', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Inputs').click();
   assert.match(await row(page, 'taste-skill').textContent(), /v1\.2\.0 · published release · MIT.*Became 2 capabilities · 1 dropped/);
   await page.getByText('house-style.md', { exact: true }).waitFor();
@@ -364,7 +365,7 @@ await test('choosing an input shows it, and opens the entries of the capabilitie
 
 await test('Records and Runs are the read-only views of the harmonization', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Records').click();
   const records = page.getByRole('list', { name: 'Decision records' });
   assert.deepEqual(await texts(records.locator(':scope > li p')), ['One owner per output.', 'Documents keep the source\'s limits.']);
@@ -373,29 +374,29 @@ await test('Records and Runs are the read-only views of the harmonization', 'pro
   const runs = page.getByRole('list', { name: 'Runs' }).locator(':scope > li');
   assert.equal(await runs.count(), 2);
   const newest = await runs.first().textContent();
-  for (const fact of ['0.5.0', 'current', 'marionette-v0.5.0', 'Moved taste-skill to v1.2.0.', 'Built and validated', '$2.00', 'Claude Code']) assert.ok(newest.includes(fact), `the newest run says ${fact}`);
+  for (const fact of ['0.5.0', 'current', 'sample-v0.5.0', 'Moved taste-skill to v1.2.0.', 'Built and validated', '$2.00', 'Claude Code']) assert.ok(newest.includes(fact), `the newest run says ${fact}`);
   assert.match(await runs.nth(1).textContent(), /0\.4\.0.*First harmonization\..*Budget\s*—.*Engine\s*—/);
   await page.screenshot({ path: shots + '/workspace-runs.png' });
 });
 
 await test('the project names its file, with Open folder, and its repository, author and creation date; a shell that cannot open folders loses the button for the session', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const head = page.locator('main header').first();
-  await head.getByText('Repository github.com/acaprino/marionette · main · by acaprino · created 2026-11-10', { exact: true }).waitFor();
-  await head.getByText('D:/Muro/data/projects/marionette.mp', { exact: true }).waitFor();
+  await head.getByText('Repository github.com/owner/sample · main · by acaprino · created 2026-11-10', { exact: true }).waitFor();
+  await head.getByText('D:/Muro/data/projects/sample.mp', { exact: true }).waitFor();
   const folder = head.getByRole('button', { name: 'Open folder', exact: true });
   assert.equal(await folder.getAttribute('data-variant'), 'outline', 'not the solid action of the window');
   await folder.click();
   await page.waitForFunction(() => window.calls.some(c => c.action === 'open_folder'));
-  assert.deepEqual((await callsOf(app, 'open_folder')).map(c => c.payload), [{ path: 'D:/Muro/data/projects/marionette.mp' }]);
+  assert.deepEqual((await callsOf(app, 'open_folder')).map(c => c.payload), [{ path: 'D:/Muro/data/projects/sample.mp' }]);
   await app.flags({ noShellActions: true });
   await folder.click();
   await notice(page, 'This version of Muro cannot open folders yet.').waitFor();
   await folder.waitFor({ state: 'detached' });
   await page.getByRole('button', { name: 'All projects', exact: true }).click();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Open folder', exact: true }).count(), 0, 'gone for the session, not only for this page');
 });
 
@@ -403,7 +404,7 @@ await test('the project names its file, with Open folder, and its repository, au
 await test('a project with no capability says so where the graph would be and in its examples, and nothing fails', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ emptyGraph: true });
-  await openMarionette(page);
+  await openSample(page);
   await graphPane(page).getByText('No decision graph', { exact: true }).waitFor();
   await graphPane(page).getByText('This project\'s plugin has no capabilities to choose between, so there is nothing to draw or to simulate.', { exact: true }).waitFor();
   assert.match(await graphPane(page).textContent(), /0 entries · 0 capabilities/);
@@ -416,7 +417,7 @@ await test('a project with no capability says so where the graph would be and in
 await test('capabilities that no entry groups are all on the graph, each one reachable, and an example still numbers its steps', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ noEntries: true });
-  await openMarionette(page);
+  await openSample(page);
   await graphPane(page).getByText('No entry groups these capabilities: each stands on its own.', { exact: true }).waitFor();
   await canvas(page).waitFor();
   await page.waitForFunction(() => document.querySelectorAll('[data-slot="graph-node"][data-node-id^="cap:"]').length === 4);
@@ -434,7 +435,7 @@ await test('capabilities that no entry groups are all on the graph, each one rea
 await test('two examples with one title are two rows, each chosen on its own; a title, an intent and an output with <, & and quotes are text, not markup', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ oddNames: true });
-  await openMarionette(page);
+  await openSample(page);
   const letters = row(page, 'A letter');
   assert.equal(await letters.count(), 2);
   await letters.nth(1).click();
@@ -457,28 +458,28 @@ await test('two examples with one title are two rows, each chosen on its own; a 
 await test('a record or a run holding an object where the file should hold text is shown as text, and the window stays whole', 'projects', {}, async app => {
   const { page } = app;
   await app.flags({ objectFields: true });
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Records').click();
   const records = page.getByRole('list', { name: 'Decision records' });
   assert.deepEqual(await texts(records.locator(':scope > li p')), ['{"en":"One owner per output."}', 'Documents keep the source\'s limits.']);
   await segment(page, 'Runs').click();
   assert.match(await page.getByRole('list', { name: 'Runs' }).locator(':scope > li').first().textContent(), /\{"en":"Moved taste-skill to v1\.2\.0\."\}/);
   assert.equal(await frameButtons(page).count(), 3, 'the title bar and its three buttons are there');
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await page.getByText('This screen could not be shown').count(), 0, 'the page itself did not fail');
 });
 
 // ---------- what the session keeps ----------
 await test('a reload brings back the open project, its panel and its selection; a request that was waiting comes back idle', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Inputs').click();
   await row(page, 'genoffice').click();
   await inspector(page).getByRole('heading', { name: 'genoffice', level: 3 }).waitFor();
-  assert.deepEqual(await kept(page).then(k => [k.id, k.panel, k.selected]), ['marionette', 'inputs', { kind: 'input', id: 'genoffice' }]);
+  assert.deepEqual(await kept(page).then(k => [k.id, k.panel, k.selected]), ['sample', 'inputs', { kind: 'input', id: 'genoffice' }]);
   await page.reload();
   await goProjects(page);
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await segment(page, 'Inputs').getAttribute('aria-pressed'), 'true', 'the panel that was open');
   assert.equal(await row(page, 'genoffice').getAttribute('aria-current'), 'true', 'the input that was selected');
   await inspector(page).getByRole('heading', { name: 'genoffice', level: 3 }).waitFor();
@@ -492,7 +493,7 @@ await test('a reload brings back the open project, its panel and its selection; 
   assert.equal('run' in (await kept(page)).sim, false, 'the run is never written to the session');
   await page.reload();
   await goProjects(page);
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await page.getByRole('textbox', { name: 'Request to simulate' }).inputValue(), 'Write a letter');
   assert.equal(await page.getByRole('button', { name: 'Simulate' }).getAttribute('aria-busy'), null, 'never brought back as waiting');
   // A selection the project no longer has is no selection, and nothing fails.
@@ -506,7 +507,7 @@ await test('a reload brings back the open project, its panel and its selection; 
 // ---------- narrow windows ----------
 await test('at 900px the inspector is a panel over the graph and a press on another example keeps it; at 500px the left panel is a drawer and nothing scrolls sideways', 'projects', { viewport: { width: 900, height: 900 } }, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await row(page, 'A landing page').click();
   await inspector(page).getByRole('heading', { name: 'A landing page', level: 3 }).waitFor();
   assert.equal(await inspector(page).getAttribute('data-inspector-form'), 'drawer', 'under 1000px the inspector is a drawer');
@@ -547,7 +548,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
 
 await test('every control has a name, and the actions that are not there yet are disabled and say why', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await row(page, 'A landing page').click();
   await inspector(page).getByRole('heading', { name: 'A landing page', level: 3 }).waitFor();
   assert.deepEqual(await unnamed(page), [], 'the examples, the graph and the details');

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Badge, Button, Cell, Cluster, Column, Heading, Icon, ScrollArea, Separator, Sheet, SheetContent, SheetHeader, SheetTitle, Spacer, Text, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Button, Cell, Cluster, Column, Heading, Icon, ScrollArea, Separator, Sheet, SheetContent, SheetHeader, SheetTitle, Spacer, Text, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
 import { Empty } from '@acaprino/sigrid/components';
 import { ContentSplit, Inspector, useAppShell } from '@acaprino/sigrid/layout';
 import { GraphCanvas, type GraphCanvasHandle } from '@acaprino/sigrid/graph';
@@ -185,7 +185,6 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
             <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>
             <Heading size="small" level={1}><Text pre>{name}</Text></Heading>
             {version ? <Text variant="note">{version}</Text> : null}
-            {info.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
             <Text variant="note">{summary}</Text>
             <Spacer />
             <GatedButton off={editBusy} variant="outline" size="sm" onClick={() => show('details')}>Edit details…</GatedButton>

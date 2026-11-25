@@ -1,7 +1,7 @@
 // Regenerates the screenshots of docs/assets/screenshots from the fake transport's demo scenarios (fake-transport.js):
 //   node apps/desktop/tests/screenshots.mjs
 // MURO_UI_PORT moves the dev server when 1422 is taken; MURO_SHOTS_OUT=<folder> writes somewhere else;
-// MURO_GUIDE=<path of a release's GUIDE.html> also captures Marionette's offline guide.
+// MURO_GUIDE=<path of a release's GUIDE.html> also captures that release's offline guide.
 // The pages of the React window: the Projects list, and the workspace of a project with a documented example lit, with an
 // answer to a free-text request, and in the light theme. Sync, Activity, Settings and the first run are not in the window yet
 // (plan R0), so nothing here draws them: their pictures in docs/assets/screenshots are those of the earlier window.
@@ -25,17 +25,17 @@ const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });
 
-/** The Projects tab of the `projects` scenario (Marionette as the default project, one plugin installed as published) and the project opened. */
+/** The Projects tab of the `projects` scenario (one project, one plugin installed as published) and the project opened. */
 async function openProject(page) {
   await ready(page);
   await tab(page, 'Projects').click();
   await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).waitFor();
 }
 const workspace = async page => {
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
-  await page.getByRole('tree', { name: 'Decision graph of Marionette' }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  await page.getByRole('tree', { name: 'Decision graph of Sample' }).waitFor();
 };
 
 for (const scheme of ['dark', 'light']) {
@@ -68,7 +68,7 @@ if (process.env.MURO_GUIDE) {
     await page.getByRole('button', { name: 'Percorsi' }).click();
     await page.getByText('Landing con animazioni allo scroll', { exact: true }).first().click();
     await delay(2000);
-    await shot(page, 'marionette-guide', 560);
+    await shot(page, 'package-guide', 560);
     if (errors.length) throw Error('Page errors: ' + errors.join('; '));
   } finally { await browser.close(); }
 }

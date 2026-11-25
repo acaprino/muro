@@ -11,13 +11,13 @@ const it = (name: string, body: () => void | Promise<void>) => test(name, async 
 const decision = { kind: 'decision', asked: 'Write a letter', status: 'selected', steps: [{ step_id: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent', reason: 'A Word file.', added_as_prerequisite: false }], reason: 'One document.', questions: [], stack: [], who: null, example: null } as const;
 
 it('a project opened from the list starts on its examples, with nothing selected and no simulation', () => {
-  assert.deepEqual(fresh('marionette'), { id: 'marionette', panel: 'examples', selected: null, sim: newSim() });
+  assert.deepEqual(fresh('sample'), { id: 'sample', panel: 'examples', selected: null, sim: newSim() });
   assert.deepEqual(newSim(), { task: '', example: null, run: null, error: '', result: null });
   assert.deepEqual(PANELS, ['inputs', 'examples', 'records', 'runs']);
 });
 
 it('a good record comes back as it was: the project, the panel, the selection and the simulation', () => {
-  const held: ProjectView = { id: 'marionette', panel: 'inputs', selected: { kind: 'input', id: 'taste-skill' }, sim: { task: 'Write a letter', example: 1, run: null, error: '', result: structuredClone(decision) as any } };
+  const held: ProjectView = { id: 'sample', panel: 'inputs', selected: { kind: 'input', id: 'taste-skill' }, sim: { task: 'Write a letter', example: 1, run: null, error: '', result: structuredClone(decision) as any } };
   remember(held);
   assert.deepEqual(recall(), held);
   for (const selected of [{ kind: 'example', id: '0' }, { kind: 'capability', id: 'design-taste' }, null] as const) {
@@ -29,7 +29,7 @@ it('a good record comes back as it was: the project, the panel, the selection an
 });
 
 it('a simulation that was waiting for the AI is never brought back as waiting, and the error of the box is not kept', () => {
-  remember({ ...fresh('marionette'), sim: { task: 'Write a letter', example: null, run: 'run-1', error: 'Write a request first.', result: null } });
+  remember({ ...fresh('sample'), sim: { task: 'Write a letter', example: null, run: 'run-1', error: 'Write a request first.', result: null } });
   const kept = JSON.parse(memory.get('muro.project')!);
   assert.equal('run' in kept.sim, false, 'the run is not written');
   assert.equal('error' in kept.sim, false);
@@ -65,13 +65,13 @@ it('a bad record is no record: not JSON, not an object, an unknown panel, no id,
 it('a session that keeps nothing still works, and the engine note is then said every time', () => {
   delete (globalThis as any).sessionStorage;
   assert.equal(recall(), null);
-  assert.doesNotThrow(() => remember(fresh('marionette')));
+  assert.doesNotThrow(() => remember(fresh('sample')));
   assert.doesNotThrow(() => remember(null));
   assert.doesNotThrow(() => tellNote());
   assert.equal(noteTold(), false);
   (globalThis as any).sessionStorage = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); }, removeItem: () => { throw new Error('denied'); } };
   assert.equal(recall(), null, 'a session that refuses to be read');
-  assert.doesNotThrow(() => remember(fresh('marionette')));
+  assert.doesNotThrow(() => remember(fresh('sample')));
   assert.equal(noteTold(), false);
 });
 

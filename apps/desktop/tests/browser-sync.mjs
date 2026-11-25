@@ -394,9 +394,9 @@ await test('the table: a row per plugin with its source, version and policy, a c
   await ready(page);
   await check(app);
   assert.equal(await rows(page).count(), 5);
-  const m = cells(page, 'Marionette');
-  assert.match(await m.nth(0).textContent(), /github\.com\/acaprino\/marionette/);
-  assert.equal(await m.nth(0).locator('[title="Marionette"]').count(), 1, 'the whole name in its title');
+  const m = cells(page, 'Sample');
+  assert.match(await m.nth(0).textContent(), /github\.com\/owner\/sample/);
+  assert.equal(await m.nth(0).locator('[title="Sample"]').count(), 1, 'the whole name in its title');
   assert.equal(await m.nth(1).textContent(), 'v0.4.0Latest release');
   assert.equal(await m.nth(2).textContent(), 'Update 0.3.0 → 0.4.0');
   assert.equal(await m.nth(3).textContent(), '0.4.0');
@@ -415,7 +415,7 @@ await test('the table: a row per plugin with its source, version and policy, a c
   // The rows are one tab stop, and the arrows move between them.
   const name = n => page.locator('#rows').getByRole('button', { name: n, exact: true });
   assert.equal(await page.locator('#rows [data-row-button][tabindex="0"]').count(), 1);
-  await name('Marionette').focus();
+  await name('Sample').focus();
   await page.keyboard.press('ArrowDown');
   assert.equal(await focusedText(page), 'commit-helper');
   await page.keyboard.press('End');
@@ -423,12 +423,12 @@ await test('the table: a row per plugin with its source, version and policy, a c
   await page.keyboard.press('ArrowDown');
   assert.equal(await focusedText(page), 'sql-companion', 'the last row stays the last');
   await page.keyboard.press('Home');
-  assert.equal(await focusedText(page), 'Marionette');
+  assert.equal(await focusedText(page), 'Sample');
   await page.keyboard.press('ArrowUp');
-  assert.equal(await focusedText(page), 'Marionette');
+  assert.equal(await focusedText(page), 'Sample');
   await page.keyboard.press('ArrowDown');
   assert.equal(await name('commit-helper').getAttribute('tabindex'), '0', 'the tab stop follows the focus');
-  assert.equal(await name('Marionette').getAttribute('tabindex'), '-1');
+  assert.equal(await name('Sample').getAttribute('tabindex'), '-1');
   await page.screenshot({ path: shots + '/sync-table.png' });
 });
 
