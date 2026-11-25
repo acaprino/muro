@@ -54,6 +54,18 @@
       ]
     },
     {
+      "name": "marionette-polish",
+      "description": "Use when a screen or interface already works but feels off or unfinished and needs polish (states, hit areas, contrast, layout shift, type, hover and press), when an animation, easing or transition must be checked frame by frame and made correct, when a working UI should be reviewed against a high craft bar without changes, or when colours clash or feel muddy, garish or off and you want a measured critique of a poster, hero, landing page, app screen or palette, with exact OKLCH and hex fixes and before/after previews, or a check of someone else's colour critique. Not for a screen that looks AI-generated, an accessibility audit or the review before shipping (design review), for a motion specification, or for choosing a new palette or look.",
+      "capabilities": [
+        "interface-polish",
+        "color-critique"
+      ],
+      "absorbs": [
+        "charles-polish",
+        "charles-color-analysis"
+      ]
+    },
+    {
       "name": "marionette-motion",
       "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
       "capabilities": [

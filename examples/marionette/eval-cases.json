@@ -1656,6 +1656,150 @@
         ]
       },
       "why": "The responsive limits are data of the design file; layout-structure builds or reviews layout in code and does not write the file."
+    },
+    {
+      "id": "cs-polish-modal-feels-off",
+      "task": "Il modal di onboarding funziona, ma sembra un po' strano: compare dal nulla, il pulsante di chiusura è minuscolo sul telefono e i numeri ballano mentre contano. Fallo sembrare finito.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-polish"
+          }
+        ]
+      },
+      "why": "A working screen that feels off, with an entrance, a hit area and jiggling numbers to fix, is the polish intent; nothing asks for an audit before shipping or for a motion specification."
+    },
+    {
+      "id": "cs-polish-drawer-frame-by-frame",
+      "task": "Ho aggiunto un'animazione di slide-in al drawer del carrello. Controllala frame per frame e sistema quello che scatta.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-polish"
+          }
+        ]
+      },
+      "why": "Motion that already exists, checked on captured frames and corrected in the code, is interface polish; the motion specification decides motion that does not exist yet."
+    },
+    {
+      "id": "cs-craft-review-report-only",
+      "task": "card.html e card.css sono una card di dashboard con un modal e un toast. Rivedili con un'asticella alta di craft. Non cambiare niente: elenca ogni problema con gravità, evidenza (file e riga) e correzione.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-review"
+          }
+        ]
+      },
+      "why": "A report of craft findings with severity, evidence and fix, and no edit, is the review intent of the same capability; it is not a logic review and not a layout report with a verdict."
+    },
+    {
+      "id": "cs-ai-look-stays-design-review",
+      "task": "La mia pagina prezzi sembra ogni template AI: gradiente viola, card di vetro ed emoji ovunque. Falla smettere di sembrare fatta da un'AI.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.generic-look-check"
+          }
+        ]
+      },
+      "why": "A screen that reads as a generic generated template is the generic-look pass of design review; the polish source itself sends such a screen elsewhere first."
+    },
+    {
+      "id": "cs-color-clash-check-a-critique",
+      "task": "Nei commenti dicono che l'arancione e il verde del mio poster fanno a pugni e che dovrei desaturare l'arancione. Hanno ragione? L'immagine è poster.jpg.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "color-critique"
+        ],
+        "selections": [
+          {
+            "capability": "color-critique",
+            "intent": "ui.color-critique"
+          }
+        ]
+      },
+      "why": "Whether someone else's colour critique is right, answered with measurements of the image, is the colour critique; no palette is chosen and nothing is edited."
+    },
+    {
+      "id": "cs-color-muddy-landing",
+      "task": "I colori della mia landing sembrano fangosi e un po' cheap e non capisco perché: sfondo lavanda polveroso, pulsanti teal, titoli marrone caldo. Cosa c'è che non va e con quali valori esatti lo sistemo?",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "color-critique"
+        ],
+        "selections": [
+          {
+            "capability": "color-critique",
+            "intent": "ui.color-critique"
+          }
+        ]
+      },
+      "why": "Colours that exist and feel off, with a request for the cause and exact corrections, are a colour critique; a restyle of the page with a new visual system would be visual direction."
+    },
+    {
+      "id": "cs-contrast-fix-stays-design-review",
+      "task": "Controlla il contrasto dei testi di dashboard.html rispetto a WCAG AA e correggi nel file quelli che non passano.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.accessibility-audit"
+          }
+        ]
+      },
+      "why": "Fixing failing contrast in the file against WCAG AA is the accessibility audit; the colour critique reports and previews and changes no file."
+    },
+    {
+      "id": "cs-motion-spec-stays-motion",
+      "task": "La nuova dashboard non ha ancora animazioni: decidi come si deve muovere, con durate, easing e alternative per chi ha ridotto il movimento.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "motion-principles"
+        ],
+        "selections": [
+          {
+            "capability": "motion-principles",
+            "intent": "ui.motion-design"
+          }
+        ]
+      },
+      "why": "Deciding motion that does not exist yet, as a specification, is the motion specification; interface polish corrects motion that already exists."
     }
   ]
 }

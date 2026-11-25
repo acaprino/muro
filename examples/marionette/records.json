@@ -277,6 +277,16 @@
       "text": "2026-11-23: better-layout (jakubkrehel/skills, head 672ae44a: no release upstream) is absorbed as one on-demand role, layout-structure, with a build intent and a review intent; nothing acts in every session. The owner asked for a responsive and mobile layout skill, compared four candidates and took only better-layout (\"è meglio solo better layout\", ui-craft being heavy). Its hand-offs to sibling skills of the repository are not carried, because those skills are not in the package; the concerns that have an owner here (accessibility, animation) are named. Responsive limits recorded as data stay design-file; accessibility stays design-review.",
       "author": "muro",
       "binding": false
+    },
+    {
+      "id": "harmonization-23",
+      "date": "2026-11-25",
+      "subjects": [
+        "charles-skills"
+      ],
+      "text": "2026-11-25: charles-skills (LemonFace0309/charles-skills, head 83de509d: no release upstream) is absorbed as two on-demand roles; nothing acts in every session. The owner asked for charles-color-analysis and then charles-polish, so the other skills of the repository are not sources and were not read. color-critique measures the colour of a visual, page, app screen or palette and reports ranked corrections with previews; it writes no palette and no file of the project. interface-polish scores a working interface, climbs it and verifies its motion frame by frame, or reviews it without edits; it was compared with design-review's polish pass and kept apart, because that pass audits and gives a readiness verdict. Decided here: a recorded motion-spec or a design file's motion values win over the polish source's timings; a recorded design system is reported, not changed; the hand-off to charles-unslop is answered by design-review's generic-look pass; both hit-area minimums (40px desktop there, 44px in design-review) are kept as written. Left open: which of the two polishing roles a bare \"polish this\" selects is judged per request by the classifier, and no routing evaluation was scored.",
+      "author": "muro",
+      "binding": false
     }
   ]
 }

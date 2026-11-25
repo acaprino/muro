@@ -544,6 +544,51 @@
       ],
       "reason": "La review di layout è un intento diverso dalla sistemazione: riporta soltanto. Non è la review dell'accessibilità né quella della logica del codice.",
       "questions": []
+    },
+    {
+      "title": "Uno schermo che funziona ma non sembra finito",
+      "task": "Il modal di onboarding funziona, ma sembra un po' strano: compare dal nulla, il pulsante di chiusura è minuscolo sul telefono e i numeri ballano mentre contano. Fallo sembrare finito.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interface-polish",
+          "intent": "ui.craft-polish",
+          "reason": "Lo schermo funziona già: serve dare un punteggio, nominare la cosa più debole, sistemare i dettagli e rendere corretto il movimento, verificandolo frame per frame."
+        }
+      ],
+      "reason": "Un solo passo che ripete render, correzione e verifica finché due passate di fila non cambiano più il punteggio. Non è l'audit prima della consegna e non scrive una specifica di movimento.",
+      "questions": []
+    },
+    {
+      "title": "Solo una review di craft, senza modifiche",
+      "task": "card.html e card.css sono una card di dashboard con un modal e un toast. Rivedili con un'asticella alta. Non cambiare niente: elenca ogni problema con gravità, evidenza e correzione.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interface-polish",
+          "intent": "ui.craft-review",
+          "reason": "Serve un rapporto con gravità, evidenza (frame, numero o file e riga) e correzione, senza toccare i file."
+        }
+      ],
+      "reason": "La review usa lo stesso metodo della rifinitura e si ferma prima di modificare. Sistemare ciò che trova è un'altra richiesta.",
+      "questions": []
+    },
+    {
+      "title": "I colori fanno a pugni?",
+      "task": "Nei commenti dicono che l'arancione e il verde del mio poster fanno a pugni e che dovrei desaturare l'arancione. Hanno ragione? L'immagine è poster.jpg.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "color-critique",
+          "intent": "ui.color-critique",
+          "reason": "Il risultato richiesto è un giudizio misurato sui colori che esistono: quote d'area, luminosità, distanza di tinta, croma e contrasto, con le correzioni esatte in OKLCH e hex."
+        }
+      ],
+      "reason": "Un solo passo: misura l'immagine, risponde punto per punto alla critica altrui e mostra l'anteprima prima/dopo delle due correzioni principali. Non sceglie una palette nuova e non modifica i file del progetto.",
+      "questions": []
     }
   ]
 }

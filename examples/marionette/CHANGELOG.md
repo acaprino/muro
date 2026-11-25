@@ -1,3 +1,15 @@
+# Marionette 0.7.0
+
+Marionette absorbs two of Charles Liu's design skills, from charles-skills, as two new
+on-demand capabilities. `interface-polish` (charles-polish) takes an interface that
+already works from fine to finished: it scores it, fixes the details people feel and
+checks its motion frame by frame, or reviews it without changing it. `color-critique`
+(charles-color-analysis) measures the colours of a visual, a page, an app screen or a
+palette and gives the corrections as exact OKLCH and hex values with before/after
+previews. The catalog goes from 38 to 40 capabilities and from 17 to 18 sources;
+nothing new acts in every session. The upstream has no release or tag, so the pin
+follows its head (83de509d).
+
 # Marionette 0.6.0
 
 Marionette absorbs better-layout, Jakub Krehel's layout skill, as one new on-demand
