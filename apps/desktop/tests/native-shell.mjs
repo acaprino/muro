@@ -334,13 +334,20 @@ try {
   };
   await seed('save_target', { target: { id: 'slow-oc', harness: 'opencode', name: 'OpenCode slow test', root: slowProfile, executable: '', exclusive: false, enabled: true } });
   await seed('save_plugin', { plugin: { id: 'slow', name: 'Slow source', source: `https://127.0.0.1:${stall.address().port}/slow/plugin.git`, policy: 'pinned', pinned_version: 'v1', targets: [], distributions: [] } });
-  const holdRegistry = () => { const holder = spawn(ctl, ['--data', slowData, 'request', 'check'], { stdio: 'ignore', windowsHide: true }); holders.push(holder); return holder; };
+  const startHolder = () => { const holder = spawn(ctl, ['--data', slowData, 'request', 'check'], { stdio: 'ignore', windowsHide: true }); holders.push(holder); return holder; };
   const registryBusy = () => /Registry is busy/.test(spawnSync(ctl, ['--data', slowData, 'request', 'snapshot'], { encoding: 'utf8' }).stderr);
+  // A check that meets another reader at its start is refused and ends, the probe's own included: it is given a second alone, and started again.
+  const holdRegistry = async () => {
+    let holder;
+    await until('the registry is held', async () => {
+      if (!holder || holder.exitCode !== null) { holder = startHolder(); await delay(1000); }
+      return registryBusy();
+    }, 30000);
+  };
   const slowAutomation = () => json(join(slowData, 'automation-status.json'));
 
   // 8a. Muro starts while another process holds the registry: it waits for it, and shows its page.
-  holdRegistry();
-  await until('the registry is held', registryBusy, 15000);
+  await holdRegistry();
   const slow = await launch([], { dataDir: slowData });
   const sync = async () => {
     await slow.page.locator('[data-window-control="close"]').waitFor({ timeout: 60000 });
@@ -366,8 +373,7 @@ try {
     window.__unavailable = false;
     new MutationObserver(() => { if (document.body?.innerText.includes('Registry not available')) window.__unavailable = true; }).observe(document, { subtree: true, childList: true, characterData: true });
   });
-  holdRegistry();
-  await until('the registry is held again', registryBusy, 15000);
+  await holdRegistry();
   const began = Date.now();
   await slow.page.reload();
   await sync();
