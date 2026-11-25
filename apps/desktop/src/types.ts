@@ -39,6 +39,8 @@ export interface Autostart { supported:boolean; enabled:boolean; current:boolean
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;
 export type Page = 'projects'|'sync'|'activity'|'settings';
+/** What the Activity page lists: everything, the sync runs, the AI runs, or what did not end well. */
+export type ActivityFilter = 'all'|'sync'|'ai'|'problems';
 /** `project.json` of a project file. */
 export interface ProjectMeta { schema:number; name:string; slug:string; version:string; author:string; created:string; changed:string; repository:{url:string;branch:string;tag_prefix:string}|null; builtin:boolean }
 /** What the action `projects` returns for each listed project: its id and file, then what `muro project info` knows in short (a count the runtime does not send is absent), or `error` when the file is missing or invalid. */

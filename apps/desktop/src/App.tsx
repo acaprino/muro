@@ -1,6 +1,6 @@
 // The window: Imago's (`AppWindow`), with the four pages as its views, the status row, the page of the view, and the foot. It also holds the
 // action bar and the inspector of the page: of Sync its actions and the harness, of an open project its actions and what is selected.
-// The pages that are not in the new window yet say so (pages/Moved.tsx); the window opens on Sync.
+// Every tab is a page of the window now; it opens on Sync.
 import { useCallback, useRef, useState } from 'react';
 import { AppWindow, ScreenBoundary, focusContent, type AppView } from '@acaprino/imago';
 import { useMedia } from '@acaprino/sigrid';
@@ -16,7 +16,7 @@ import { SyncProvider, useSync } from './pages/sync/useSync.tsx';
 import { checkedLine, chipOf } from './pages/sync/words.ts';
 import { Sync, SyncActions } from './pages/sync/Sync.tsx';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
-import { Moved } from './pages/Moved.tsx';
+import { Activity } from './pages/activity/Activity.tsx';
 import { Projects } from './pages/Projects.tsx';
 import { Settings } from './pages/Settings.tsx';
 import { ProjectActions, ProjectInspector } from './pages/project/Workspace.tsx';
@@ -106,7 +106,7 @@ function Muro() {
     >
       {!snapshot && error ? (
         <Empty fill title="Registry not available" description={error} action={<Button onClick={() => { void reload(); }}>Try again</Button>} />
-      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} /> : page === 'settings' ? <Settings /> : <Moved page="Activity" />}
+      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} /> : page === 'settings' ? <Settings /> : <Activity />}
     </AppWindow>
   );
 }

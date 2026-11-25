@@ -180,7 +180,7 @@ function scenarioData(scenario) {
       const synced = { claude: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, codex: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, opencode: { checked: ago(checkedAgo), synced: ago(syncedAgo) } };
       const jobs = done ? [] : [{ id: 'job-1', plugin_id: 'docs-writer', harness: 'opencode', status: 'running', phase: 'harmonization', budget_usd: 2, log_path: 'C:/Users/you/Muro/data/jobs/job-1/log.txt', message: 'Claude Code is adapting the plugin for OpenCode.', time: ago(3) }];
       const earlier = scenario === 'demo-activity' ? [{ id: 'a0', time: ago(2900), action: 'check', status: 'failed', message: 'Plan calculated; sources not resolved: sql-companion' }] : [], between = scenario === 'demo-activity' ? [{ id: 'a3', time: ago(75), action: 'Automatic sync', status: 'complete', message: '2 changes applied' }] : [];
-      const activity = [...earlier, { id: 'a1', time: ago(1500), action: 'apply', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, ...between, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
+      const activity = [...earlier, { id: 'a1', time: ago(1500), action: 'sync', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, ...between, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
       return { ...base, auto_sync: true, targets, plugins, installed, found: [foundHarness('pi', 'Pi', { version: '0.9.1' }), foundHarness('hermes', 'Hermes Agent', { version: '0.7.0' })], jobs, activity, sync: { last_check: ago(checkedAgo), last_sync: ago(syncedAgo), revision: null, pending: null, blockers: null, errors: null, targets: synced } };
     }
     default: return { ...base, found: [foundHarness('codex', 'Codex', { version: 'test' })] };
@@ -615,7 +615,7 @@ export function createTransport(scenario = 'default') {
     }
     const time = ago(0), touched = [...new Set(executed.map(o => o.target_id))];
     for (const id of touched) sync.targets[id] = { ...sync.targets[id], synced: time };
-    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('apply', 'complete', `${executed.length} operations applied`); }
+    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('sync', 'complete', `${executed.length} operations applied`); }
     const result = snapshot();
     if (payload.allow_blocked) result.left_out = plan.blockers;
     result.skipped_removals = skip ? removals : 0;

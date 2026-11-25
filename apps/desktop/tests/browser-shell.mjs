@@ -74,11 +74,11 @@ await test('the window opens on Sync; the four tabs are in the title bar in orde
   }
   await content(page).getByRole('heading', { name: 'Appearance' }).waitFor();
   await tab(page, 'Activity').click();
-  await content(page).getByText('Activity is moving to the new window').waitFor();
-  await content(page).getByText('the background worker goes on checking your registry; with automatic sync on it also applies the changes').waitFor();
+  await content(page).getByRole('heading', { name: 'History' }).waitFor();
+  await content(page).getByRole('group', { name: 'Filter activity' }).waitFor();
   await tab(page, 'Sync').click();
   assert.deepEqual(await texts(currentTab(page)), ['Sync'], 'Sync is a page of its own now (browser-sync.mjs tests it)');
-  assert.equal(await content(page).getByText(/is moving to the new window/).count(), 0, 'and no longer says it is moving');
+  assert.equal(await content(page).getByText(/is moving to the new window/).count(), 0, 'and no page says it is moving');
 });
 
 await test('the title bar names the product and its buttons: the palette, and the three window buttons at its end', 'default', {}, async app => {
@@ -118,7 +118,7 @@ await test('from 250px up nothing sticks out sideways: the tabs go under the bar
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name]);
   }
-  await content(page).getByText('Activity is moving to the new window').waitFor();
+  await content(page).getByRole('heading', { name: 'History' }).waitFor();
   assert.equal(await controls(page).count(), 3, 'the window buttons stay at 500px');
   await titleBar(page).getByRole('button', { name: 'Commands', exact: true }).waitFor();
 });

@@ -3,17 +3,16 @@
 The desktop interface is a React app in Imago's shell (`@acaprino/imago`, with the Rust crate `imago-shell` for the
 window), its screens made of Sigrid's parts (`@acaprino/sigrid`; [ADR-0031](adr/ADR-0031-desktop-on-sigrid.md)). The React window took the place
 of the Imago window and is not complete: it has the Projects page, where a project is read, simulated and now also made and
-changed ([Changing a project](#changing-a-project)), and **Sync**, **Activity**, **Settings** and the first run are not in it
-yet (the plans R1 to R3, kept outside this repository, are meant to bring them back). Until they are, a person cannot review
-or apply a plan, change a setting or add a harness in the window. The tray, the background
+changed ([Changing a project](#changing-a-project)), the Sync page, the Activity page ([Activity](#activity)) and the look of
+the window in Settings. The sections of Settings other than Appearance and the first run are not in it yet (the plan R3,
+kept outside this repository, is meant to bring them back). Until then a person cannot change the other settings in the window. The tray, the background
 worker and the registry are as they were, so automatic sync still runs, and the registry's operations stay available
 through `muroctl` and `muro` ([CLI reference](desktop-cli.md)). [Imago migration](imago-migration.md) records what the
 old window took from Imago, kept as history.
 
 ## The window
 
-One window with four tabs, **Projects**, **Sync**, **Activity** and **Settings**. It opens on Sync, which says it is moving;
-only Projects is built. It is Imago's `AppWindow` (title bar, status row, content, inspector, actions, foot) in Muro's accent
+One window with four tabs, **Projects**, **Sync**, **Activity** and **Settings**. It opens on Sync. It is Imago's `AppWindow` (title bar, status row, content, inspector, actions, foot) in Muro's accent
 (hue 170).
 
 **The frame.**
@@ -72,11 +71,18 @@ Sync page is back. [Changing a project](#changing-a-project) says what each chan
 selection and the request being typed survive a reload of the page (session storage, key `muro.project`); a simulation that
 was waiting for the AI never comes back as waiting.
 
-**Sync, Activity and Settings** each say that the page is moving to the new window (*Sync is moving to the new window*, and
-so on), and the first run is not shown at all. The tray and the background
-worker go on meanwhile ([Runtime and storage](#runtime-and-storage)). Where a section below names a button of those pages
-(Check now, Review, Apply all, Add harness, Adapt with AI, the Settings sections), it names the operation of the service
-that the page drove; the window has no such button now.
+**Settings** has the Appearance section only (the theme and the glass); the other sections and the first run are not shown. The tray and the background
+worker go on meanwhile ([Runtime and storage](#runtime-and-storage)). Where a section below names a button of the Settings page
+(Adapt with AI, the Settings sections), it names the operation of the service that the page drove; the window has no such button now.
+
+### Activity
+
+**Activity** says what Muro did, newest first. Its parts, from the top:
+
+- the AI run that is going, if one is (the card of the Projects page, with the run's phase, time, budget and log): **Cancel** asks first (*Cancel adaptation?* or *Cancel run?*, *It cannot be resumed.*, answered with **Cancel adaptation** or **Keep running**) and then asks the runtime to stop it;
+- **History**, with the filter *All*, *Sync*, *AI runs* and *Problems*. The entries are the events the service and the background worker wrote (`activity` of the snapshot: a check, a sync, *Automatic sync*, *Background check*, a saved plugin or harness, a saved setting) and the AI runs that are over (adaptations and project runs, dated by their start). A problem is any entry whose status is not complete, completed or ok. An action the window has no words for is shown as the service named it. An entry has its title, its time, the outcome when it is not a success, the service's message and, for an AI run, its log.
+
+The page reads the registry again when it opens, because the worker writes events while the window is elsewhere; what the window holds shows meanwhile. It says nothing when a run ends: the window already does (the runs are read by `useJobs`). Sigrid has no timeline, so each entry is a row made of its text and badge parts. The list is `pages/activity/entries.ts` (tested in `tests/activity.test.ts`), the page `pages/activity/Activity.tsx` (`tests/browser-activity.mjs`).
 
 Windows-first native portable Tauri application. The Rust registry and desktop runtime live in `crates/`; the UI and native shell live in `apps/desktop/`. The Python factory remains independent and standard-library-only. The GUI communicates with bundled `tools/muroctl.exe` over correlated NDJSON; that backend invokes bundled `tools/mukade.exe` for discovery and executable resolution. Both tools can also be called directly. See [CLI reference](desktop-cli.md).
 
@@ -174,8 +180,7 @@ there again after leaving the project or the tab, or after a reload. When a run 
 again and the outcome is notified in the runtime's words. A run that failed, was cancelled or was interrupted stays on the
 card, with its log, until **Dismiss**; a run that succeeded is said once, if this window saw it going. One AI run goes at a
 time, adaptations included (the runtime's lock): while one does, no other AI run is offered and the buttons say why. The card
-of that run is on the Projects page whatever it is (the run of another project, the adaptation of a plugin: the window has no
-Activity page yet), saying whose it is, so it can be stopped from there. A request the runtime refuses because another run
+of that run is on the Projects page whatever it is (the run of another project, the adaptation of a plugin: Activity shows it too), saying whose it is, so it can be stopped from there. A request the runtime refuses because another run
 goes (one that `muroctl` or another client started) makes the window read the runs again, and the card shows.
 
 **Cancel, and the saving phase.** A Cancel before the factory builds the project leaves the file as it was: between the steps
@@ -197,8 +202,7 @@ no edit is offered (the runtime refuses one); a run of another project does not 
 stays where it is, then sends `delete_project` with the registry revision (once more, with the revision read again, when the
 registry moved meanwhile). The project Muro ships has no such button.
 
-**Not in the window yet.** **Install on harnesses…** and **Review decisions…** (above), the Activity page, where ADR-0032
-decision 7 has the filter *AI runs*, and the pages of the plans R1 to R3. No change was run with a real Claude Code from this
+**Not in the window yet.** **Install on harnesses…** and **Review decisions…** (above), and the pages of the plan R3. No change was run with a real Claude Code from this
 window, and none on a Windows window: see [the verification record](verification/2026-11-23-project-write-react.md).
 
 ### What an AI run can reach, and what it costs
