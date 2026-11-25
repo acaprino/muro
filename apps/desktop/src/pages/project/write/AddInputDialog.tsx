@@ -33,6 +33,7 @@ export function AddInputDialog(props: ChangeDialogProps) {
             placeholder="https://github.com/owner/repository"
             autoComplete="off"
             spellCheck={false}
+            mono
             onChange={e => { setSource(e.currentTarget.value); setError(undefined); }}
           />
         </FormField>

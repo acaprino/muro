@@ -74,7 +74,7 @@ export function InstructionsDialog(props: ChangeDialogProps) {
           const named = row.path.trim();
           return (
             <Card key={row.key} variant="quiet" pad="md" role="group" aria-labelledby={`${ids}-head-${row.key}`}>
-              <Heading size="small" id={`${ids}-head-${row.key}`}><Text pre>{named || 'New file'}</Text></Heading>
+              <Heading size="small" id={`${ids}-head-${row.key}`} truncate>{named || 'New file'}</Heading>
               <FormField label="File name" id={`${ids}-path-${row.key}`} help={i === 0 ? 'Markdown, such as house-style.md or team/tone.md.' : undefined}>
                 <Input
                   autoFocus={i === 0}
@@ -82,11 +82,12 @@ export function InstructionsDialog(props: ChangeDialogProps) {
                   placeholder="house-style.md"
                   autoComplete="off"
                   spellCheck={false}
+                  mono
                   onChange={e => change(row.key, { path: e.currentTarget.value })}
                 />
               </FormField>
               <FormField label="Text">
-                <Textarea rows={6} value={row.text} onChange={e => change(row.key, { text: e.currentTarget.value })} />
+                <Textarea rows={6} maxRows={14} value={row.text} onChange={e => change(row.key, { text: e.currentTarget.value })} />
               </FormField>
               <Cluster>
                 <Button variant="outline" size="sm" aria-label={`Remove file ${named || '(new)'}`} onClick={() => removeRow(row.key)}><Icon name="delete" />Remove file</Button>

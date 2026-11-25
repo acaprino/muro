@@ -142,7 +142,7 @@ export function AddHarnessDialog({ open, onOpenChange }: AddHarnessDialogProps) 
               {offered.map((d, i) => (
                 <Choice key={keyOf(d)} id={`${formId}-found-${i}`} value={keyOf(d)} label={d.name} disabled={!d.supported}>
                   {d.supported ? null : 'No plugin support yet. '}
-                  <code>{[d.version, d.config_root ?? 'no configuration folder found', d.executable].filter(Boolean).join(' · ')}</code>
+                  <Text mono>{[d.version, d.config_root ?? 'no configuration folder found', d.executable].filter(Boolean).join(' · ')}</Text>
                 </Choice>
               ))}
               <Choice id={`${formId}-hand`} value="hand" label="Another harness, by hand">For one Muro did not find, or one installed somewhere else.</Choice>

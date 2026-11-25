@@ -110,7 +110,7 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
   return (
     <TableHead>
       <Column gap="xs" align="start">
-        <Button variant="ghost" size="sm" title={target.name} onClick={event => onOpen(target.id, event.currentTarget)}>{target.name}</Button>
+        <Button variant="ghost" size="sm" onClick={event => onOpen(target.id, event.currentTarget)}><Text truncate>{target.name}</Text></Button>
         {line}
         {builds ? <Badge tone="warning">{needBuild(builds)}</Badge> : null}
         <Text variant="caption" title={`Last sync ${stamp(times?.synced ?? null)}`}>Checked {stamp(times?.checked ?? null)}</Text>
@@ -134,20 +134,19 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
   const v = versionOf(plugin);
   return (
     <TableRow>
-      <TableCell>
-        <Column gap="xs" align="start">
+      <TableCell grow>
+        <Column gap="xs">
           <Button
             variant="link"
-            size="xs"
+            size="inline"
             data-row-button=""
-            title={plugin.name}
             tabIndex={tabStop ? 0 : -1}
             onFocus={() => onFocusRow(plugin.id)}
             onClick={event => onOpen(plugin.id, event.currentTarget)}
           >
-            {plugin.name}
+            <Text truncate>{plugin.name}</Text>
           </Button>
-          <Text variant="note" pre title={plugin.source}>{plugin.source}</Text>
+          <Text variant="note" truncate>{plugin.source}</Text>
         </Column>
       </TableCell>
       <TableCell>
@@ -164,7 +163,7 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
 /** One plugin on one harness: the installed version, or the change a sync would make there, or why it cannot say. */
 function Cell({ state }: { state: CellStatus }) {
   switch (state.kind) {
-    case 'ok': return <Cluster gap="xs" wrap={false}><Icon name="check" /><Text variant="strong">{state.to}</Text></Cluster>;
+    case 'ok': return <Cluster gap="xs" wrap={false}><Text tone="success"><Icon name="check" /></Text><Text variant="strong">{state.to}</Text></Cluster>;
     case 'update': return <Badge tone="info">Update {state.from} → {state.to}</Badge>;
     case 'install': return <Badge tone="info">Install {state.to}</Badge>;
     case 'reinstall': return <Badge tone="info">Reinstall {state.to}</Badge>;
@@ -173,6 +172,6 @@ function Cell({ state }: { state: CellStatus }) {
     case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
     case 'unknown': return <Text variant="muted">Unknown</Text>;
     case 'paused': return <Text variant="muted">Paused</Text>;
-    default: return <Text variant="muted" role="img" aria-label="Not installed here">—</Text>;
+    default: return <><Text variant="muted" aria-hidden="true">—</Text><Text srOnly>Not installed here</Text></>;
   }
 }

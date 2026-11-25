@@ -112,7 +112,7 @@ export function ExamplesPanel({ data, onChosen }: ExamplesPanelProps) {
                   title={<span title={e.title}>{e.title}</span>}
                   description={asked ? <span title={asked}>{asked}</span> : undefined}
                   facts={[
-                    ...(intents.length ? [{ text: <Text pre>Intent {intents.map((x, k) => <React.Fragment key={k}>{k ? ' → ' : ''}<code>{x}</code></React.Fragment>)}</Text> }] : []),
+                    ...(intents.length ? [{ text: <Text pre>Intent <Text mono>{intents.join(' → ')}</Text></Text> }] : []),
                     ...(outs.length ? [{ text: <Text pre>Output {outs.join(', ')}</Text> }] : []),
                   ]}
                 />

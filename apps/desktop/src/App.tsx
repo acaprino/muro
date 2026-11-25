@@ -18,6 +18,7 @@ import { Sync, SyncActions } from './pages/sync/Sync.tsx';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
+import { Settings } from './pages/Settings.tsx';
 import { ProjectActions, ProjectInspector } from './pages/project/Workspace.tsx';
 import { ProjectProvider, useProject } from './state/useProject.tsx';
 
@@ -41,7 +42,7 @@ function StatusLine({ snapshot, error }: { snapshot: Snapshot | null; error: str
   return (
     <>
       <Badge tone={doing ? 'info' : chip.tone === 'ok' ? 'success' : 'warning'}>{doing ?? chip.text}</Badge>
-      {narrow ? null : <Text>{checkedLine(snapshot)}</Text>}
+      {narrow ? null : <Text truncate>{checkedLine(snapshot)}</Text>}
       <Spacer />
       <Text>{plural(snapshot.registry.targets.length, 'harness', 'harnesses')}</Text>
     </>
@@ -105,7 +106,7 @@ function Muro() {
     >
       {!snapshot && error ? (
         <Empty fill title="Registry not available" description={error} action={<Button onClick={() => { void reload(); }}>Try again</Button>} />
-      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} /> : <Moved page={page === 'activity' ? 'Activity' : 'Settings'} />}
+      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} /> : page === 'settings' ? <Settings /> : <Moved page="Activity" />}
     </AppWindow>
   );
 }

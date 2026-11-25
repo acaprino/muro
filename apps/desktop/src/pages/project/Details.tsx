@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Badge, Button, Cluster, Column, Heading, Icon, Text } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Column, Heading, Icon, Text, TextList } from '@acaprino/sigrid/primitives';
 import type { IconName } from '@acaprino/sigrid/primitives';
 import { DescriptionList } from '@acaprino/sigrid/components';
 import type { ProjectInput } from '../../types.ts';
@@ -55,11 +55,11 @@ export function GroupHeading({ icon, children }: { icon: IconName; children: Rea
 }
 /** A capability or an input named in the inspector: pressing it shows that one. Its whole name is its hint and, unless `label` says more, its accessible name. */
 export function ItemLink({ id, label, onPress }: { id: string; label?: string | undefined; onPress(id: string): void }) {
-  return <Button variant="link" size="xs" title={id} aria-label={label ?? id} onClick={() => onPress(id)}>{id}</Button>;
+  return <Button variant="link" size="inline" aria-label={label ?? id} onClick={() => onPress(id)}><Text truncate>{id}</Text></Button>;
 }
 const none = <Text variant="muted">—</Text>;
-/** Sentences in a list. */
-export const Sentences = ({ items }: { items: readonly string[] }) => <Column as="ul" gap="xs">{items.map((item, i) => <li key={i}><Text variant="soft" pre>{item}</Text></li>)}</Column>;
+/** Sentences in a list, in the soft ink. */
+export const Sentences = ({ items }: { items: readonly string[] }) => <Text as="div" variant="soft"><TextList items={items} /></Text>;
 
 /** The steps of a decision, in order: the capability of each (a link to it when the graph has it), the intent it answers, and why it is there. A prerequisite the runtime added has no intent and no reason of its own. */
 export function StepList({ steps, known, onCapability }: { steps: SimStep[]; known: Set<string>; onCapability(id: string): void }) {
@@ -70,8 +70,8 @@ export function StepList({ steps, known, onCapability }: { steps: SimStep[]; kno
           <Text variant="strong" aria-hidden="true">{i + 1}</Text>
           <Column gap="xs">
             <Cluster>
-              {known.has(s.capability) ? <ItemLink id={s.capability} label={`Step ${i + 1}: ${s.capability}`} onPress={onCapability} /> : <Text variant="strong" pre>{s.capability}</Text>}
-              {s.intent ? <Text variant="soft" pre><code>{s.intent}</code></Text> : null}
+              {known.has(s.capability) ? <ItemLink id={s.capability} label={`Step ${i + 1}: ${s.capability}`} onPress={onCapability} /> : <Text variant="strong" truncate>{s.capability}</Text>}
+              {s.intent ? <Text variant="soft" mono truncate>{s.intent}</Text> : null}
               {s.added_as_prerequisite ? <Badge variant="secondary">Prerequisite</Badge> : null}
             </Cluster>
             {s.reason ? <Text as="p" variant="note">{s.reason}</Text> : s.added_as_prerequisite ? <Text as="p" variant="note">A prerequisite the plugin declares, added before the step that needs it.</Text> : null}
@@ -87,7 +87,7 @@ function ExampleDetails({ example: e, data, known, onCapability }: { example: Ex
   return (
     <Column gap="lg">
       <Column gap="xs">
-        <Heading size="small"><Text pre>{e.title}</Text></Heading>
+        <Heading size="small" truncate>{e.title}</Heading>
         {e.task ? <Text as="p" variant="soft" pre>“{e.task}”</Text> : null}
         {e.stack.length ? <Text as="p" variant="note">With {e.stack.join(', ')}</Text> : null}
       </Column>
@@ -118,7 +118,7 @@ function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: Project
   return (
     <Column gap="lg">
       <Column gap="xs">
-        <Heading size="small"><Text pre>{c.id}</Text></Heading>
+        <Heading size="small" truncate>{c.id}</Heading>
         {c.title && c.title !== c.id ? <Text as="p" variant="soft">{c.title}</Text> : null}
       </Column>
       <DescriptionList
@@ -134,7 +134,7 @@ function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: Project
           <Column as="ul">
             {c.intents.map((i, k) => (
               <Column key={`${k}:${i.id}`} as="li" gap="xs">
-                <Text pre><code>{i.id}</code></Text>
+                <Text mono truncate>{i.id}</Text>
                 {i.description ? <Text variant="note">{i.description}</Text> : null}
                 {i.excludes ? <Text variant="note">Not for: {i.excludes}</Text> : null}
               </Column>
@@ -162,8 +162,8 @@ function InputDetails({ input, data, known, onCapability }: { input: ProjectInpu
   return (
     <Column gap="lg">
       <Column gap="xs">
-        <Heading size="small"><Text pre>{input.id}</Text></Heading>
-        <Text as="p" variant="note" pre>{input.url || 'Local source'}</Text>
+        <Heading size="small" truncate>{input.id}</Heading>
+        <Text as="p" variant="note" truncate>{input.url || 'Local source'}</Text>
       </Column>
       <DescriptionList
         items={[
@@ -188,7 +188,7 @@ function InputDetails({ input, data, known, onCapability }: { input: ProjectInpu
               <Column key={i} as="li" gap="xs">
                 <Cluster>
                   <Badge variant="secondary">{formOf(d.form)}</Badge>
-                  <Text pre><code>{d.content}</code></Text>
+                  <Text mono truncate>{d.content}</Text>
                 </Cluster>
                 {d.reason ? <Text variant="note">{d.reason}</Text> : null}
               </Column>
