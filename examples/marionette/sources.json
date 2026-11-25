@@ -70,7 +70,10 @@
       "humanize",
       "better-layout",
       "charles-color-analysis",
-      "charles-polish"
+      "charles-polish",
+      "charles-design-laws",
+      "charles-design-tips",
+      "charles-ux-animation"
     ]
   },
   "stack": {
@@ -1095,6 +1098,11 @@
         "skills/design/charles-polish/scripts/sim.sh",
         "skills/design/charles-polish/scripts/package.json",
         "skills/design/charles-polish/scripts/package-lock.json",
+        "skills/drops/charles-design-laws/SKILL.md",
+        "skills/drops/charles-design-tips/SKILL.md",
+        "skills/drops/charles-ux-animation/SKILL.md",
+        "skills/drops/charles-ux-animation/references/recipes.md",
+        "skills/drops/charles-ux-animation/references/techniques.md",
         "LICENSE"
       ],
       "excluded_paths": [
@@ -1107,7 +1115,15 @@
         "skills/design/charles-unreasonable-craft/**",
         "skills/design/charles-unslop/**",
         "skills/design/README.md",
-        "skills/drops/**",
+        "skills/drops/README.md",
+        "skills/drops/charles-design-laws/README.md",
+        "skills/drops/charles-design-laws/examples/**",
+        "skills/drops/charles-design-tips/README.md",
+        "skills/drops/charles-design-tips/examples/**",
+        "skills/drops/charles-ux-animation/README.md",
+        "skills/drops/charles-ux-animation/examples/**",
+        "skills/drops/charles-create-posters/**",
+        "skills/drops/charles-hero-mockups/**",
         "skills/editing/**",
         "skills/qol/**",
         "scripts/**",
@@ -1137,7 +1153,7 @@
         }
       ],
       "intake": {
-        "goal": "Understand the two skills the owner took from this repository (2026-11-25): charles-color-analysis, a measured critique of the colour of a visual, page, app screen or palette with ranked OKLCH and hex fixes and before/after previews, and charles-polish, which takes a working interface from fine to finished (score anchors, the climb, the details table, the motion trees) and verifies motion frame by frame with its capture scripts. Identify every outcome each supports, including the review-only mode of polish and the check of someone else's colour critique, and compare with the existing catalog (design review and its polish pass, the motion specification, layout structure, the palette owners, design file authoring and inspection): justify one owner per output, stages or alternatives from the source evidence; do not preassign the destination by name or source order. Read the scripts' code for what each writes, what it starts and what leaves the machine. The upstream has no release or tag, so the pin follows its head. charles-polish hands a screen that still looks generated to charles-unslop, a skill of the same repository the owner did not take: record what that hand-off needs and whether the catalog has an owner for the concern; never tell the host that part of the source is not packaged. The other shelves and skills of the repository, the READMEs, the evals and the example pictures are not sources of this package."
+        "goal": "Understand the five skills the owner took from this repository on 2026-11-25. First charles-color-analysis, a measured critique of the colour of a visual, page, app screen or palette with ranked OKLCH and hex fixes and before/after previews, and charles-polish, which takes a working interface from fine to finished (score anchors, the climb, the details table, the motion trees) and verifies motion frame by frame with its capture scripts. Then, from the drops shelf and on a recommendation the owner accepted, charles-design-laws (twenty laws of UX as one procedure for designing or reviewing a screen or a flow), charles-design-tips (twenty practical tips on type, spacing, colour, forms, copy and empty states, with a findings table) and charles-ux-animation (how an interface moves, responds and gets people through a task, with its recipes and techniques). Identify every outcome each supports, including each review-only mode and the check of someone else's colour critique, and compare with the existing catalog (design review and its polish pass, the motion specification and scroll code, layout structure, design guidance, the palette owners, design file authoring and inspection) and with each other: over a dozen laws are stated in both charles-design-laws and charles-ux-animation, and the five skills give different numbers for some of the same things. Justify one owner per output, stages or alternatives from the source evidence; do not preassign the destination by name or source order. Read the scripts' code for what each writes, what it starts and what leaves the machine. The upstream has no release or tag, so the pin follows its head. charles-polish hands a screen that still looks generated to charles-unslop, which is under CC BY 4.0 and outside the license gate, and charles-design-laws hands motion, targets and choices to charles-ux-animation, which is now a source: record what each hand-off needs; never tell the host that part of the source is not packaged. The other skills and shelves of the repository, the READMEs, the evals and the example pictures are not sources of this package."
       }
     }
   ]

@@ -66,11 +66,13 @@ def test_manifest_pins_the_head_and_selects_every_file_the_two_methods_use():
     assert (src["pin"], src["commit"]) == ("head", COMMIT) and "release" not in src
     assert src["license"] == "MIT" and "Charles Liu" in src["copyright"]
     # The scripts each method runs travel with it, the file color.py itself starts included (ADR-0026).
-    assert set(COLOR_FILES + POLISH_FILES + ["LICENSE"]) == set(src["selected_paths"])
+    # The three skills of the drops shelf, taken later the same day, are in test_charles_drops_intake.py.
+    assert set(COLOR_FILES + POLISH_FILES + ["LICENSE"]) <= set(src["selected_paths"])
+    assert all(path.startswith(("skills/design/", "skills/drops/")) or path == "LICENSE" for path in src["selected_paths"])
     assert "intake_only_paths" not in src and "media_paths" not in src and "notice_paths" not in src
     # The owner took two skills: the rest of the repository is not a source of this package.
     for left_out in ("skills/design/charles-unslop/**", "skills/design/charles-unreasonable-craft/**",
-                     "skills/drops/**", "skills/editing/**", f"{COLOR_DIR}/evals/**", f"{POLISH_DIR}/evals/**"):
+                     "skills/drops/charles-hero-mockups/**", "skills/editing/**", f"{COLOR_DIR}/evals/**", f"{POLISH_DIR}/evals/**"):
         assert left_out in src["excluded_paths"], left_out
     assert len(src["runtime_deps"]) == 3 and not any(dep["bundled"] for dep in src["runtime_deps"])
     assert src["intake"]["goal"].strip()
@@ -166,11 +168,12 @@ def test_the_polish_carries_the_source_numbers_and_yields_to_a_recorded_system()
 def test_delivery_registers_nothing_and_accounts_for_every_part():
     document = read_json("delivery.json")
     mine = [item for item in document["decisions"] if item["source"] == SOURCE]
-    assert [item["form"] for item in mine] == ["capability", "capability", "dropped"]
-    assert [item["targets"] for item in mine] == [[COLOR], [POLISH], []]
+    assert [item["form"] for item in mine] == ["capability"] * 5 + ["dropped"]
+    assert [item["targets"] for item in mine][:2] == [[COLOR], [POLISH]] and mine[-1]["targets"] == []
     caps = catalog()
     # Checked against its own capabilities: the catalog also holds other sources' decisions.
-    assert validate_delivery({"decisions": mine}, [caps[COLOR], caps[POLISH]], {SOURCE}) == []
+    own = [caps[target] for item in mine for target in item["targets"]]
+    assert validate_delivery({"decisions": mine}, own, {SOURCE}) == []
     content = "\n".join(item["content"] for item in mine)
     for part in ("principles.md", "color.py", "dom_colors.js", "ocr.swift", "web-frames.mjs", "frame-diff.mjs",
                  "sheet.mjs", "edges.mjs", "lib.mjs", "sim.sh", "package-lock.json", "charles-unslop",
