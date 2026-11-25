@@ -325,12 +325,15 @@ try {
   await writeFile(join(slowProfile, 'opencode.json'), '{}');
   const seed = async (action, payload) => {
     const file = join(root, 'payload.json');
-    await writeFile(file, JSON.stringify(payload));
+    // The packaged program records its own Python in a new registry, so its revision is not 0.
+    const read = spawnSync(ctl, ['--data', slowData, 'request', 'registry'], { encoding: 'utf8' });
+    assert.equal(read.status, 0, read.stderr);
+    await writeFile(file, JSON.stringify({ revision: JSON.parse(read.stdout).revision, ...payload }));
     const done = spawnSync(ctl, ['--data', slowData, 'request', action, '--input', file], { encoding: 'utf8' });
     assert.equal(done.status, 0, done.stderr);
   };
-  await seed('save_target', { revision: 0, target: { id: 'slow-oc', harness: 'opencode', name: 'OpenCode slow test', root: slowProfile, executable: '', exclusive: false, enabled: true } });
-  await seed('save_plugin', { revision: 1, plugin: { id: 'slow', name: 'Slow source', source: `https://127.0.0.1:${stall.address().port}/slow/plugin.git`, policy: 'pinned', pinned_version: 'v1', targets: [], distributions: [] } });
+  await seed('save_target', { target: { id: 'slow-oc', harness: 'opencode', name: 'OpenCode slow test', root: slowProfile, executable: '', exclusive: false, enabled: true } });
+  await seed('save_plugin', { plugin: { id: 'slow', name: 'Slow source', source: `https://127.0.0.1:${stall.address().port}/slow/plugin.git`, policy: 'pinned', pinned_version: 'v1', targets: [], distributions: [] } });
   const holdRegistry = () => { const holder = spawn(ctl, ['--data', slowData, 'request', 'check'], { stdio: 'ignore', windowsHide: true }); holders.push(holder); return holder; };
   const registryBusy = () => /Registry is busy/.test(spawnSync(ctl, ['--data', slowData, 'request', 'snapshot'], { encoding: 'utf8' }).stderr);
   const slowAutomation = () => json(join(slowData, 'automation-status.json'));
