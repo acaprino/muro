@@ -12,7 +12,6 @@ of Marionette (see `tests/test_desktop_resources.py`). `muro project pack` is st
 """
 import json
 import re
-import shutil
 from pathlib import Path
 
 from muro import project
@@ -214,20 +213,3 @@ def test_muro_project_pack_of_marionette_carries_the_four_files_and_reads_back_a
     rows = {row["part"]: row["detail"] for row in shown["files"]}
     assert rows["Decision records"].startswith(f"{len(shown['records'])} records")
     assert rows["History"].startswith(f"{len(shown['history'])} runs")
-
-
-def test_pack_writes_the_version_of_sources_json_into_the_packed_project_json(tmp_path, capsys):
-    """The version lives once, in sources.json: a release bumps it there and nowhere else."""
-    copy = tmp_path / "marionette"
-    shutil.copytree(PACKAGE, copy)
-    stale = json.loads((copy / "project.json").read_text(encoding="utf-8"))
-    stale["version"] = "0.0.1"
-    (copy / "project.json").write_text(json.dumps(stale, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    cache = fake_sources_cache(tmp_path / "sources")
-    code = main(["project", "pack", "--manifest", str(copy / "sources.json"), "--out", str(tmp_path / "m.mp"),
-                 "--sources-cache", str(cache)])
-    assert code == 0, capsys.readouterr().err
-    packed = json.loads((project.unpack(tmp_path / "m.mp", tmp_path / "unpacked") / "project.json").read_text(encoding="utf-8"))
-    assert packed == {**stale, "version": manifest()["plugin"]["version"]}
-    assert list(packed) == list(stale)                                   # same fields, same order: only the version moved
-    assert json.loads((copy / "project.json").read_text(encoding="utf-8"))["version"] == "0.0.1"   # the source is not touched

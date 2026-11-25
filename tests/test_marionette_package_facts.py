@@ -416,3 +416,132 @@ def test_the_focused_plan_of_the_whole_catalog_fits_inline_on_the_host(tmp_path)
     assert entries["gsap-scrolltrigger"]["when"] == "stack:gsap"
     assert entries["css-scroll"]["conflicts"] == ["gsap-scrolltrigger"]
     assert not (consumer / ".marionette").exists()  # still writes nothing
+
+
+# --- From test_check_scope ----------------------------------------------------------------------------------
+# The runtime's check scope (ADR-0018) is tested there on the fixture package; these are the scopes this
+# package declares, which those tests used to assert while they ran on it.
+
+def test_every_multi_intent_capability_of_the_example_declares_its_scope():
+    from muro.core import parse_capability
+    for path in sorted((PACKAGE / "capabilities").glob("*.md")):
+        cap = parse_capability(path)
+        if len(cap.intents) > 1:
+            assert set(cap.intent_checks) == {intent["id"] for intent in cap.intents}, cap.id
+
+
+def test_design_options_scopes_the_panel_checks_to_both_intents_and_the_variation_checks_to_one():
+    # Split from test_check_scope::test_each_step_lists_only_the_checks_of_its_intent and the three tests
+    # beside it, which replayed the decision of a session of 2026-11-13 (variations, then a tweak panel).
+    cap = CAPS["design-options"]
+    assert cap.checks_for("ui.design-variations") == [
+        "options_differ_in_one_sentence", "both_ends_covered", "single_file_delivered", "recommendation_given",
+        "tweaks_update_and_persist", "panel_hidden_when_off"]
+    assert cap.checks_for("ui.tweak-controls") == ["single_file_delivered", "tweaks_update_and_persist",
+                                                   "panel_hidden_when_off"]
+    assert set(cap.check_conditions) == {"tweaks_update_and_persist", "panel_hidden_when_off"}
+
+
+def test_the_landing_strategy_answers_two_checks_and_one_applies_only_to_a_landing_page():
+    # Split from test_check_scope::test_a_direct_step_lists_the_checks_of_its_intent.
+    cap = CAPS["visual-direction"]
+    checks = cap.checks_for("ui.landing-strategy")
+    assert checks == ["single_primary_action", "proof_supported"] and "palette_applied" not in checks
+    assert {name for name in checks if name in cap.check_conditions} == {"single_primary_action"}
+    assert "landing page" in cap.check_conditions["single_primary_action"]
+
+
+def test_the_guide_keeps_both_design_option_steps_of_its_documented_comparison():
+    # Split from test_check_scope::test_the_guide_keeps_both_steps_of_a_repeated_capability, which now reads
+    # the fixture's example of a repeated capability.
+    from muro.guide import _examples
+    from muro.routing import catalog_digest, catalog_entries
+    rows = parse_router(PACKAGE / "ROUTER.md")
+    delivery = json.loads((PACKAGE / "delivery.json").read_text(encoding="utf-8"))
+    digest = catalog_digest(catalog_entries(rows, CAPS), CAPS,
+                            (ROOT / "prompts" / "classify.md").read_text(encoding="utf-8"), delivery)
+    example = next(item for item in _examples(PACKAGE, rows, CAPS, digest) if item["title"].startswith("Temi a confronto"))
+    assert example["path"] == ["design-options"]
+    assert [(step["step"], step["intent"]) for step in example["steps"]] == [
+        ("design-options#1", "ui.design-variations"), ("design-options#2", "ui.tweak-controls")]
+
+
+# --- From test_conditional_needs ----------------------------------------------------------------------------
+
+def test_the_canvas_step_needs_the_website_step_only_for_a_landing_page():
+    # Split from test_conditional_needs::test_catalog_exposes_the_condition_for_the_ai.
+    cap = CAPS["canvas-design"]
+    assert [need["capability"] for need in cap.needs] == ["visual-direction"]
+    assert "landing page" in cap.needs[0]["when"] and cap.after == []
+
+
+def test_the_canvas_step_labels_its_condition_in_at_most_five_words():
+    # Split from test_conditional_needs::test_malformed_needs_frontmatter_is_rejected.
+    label = CAPS["canvas-design"].needs[0]["label"]
+    assert label == "only landing without outline" and len(label.split()) <= 5
+
+
+# --- From test_amend_preservation ---------------------------------------------------------------------------
+
+def test_the_file_step_scopes_the_checks_of_reading_and_of_editing_apart():
+    # Split from test_amend_preservation::test_changed_intent_reexecutes_with_its_own_checks_instead_of_writing_invalid_state
+    # and test_invalid_previous_check_scope_is_rejected_before_archive_or_replacement.
+    cap = CAPS["office-files"]
+    reading, editing = cap.checks_for("office.content-extraction"), cap.checks_for("office.file-editing")
+    assert "conversion_loss_reported" in reading and "post_edit_check_clean" not in reading
+    assert "post_edit_check_clean" in editing and "conversion_loss_reported" not in editing
+
+
+# --- From test_eval_intents ---------------------------------------------------------------------------------
+
+def test_marionette_gold_covers_abstention_and_operation_boundaries():
+    cases = json.loads((MARIONETTE / "eval-cases.json").read_text(encoding="utf-8"))["cases"]
+    by_id = {case["id"]: case for case in cases}
+    assert any(case["expect"]["status"] == "needs_clarification" for case in cases)
+    assert by_id["docx-to-pdf"]["expect"]["selections"][0]["intent"] == "office.format-conversion"
+    assert by_id["zsd-export-tokens"]["expect"]["selections"][0]["intent"] == "design-file.token-export"
+    assert by_id["design-inspect-file-not-live-ui"]["expect"]["selections"][0]["intent"] == "design-file.document-review"
+    assert by_id["deep-chat-veto"]["expect"]["status"] == "no_match"
+    caps = {cap.id: cap for cap in parse_capabilities(MARIONETTE / "capabilities")}
+    for case in cases:
+        if any(len(caps[name].intents) > 1 or caps[name].needs for name in case["expect"]["capabilities"]):
+            assert "selections" in case["expect"], case["id"]
+
+
+# --- From test_ai_routing -----------------------------------------------------------------------------------
+
+def test_shipped_catalog_declares_no_forced_prerequisites(package, tmp_path):
+    # Re-harmonization 2026-11-10: each consumer can start from existing work;
+    # the AI orders producer and consumer explicitly when both are needed.
+    coordinator = Coordinator(package, tmp_path / "consumer")
+    assert all(not cap.after for cap in coordinator.capabilities.values())
+    task = "Design the landing page, then specify its scroll motion and build it"
+    ids = ["visual-direction", "motion-principles", "gsap-scrolltrigger"]
+    result = proposed(coordinator, task, ids, {"stack:gsap"})
+    assert result["plan"] == ids
+
+
+def test_active_bodies_deliver_outputs_without_direct_managed_map_writes(package, tmp_path):
+    coordinator = Coordinator(package, tmp_path / "consumer")
+    for name in ("visual-direction", "motion-principles", "gsap-scrolltrigger", "css-scroll", "canvas-design"):
+        body = coordinator.capabilities[name].body
+        assert "## Output handoff" in body, name
+        assert "Do not edit" in body, name
+        assert "Write outputs to `.muro/map.md" not in body, name
+        assert "Write to `.muro/map.md" not in body, name
+
+
+def test_the_website_step_names_its_source_files_under_the_packaged_scripts_folder(package, tmp_path):
+    # Split from test_ai_routing::test_helper_commands_resolve_against_installed_package_not_consumer, which
+    # keeps the package root and the form of the path on the fixture package.
+    coordinator = Coordinator(package, tmp_path / "consumer")
+    result = coordinator.confirm("Create a page", proposed(coordinator, "Create a page", ["visual-direction"])["plan"])
+    assert '<package_root>/scripts/ai-design-skills/skills/landing-page-design' in result["instructions"]
+    assert '<package_root>/skills/ai-design-skills' not in result["instructions"]
+
+
+def test_the_canvas_step_requires_a_design_canvas_and_declares_no_hook():
+    # Split from test_ai_routing::test_catalog_exposes_tool_requirements_and_hook_policy_without_running_them.
+    cap = CAPS["canvas-design"]
+    assert any(tool["name"] == "design-canvas" and tool["required"] for tool in cap.tools)
+    assert cap.hooks == []

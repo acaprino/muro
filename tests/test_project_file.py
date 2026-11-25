@@ -272,6 +272,20 @@ def test_a_package_without_records_history_or_changelog_gets_empty_ones(tmp_path
     assert (folder / "CHANGELOG.md").read_text(encoding="utf-8") == ""
 
 
+def test_pack_writes_the_version_of_sources_json_into_the_packed_project_json(tmp_path, package, cache, capsys):
+    """The version lives once, in sources.json: a release bumps it there and nowhere else."""
+    stale = {**PROJECT_JSON, "version": "0.0.1"}
+    assert PLUGIN["version"] != stale["version"]
+    (package / "project.json").write_text(json.dumps(stale, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    code = main(["project", "pack", "--manifest", str(package / "sources.json"), "--out", str(tmp_path / "t.mp"),
+                 "--sources-cache", str(cache)])
+    assert code == 0, capsys.readouterr().err
+    packed = json.loads((project.unpack(tmp_path / "t.mp", tmp_path / "out") / "project.json").read_text(encoding="utf-8"))
+    assert packed == {**stale, "version": PLUGIN["version"]}
+    assert list(packed) == list(stale)                                   # same fields, same order: only the version moved
+    assert json.loads((package / "project.json").read_text(encoding="utf-8"))["version"] == "0.0.1"   # the source is not touched
+
+
 def test_pack_refuses_a_package_that_fails_validation(tmp_path, package):
     (package / "ROUTER.md").write_text(ROUTER_HEADER, encoding="utf-8")   # the capability has no router row
     with pytest.raises(ValueError, match="does not validate"):
