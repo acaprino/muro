@@ -996,6 +996,15 @@ fn plan(
             }
             // An entry that reports no `present` has its files, as a harness that cannot tell does.
             let files_missing = previous.is_some_and(|old| old["present"] == false);
+            // The copy comes from a marketplace the harness cannot load (`broken` of the inventory):
+            // installing it again from Muro's own source writes Muro's marketplace anew.
+            let market_broken = previous.is_some_and(|old| {
+                let market = old["id"]
+                    .as_str()
+                    .and_then(|id| id.split_once('@'))
+                    .map(|(_, market)| market);
+                market.is_some_and(|market| broken_markets(inv).any(|b| b["name"] == market))
+            });
             let mut reason = if previous.is_none() {
                 "Missing desired distribution"
             } else {
@@ -1020,6 +1029,9 @@ fn plan(
             } else if files_missing {
                 reason = "Files missing";
                 Some("update")
+            } else if market_broken {
+                reason = "Its marketplace cannot be loaded";
+                Some("reinstall")
             } else {
                 None
             };
@@ -1027,11 +1039,38 @@ fn plan(
                 ops.push(json!({"target_id":tid,"plugin_id":pid,"name":plugin["name"],"kind":kind,"from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],"reason":reason,"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())}));
             }
         }
+        // The list is the truth (the owner, 2026-11-25): a marketplace the harness cannot load keeps
+        // the harness from listing anything, so one that holds no plugin of the list goes, with the
+        // plugins configured from it, whatever `exclusive` says. One that holds a plugin of the list
+        // (a copy the list took over, or Muro's own marketplace of a listed plugin) is left to that
+        // plugin's reinstall, above, which writes Muro's marketplace anew.
+        let mut with_market: Vec<&Value> = vec![];
+        for market in broken_markets(inv) {
+            let plugins = market["plugins"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let ours = market["name"]
+                .as_str()
+                .and_then(|name| name.strip_prefix("muro-"));
+            let listed = plugins.iter().any(|id| desired_native.contains(id))
+                || reg["plugins"].as_array().into_iter().flatten().any(|p| {
+                    p["id"].as_str() == ours
+                        && p["targets"]
+                            .as_array()
+                            .is_some_and(|a| a.contains(&json!(tid)))
+                });
+            if listed {
+                continue;
+            }
+            with_market.extend(plugins);
+            ops.push(json!({"target_id":tid,"plugin_id":"","name":market["name"],"kind":"remove-marketplace","from_version":"","to_version":"","reason":market["message"],"plugins":plugins}));
+        }
         // A plan with blockers can be applied in part, so a harness that has one gets no
         // removal until a plan finds it clear.
         if target["exclusive"] == true && blockers.len() == blocked_before {
             for old in installed {
-                if !desired_native.contains(&old["id"]) {
+                if !desired_native.contains(&old["id"]) && !with_market.contains(&&old["id"]) {
                     let mut removal = json!({"target_id":tid,"plugin_id":old["registry_id"].as_str().unwrap_or(""),"name":old["name"],"kind":"remove","from_version":old["version"],"to_version":"","reason":"Not in desired registry for this target","native_id":old["id"]});
                     // A record whose files are gone is cleared, not uninstalled: the sheet says so.
                     if old["present"] == false {
@@ -1048,6 +1087,10 @@ fn plan(
     Ok(
         json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
     )
+}
+/// The marketplaces of an inventory that its harness cannot load (`broken`, from `native::inventory`).
+fn broken_markets(inventory: &Value) -> impl Iterator<Item = &Value> {
+    inventory["broken"].as_array().into_iter().flatten()
 }
 /// The inventory read right after an operation must be complete, or nothing can be verified.
 fn observed_complete(observed: &Value) -> Result<()> {
@@ -1171,7 +1214,11 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         hash(&invs) == str_field(&plan, "inventory_hash")?,
         "Installed inventory changed; calculate a new plan"
     );
-    for op in executed.iter().copied().filter(|o| o["kind"] != "remove") {
+    for op in executed
+        .iter()
+        .copied()
+        .filter(|o| o["kind"] != "remove" && o["kind"] != "remove-marketplace")
+    {
         let a = &op["artifact"];
         let plugin = reg["plugins"].as_array().context("plugins")?.iter()
             .find(|plugin| plugin["id"] == op["plugin_id"]).context("Plugin disappeared")?;
@@ -1226,6 +1273,22 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                 for k in keys {
                     receipts.as_object_mut().unwrap().remove(&k);
                 }
+            } else if op["kind"] == "remove-marketplace" {
+                let plugins: Vec<&str> = op["plugins"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect();
+                native::remove_marketplace(target, str_field(op, "name")?, &plugins)?;
+                // A copy Muro had put there from that marketplace is no longer on the harness.
+                receipts
+                    .as_object_mut()
+                    .context("receipts")?
+                    .retain(|_, r| {
+                        r["target_id"] != op["target_id"]
+                            || !plugins.iter().any(|id| r["native_id"] == *id)
+                    });
             } else if op["kind"] == "activate" {
                 native::activate(target, str_field(op, "previous_id")?)?;
             } else {
@@ -1255,7 +1318,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                     .retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id);
                 receipts[&key] = json!({"target_id":op["target_id"],"plugin_id":op["plugin_id"],"native_id":native_id,"name":name,"version":op["to_version"],"digest":artifact["digest"],"path":artifact["path"],"custom_instructions_digest":artifact["custom_instructions_digest"]});
             }
-            if op["kind"] != "remove" {
+            if op["kind"] != "remove" && op["kind"] != "remove-marketplace" {
                 let observed = native::inventory(target, receipts);
                 if let Err(e) = installed_as_planned(&observed, op) {
                     // A first install that fails its check is on the machine all the same: with
@@ -1301,6 +1364,12 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
             ensure!(
                 !entries.iter().any(|p| p["id"] == op["native_id"]),
                 "Uninstall did not remove {}",
+                op["name"]
+            );
+        } else if op["kind"] == "remove-marketplace" {
+            ensure!(
+                !broken_markets(inv).any(|b| b["name"] == op["name"]),
+                "The marketplace {} is still configured",
                 op["name"]
             );
         } else {

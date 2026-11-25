@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Button, Cell, Checkbox, Cluster, Column, Heading, Icon, Input, Select, Split, Text } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField, SettingRow } from '@acaprino/sigrid/components';
+import { Dialog, FormField, Note, SettingRow } from '@acaprino/sigrid/components';
 import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { filesMissing, harnessNames, inList, stamp } from '../../model.ts';
@@ -118,6 +118,7 @@ function InstalledHere({ snapshot, target, adding, error, note, noteRef, onAdd }
     <Column as="section" aria-labelledby={`${target.id}-installed`}>
       <Heading size="small" id={`${target.id}-installed`}>Installed here</Heading>
       {inventory && !inventory.complete && inventory.error ? <RefusalLine>{inventory.error}</RefusalLine> : null}
+      {inventory?.warnings?.length ? <Note tone="warning" announce={false} title={<Text>Read from the harness's own files</Text>} items={inventory.warnings} /> : null}
       {plugins.length ? (
         <Column as="ul" gap="xs">
           {plugins.map(p => {
