@@ -1153,7 +1153,7 @@ source = '\\?\Z:\nowhere\lost'
 [marketplaces.kept]
 source_type = "git"
 source = "https://example.invalid/kept.git"
-[plugins."adhd@lost"]
+[plugins."notes@lost"]
 enabled = true
 [plugins."off@kept"]
 enabled = false
@@ -1166,7 +1166,7 @@ enabled = true
 enabled = true
 "#,
             &[
-                "lost/adhd/0.4.1",
+                "lost/notes/0.4.1",
                 "kept/off/1.9.0",
                 "kept/off/1.10.0",
                 "kept/unsaid/2.0.0",
@@ -1179,12 +1179,12 @@ enabled = true
         let ids: Vec<&str> = rows.iter().map(|r| r["pluginId"].as_str().unwrap()).collect();
         assert_eq!(
             ids,
-            ["adhd@lost", "off@kept", "unsaid@kept"],
+            ["notes@lost", "off@kept", "unsaid@kept"],
             "a copy, a table and a configured marketplace"
         );
         assert_eq!(
             rows[0],
-            json!({"pluginId":"adhd@lost","name":"adhd","marketplaceName":"lost","version":"0.4.1","enabled":true})
+            json!({"pluginId":"notes@lost","name":"notes","marketplaceName":"lost","version":"0.4.1","enabled":true})
         );
         assert_eq!(
             (rows[1]["version"].as_str(), rows[1]["enabled"].as_bool()),
@@ -1192,8 +1192,8 @@ enabled = true
         );
         assert!(rows[2].get("enabled").is_none(), "a table that does not say is not said to be off");
         let entries = codex_entries(&rows, home.path());
-        let folder = home.path().join("plugins").join("cache").join("lost").join("adhd").join("0.4.1");
-        assert_eq!(entry(&entries, "adhd@lost")["path"], json!(folder.to_string_lossy()));
+        let folder = home.path().join("plugins").join("cache").join("lost").join("notes").join("0.4.1");
+        assert_eq!(entry(&entries, "notes@lost")["path"], json!(folder.to_string_lossy()));
         assert_eq!(codex_rows(&json!({}), home.path()), Vec::<Value>::new());
         assert_eq!(codex_config(tempfile::tempdir().unwrap().path()).unwrap(), json!({}));
     }

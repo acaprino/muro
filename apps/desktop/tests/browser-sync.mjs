@@ -237,7 +237,7 @@ await test('a harness that holds a marketplace it cannot load is read all the sa
   const warning = page.locator('#harness-warnings');
   await warning.waitFor();
   const said = await warning.textContent();
-  for (const words of ['Codex isolated test holds an entry that cannot be loaded', 'Codex isolated test: The marketplace i-have-adhd points to a folder that is gone: D:/Projects/gone/i-have-adhd', 'still installs, updates and removes its plugins']) {
+  for (const words of ['Codex isolated test holds an entry that cannot be loaded', 'Codex isolated test: The marketplace old-notes points to a folder that is gone: D:/Projects/gone/old-notes', 'still installs, updates and removes its plugins']) {
     assert.ok(said.includes(words), `${words}: ${said}`);
   }
   await page.screenshot({ path: shots + '/sync-broken-marketplace.png' });

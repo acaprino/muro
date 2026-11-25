@@ -344,8 +344,8 @@ test('the list already holds a plugin Muro installed or one with a build in the 
 test('harnessWarnings: what a harness cannot load is told with its harness, and the harness still reads as what its plugins say',()=>{
  const s=snapshot(),t=s.registry.targets[0];
  assert.deepEqual(harnessWarnings(s),[],'a record without the field has none');
- s.inventory[0].warnings=['The marketplace i-have-adhd points to a folder that is gone: D:/gone'];s.inventory[0].plugins[0].version='2';
- assert.deepEqual(harnessWarnings(s).map(w=>[w.target.id,w.message]),[['target','The marketplace i-have-adhd points to a folder that is gone: D:/gone']]);
+ s.inventory[0].warnings=['The marketplace old-notes points to a folder that is gone: D:/gone'];s.inventory[0].plugins[0].version='2';
+ assert.deepEqual(harnessWarnings(s).map(w=>[w.target.id,w.message]),[['target','The marketplace old-notes points to a folder that is gone: D:/gone']]);
  assert.deepEqual(harnessState(t,s,plan([])),{kind:'ok',count:0},'read all the same: never "cannot be read" for a warning');
  assert.equal(syncHeadline(s,plan([])).kind,'ok');assert.deepEqual(syncHeadline(s,plan([])).unreadable,[]);
  assert.equal(cellState(plugin,t,s,plan([])).kind,'ok');

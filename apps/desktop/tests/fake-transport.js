@@ -202,7 +202,7 @@ export function createTransport(scenario = 'default') {
   const log = (action, status, message) => activity.push({ id: 'a' + ++activityNumber + 'x', time: ago(0), action, status, message });
   const inventory = t => {
     if (flags.unreadable && t.id === reg.targets[0]?.id) return { target_id: t.id, complete: false, error: 'Configuration folder not found', supported: true, plugins: [] };
-    const warnings = flags.brokenMarketplace && t.id === reg.targets[0]?.id ? ['The marketplace i-have-adhd points to a folder that is gone: D:/Projects/gone/i-have-adhd'] : [];
+    const warnings = flags.brokenMarketplace && t.id === reg.targets[0]?.id ? ['The marketplace old-notes points to a folder that is gone: D:/Projects/gone/old-notes'] : [];
     return { target_id: t.id, complete: true, error: null, warnings, supported: true, plugins: installed[t.id] || [] };
   };
   const instructions = () => reg.plugins.map(p => ({ plugin_id: p.id, path: p.custom_instructions_dir || 'D:/isolated/data/custom-instructions/' + p.id, files: flags.instructionFiles, digest: 'fixture-digest', stale_harnesses: flags.instructionStale ? [reg.targets.find(t => p.targets.includes(t.id))?.harness].filter(Boolean) : [] }));
