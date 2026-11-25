@@ -10,6 +10,7 @@ import type { Panel } from '../../state/project.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
+import type { ProjectDialog } from '../../state/useProject.tsx';
 import { message, plural, unknownTo } from '../../words.ts';
 import { litOf, outcomeOfExample } from './graph-model.ts';
 import type { Outcome } from './graph-model.ts';
@@ -32,7 +33,7 @@ import { InstructionsDialog } from './write/InstructionsDialog.tsx';
 import { DetailsDialog } from './write/DetailsDialog.tsx';
 
 /** The workspace of an open project, in the frame of the window: the panel at the left (inputs, examples, records, runs), the decision graph at the centre, the details
- * of what is selected in the window's inspector (`ProjectInspector`), and the actions of the project at the foot. The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
+ * of what is selected in the window's inspector (`ProjectInspector`), and the actions of the project in the window's action bar (`ProjectActions`). The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
  * is a panel over the end of the graph, and where the frame has no room for a sidebar (under 850px) the left panel opens as a drawer from a button.
  *
  * What lights the graph is the decision shown (a documented example, or the AI's answer to a free-text request: `sim`), whose steps the canvas numbers as its path, or
@@ -48,8 +49,6 @@ const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examp
 /** Why the two actions the runtime has no operation for here are off. */
 const NO_REVIEW = 'Coming with the review';
 const NO_INSTALL = 'Coming with the Sync page';
-/** The dialog open over the workspace, if any. */
-type Open = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details' | null;
 /** Whether the shell said it cannot open a folder ("Unknown ... open_folder"): then "Open folder" is gone, for every project, until the window is loaded again. */
 let noFolderShell = false;
 
@@ -62,7 +61,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const [drawer, setDrawer] = React.useState(false);
   const [noFolder, setNoFolder] = React.useState(noFolderShell);
   const jobs = useJobs();
-  const [dialog, setDialog] = React.useState<Open>(null);
+  const { dialog, setDialog } = project;
   // The input of the pin dialog stays when it closes, so the dialog does not change while it goes.
   const [pin, setPin] = React.useState({ input: '', remove: false });
   const data = React.useMemo(() => projectData(info), [info]);
@@ -122,12 +121,11 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
     else setCollapsed(now => now.includes(id) ? now.filter(x => x !== id) : [...now, id]);
   };
   const chosen = () => setDrawer(false);
-  // One AI run at a time, of any project or adaptation (the runtime's lock): while one goes, no change of the package is offered. An edit by hand waits only for a run of this project.
-  const busy = busyReason(jobs.running);
+  // An edit by hand waits only for a run of this project.
   const mine = runningOn(jobs.jobs, view.id);
   const editBusy = mine ? busyReason(mine) : null;
   /** A dialog opens over the workspace; a drawer that holds the panel closes first, so no two modal surfaces are open at once. */
-  const show = (next: Exclude<Open, null>) => { setDrawer(false); setDialog(next); };
+  const show = (next: ProjectDialog) => { setDrawer(false); setDialog(next); };
   const showPin = (input: string, remove: boolean) => { setPin({ input, remove }); show('pin'); };
   const closed = (open: boolean) => { if (!open) setDialog(null); };
   /** The file manager on the folder of the project's file (`open_folder {path}`, answered by the runtime for a listed project only). A shell that does not know the
@@ -213,15 +211,6 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
           {pane}
         </>
       ) : <Cell grow><ContentSplit aside={panel} asideLabel="Project panel" step={0}>{pane}</ContentSplit></Cell>}
-      <Separator decorative />
-      <Cluster pad="md" justify="end">
-        <Text variant="note" role="status">{busy ?? ''}</Text>
-        <Spacer />
-        <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
-        <GatedButton off={busy} variant="outline" onClick={() => show('harmonize')}>Harmonize again…</GatedButton>
-        <GatedButton off={NO_INSTALL} variant="outline">Install on harnesses…</GatedButton>
-        <GatedButton off={busy} onClick={() => show('add')}>Add input…</GatedButton>
-      </Cluster>
       <AddInputDialog id={view.id} info={info} open={dialog === 'add'} onOpenChange={closed} />
       <HarmonizeDialog id={view.id} info={info} open={dialog === 'harmonize'} onOpenChange={closed} />
       <PinDialog id={view.id} info={info} open={dialog === 'pin'} onOpenChange={closed} input={pin.input} remove={pin.remove} />
@@ -245,6 +234,24 @@ function LeftPanel({ data, panel, onPanel, onChosen, onPin, onInstructions }: { 
           : <RunsPanel data={data} />}
       </ScrollArea>
     </Column>
+  );
+}
+
+/** The actions of the open project, in the window's region for them. One AI run at a time, of any project or adaptation (the runtime's lock): while one goes, no change of the package is offered. */
+export function ProjectActions() {
+  const { setDialog } = useProject();
+  const busy = busyReason(useJobs().running);
+  return (
+    <Cell grow>
+      <Cluster justify="end">
+        <Text variant="note" role="status">{busy ?? ''}</Text>
+        <Spacer />
+        <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
+        <GatedButton off={busy} variant="outline" onClick={() => setDialog('harmonize')}>Harmonize again…</GatedButton>
+        <GatedButton off={NO_INSTALL} variant="outline">Install on harnesses…</GatedButton>
+        <GatedButton off={busy} onClick={() => setDialog('add')}>Add input…</GatedButton>
+      </Cluster>
+    </Cell>
   );
 }
 

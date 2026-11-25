@@ -1,5 +1,5 @@
-// The window: Imago's (`AppWindow`), with the four pages as its views, the status row, the page of the view, and the foot. On Sync it
-// also holds the page's action bar and the harness inspector, beside the table.
+// The window: Imago's (`AppWindow`), with the four pages as its views, the status row, the page of the view, and the foot. It also holds the
+// action bar and the inspector of the page: of Sync its actions and the harness, of an open project its actions and what is selected.
 // The pages that are not in the new window yet say so (pages/Moved.tsx); the window opens on Sync.
 import { useCallback, useRef, useState } from 'react';
 import { AppWindow, ScreenBoundary, focusContent, type AppView } from '@acaprino/imago';
@@ -18,8 +18,8 @@ import { Sync, SyncActions } from './pages/sync/Sync.tsx';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
-import { ProjectInspector } from './pages/project/Workspace.tsx';
-import { ProjectProvider } from './state/useProject.tsx';
+import { ProjectActions, ProjectInspector } from './pages/project/Workspace.tsx';
+import { ProjectProvider, useProject } from './state/useProject.tsx';
 
 /** The four pages, in the order of the bar. */
 const PAGES: readonly AppView<Page>[] = [
@@ -56,6 +56,7 @@ const footLine = (snapshot: Snapshot): string =>
 function Muro() {
   const { snapshot, error, reload } = useRegistry();
   const { busy, check } = useSync();
+  const project = useProject();
   const [page, setPage] = useState<Page>('sync');
   // The harness open in the inspector (Sync's column heads open it), kept while it closes, and the button it was opened from, where focus goes back.
   const [harness, setHarness] = useState<{ id: string; open: boolean } | null>(null);
@@ -93,8 +94,8 @@ function Muro() {
       onView={go}
       status={<StatusLine snapshot={snapshot} error={error} />}
       footer={snapshot ? <Text>{footLine(snapshot)}</Text> : undefined}
-      // Sync's action bar and harness inspector are regions of the frame: the bar under the content, the inspector beside it (docked from 1000px, a drawer under).
-      actions={onSync && snapshot ? <SyncActions /> : undefined}
+      // The actions and the details of a page are regions of the frame: the bar under the content, the inspector beside it (docked from 1000px, a drawer under).
+      actions={onSync ? snapshot && <SyncActions /> : page === 'projects' && project.view && project.info ? <ProjectActions /> : undefined}
       inspector={onSync && harness ? (
         // One inspector for every harness: another column changes its `targetId`, and the inspector decides what becomes of a form with changes.
         <ScreenBoundary of={harness.id}>
