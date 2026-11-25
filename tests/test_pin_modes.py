@@ -141,4 +141,5 @@ def test_manifest_declares_a_mode_for_every_source():
         "explain-this": ("head", None),
         "text-humanizer": ("head", None),
         "better-layout": ("head", None),
+        "charles-skills": ("head", None),
     }

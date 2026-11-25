@@ -3,9 +3,9 @@
     "slug": "marionette",
     "name": "Marionette",
     "command": "marionette",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "language": "it",
-    "description": "Use when building websites and landing pages, UI/UX, layout, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing web designs, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, repository audits, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec and their execution under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking explainers; humanizing prose; paper search; or steering TokenEconomizer.",
+    "description": "Use when building websites, landing pages, UI/UX, layout, accessibility guidance, wireframing or prototyping app screens, choosing a product look, design variations, tweak panels or HTML decks, extracting tokens, auditing and polishing interfaces, colour critique, a DESIGN.md of design choices, applied, inspected, exported or enforced in CI, Figma, FigCraft, motion, GSAP or CSS scroll animation; creating, editing or converting Office (Word, Excel, PowerPoint) and PDF files; implementing or reviewing changes, specs and handoffs, repository audits, shortcut debt or the Ponytail method; idea briefs, design documents, their fresh review, contract READMEs, design drift reports; implementation plans from a spec, executed under TDD; explaining a paper, article or concept as an HTML page, making and fact-checking explainers; humanizing prose; paper search; steering TokenEconomizer.",
     "replaces": [
       "landing-page-design",
       "figma-designer",
@@ -68,7 +68,12 @@
       "enforce-design",
       "text-humanizer",
       "humanize",
-      "better-layout"
+      "better-layout",
+      "charles-color-analysis",
+      "charles-polish",
+      "charles-design-laws",
+      "charles-design-tips",
+      "charles-ux-animation"
     ]
   },
   "stack": {
@@ -1069,6 +1074,86 @@
       "runtime_deps": [],
       "intake": {
         "goal": "Understand the layout skill: grouping and alignment, reading order, progressive disclosure, content-driven breakpoints, container queries, safe areas, full-bleed content, RTL and logical properties, growth for translated text, and its review report. Identify every task outcome it supports (building or restructuring a layout, and reviewing code for layout problems) and compare with the existing catalog (responsive data in a DESIGN.md, design review, design guidance, visual direction): justify one owner per output, stages or alternatives from the source evidence; do not preassign the destination by name or source order. The upstream has no release or tag, so the pin follows its head. The skill defers hit areas, polish, line length and its orchestrated review to sibling skills of the same repository: read what those hand-offs need to be carried and decide from the evidence whether the siblings are covered by the existing catalog or must be selected, recording the reading in `dropped` decisions or `omissions`; never tell the host that part of the source is not packaged. A vendored, unmodified copy of these skills exists in boraoztunc/skills; the original upstream is the source of this pin."
+      }
+    },
+    {
+      "id": "charles-skills",
+      "repo_url": "https://github.com/LemonFace0309/charles-skills",
+      "commit": "83de509dd10b77ebaf83c3f9986b538cdaf19b63",
+      "pin": "head",
+      "license": "MIT",
+      "copyright": "Copyright (c) 2026 Charles Liu",
+      "selected_paths": [
+        "skills/design/charles-color-analysis/SKILL.md",
+        "skills/design/charles-color-analysis/references/principles.md",
+        "skills/design/charles-color-analysis/scripts/color.py",
+        "skills/design/charles-color-analysis/scripts/dom_colors.js",
+        "skills/design/charles-color-analysis/scripts/ocr.swift",
+        "skills/design/charles-polish/SKILL.md",
+        "skills/design/charles-polish/scripts/web-frames.mjs",
+        "skills/design/charles-polish/scripts/frame-diff.mjs",
+        "skills/design/charles-polish/scripts/sheet.mjs",
+        "skills/design/charles-polish/scripts/edges.mjs",
+        "skills/design/charles-polish/scripts/lib.mjs",
+        "skills/design/charles-polish/scripts/sim.sh",
+        "skills/design/charles-polish/scripts/package.json",
+        "skills/design/charles-polish/scripts/package-lock.json",
+        "skills/drops/charles-design-laws/SKILL.md",
+        "skills/drops/charles-design-tips/SKILL.md",
+        "skills/drops/charles-ux-animation/SKILL.md",
+        "skills/drops/charles-ux-animation/references/recipes.md",
+        "skills/drops/charles-ux-animation/references/techniques.md",
+        "LICENSE"
+      ],
+      "excluded_paths": [
+        "skills/design/charles-color-analysis/README.md",
+        "skills/design/charles-color-analysis/evals/**",
+        "skills/design/charles-color-analysis/examples/**",
+        "skills/design/charles-polish/README.md",
+        "skills/design/charles-polish/evals/**",
+        "skills/design/charles-store-screenshots/**",
+        "skills/design/charles-unreasonable-craft/**",
+        "skills/design/charles-unslop/**",
+        "skills/design/README.md",
+        "skills/drops/README.md",
+        "skills/drops/charles-design-laws/README.md",
+        "skills/drops/charles-design-laws/examples/**",
+        "skills/drops/charles-design-tips/README.md",
+        "skills/drops/charles-design-tips/examples/**",
+        "skills/drops/charles-ux-animation/README.md",
+        "skills/drops/charles-ux-animation/examples/**",
+        "skills/drops/charles-create-posters/**",
+        "skills/drops/charles-hero-mockups/**",
+        "skills/editing/**",
+        "skills/qol/**",
+        "scripts/**",
+        "site/**",
+        "templates/**",
+        ".claude-plugin/**",
+        ".github/**",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "README.md"
+      ],
+      "runtime_deps": [
+        {
+          "name": "Python 3 with numpy and Pillow, for charles-color-analysis's color.py",
+          "license": "PSF, BSD-3-Clause and MIT-CMU runtime prerequisites, not bundled by Muro",
+          "bundled": false
+        },
+        {
+          "name": "Node.js 18 or newer with playwright-core 1.63.0 and sharp 0.35.5 (npm install --prefix into the packaged charles-polish/scripts folder), for the capture and measuring scripts",
+          "license": "MIT (Node.js), Apache-2.0 (playwright-core, sharp; sharp's prebuilt libvips is LGPL-3.0-or-later); installed at run time, not bundled by Muro",
+          "bundled": false
+        },
+        {
+          "name": "Google Chrome or Chromium (color.py shot, web-frames.mjs); ffmpeg for recordings; Xcode's simctl and Swift with Vision on macOS",
+          "license": "External programs of the host, not bundled by Muro",
+          "bundled": false
+        }
+      ],
+      "intake": {
+        "goal": "Understand the five skills the owner took from this repository on 2026-11-25. First charles-color-analysis, a measured critique of the colour of a visual, page, app screen or palette with ranked OKLCH and hex fixes and before/after previews, and charles-polish, which takes a working interface from fine to finished (score anchors, the climb, the details table, the motion trees) and verifies motion frame by frame with its capture scripts. Then, from the drops shelf and on a recommendation the owner accepted, charles-design-laws (twenty laws of UX as one procedure for designing or reviewing a screen or a flow), charles-design-tips (twenty practical tips on type, spacing, colour, forms, copy and empty states, with a findings table) and charles-ux-animation (how an interface moves, responds and gets people through a task, with its recipes and techniques). Identify every outcome each supports, including each review-only mode and the check of someone else's colour critique, and compare with the existing catalog (design review and its polish pass, the motion specification and scroll code, layout structure, design guidance, the palette owners, design file authoring and inspection) and with each other: over a dozen laws are stated in both charles-design-laws and charles-ux-animation, and the five skills give different numbers for some of the same things. Justify one owner per output, stages or alternatives from the source evidence; do not preassign the destination by name or source order. Read the scripts' code for what each writes, what it starts and what leaves the machine. The upstream has no release or tag, so the pin follows its head. charles-polish hands a screen that still looks generated to charles-unslop, which is under CC BY 4.0 and outside the license gate, and charles-design-laws hands motion, targets and choices to charles-ux-animation, which is now a source: record what each hand-off needs; never tell the host that part of the source is not packaged. The other skills and shelves of the repository, the READMEs, the evals and the example pictures are not sources of this package."
       }
     }
   ]

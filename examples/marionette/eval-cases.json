@@ -1656,6 +1656,330 @@
         ]
       },
       "why": "The responsive limits are data of the design file; layout-structure builds or reviews layout in code and does not write the file."
+    },
+    {
+      "id": "cs-polish-modal-feels-off",
+      "task": "Il modal di onboarding funziona, ma sembra un po' strano: compare dal nulla, il pulsante di chiusura è minuscolo sul telefono e i numeri ballano mentre contano. Fallo sembrare finito.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-polish"
+          }
+        ]
+      },
+      "why": "A working screen that feels off, with an entrance, a hit area and jiggling numbers to fix, is the polish intent; nothing asks for an audit before shipping or for a motion specification."
+    },
+    {
+      "id": "cs-polish-drawer-frame-by-frame",
+      "task": "Ho aggiunto un'animazione di slide-in al drawer del carrello. Controllala frame per frame e sistema quello che scatta.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-polish"
+          }
+        ]
+      },
+      "why": "Motion that already exists, checked on captured frames and corrected in the code, is interface polish; the motion specification decides motion that does not exist yet."
+    },
+    {
+      "id": "cs-craft-review-report-only",
+      "task": "card.html e card.css sono una card di dashboard con un modal e un toast. Rivedili con un'asticella alta di craft. Non cambiare niente: elenca ogni problema con gravità, evidenza (file e riga) e correzione.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interface-polish"
+        ],
+        "selections": [
+          {
+            "capability": "interface-polish",
+            "intent": "ui.craft-review"
+          }
+        ]
+      },
+      "why": "A report of craft findings with severity, evidence and fix, and no edit, is the review intent of the same capability; it is not a logic review and not a layout report with a verdict."
+    },
+    {
+      "id": "cs-ai-look-stays-design-review",
+      "task": "La mia pagina prezzi sembra ogni template AI: gradiente viola, card di vetro ed emoji ovunque. Falla smettere di sembrare fatta da un'AI.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.generic-look-check"
+          }
+        ]
+      },
+      "why": "A screen that reads as a generic generated template is the generic-look pass of design review; the polish source itself sends such a screen elsewhere first."
+    },
+    {
+      "id": "cs-color-clash-check-a-critique",
+      "task": "Nei commenti dicono che l'arancione e il verde del mio poster fanno a pugni e che dovrei desaturare l'arancione. Hanno ragione? L'immagine è poster.jpg.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "color-critique"
+        ],
+        "selections": [
+          {
+            "capability": "color-critique",
+            "intent": "ui.color-critique"
+          }
+        ]
+      },
+      "why": "Whether someone else's colour critique is right, answered with measurements of the image, is the colour critique; no palette is chosen and nothing is edited."
+    },
+    {
+      "id": "cs-color-muddy-landing",
+      "task": "I colori della mia landing sembrano fangosi e un po' cheap e non capisco perché: sfondo lavanda polveroso, pulsanti teal, titoli marrone caldo. Cosa c'è che non va e con quali valori esatti lo sistemo?",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "color-critique"
+        ],
+        "selections": [
+          {
+            "capability": "color-critique",
+            "intent": "ui.color-critique"
+          }
+        ]
+      },
+      "why": "Colours that exist and feel off, with a request for the cause and exact corrections, are a colour critique; a restyle of the page with a new visual system would be visual direction."
+    },
+    {
+      "id": "cs-contrast-fix-stays-design-review",
+      "task": "Controlla il contrasto dei testi di dashboard.html rispetto a WCAG AA e correggi nel file quelli che non passano.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.accessibility-audit"
+          }
+        ]
+      },
+      "why": "Fixing failing contrast in the file against WCAG AA is the accessibility audit; the colour critique reports and previews and changes no file."
+    },
+    {
+      "id": "cs-motion-spec-stays-motion",
+      "task": "La nuova dashboard non ha ancora animazioni: decidi come si deve muovere, con durate, easing e alternative per chi ha ridotto il movimento.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "motion-principles"
+        ],
+        "selections": [
+          {
+            "capability": "motion-principles",
+            "intent": "ui.motion-design"
+          }
+        ]
+      },
+      "why": "Deciding motion that does not exist yet, as a specification, is the motion specification; interface polish corrects motion that already exists."
+    },
+    {
+      "id": "cd-checkout-confusing-fix",
+      "task": "Il checkout è confuso: troppi campi, la spedizione express a pagamento è già selezionata e alla fine c'è solo un redirect alla home. Sistemalo nel codice (src/checkout).",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "ux-laws"
+        ],
+        "selections": [
+          {
+            "capability": "ux-laws",
+            "intent": "ui.ux-laws"
+          }
+        ]
+      },
+      "why": "What a flow asks of people, what it preselects and how it ends, fixed in the product's code law by law, is the UX laws step; nothing is looked up and no prototype is made."
+    },
+    {
+      "id": "cd-ux-laws-review-report-only",
+      "task": "Il form di registrazione ha 14 campi e la gente abbandona a metà. Rivedi il flusso e dimmi cosa togliere e cosa può compilare l'app da sola; non modificare niente.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "ux-laws"
+        ],
+        "selections": [
+          {
+            "capability": "ux-laws",
+            "intent": "ui.ux-laws-review"
+          }
+        ]
+      },
+      "why": "A report on what a flow asks of people and what the product could fill in, with no edit, is the review intent of the UX laws; it is not a lookup of rules and not a layout or craft review."
+    },
+    {
+      "id": "cd-tips-thrown-together",
+      "task": "La pagina impostazioni funziona ma sembra buttata lì: paragrafi lunghi centrati, grigi piatti, un'ombra enorme sotto le card, bottoni «Submit» e campi con solo il placeholder. Sistemala nei nostri token Tailwind.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-tips"
+        ],
+        "selections": [
+          {
+            "capability": "design-tips",
+            "intent": "ui.design-tips"
+          }
+        ]
+      },
+      "why": "Alignment, greys, shadows, button labels and field labels named one by one, fixed in the project's tokens, are the design tips; the screen is not said to look generated and no score or motion is asked."
+    },
+    {
+      "id": "cd-tips-review-table",
+      "task": "Controlla Invoices.tsx: interlinea, padding dei bottoni, numeri della tabella, maiuscole delle etichette e stato vuoto. Dammi una tabella con gravità, prima e dopo; non toccare il codice.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-tips"
+        ],
+        "selections": [
+          {
+            "capability": "design-tips",
+            "intent": "ui.design-tips-review"
+          }
+        ]
+      },
+      "why": "A findings table on type, padding, table numbers, casing and the empty state, with no edit, is the review intent of the design tips."
+    },
+    {
+      "id": "cd-add-modal-and-button-motion",
+      "task": "Aggiungi le animazioni al modal e al drawer del carrello nel nostro progetto React (Motion è già installato): apertura, chiusura, feedback alla pressione e stato di caricamento del bottone Paga.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interaction-motion"
+        ],
+        "selections": [
+          {
+            "capability": "interaction-motion",
+            "intent": "ui.interaction-motion"
+          }
+        ]
+      },
+      "why": "Writing the animation and feedback people trigger, in the project's code, is interaction motion: the behaviour is asked for directly, so no specification step is needed, and nothing is scroll-linked."
+    },
+    {
+      "id": "cd-interaction-review-report-only",
+      "task": "Rivedi come si muove e risponde l'onboarding: transizioni, feedback ai tocchi, attese e messaggi d'errore. Solo un rapporto con gravità e principio, niente modifiche.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "interaction-motion"
+        ],
+        "selections": [
+          {
+            "capability": "interaction-motion",
+            "intent": "ui.interaction-review"
+          }
+        ]
+      },
+      "why": "A report on how an interface moves and responds, by principle and without edits, is the review intent of interaction motion; a whole-screen craft review would be interface polish."
+    },
+    {
+      "id": "cd-rules-lookup-stays-guidance",
+      "task": "Che regole di UX e di animazione consigli per un'app Flutter di prenotazioni? Niente codice: voglio solo le regole per quello stack.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-guidance"
+        ],
+        "selections": [
+          {
+            "capability": "design-guidance",
+            "intent": "ui.design-guidance"
+          }
+        ]
+      },
+      "why": "Rules looked up for a stack, with nothing to change, are design guidance; the three procedures of this intake apply to a screen's code."
+    },
+    {
+      "id": "cd-last-check-stays-polish-pass",
+      "task": "Prima di mostrare landing.html al cliente fai l'ultimo controllo completo, correggi quello che trovi e dimmi se è pronta.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.polish-pass"
+          }
+        ]
+      },
+      "why": "The last complete check before delivery, with fixes and a readiness verdict, is the polish pass of design review; interface polish raises a working interface against a score and gives no such verdict."
+    },
+    {
+      "id": "cd-missing-states-stay-design-review",
+      "task": "Ai bottoni e ai link di dashboard.html mancano gli stati hover, focus e disabled: aggiungili.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-review"
+        ],
+        "selections": [
+          {
+            "capability": "design-review",
+            "intent": "ui.interaction-states"
+          }
+        ]
+      },
+      "why": "Which states an element has, and adding the missing ones, is the interaction-states pass; interaction motion builds how an interaction moves and responds from principles."
+    },
+    {
+      "id": "cd-heading-spacing-is-design-tips",
+      "task": "In Article.tsx i titoli sono attaccati al paragrafo sopra, l'interlinea del testo è troppo larga e le etichette dei bottoni sono in Title Case: correggi.",
+      "stack_tokens": [],
+      "expect": {
+        "status": "selected",
+        "capabilities": [
+          "design-tips"
+        ],
+        "selections": [
+          {
+            "capability": "design-tips",
+            "intent": "ui.design-tips"
+          }
+        ]
+      },
+      "why": "Heading spacing, line height and label casing named one by one are three of the tips; the hierarchy and rhythm review judges what the eye meets first across a design."
     }
   ]
 }

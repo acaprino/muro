@@ -54,16 +54,42 @@
       ]
     },
     {
+      "name": "marionette-ux",
+      "description": "Use when a screen or flow (a form, settings, a dashboard, checkout, onboarding) feels confusing, cluttered or hard to use and should be designed, fixed or reviewed by the laws of UX: what to cut, what the product can fill in, safe defaults, grouping, one thing that stands out, progress and a clear ending; or when a screen works but looks thrown together and needs practical design tips applied or checked: line height and weight, button and field padding, tinted greys, text on colour, layered shadows, labels above fields, table numbers, sentence case, button labels and empty states. Not for looking rules up without touching the code (design guidance), a screen that looks AI-generated or the review before shipping (design review), or how it moves (motion).",
+      "capabilities": [
+        "ux-laws",
+        "design-tips"
+      ],
+      "absorbs": [
+        "charles-design-laws",
+        "charles-design-tips"
+      ]
+    },
+    {
+      "name": "marionette-polish",
+      "description": "Use when a screen or interface already works but feels off or unfinished and needs polish (states, hit areas, contrast, layout shift, type, hover and press), when an animation, easing or transition must be checked frame by frame and made correct, when a working UI should be reviewed against a high craft bar without changes, or when colours clash or feel muddy, garish or off and you want a measured critique of a poster, hero, landing page, app screen or palette, with exact OKLCH and hex fixes and before/after previews, or a check of someone else's colour critique. Not for a screen that looks AI-generated, an accessibility audit or the review before shipping (design review), for a motion specification, or for choosing a new palette or look.",
+      "capabilities": [
+        "interface-polish",
+        "color-critique"
+      ],
+      "absorbs": [
+        "charles-polish",
+        "charles-color-analysis"
+      ]
+    },
+    {
       "name": "marionette-motion",
-      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines.",
+      "description": "Use when deciding how an interface moves (purpose, durations, easing, choreography, reduced-motion alternatives), when adding or reviewing animation, transitions, press and hover feedback, loading and optimistic states in the project's code (modals, drawers, popovers, toasts, icon swaps, async buttons), when asking for a rendered animation file (MP4, GIF, WebM, dotLottie, Lottie JSON) or when implementing scroll-linked animation, pinning, scrub, parallax or horizontal scroll sections with GSAP ScrollTrigger or pure CSS scroll-driven timelines. Not for finishing a whole screen with its motion checked frame by frame (polish).",
       "capabilities": [
         "motion-principles",
+        "interaction-motion",
         "gsap-scrolltrigger",
         "css-scroll"
       ],
       "absorbs": [
         "motion-design",
-        "gsap-scrolltrigger"
+        "gsap-scrolltrigger",
+        "charles-ux-animation"
       ]
     },
     {
