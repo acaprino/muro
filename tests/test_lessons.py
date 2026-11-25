@@ -16,21 +16,20 @@ from muro import build_release, parse_capabilities, validate_plugin_identity
 from muro.evals import prepare_eval, score_eval, validate_cases
 from muro.factory import harmonize_prompt, prepare_intake
 from muro.runtime import Coordinator
-from routing_helpers import copy_delivery, copy_prompts, proposed, response
+from routing_helpers import FIXTURE, copy_delivery, copy_prompts, proposed, response
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 
 
 @pytest.fixture
 def pkg(tmp_path):
     root = tmp_path / "pkg"
     root.mkdir()
-    shutil.copytree(MARIONETTE / "capabilities", root / "capabilities")
+    shutil.copytree(FIXTURE / "capabilities", root / "capabilities")
     for name in ("ROUTER.md", "sources.json"):
-        shutil.copy2(MARIONETTE / name, root / name)
+        shutil.copy2(FIXTURE / name, root / name)
     copy_prompts(root)
-    copy_delivery(root, MARIONETTE)
+    copy_delivery(root)
     return root
 
 
@@ -63,18 +62,18 @@ def test_build_out_stages_a_release_elsewhere_and_keeps_dist_protected(portable_
 
 def test_amend_keeps_only_explicitly_selected_valid_outputs_when_the_request_is_refined(pkg, tmp_path):
     c = Coordinator(pkg, tmp_path / "consumer")
-    task = "Landing per il mio SaaS, poi il movimento"
-    plan = proposed(c, task, ["visual-direction", "motion-principles"])["plan"]
+    task = "Una storia sulle api in città, poi il suo movimento"
+    plan = proposed(c, task, ["story-brief", "pacing-spec"])["plan"]
     step = c.confirm(task, plan)
-    c.record({k: f"v_{k}" for k in step["required_outputs"]}, step["map_id"], "visual-direction")
+    c.record({k: f"v_{k}" for k in step["required_outputs"]}, step["map_id"], "story-brief")
 
-    refined = task + " e anche le regole di accessibilità"
-    ids = ["visual-direction", "motion-principles", "design-guidance"]
+    refined = task + " e anche la verifica dei fatti"
+    ids = ["story-brief", "pacing-spec", "fact-check"]
     route = response(c.propose(refined, set()), ids)
     assert c.propose(refined, set(), classification=route, amend=True) == {"mode": "confirm", "task": refined, "plan": ids}
-    nxt = c.confirm(refined, ids, amend=True, preserve_completed=["visual-direction"])
-    assert nxt["capability"] == "motion-principles"          # visual-direction is not redone
-    assert nxt["recorded_outputs"]["palette"] == "v_palette"
+    nxt = c.confirm(refined, ids, amend=True, preserve_completed=["story-brief"])
+    assert nxt["capability"] == "pacing-spec"                # story-brief is not redone
+    assert nxt["recorded_outputs"]["angle"] == "v_angle"
     assert nxt["map_id"] != step["map_id"] and nxt["task"] == refined
     assert any((c.state_dir / "archive").iterdir())           # the earlier map is still archived
 
@@ -82,42 +81,42 @@ def test_amend_keeps_only_explicitly_selected_valid_outputs_when_the_request_is_
 def test_amend_redoes_a_step_when_a_new_upstream_step_feeds_it_and_needs_an_active_map(pkg, tmp_path):
     c = Coordinator(pkg, tmp_path / "consumer")
     task = "Specifica il movimento e implementalo"
-    plan = proposed(c, task, ["motion-principles", "gsap-scrolltrigger"], {"stack:gsap"})["plan"]
+    plan = proposed(c, task, ["pacing-spec", "scroll-build-gsap"], {"stack:gsap"})["plan"]
     with pytest.raises(ValueError, match="active map"):
         c.confirm(task, plan, {"stack:gsap"}, amend=True)
     step = c.confirm(task, plan, {"stack:gsap"})
-    c.record({"motion-spec": "scrub", "reduced-motion": "fade"}, step["map_id"], "motion-principles")
-    # A website direction is added before it: motion-principles reads its palette and layout,
-    # so the recorded motion spec is stale and is not carried over.
-    refined = "Prima rifai la direzione visiva del sito, poi il movimento e lo scroll"
-    ids = ["visual-direction", "motion-principles", "gsap-scrolltrigger"]
+    c.record({"pacing-plan": "scrub", "reduced-motion": "fade"}, step["map_id"], "pacing-spec")
+    # A story brief is added before it: pacing-spec reads its angle and outline,
+    # so the recorded pacing plan is stale and is not carried over.
+    refined = "Prima rifai il piano della storia, poi il movimento e lo scroll"
+    ids = ["story-brief", "pacing-spec", "scroll-build-gsap"]
     route = response(c.propose(refined, {"stack:gsap"}), ids)
     c.propose(refined, {"stack:gsap"}, classification=route, amend=True)
     first = c.confirm(refined, ids, {"stack:gsap"}, amend=True)
-    assert first["capability"] == "visual-direction"
+    assert first["capability"] == "story-brief"
     assert json.loads(c.state_path.read_text(encoding="utf-8"))["outputs"] == {}
 
 
 # --- Declared, not inferred -----------------------------------------------
 
 def test_a_resumable_capability_gets_a_map_even_as_a_single_step(pkg, tmp_path):
-    caps = {cap.id: cap for cap in parse_capabilities(MARIONETTE / "capabilities")}
-    assert caps["visual-direction"].resumable is True and caps["office-files"].resumable is False
+    caps = {cap.id: cap for cap in parse_capabilities(pkg / "capabilities")}
+    assert caps["story-brief"].resumable is True and caps["manuscript-files"].resumable is False
     c = Coordinator(pkg, tmp_path / "consumer")
-    task = "Rifai il sito della mia pasticceria"
-    result = proposed(c, task, ["visual-direction"])
-    assert result == {"mode": "confirm", "task": task, "plan": ["visual-direction"], "approval": "not-needed"}
+    task = "Prepara la storia sulla mia pasticceria"
+    result = proposed(c, task, ["story-brief"])
+    assert result == {"mode": "confirm", "task": task, "plan": ["story-brief"], "approval": "not-needed"}
     step = c.confirm(task, result["plan"])
     assert step["mode"] == "step" and c.state_path.is_file()
-    assert Coordinator(pkg, tmp_path / "consumer").resume()["capability"] == "visual-direction"
-    quick = proposed(Coordinator(pkg, tmp_path / "other"), "Converti a.docx in PDF", ["office-files"])
+    assert Coordinator(pkg, tmp_path / "consumer").resume()["capability"] == "story-brief"
+    quick = proposed(Coordinator(pkg, tmp_path / "other"), "Converti capitolo.docx in PDF", ["manuscript-files"])
     assert quick["mode"] == "direct"
 
 
 def test_resumable_must_be_a_boolean(tmp_path):
     from muro import parse_capability
-    text = (MARIONETTE / "capabilities" / "office-files.md").read_text(encoding="utf-8")
-    path = tmp_path / "office-files.md"
+    text = (FIXTURE / "capabilities" / "manuscript-files.md").read_text(encoding="utf-8")
+    path = tmp_path / "manuscript-files.md"
     path.write_text(text.replace("hooks: []", "hooks: []\nresumable: \"yes\"", 1), encoding="utf-8")
     with pytest.raises(ValueError, match="resumable"):
         parse_capability(path)
@@ -125,20 +124,21 @@ def test_resumable_must_be_a_boolean(tmp_path):
 
 def test_replaced_originals_are_declared_and_reach_every_install_note(portable_project, tmp_path):
     plugin = {"slug": "muro", "name": "Muro", "command": "muro", "version": "1"}
-    assert validate_plugin_identity({**plugin, "replaces": ["figma-designer"]}) == []
-    assert any("replaces" in e for e in validate_plugin_identity({**plugin, "replaces": "figma-designer"}))
+    assert validate_plugin_identity({**plugin, "replaces": ["story-planner"]}) == []
+    assert any("replaces" in e for e in validate_plugin_identity({**plugin, "replaces": "story-planner"}))
     manifest_path = portable_project / "sources.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["plugin"]["replaces"] = ["figma-designer", "landing-page-design"]
+    manifest["plugin"]["replaces"] = ["story-planner", "series-bible"]
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     release = build_release(manifest_path, portable_project, tmp_path / "out")
     for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
         note = (release / "adapters" / host / "INSTALL.md").read_text(encoding="utf-8")
-        assert "figma-designer" in note and "landing-page-design" in note and "switch" in note.lower()
+        assert "story-planner" in note and "series-bible" in note and "switch" in note.lower()
         skill = (release / "adapters" / host / "skills" / "muro" / "SKILL.md").read_text(encoding="utf-8")
         assert "already in the conversation" in skill and "approval: not-needed" in skill and "--amend" in skill
-    marionette = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))["plugin"]
-    assert "figma-designer" in marionette["replaces"] and validate_plugin_identity(marionette) == []
+    # A whole manifest that declares them: the fixture package's.
+    declared = json.loads((FIXTURE / "sources.json").read_text(encoding="utf-8"))["plugin"]
+    assert "story-planner" in declared["replaces"] and validate_plugin_identity(declared) == []
 
 
 # --- Outside-in evaluation --------------------------------------------------
@@ -148,7 +148,7 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
     for case in cases:
         ids = case["expect"]["capabilities"]
         if case["id"] == wrong:
-            ids = ["office-files"]
+            ids = ["manuscript-files"]
         selections = []
         expected_selections = case["expect"].get("selections") if case["id"] != wrong else None
         for position, name in enumerate(ids):
@@ -176,12 +176,12 @@ def fixture_decisions(contexts, cases, caps, wrong=None):
 
 
 def test_eval_prepares_blind_cases_and_scores_authored_decisions(tmp_path):
-    caps = {cap.id: cap for cap in parse_capabilities(MARIONETTE / "capabilities")}
-    cases = json.loads((MARIONETTE / "eval-cases.json").read_text(encoding="utf-8"))
-    assert validate_cases(cases, list(caps.values())) == [] and len(cases["cases"]) >= 10
+    caps = {cap.id: cap for cap in parse_capabilities(FIXTURE / "capabilities")}
+    cases = json.loads((FIXTURE / "eval-cases.json").read_text(encoding="utf-8"))
+    assert validate_cases(cases, list(caps.values())) == []
     assert any(c["expect"]["status"] == "no_match" for c in cases["cases"])
-    out = prepare_eval(MARIONETTE, tmp_path / "eval")
-    assert prepare_eval(MARIONETTE, tmp_path / "eval") == out            # rerunnable
+    out = prepare_eval(FIXTURE, tmp_path / "eval")
+    assert prepare_eval(FIXTURE, tmp_path / "eval") == out               # rerunnable
     prompt = (out / "PROMPT.md").read_text(encoding="utf-8")
     assert "semantic decision" in prompt and cases["cases"][0]["task"] in prompt
     assert '"expect"' not in prompt                                       # expectations never reach the classifier
@@ -189,24 +189,24 @@ def test_eval_prepares_blind_cases_and_scores_authored_decisions(tmp_path):
 
     good = tmp_path / "good.json"
     good.write_text(json.dumps(fixture_decisions(contexts, cases["cases"], caps)), encoding="utf-8")
-    report = score_eval(MARIONETTE, good)
+    report = score_eval(FIXTURE, good)
     assert report["passed"] == report["total"] == len(cases["cases"]) and report["failures"] == []
 
-    victim = next(c["id"] for c in cases["cases"] if c["expect"]["capabilities"] not in ([], ["office-files"]))
+    victim = next(c["id"] for c in cases["cases"] if c["expect"]["capabilities"] not in ([], ["manuscript-files"]))
     bad = tmp_path / "bad.json"
     doc = fixture_decisions(contexts, cases["cases"], caps, wrong=victim)
     del doc["decisions"][cases["cases"][-1]["id"]]
     bad.write_text(json.dumps(doc), encoding="utf-8")
-    report = score_eval(MARIONETTE, bad)
-    assert report["passed"] == report["total"] - 2
+    report = score_eval(FIXTURE, bad)
+    assert victim != cases["cases"][-1]["id"] and report["passed"] == report["total"] - 2
     assert {f["id"] for f in report["failures"]} == {victim, cases["cases"][-1]["id"]}
 
 
 def test_eval_cases_are_checked_for_shape(tmp_path):
-    caps = parse_capabilities(MARIONETTE / "capabilities")
+    caps = parse_capabilities(FIXTURE / "capabilities")
     case = {"id": "a", "task": "t", "stack_tokens": [], "expect": {"status": "selected", "capabilities": ["ghost"]}}
     assert any("ghost" in e for e in validate_cases({"cases": [case]}, caps))
-    case["expect"] = {"status": "no_match", "capabilities": ["office-files"]}
+    case["expect"] = {"status": "no_match", "capabilities": ["manuscript-files"]}
     assert any("no_match" in e for e in validate_cases({"cases": [case]}, caps))
     assert validate_cases({"cases": []}, caps)
 
@@ -214,15 +214,14 @@ def test_eval_cases_are_checked_for_shape(tmp_path):
 def test_router_line_cap_counts_prose_not_catalog_rows(tmp_path):
     """Second-source lesson: at 18 capabilities the flat 80-line cap blocked the next intake."""
     from muro import parse_router
-    text = (MARIONETTE / "ROUTER.md").read_text(encoding="utf-8")
+    text = (FIXTURE / "ROUTER.md").read_text(encoding="utf-8")
     rows = [line for line in text.splitlines() if line.startswith("| ") and not line.startswith("| id ")]
-    assert len(rows) == 43
+    assert len(rows) == len(parse_router(FIXTURE / "ROUTER.md"))
     many = tmp_path / "ROUTER.md"
-    extra = "".join(f"| extra-{n} | role-{n} | — | — | out_{n} | area.intent-{n} |\n" for n in range(40))
+    extra = "".join(f"| extra-{n} | role-{n} | — | — | out_{n} | area.intent-{n} |\n" for n in range(81))
     anchor = rows[-1] + "\n"
     many.write_text(text.replace(anchor, anchor + extra), encoding="utf-8")
-    assert len(many.read_text(encoding="utf-8").splitlines()) > 80
-    assert len(parse_router(many)) == 83                     # rows never hit the cap
+    assert len(parse_router(many)) == len(rows) + 81 > 80    # the rows alone pass 80 and never hit the cap
     prose = tmp_path / "prose" / "ROUTER.md"
     prose.parent.mkdir()
     prose.write_text(text + "\n".join(f"- note {n}" for n in range(80)) + "\n", encoding="utf-8")

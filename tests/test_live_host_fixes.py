@@ -7,9 +7,7 @@
 3. Pi passed --stack css-only: the error now names the token and the accepted form.
 """
 import json
-import re
 import shutil
-from pathlib import Path
 
 import pytest
 
@@ -17,87 +15,83 @@ from muro import build_release, parse_capabilities, validate_capabilities_and_ro
 from muro.core import parse_router
 from muro.routing import validate_stack
 from muro.runtime import Coordinator
-from routing_helpers import copy_delivery, copy_prompts, proposed
-
-ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
-
-
-def test_release_never_ships_a_file_named_skill_md_below_a_skill_folder():
-    release = build_release(MARIONETTE / "sources.json", MARIONETTE, Path(pytest.importorskip("tempfile").mkdtemp()) / "out")
-    try:
-        for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
-            skills = release / "adapters" / host / "skills"
-            nested = [p for p in skills.rglob("SKILL.md") if p.parent.parent != skills]
-            assert nested == [], (host, [str(p.relative_to(skills)) for p in nested[:5]])
-            assert (skills / "marionette" / "scripts" / "ai-design-skills" / "skills" / "landing-page-design" / "SKILL.source.md").is_file()
-            assert (skills / "marionette" / "scripts" / "ui-ux-pro-max" / ".claude" / "skills" / "ui-ux-pro-max"
-                    / "SKILL.source.md").is_file()
-        assert not list((release / "scripts").rglob("SKILL.md"))
-    finally:
-        shutil.rmtree(release.parent.parent, ignore_errors=True)
+from routing_helpers import FIXTURE, copy_delivery, copy_prompts, proposed
+from test_cli import git
+from test_intake_only_paths import update
 
 
-def test_capabilities_reference_packaged_source_skills_by_their_packaged_name():
-    caps = parse_capabilities(MARIONETTE / "capabilities")
-    pattern = re.compile(r"<(?:package_root|[A-Z]{2})>[^\s`'\")]*SKILL\.md")
-    for cap in caps:
-        assert not pattern.search(cap.body), (cap.id, pattern.search(cap.body).group(0))
-    body = next(c for c in caps if c.id == "visual-direction").body
-    assert "<LP>/SKILL.source.md" in body
-    # Provenance lines keep the upstream file name.
-    assert "skills/landing-page-design/SKILL.md" in body
+def test_release_never_ships_a_file_named_skill_md_below_a_skill_folder(portable_project, tmp_path):
+    # The upstream keeps an original skill at its root, one in a skills folder and one in a host's dot-folder.
+    repo = tmp_path / "repo"
+    for folder in ("skills/alpha", ".claude/skills/beta"):
+        (repo / folder).mkdir(parents=True)
+        (repo / folder / "SKILL.md").write_text(f"# Original in {folder}", encoding="utf-8")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "nested originals")
+    update(portable_project, commit=git(repo, "rev-parse", "HEAD"), selected_paths=["SKILL.md", "skills/**", ".claude/**"])
+    release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
+    for host in ("claude-code", "codex", "pi", "opencode", "hermes"):
+        skills = release / "adapters" / host / "skills"
+        packaged = skills / "muro" / "scripts" / "demo"
+        for original in ("SKILL.source.md", "skills/alpha/SKILL.source.md", ".claude/skills/beta/SKILL.source.md"):
+            assert (packaged / original).is_file(), (host, original)     # the originals travel, under the other name
+        assert (skills / "muro" / "SKILL.md").is_file()                  # the one skill a host registers
+        nested = [p for p in skills.rglob("SKILL.md") if p.parent.parent != skills]
+        assert nested == [], (host, [str(p.relative_to(skills)) for p in nested[:5]])
+    assert (release / "scripts" / "demo" / "skills" / "alpha" / "SKILL.source.md").is_file()
+    assert not list((release / "scripts").rglob("SKILL.md"))
 
 
-def test_validation_rejects_a_packaged_reference_to_skill_md(tmp_path):
-    caps = parse_capabilities(MARIONETTE / "capabilities")
-    rows = parse_router(MARIONETTE / "ROUTER.md")
-    broken = next(c for c in caps if c.id == "paper-search")
-    broken.body = broken.body + "\nRead `<package_root>/scripts/open-paper-skills/skills/paper-search/SKILL.md` first.\n"
-    errors = validate_capabilities_and_router(caps, rows, plugin_slug="marionette")
-    assert any("SKILL.source.md" in e and "paper-search" in e for e in errors), errors
+def test_validation_rejects_a_packaged_reference_to_skill_md():
+    caps = parse_capabilities(FIXTURE / "capabilities")
+    rows = parse_router(FIXTURE / "ROUTER.md")
+    assert validate_capabilities_and_router(caps, rows, plugin_slug="pressroom") == []
+    broken = next(c for c in caps if c.id == "fact-check")
+    broken.body = broken.body + "\nRead `<package_root>/scripts/editorial-desk/skills/fact-check/SKILL.md` first.\n"
+    errors = validate_capabilities_and_router(caps, rows, plugin_slug="pressroom")
+    assert any("SKILL.source.md" in e and "fact-check" in e for e in errors), errors
 
 
 @pytest.fixture
 def coordinator(tmp_path):
     pkg = tmp_path / "pkg"
     pkg.mkdir()
-    shutil.copytree(MARIONETTE / "capabilities", pkg / "capabilities")
-    shutil.copy2(MARIONETTE / "ROUTER.md", pkg / "ROUTER.md")
+    shutil.copytree(FIXTURE / "capabilities", pkg / "capabilities")
+    shutil.copy2(FIXTURE / "ROUTER.md", pkg / "ROUTER.md")
     copy_prompts(pkg)
-    copy_delivery(pkg, MARIONETTE)
+    copy_delivery(pkg)
     return Coordinator(pkg, tmp_path / "consumer")
 
 
 def test_a_mapped_step_names_its_scope_the_remaining_steps_and_how_to_submit(coordinator):
-    task = "Decidi il movimento delle card e implementalo solo in CSS"
+    task = "Decidi il movimento delle sezioni e implementalo solo in CSS"
     stack = {"stack:css-only"}
-    plan = proposed(coordinator, task, ["motion-principles", "css-scroll"], stack)["plan"]
+    plan = proposed(coordinator, task, ["pacing-spec", "scroll-build-css"], stack)["plan"]
     step = coordinator.confirm(task, plan, stack)
-    assert step["capability"] == "motion-principles"
-    assert step["remaining_steps"] == ["css-scroll"]
+    assert step["capability"] == "pacing-spec"
+    assert step["remaining_steps"] == ["scroll-build-css"]
     submit = step["submit"]
     assert submit.startswith("step ") and f"--map-id {step['map_id']}" in submit
-    assert "--capability motion-principles" in submit and "step.json" in submit
+    assert "--capability pacing-spec" in submit and "step.json" in submit
     assert str(coordinator.project_root) in submit
-    assert "css-scroll" in step["scope"] and "only" in step["scope"]
-    nxt = coordinator.record({"motion-spec": "fade 24px", "reduced-motion": "static"}, step["map_id"], "motion-principles")
-    assert nxt["capability"] == "css-scroll" and nxt["remaining_steps"] == []
-    assert "--capability css-scroll" in nxt["submit"]
-    checks = coordinator.record({"code-patch": "styles.css", "scroll-verified": "browser"}, nxt["map_id"], "css-scroll")
+    assert "scroll-build-css" in step["scope"] and "only" in step["scope"]
+    nxt = coordinator.record({"pacing-plan": "fade 24px", "reduced-motion": "static"}, step["map_id"], "pacing-spec")
+    assert nxt["capability"] == "scroll-build-css" and nxt["remaining_steps"] == []
+    assert "--capability scroll-build-css" in nxt["submit"]
+    checks = coordinator.record({"scroll-patch": "styles.css", "scroll-verified": "browser"}, nxt["map_id"], "scroll-build-css")
     assert checks["mode"] == "checks"
     assert checks["submit_check"].startswith("check ") and f"--map-id {checks['map_id']}" in checks["submit_check"]
     assert checks["submit_complete"] == f'complete --project "{coordinator.project_root}" --map-id {checks["map_id"]}'
 
 
 def test_direct_steps_carry_no_map_submission(coordinator):
-    result = proposed(coordinator, "Converti a.docx in PDF", ["office-files"])
+    result = proposed(coordinator, "Converti capitolo.docx in PDF", ["manuscript-files"])
     # No map: nothing of the mapped flow travels with a direct step. The output
     # handoff still gets its one-line command (record --direct), because a live
     # host left required_outputs unrecorded without it (2026-11-14).
     assert result["mode"] == "direct" and "map_id" not in result and "remaining_steps" not in result
     assert "scope" not in result and "--map-id" not in result["submit"]
-    assert result["submit"].startswith("record ") and "--direct --capability office-files" in result["submit"]
+    assert result["submit"].startswith("record ") and "--direct --capability manuscript-files" in result["submit"]
 
 
 def test_a_bare_stack_word_gets_an_error_that_shows_the_accepted_form():
