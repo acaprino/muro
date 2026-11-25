@@ -31,7 +31,7 @@ fn a_registry_starts_with_no_projects_and_saves_a_list_with_its_revision() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
     assert_eq!(registry(root)["projects"], json!([]));
-    let list = json!([{"id":"marionette","path":absolute("marionette.mp")},
+    let list = json!([{"id":"sample","path":absolute("sample.mp")},
                       {"id":"notes","path":absolute("Notes.MP")}]);
     let saved = save_projects(root, list.clone()).unwrap();
     assert_eq!(saved["registry"]["projects"], list);
@@ -93,9 +93,9 @@ fn a_project_is_removed_from_the_list_and_only_from_the_list() {
     let root = temp.path();
     let (file, other) = (root.join("notes.mp"), root.join("other.mp"));
     fs::write(&file, b"a project").unwrap();
-    save_projects(root, json!([{"id":"marionette","path":absolute("marionette.mp")},{"id":"notes","path":file},{"id":"other","path":other}])).unwrap();
+    save_projects(root, json!([{"id":"sample","path":absolute("sample.mp")},{"id":"notes","path":file},{"id":"other","path":other}])).unwrap();
     let removed = remove_project(root, "notes").unwrap();
-    assert_eq!(removed["registry"]["projects"], json!([{"id":"marionette","path":absolute("marionette.mp")},{"id":"other","path":other}]));
+    assert_eq!(removed["registry"]["projects"], json!([{"id":"sample","path":absolute("sample.mp")},{"id":"other","path":other}]));
     assert_eq!(registry(root)["projects"], removed["registry"]["projects"]);
     assert_eq!(fs::read(&file).unwrap(), b"a project", "the file is the person's: it stays");
     assert_eq!(registry(root)["revision"], 2, "one save for the list, one for the removal");
@@ -114,18 +114,19 @@ fn a_project_is_removed_from_the_list_and_only_from_the_list() {
 }
 
 #[test]
-fn the_default_project_cannot_be_removed_from_the_list() {
+fn no_project_of_the_list_is_kept_from_leaving_it() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path();
-    let list = json!([{"id":projects::DEFAULT_ID,"path":absolute("marionette.mp")},{"id":"notes","path":absolute("notes.mp")}]);
+    let list = json!([{"id":"sample","path":absolute("sample.mp")},{"id":"notes","path":absolute("notes.mp")}]);
     save_projects(root, list.clone()).unwrap();
-    let before = registry(root);
-    let refused = remove_project(root, "marionette").unwrap_err();
-    assert_eq!(format!("{refused:#}"), "The default project stays in the list");
-    assert_eq!(projects::DEFAULT_ID, "marionette");
-    assert_eq!(registry(root), before, "nothing was saved, not even the revision");
-    assert!(projects::remove(&list, "marionette").is_err());
-    assert_eq!(projects::remove(&list, "notes").unwrap(), json!([{"id":"marionette","path":absolute("marionette.mp")}]));
+    assert_eq!(projects::remove(&list, "notes").unwrap(), json!([{"id":"sample","path":absolute("sample.mp")}]));
+    assert_eq!(projects::remove(&list, "sample").unwrap(), json!([{"id":"notes","path":absolute("notes.mp")}]));
+    // the list reserves no id: every entry leaves it, the first one too, until none is left
+    for id in ["sample", "notes"] {
+        remove_project(root, id).unwrap();
+    }
+    assert_eq!(registry(root)["projects"], json!([]));
+    assert_eq!(registry(root)["revision"], 3, "one save for the list, one for each removal");
 }
 
 #[test]

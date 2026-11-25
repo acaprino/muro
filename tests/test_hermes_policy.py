@@ -129,7 +129,7 @@ def long_policy(size):
 def test_a_policy_over_the_section_limit_is_delivered_whole_through_the_turn_hook(tmp_path, size):
     """Hermes caps a section at 4,000 characters and all sections at 8,000 (hooks.md, plugins_dispatch.py).
 
-    Marionette's policy is 9,998 characters of two sources' own words: it is never cut and
+    A real policy measured 9,998 characters of two sources' own words: it is never cut and
     never registered as a section the host would reject or skip.
     """
     policy = long_policy(size)

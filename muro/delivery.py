@@ -17,7 +17,7 @@ FORMS = ("capability", "always-on", "hook", "mcp-server", "package-tool", "dropp
 # Text every receiving prompt pays for, so it is bounded. The budget grows with the sources the AI gave a
 # permanent place: one allowance for each source with an always-on decision (owner, 2026-11-12).
 # The allowance is sized so a real always-on source fits in its own words: content is never shortened to fit
-# (the larger of Marionette's two, i-have-adhd, is about 7000 characters). Exact token cost depends on the model.
+# (the largest one measured, i-have-adhd, is about 7000 characters). Exact token cost depends on the model.
 ALWAYS_ON_PER_SOURCE = 6000
 # Arbitrary source command hooks; native prompt registration is supported on every host.
 HOOK_HOSTS = ("claude-code", "codex")

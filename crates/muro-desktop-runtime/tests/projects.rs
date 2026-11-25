@@ -1,13 +1,10 @@
 //! Projects in the desktop runtime: the list, reading a project through the factory, opening a file,
-//! installing a project's plugin, the default project and the small actions (ADR-0028). The factory is a
+//! installing a project's plugin and the small actions (ADR-0028). The factory is a
 //! stand-in (`common`): what is tested is the runtime around it.
 mod common;
 
 use common::{calls, install, plugin, project_file};
-use muro_desktop_runtime::{
-    projects::{self, DefaultProject},
-    request,
-};
+use muro_desktop_runtime::{projects, request};
 use muro_registry::{ai, projects as registry_projects};
 use serde_json::{Value, json};
 use std::{
@@ -96,7 +93,7 @@ fn the_list_has_a_summary_for_each_project_in_order_and_one_bad_file_is_its_own_
     assert_eq!(shown[0]["plugin"]["slug"], "good");
     assert_eq!((shown[0]["inputs"].as_u64(), shown[0]["runs"].as_u64()), (Some(1), Some(6)));
     assert!(shown[0]["digest"].as_str().unwrap().len() == 64 && shown[0].get("error").is_none());
-    assert_eq!(shown[1], json!({"id":"broken","path":broken,"error":"Not a Muro project file: it is not a zip archive","included":false}));
+    assert_eq!(shown[1], json!({"id":"broken","path":broken,"error":"Not a Muro project file: it is not a zip archive"}));
     assert!(shown[2]["error"].as_str().unwrap().starts_with("The project file is missing"), "{}", shown[2]);
     assert!(shown[2].get("plugin").is_none());
     assert_eq!(shown[3]["plugin"]["slug"], "other", "a bad file does not hide the ones after it");
@@ -409,89 +406,6 @@ fn a_changed_file_makes_the_installed_build_stale_until_the_project_is_installed
     assert_eq!(home.call("plan", json!({})).unwrap()["blockers"], json!([]));
 }
 
-// --- the default project --------------------------------------------------------------------------
-
-fn resources(home: &Home) -> PathBuf {
-    let folder = home.files.join("resources");
-    fs::create_dir_all(folder.join("projects")).unwrap();
-    fs::write(folder.join("projects").join("marionette.mp"), b"the project Muro ships").unwrap();
-    folder
-}
-
-#[test]
-fn a_muro_without_a_bundled_project_installs_none() {
-    let home = Home::new();
-    let empty = home.files.join("none");
-    fs::create_dir_all(&empty).unwrap();
-    assert_eq!(projects::install_default(&home.data, &empty).unwrap(), DefaultProject::NotBundled);
-    assert_eq!(home.registry()["projects"], json!([]));
-    assert!(!projects::projects_dir(&home.data).exists());
-}
-
-#[test]
-fn the_default_project_is_copied_and_listed_once_and_never_overwritten() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Installed);
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships");
-    assert_eq!(home.registry()["projects"], json!([{"id":"marionette","path":kept}]));
-    // the person edits it (or a newer one is kept there): a start again leaves it exactly as it is
-    fs::write(&kept, b"the person's own version").unwrap();
-    let revision = home.registry()["revision"].clone();
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(fs::read(&kept).unwrap(), b"the person's own version");
-    assert_eq!(home.registry()["revision"], revision);
-}
-
-#[test]
-fn a_default_project_the_person_removed_and_deleted_does_not_come_back_at_every_start() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Installed);
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    request(&home.data, "save_projects", json!({"revision":home.registry()["revision"],"projects":[]})).unwrap();
-    fs::remove_file(&kept).unwrap();
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(home.registry()["projects"], json!([]));
-    assert!(!kept.exists());
-}
-
-#[test]
-fn a_file_the_person_already_keeps_there_is_never_replaced_even_without_the_mark() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    fs::create_dir_all(kept.parent().unwrap()).unwrap();
-    fs::write(&kept, b"already mine").unwrap();
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(fs::read(&kept).unwrap(), b"already mine");
-    assert_eq!(home.registry()["projects"], json!([]), "a file that was not listed is not listed for them");
-}
-
-#[test]
-fn a_start_that_ended_after_listing_is_finished_by_the_next_one() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    home.list(&[("marionette", &kept)]);
-    assert!(!kept.exists());
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Installed);
-    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships");
-    assert_eq!(home.registry()["projects"].as_array().unwrap().len(), 1, "listed once");
-}
-
-#[test]
-fn a_project_of_the_person_with_the_id_marionette_is_left_alone() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    let mine = home.file("mine.mp", json!({"plugin":plugin("Mine","marionette")}));
-    home.list(&[("marionette", &mine)]);
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::IdTaken);
-    assert_eq!(home.registry()["projects"], json!([{"id":"marionette","path":mine}]));
-    assert!(!projects::projects_dir(&home.data).join("marionette.mp").exists());
-}
-
 // --- small actions -------------------------------------------------------------------------------
 
 #[test]
@@ -564,124 +478,8 @@ fn the_folder_to_open_is_the_folder_of_a_listed_project_and_nothing_else() {
     assert!(error_of(home.call("open_folder", json!({}))).contains("Only the folder of a project in your list"));
 }
 
-// --- the shipped project is updated while it is still the one Muro copied ---------------------------------
-
 fn digest_of(path: &Path) -> String {
     registry_projects::file_digest(path).unwrap()
-}
-
-fn ships(home: &Home, content: &[u8]) -> PathBuf {
-    let file = home.files.join("resources").join("projects").join("marionette.mp");
-    fs::create_dir_all(file.parent().unwrap()).unwrap();
-    fs::write(&file, content).unwrap();
-    file
-}
-
-fn mark(home: &Home) -> String {
-    fs::read_to_string(projects::projects_dir(&home.data).join(".default-installed")).unwrap()
-}
-
-#[test]
-fn the_default_project_records_the_digest_of_the_file_it_copied() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Installed);
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    assert_eq!(mark(&home), digest_of(&kept));
-    assert_eq!(mark(&home), digest_of(&bundled.join("projects").join("marionette.mp")));
-}
-
-#[test]
-fn a_newer_shipped_project_replaces_the_copy_nobody_changed_and_moves_the_mark() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    let revision = home.registry()["revision"].clone();
-    // an unchanged shipped file changes nothing
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    // a new Muro ships a newer project
-    ships(&home, b"the project Muro ships, newer");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
-    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships, newer");
-    assert_eq!(mark(&home), digest_of(&kept), "the recorded digest moved with it");
-    assert_eq!(home.registry()["revision"], revision, "it was listed already: the list is not saved again");
-    let mut names: Vec<String> = fs::read_dir(projects::projects_dir(&home.data)).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
-    names.sort();
-    assert_eq!(names, [".default-installed", "marionette.mp"], "written beside and put in place: nothing is left over");
-    // a start again changes nothing; the next newer one is taken in the same way
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    ships(&home, b"newer still");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
-    assert_eq!(fs::read(&kept).unwrap(), b"newer still");
-}
-
-#[test]
-fn a_copy_the_person_changed_is_never_replaced_by_a_newer_shipped_one() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    let copied = mark(&home);
-    fs::write(&kept, b"the person's own version").unwrap();
-    ships(&home, b"the project Muro ships, newer");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(fs::read(&kept).unwrap(), b"the person's own version");
-    assert_eq!(mark(&home), copied, "the record is not moved for a file that is not Muro's");
-    // and a person who then restores the very bytes Muro copied gets the newer project, as an unchanged copy does
-    fs::write(&kept, b"the project Muro ships").unwrap();
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated);
-    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships, newer");
-}
-
-#[test]
-fn a_start_that_ended_after_replacing_the_file_finds_it_and_moves_the_mark() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    let newer = ships(&home, b"the project Muro ships, newer");
-    fs::copy(&newer, &kept).unwrap();         // the replacement happened, the mark did not move
-    assert_ne!(mark(&home), digest_of(&kept));
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(mark(&home), digest_of(&kept));
-    ships(&home, b"and a later one");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::Updated, "the mark is Muro's again");
-}
-
-#[test]
-fn a_copy_without_a_recorded_digest_or_that_is_gone_is_not_replaced_or_brought_back() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    // a mark that records nothing (a file of the person's own, or one made before digests were recorded)
-    fs::write(projects::projects_dir(&home.data).join(".default-installed"), b"").unwrap();
-    ships(&home, b"the project Muro ships, newer");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert_eq!(fs::read(&kept).unwrap(), b"the project Muro ships");
-    // a copy the person deleted stays deleted
-    fs::write(projects::projects_dir(&home.data).join(".default-installed"), digest_of(&kept)).unwrap();
-    fs::remove_file(&kept).unwrap();
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert!(!kept.exists());
-}
-
-#[cfg(unix)]
-#[test]
-fn a_link_in_place_of_the_copy_is_never_replaced() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    let theirs = home.files.join("theirs.mp");
-    fs::copy(&kept, &theirs).unwrap();
-    fs::remove_file(&kept).unwrap();
-    std::os::unix::fs::symlink(&theirs, &kept).unwrap();
-    ships(&home, b"the project Muro ships, newer");
-    assert_eq!(projects::install_default(&home.data, &bundled).unwrap(), DefaultProject::AlreadyThere);
-    assert!(fs::symlink_metadata(&kept).unwrap().file_type().is_symlink());
-    assert_eq!(fs::read(&theirs).unwrap(), b"the project Muro ships");
 }
 
 // --- removing a project from the list ---------------------------------------------------------------------
@@ -689,22 +487,22 @@ fn a_link_in_place_of_the_copy_is_never_replaced() {
 #[test]
 fn a_project_is_removed_from_the_list_through_the_runtime_and_its_file_stays() {
     let home = Home::new();
-    let kept = home.file("marionette.mp", json!({"plugin":plugin("Marionette","marionette")}));
+    let kept = home.file("sample.mp", json!({"plugin":plugin("Sample","sample")}));
     let notes = home.file("notes.mp", json!({"plugin":plugin("Notes","notes")}));
-    home.list(&[("marionette", &kept), ("notes", &notes)]);
+    home.list(&[("sample", &kept), ("notes", &notes)]);
     home.call("project", json!({"id":"notes"})).unwrap();
     let cache = projects::cache_dir(&home.data);
     assert!(cache.join(digest_of(&notes)).is_dir(), "its unpack is in the cache");
     let revision = home.registry()["revision"].clone();
     let removed = home.call("remove_project", json!({"id":"notes","revision":revision})).unwrap();
-    assert_eq!(removed["registry"]["projects"], json!([{"id":"marionette","path":kept}]));
+    assert_eq!(removed["registry"]["projects"], json!([{"id":"sample","path":kept}]));
     assert!(notes.is_file(), "the file is the person's");
     assert!(!cache.join(digest_of(&notes)).exists(), "nothing needs its unpack any more");
-    // the default project stays, and the refusal changes nothing
-    let before = home.registry();
-    let refused = error_of(home.call("remove_project", json!({"id":"marionette","revision":before["revision"]})));
-    assert_eq!(refused, "The default project stays in the list");
-    assert_eq!(home.registry(), before);
+    // no entry is kept from leaving: the one that is left goes the same way, and its file stays too
+    let revision = home.registry()["revision"].clone();
+    let emptied = home.call("remove_project", json!({"id":"sample","revision":revision})).unwrap();
+    assert_eq!(emptied["registry"]["projects"], json!([]));
+    assert!(kept.is_file(), "the file is the person's");
 }
 
 // --- the cache is kept to what is used ----------------------------------------------------------------------
@@ -801,39 +599,4 @@ fn a_start_removes_the_leftovers_older_than_a_day_and_nothing_younger() {
     projects::sweep(&home.data);
     let empty = Home::new();
     projects::sweep(&empty.data);
-}
-
-// --- Included with Muro comes from the runtime ----------------------------------------------------------------
-
-#[test]
-fn only_the_copy_muro_put_in_its_own_folder_is_included_whatever_a_file_says_of_itself() {
-    let home = Home::new();
-    let bundled = resources(&home);
-    projects::install_default(&home.data, &bundled).unwrap();
-    let kept = projects::projects_dir(&home.data).join("marionette.mp");
-    // a stand-in factory reads the descriptor from the file: the shipped bytes here are no descriptor, so write one
-    project_file(&kept, json!({"plugin":plugin("Marionette","marionette"),"builtin":false}));
-    let foreign = home.file("foreign.mp", json!({"plugin":plugin("Foreign","foreign"),"builtin":true}));
-    let current = home.registry();
-    let mut all = current["projects"].as_array().unwrap().clone();
-    all.push(json!({"id":"foreign","path":foreign}));
-    request(&home.data, "save_projects", json!({"revision":current["revision"],"projects":all})).unwrap();
-    let shown = home.call("projects", json!({})).unwrap();
-    assert_eq!((shown[0]["id"].as_str(), shown[0]["included"].as_bool()), (Some("marionette"), Some(true)), "{}", shown[0]);
-    assert_eq!(shown[0]["project"].get("builtin"), None, "what the file says of itself is not what decides");
-    assert_eq!((shown[1]["id"].as_str(), shown[1]["included"].as_bool()), (Some("foreign"), Some(false)));
-    assert_eq!(shown[1]["project"]["builtin"], true, "it claims it, and is not believed");
-    assert_eq!(home.call("project", json!({"id":"marionette"})).unwrap()["included"], true);
-    assert_eq!(home.call("project", json!({"id":"foreign"})).unwrap()["included"], false);
-    let opened = home.call("open_project", json!({"path":home.file("opened.mp", json!({"plugin":plugin("Opened","opened"),"builtin":true}))})).unwrap();
-    assert_eq!(opened["included"], false);
-    // the shipped copy, when it cannot be read, is still the one that stays in the list
-    fs::write(&kept, b"{ not a project").unwrap();
-    let unreadable = home.call("projects", json!({})).unwrap();
-    assert_eq!((unreadable[0]["included"].as_bool(), unreadable[0]["error"].is_string()), (Some(true), true), "{}", unreadable[0]);
-    // a project of the person's own that holds the id marionette elsewhere is not the shipped one
-    let mine = home.file("mine.mp", json!({"plugin":plugin("Mine","marionette")}));
-    assert!(!projects::is_included(&home.data, "marionette", &mine.to_string_lossy()));
-    assert!(projects::is_included(&home.data, "marionette", &kept.to_string_lossy()));
-    assert!(!projects::is_included(&home.data, "other", &kept.to_string_lossy()), "the id counts too");
 }

@@ -738,7 +738,7 @@ def test_the_documents_name_the_form_and_record_what_was_not_run():
     adr = (root / "docs/adr/ADR-0033-package-mcp-server.md").read_text(encoding="utf-8")
     assert "## Amendment: implementation (2026-11-23)" in adr
     not_run = adr.split("## Not run", 1)[1]
-    for phrase in ("Claude Code included", "POSIX", "Supads has not been harmonized again", "Delivery 2", "shutil.which",
+    for phrase in ("Claude Code included", "POSIX", "Delivery 2", "shutil.which",
                    "environment variables that reach the server"):
         assert phrase in not_run, phrase
 

@@ -3,7 +3,7 @@
 The intake AI used to receive only the files in `selected_paths`. A source whose
 SKILL.md runs scripts, copies a kit and gates on checkers that were never selected
 was absorbed as "write it by hand, the rest is not packaged" (taste-skill in
-Marionette: 11 files of 1,631). Preparation now reports what was left out and which
+a real package: 11 files of 1,631). Preparation now reports what was left out and which
 of it the selected files name. Python resolves paths; it never judges what is needed.
 """
 import json
@@ -161,7 +161,7 @@ def test_an_api_model_without_file_tools_receives_the_coverage_inline(tmp_path):
 
 
 def test_the_intake_prompt_has_a_skill_read_before_it_is_left_out_as_a_duplicate():
-    # Marionette, 2026-11-11: explain-anything-html was left out of open-paper-skills, unread, as
+    # A real intake, 2026-11-11: explain-anything-html was left out of open-paper-skills, unread, as
     # "served by explain-this", which starts on other requests and makes another page.
     from pathlib import Path
     prompt = (Path(__file__).resolve().parent.parent / "prompts" / "intake.md").read_text(encoding="utf-8")

@@ -22,21 +22,21 @@ const CAPS = [
   cap('office-fonts'),
 ];
 const ENTRIES = [
-  { name: 'marionette-design', description: 'Use when designing', capabilities: ['design-taste', 'design-review'] },
-  { name: 'marionette-office', description: 'Use when making files', capabilities: ['office-docs', 'office-pdf', 'office-fonts'] },
+  { name: 'sample-design', description: 'Use when designing', capabilities: ['design-taste', 'design-review'] },
+  { name: 'sample-office', description: 'Use when making files', capabilities: ['office-docs', 'office-pdf', 'office-fonts'] },
 ];
 const EXAMPLES = [
   { title: 'A landing page', task: 'Design a landing page', stack_tokens: ['stack:react'], status: 'selected', selections: [pick('design-taste', 'It designs a page.'), pick('design-review', 'The design is checked.')], reason: 'Design, then review.', questions: [], path: ['design-taste', 'design-review'], steps: [{ step: 'design-taste', capability: 'design-taste', intent: 'design-taste-intent' }, { step: 'design-review', capability: 'design-review', intent: 'design-review-intent' }] },
   { title: 'A letter', task: 'Write a letter', stack_tokens: [], status: 'selected', selections: [pick('office-docs', 'A Word file.')], reason: 'One document.', questions: [], path: ['office-fonts', 'office-docs'], steps: [{ step: 'office-fonts', capability: 'office-fonts', intent: null }, { step: 'office-docs', capability: 'office-docs', intent: 'office-docs-intent' }] },
   { title: 'Hello', task: 'Say hello', stack_tokens: [], status: 'no_match', selections: [], reason: 'Nothing to build.', questions: [], path: [], steps: [] },
 ];
-const meta = { schema: 1, name: 'Marionette', slug: 'marionette', version: '0.5.0', author: 'a', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: null, builtin: true };
+const meta = { schema: 1, name: 'Sample', slug: 'sample', version: '0.5.0', author: 'a', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: null, builtin: true };
 const info = (graphOver: Record<string, unknown> = {}): ProjectInfo => ({
-  project: meta, plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: [], records: [], history: [], changelog: '', prompts: [],
+  project: meta, plugin: { name: 'Sample', slug: 'sample', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: [], records: [], history: [], changelog: '', prompts: [],
   graph: { entries: ENTRIES, capabilities: CAPS, examples: EXAMPLES, ...graphOver }, files: [], digest: 'sha256:a',
 } as unknown as ProjectInfo);
 
-const sceneOf = (lit: Map<string, number[]> = new Map(), held = info(), slug = 'marionette', reached: string[] = []) => graphScene(entriesOf(held), capsOf(held), slug, lit, reached);
+const sceneOf = (lit: Map<string, number[]> = new Map(), held = info(), slug = 'sample', reached: string[] = []) => graphScene(entriesOf(held), capsOf(held), slug, lit, reached);
 /** A thing by its label (labels are unique in these fixtures). */
 const thing = (scene: Scene, label: string) => {
   const found = scene.nodes.find(n => n.label === label);
@@ -68,10 +68,10 @@ test('a closed entry is its name alone; its "Use when" first sentence is kept, a
   assert.equal('detail' in thing(opened, 'office'), false, 'the entry left closed does not');
   assert.ok(capabilitiesOfScene(opened).every(n => !('detail' in n)), 'a lit capability is numbered by the canvas (steps), not by a second line');
   const held = info({ entries: [
-    { name: 'marionette-a', description: 'Use when designing pages. Also for decks and notes.', capabilities: [] },
-    { name: 'marionette-b', description: 'Use when\n  making files (e.g. a letter). Not for code!', capabilities: [] },
-    { name: 'marionette-c', description: 'Is it a page? Then use this.', capabilities: [] },
-    { name: 'marionette-d', description: '   ', capabilities: [] },
+    { name: 'sample-a', description: 'Use when designing pages. Also for decks and notes.', capabilities: [] },
+    { name: 'sample-b', description: 'Use when\n  making files (e.g. a letter). Not for code!', capabilities: [] },
+    { name: 'sample-c', description: 'Is it a page? Then use this.', capabilities: [] },
+    { name: 'sample-d', description: '   ', capabilities: [] },
   ] });
   const entries = entriesOfScene(sceneOf(new Map(), held));
   assert.deepEqual(entries.map(n => n.about), ['Use when designing pages.', 'Use when making files (e.g. a letter).', 'Is it a page?', undefined]);
@@ -96,10 +96,10 @@ test('the things as the canvas draws them: an entry the person opens gets its se
 
 test('prefix shortening affects only entry labels, never identity or an unrelated name', () => {
   const held = info({ capabilities: ['a', 'b', 'c'].map(id => cap(id)), entries: [
-    { name: 'marionette-design', capabilities: ['a'] }, { name: 'other-marionette-x', capabilities: ['b'] }, { name: 'marionette', capabilities: ['c'] },
+    { name: 'sample-design', capabilities: ['a'] }, { name: 'other-sample-x', capabilities: ['b'] }, { name: 'sample', capabilities: ['c'] },
   ] });
-  assert.deepEqual(entriesOfScene(sceneOf(new Map(), held)).map(n => n.label), ['design', 'other-marionette-x', 'marionette']);
-  assert.deepEqual(entriesOfScene(sceneOf(new Map(), held, '')).map(n => n.label), ['marionette-design', 'other-marionette-x', 'marionette'], 'a project with no slug strips nothing');
+  assert.deepEqual(entriesOfScene(sceneOf(new Map(), held)).map(n => n.label), ['design', 'other-sample-x', 'sample']);
+  assert.deepEqual(entriesOfScene(sceneOf(new Map(), held, '')).map(n => n.label), ['sample-design', 'other-sample-x', 'sample'], 'a project with no slug strips nothing');
 });
 
 test('a repeated capability id is one thing, the first one decides, and an id that looks like an entry\'s stays apart from it', () => {
@@ -153,12 +153,12 @@ test('an example with no match lights nothing, and a step that names a capabilit
 });
 
 test('the capabilities an input went to open the entries that hold them, unnumbered, and no other entry; one the graph lacks opens nothing', () => {
-  const scene = sceneOf(new Map(), info(), 'marionette', ['office-docs']);
+  const scene = sceneOf(new Map(), info(), 'sample', ['office-docs']);
   assert.deepEqual(scene.closed, [thing(scene, 'design').id]);
   assert.equal(thing(scene, 'office').detail, 'Use when making files', 'open, it says its sentence');
   assert.equal(scene.steps.size, 0, 'reached is not lit: nothing is numbered');
-  assert.equal(sceneOf(new Map(), info(), 'marionette', ['gone']).closed.length, 2);
-  assert.deepEqual(sceneOf(new Map([['design-taste', [1]]]), info(), 'marionette', ['office-pdf']).closed, [], 'what is lit and what is reached both open their entries');
+  assert.equal(sceneOf(new Map(), info(), 'sample', ['gone']).closed.length, 2);
+  assert.deepEqual(sceneOf(new Map([['design-taste', [1]]]), info(), 'sample', ['office-pdf']).closed, [], 'what is lit and what is reached both open their entries');
 });
 
 test('a capability run twice carries both numbers', () => {
@@ -263,7 +263,7 @@ test('the entries to open so that some things are in sight: those that hide a ca
 
 // ---------- what hangs from no one ----------
 test('a capability that no entry lists is kept, hangs from no one and is never closed away', () => {
-  const held = info({ capabilities: [cap('listed'), cap('loose')], entries: [{ name: 'marionette-one', description: 'Use when one.', capabilities: ['listed', 'unknown'] }] });
+  const held = info({ capabilities: [cap('listed'), cap('loose')], entries: [{ name: 'sample-one', description: 'Use when one.', capabilities: ['listed', 'unknown'] }] });
   const scene = sceneOf(new Map(), held);
   assert.equal(scene.nodes.length, 3);
   assert.ok(scene.nodes.some(n => n.id === capNodeId('loose')));
@@ -275,7 +275,7 @@ test('a capability that no entry lists is kept, hangs from no one and is never c
 });
 
 test('an entry with nothing in it is a thing too, closed', () => {
-  const scene = sceneOf(new Map(), info({ entries: [{ name: 'marionette-empty', description: 'Use when empty.', capabilities: [] }] }));
+  const scene = sceneOf(new Map(), info({ entries: [{ name: 'sample-empty', description: 'Use when empty.', capabilities: [] }] }));
   assert.deepEqual(entriesOfScene(scene).map(n => n.label), ['empty']);
   assert.equal(scene.closed.length, 1);
 });
@@ -291,11 +291,11 @@ test('a capability is named on the canvas by an id that gives its own name back,
   assert.ok(entriesOfScene(scene).every(n => capabilityOf(n.id) === null));
 });
 
-// ---------- at the size of Marionette ----------
+// ---------- at the size of a large project ----------
 test('37 capabilities in 15 entries are 52 things with every entry closed, every relation is a line of its own kind, and no line is doubled', async () => {
   const fake = createTransport('projects');
   fake.flags.bigGraph = true;
-  const held = await fake.request('project', { id: 'marionette' }) as ProjectInfo;
+  const held = await fake.request('project', { id: 'sample' }) as ProjectInfo;
   const scene = sceneOf(new Map(), held);
   assert.equal(scene.nodes.length, 52);
   assert.equal(entriesOfScene(scene).length, 15);
@@ -318,7 +318,7 @@ test('37 capabilities in 15 entries are 52 things with every entry closed, every
 test('an example of the large graph opens the entries of its capabilities and no others, and numbers them', async () => {
   const fake = createTransport('projects');
   fake.flags.bigGraph = true;
-  const held = await fake.request('project', { id: 'marionette' }) as ProjectInfo;
+  const held = await fake.request('project', { id: 'sample' }) as ProjectInfo;
   const example = examplesOf(held)[0], lit = litOf(outcomeOfExample(example));
   assert.equal(lit.size, 2);
   const scene = sceneOf(lit, held);

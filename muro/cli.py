@@ -563,7 +563,7 @@ def _modern_main(argv: list[str]) -> int:
     p = sub.add_parser("marketplace", help="Write the Claude Code and Codex marketplaces at the root of a repository "
                                            "that publishes a built release in a subfolder")
     p.add_argument("repository", type=Path, help="The repository's folder")
-    p.add_argument("folder", help="The release's folder inside it (holds adapters/<harness>), e.g. marionette")
+    p.add_argument("folder", help="The release's folder inside it (holds adapters/<harness>), e.g. my-package")
     p = sub.add_parser("license-check", help="List the files of a folder that are the complete MIT or Apache-2.0 text "
                                              "(a preflight, not the license gate; exit 1 when there is none)")
     p.add_argument("folder", type=Path, help="The folder to search, e.g. a source's repository root")

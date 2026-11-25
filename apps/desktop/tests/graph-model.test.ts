@@ -22,8 +22,8 @@ const CAPS = [
   cap('office-fonts'),
 ];
 const ENTRIES = [
-  { name: 'marionette-design', description: 'Use when designing', capabilities: ['design-taste', 'design-review'] },
-  { name: 'marionette-office', description: 'Use when making files', capabilities: ['office-docs', 'office-pdf', 'office-fonts'] },
+  { name: 'sample-design', description: 'Use when designing', capabilities: ['design-taste', 'design-review'] },
+  { name: 'sample-office', description: 'Use when making files', capabilities: ['office-docs', 'office-pdf', 'office-fonts'] },
 ];
 const EXAMPLES = [
   { title: 'A landing page', task: 'Design a landing page', stack_tokens: ['stack:react'], status: 'selected', selections: [pick('design-taste', 'It designs a page.'), pick('design-review', 'The design is checked.')], reason: 'Design, then review.', questions: [], path: ['design-taste', 'design-review'], steps: [{ step: 'design-taste', capability: 'design-taste', intent: 'design-taste-intent' }, { step: 'design-review', capability: 'design-review', intent: 'design-review-intent' }] },
@@ -36,9 +36,9 @@ const DECISIONS = [
   { source: 'genoffice', content: 'skills/docx', form: 'capability', targets: ['design-taste', 'office-docs'], reason: 'x' },
   { source: 'superpowers', content: 'using', form: 'always-on', targets: [], reason: 'x' },
 ];
-const meta = { schema: 1, name: 'Marionette', slug: 'marionette', version: '0.5.0', author: 'a', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: null, builtin: true };
+const meta = { schema: 1, name: 'Sample', slug: 'sample', version: '0.5.0', author: 'a', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository: null, builtin: true };
 const info = (over: Record<string, unknown> = {}, graphOver: Record<string, unknown> = {}): ProjectInfo => ({
-  project: meta, plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: DECISIONS, records: [], history: [], changelog: '', prompts: [],
+  project: meta, plugin: { name: 'Sample', slug: 'sample', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: DECISIONS, records: [], history: [], changelog: '', prompts: [],
   graph: { entries: ENTRIES, capabilities: CAPS, examples: EXAMPLES, ...graphOver }, files: [], digest: 'sha256:a', ...over,
 } as unknown as ProjectInfo);
 
@@ -52,7 +52,7 @@ test('the graph is read from the guide data: capabilities, entries and what each
   assert.deepEqual(review.needs, [{ capability: 'design-taste', label: 'A design exists', when: 'A design exists', reason: 'Because.' }]);
   assert.deepEqual(capsOf(held).find(c => c.id === 'office-docs')!.conflicts, ['office-pdf']);
   assert.deepEqual(capsOf(held).find(c => c.id === 'office-docs')!.after, ['office-fonts']);
-  assert.deepEqual(entriesOf(held).map(e => [e.name, e.capabilities.length]), [['marionette-design', 2], ['marionette-office', 3]]);
+  assert.deepEqual(entriesOf(held).map(e => [e.name, e.capabilities.length]), [['sample-design', 2], ['sample-office', 3]]);
 });
 test('a graph that is not what the factory writes is read for what is there, never trusted', () => {
   const held = info({}, { capabilities: [cap('ok'), { title: 'no id' }, null, 7, { id: 5 }, { id: 'half', title: 3, intents: 'x', needs: [{ label: 'no target' }, 'x'], conflicts: [1, 'ok'], outputs: 'x', after: [null] }], entries: [{ name: 'e', capabilities: ['ok', 3] }, 'x', { description: 'no name' }], examples: [null, { title: 7 }] });

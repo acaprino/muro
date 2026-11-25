@@ -11,8 +11,8 @@ const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ h
 const button = (scope, name) => scope.getByRole('button', { name, exact: true });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });
 const segment = (page, name) => page.locator('[data-slot="toggle-group-item"]').filter({ hasText: new RegExp(`^${name}$`) });
-const projects = async page => { await tab(page, 'Projects').click(); await button(page, 'Marionette').waitFor(); };
-const project = async page => { await projects(page); await button(page, 'Marionette').click(); await page.getByRole('tree', { name: 'Decision graph of Marionette' }).waitFor(); };
+const projects = async page => { await tab(page, 'Projects').click(); await button(page, 'Sample').waitFor(); };
+const project = async page => { await projects(page); await button(page, 'Sample').click(); await page.getByRole('tree', { name: 'Decision graph of Sample' }).waitFor(); };
 /** The left panel of the project: beside the graph, or in its drawer where the window is narrow. */
 const panel = async (page, name) => {
   const opener = button(page, 'Project panel');

@@ -1449,14 +1449,14 @@ mod tests {
     fn a_copy_of_the_same_name_is_taken_over_from_the_person_or_from_another_plugin_once() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
-        let copy = root.join("cache/marionette/marionette/0.6.0");
+        let copy = root.join("cache/sample/sample/0.6.0");
         fs::create_dir_all(&copy).unwrap();
         fs::write(copy.join("SKILL.md"), "PUBLISHED").unwrap();
         let mut registry = json!({"targets":[{"id":"cc","name":"Claude Code"},{"id":"cx","name":"Codex"}],"plugins":[
-            {"id":"marionette","name":"Marionette","targets":["cc","cx"]},
-            {"id":"adopted","name":"marionette","targets":["cc","cx"]}]});
+            {"id":"sample","name":"Sample","targets":["cc","cx"]},
+            {"id":"adopted","name":"sample","targets":["cc","cx"]}]});
         let entry = |registry_id: Option<&str>| {
-            let mut e = json!({"id":"marionette@marionette","name":"marionette@marionette","plugin_name":"marionette",
+            let mut e = json!({"id":"sample@sample","name":"sample@sample","plugin_name":"sample",
                 "version":"0.6.0","path":copy.to_string_lossy(),"managed":registry_id.is_some()});
             if let Some(owner) = registry_id { e["registry_id"] = json!(owner); }
             e
@@ -1465,32 +1465,32 @@ mod tests {
         let mut receipts = json!({});
         for target in ["cc", "cx"] {
             receipts[receipt_key(target, "adopted")] =
-                json!({"target_id":target,"plugin_id":"adopted","native_id":"marionette@marionette"});
+                json!({"target_id":target,"plugin_id":"adopted","native_id":"sample@sample"});
         }
-        assert!(claim(root, &mut registry, &mut receipts, "marionette", "cc", "marionette", &[entry(Some("adopted"))]).unwrap());
+        assert!(claim(root, &mut registry, &mut receipts, "sample", "cc", "sample", &[entry(Some("adopted"))]).unwrap());
         assert_eq!(registry["plugins"][1]["targets"], json!(["cx"]), "only that harness");
         let all = receipts.as_object().unwrap();
         assert_eq!(all.len(), 2, "{receipts}");
-        let taken = &receipts[receipt_key("cc", "marionette")];
-        assert_eq!((taken["native_id"].as_str(), taken["version"].as_str(), taken["adopted"].as_bool()), (Some("marionette@marionette"), Some("0.6.0"), Some(true)));
+        let taken = &receipts[receipt_key("cc", "sample")];
+        assert_eq!((taken["native_id"].as_str(), taken["version"].as_str(), taken["adopted"].as_bool()), (Some("sample@sample"), Some("0.6.0"), Some(true)));
         assert_eq!(taken["digest"], json!(tree_hash(&copy).unwrap()));
         assert_eq!(receipts[receipt_key("cx", "adopted")]["plugin_id"], "adopted", "the other harness is untouched");
         // A copy the person installed, that no plugin of the list holds.
-        assert!(claim(root, &mut registry, &mut receipts, "marionette", "cx", "marionette", &[entry(None)]).unwrap());
-        assert_eq!(receipts[receipt_key("cx", "marionette")]["plugin_id"], "marionette");
+        assert!(claim(root, &mut registry, &mut receipts, "sample", "cx", "sample", &[entry(None)]).unwrap());
+        assert_eq!(receipts[receipt_key("cx", "sample")]["plugin_id"], "sample");
         // Nothing to take: the plugin has its own copy there, the name differs, or the files are gone.
         let before = (registry.clone(), receipts.clone());
         let mut gone = entry(None);
         gone["present"] = json!(false);
-        for entries in [vec![entry(Some("marionette")), entry(None)], vec![entry(None)], vec![gone]] {
-            let name = if entries.len() == 1 && entries[0]["present"] != false { "other" } else { "marionette" };
-            assert!(!claim(root, &mut registry, &mut receipts, "marionette", "cx", name, &entries).unwrap());
+        for entries in [vec![entry(Some("sample")), entry(None)], vec![entry(None)], vec![gone]] {
+            let name = if entries.len() == 1 && entries[0]["present"] != false { "other" } else { "sample" };
+            assert!(!claim(root, &mut registry, &mut receipts, "sample", "cx", name, &entries).unwrap());
         }
         assert_eq!((registry.clone(), receipts.clone()), before);
         // A plugin that does not list the harness takes nothing there.
         registry["plugins"][0]["targets"] = json!(["cx"]);
-        let error = claim(root, &mut registry, &mut receipts, "marionette", "cc", "marionette", &[entry(None)]).unwrap_err();
-        assert_eq!(error.to_string(), "Marionette must list Claude Code to take over the copy there");
+        let error = claim(root, &mut registry, &mut receipts, "sample", "cc", "sample", &[entry(None)]).unwrap_err();
+        assert_eq!(error.to_string(), "Sample must list Claude Code to take over the copy there");
     }
     #[test]
     fn reinstall_check_compares_installed_files_with_the_artifact() {

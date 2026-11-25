@@ -92,10 +92,6 @@ await test('New project: every field is checked in the runtime\'s words, nothing
   assert.equal((await callsOf(app, 'create_project')).length, 0, 'nothing is sent while the form is wrong');
   // Each field, checked as the runtime checks it.
   await wrong(drawer, 'name', 'x'.repeat(201), 'The project name must be one line of at most 200 characters');
-  await field(drawer, 'name').fill('Marionette');
-  assert.equal(await field(drawer, 'slug').inputValue(), 'marionette', 'the plugin id follows the name');
-  await field(drawer, 'slug').blur();
-  await drawer.getByText('The plugin id marionette is the project Muro ships: choose another', { exact: true }).waitFor();
   await wrong(drawer, 'slug', 'Bad Slug', 'The plugin id is lowercase letters and digits joined by dashes, such as my-plugin');
   await wrong(drawer, 'slug', 'commit-helper', 'A plugin named commit-helper is already in your list: choose another plugin id');
   await wrong(drawer, 'author', '   ', 'The author is required');
@@ -173,7 +169,7 @@ await test('New project: the folder dialog fills the folder, a closed dialog lea
 await test('New project with Codex as the agent says what is needed before the run, and cannot start', 'projects', {}, async app => {
   const { page } = app;
   await goProjects(page);
-  await page.getByRole('button', { name: 'Marionette', exact: true }).waitFor();   // the list is read: the registry is not refreshed while a request of the person is pending
+  await page.getByRole('button', { name: 'Sample', exact: true }).waitFor();   // the list is read: the registry is not refreshed while a request of the person is pending
   await page.evaluate(() => window.behind.settings({ ai: { engine: 'harness', harness: 'codex', budget_usd: 0.5, api_base: '', model: '', api_key_env: 'MURO_API_KEY' }, agent: 'codex' }));
   await page.evaluate(() => window.shown());
   await newButton(page).click();
@@ -316,15 +312,15 @@ await test('New project: the form fits a 500px window, the buttons at its foot i
 });
 
 // ---------- delete ----------
-await test('Delete project: asks first, names the file and says it goes too; the project Muro ships has none; the project leaves the list', 'projects', {}, async app => {
+await test('Delete project: asks first, names the file and says it goes too; every project of the list has it; the project leaves the list', 'projects', {}, async app => {
   const { page } = app;
   const odd = '<b>Odd & "quoted"', file = `D:/My Notes/${odd}.mp`;
   await app.flags({ pickPath: file });
   await goProjects(page);
   await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
   await notice(page, `${odd} added to your list.`).waitFor();
-  assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 1, 'one Delete: the project that is not Muro\'s');
-  assert.equal(await page.getByRole('button', { name: 'Delete Marionette…', exact: true }).count(), 0, 'the project Muro ships stays in the list');
+  assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 2, 'a Delete on every project of the list');
+  assert.equal(await page.getByRole('button', { name: 'Delete Sample…', exact: true }).count(), 1);
   assert.equal(await page.getByRole('button', { name: `Remove ${odd} from the list`, exact: true }).count(), 1, 'Remove from list is still there beside it');
   const del = page.getByRole('button', { name: `Delete ${odd}…`, exact: true });
   const dialog = dialogOf(page);
@@ -348,7 +344,14 @@ await test('Delete project: asks first, names the file and says it goes too; the
   assert.equal(asked[0].payload.id, odd.toLowerCase());
   assert.equal(typeof asked[0].payload.revision, 'number');
   assert.deepEqual(Object.keys(asked[0].payload).sort(), ['id', 'revision']);
-  assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Marionette', exact: true }).count(), 1, 'the project Muro ships is what is left');
+  assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Sample', exact: true }).count(), 1, 'the other project is what is left');
+  // No project is kept from deletion: the one that was first in the list goes the same way.
+  await page.getByRole('button', { name: 'Delete Sample…', exact: true }).click();
+  await dialog.getByText('Delete Sample?', { exact: true }).waitFor();
+  await dialog.getByText('D:/Muro/data/projects/sample.mp', { exact: true }).waitFor();
+  await dialog.getByRole('button', { name: 'Delete Sample', exact: true }).click();
+  await notice(page, 'Sample deleted.').waitFor();
+  assert.deepEqual((await callsOf(app, 'delete_project')).map(c => c.payload.id), [odd.toLowerCase(), 'sample']);
   assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 0);
 });
 

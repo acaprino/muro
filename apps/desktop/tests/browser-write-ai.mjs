@@ -32,11 +32,11 @@ const callsOf = async (app, action) => (await app.calls()).filter(c => c.action 
 /** The window has read the registry once: the footer says what it holds. */
 const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
-const openMarionette = async page => {
+const openSample = async page => {
   await ready(page);
   await tab(page, 'Projects').click();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
 };
 const segment = (scope, name) => scope.locator('[data-slot="toggle-group-item"]').filter({ hasText: new RegExp(`^${name}$`) });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });
@@ -49,7 +49,7 @@ const header = page => page.locator('main header').first();
 const notice = (page, text) => page.locator('[data-toasts]').getByText(text, { exact: true });
 const fieldError = (scope, text) => scope.locator('[data-slot="field-error"]').getByText(text, { exact: true });
 const finish = (page, status = 'completed', message = null) => page.evaluate(([s, m]) => window.behind.finish(s, m ?? undefined), [status, message]);
-const digest = page => page.evaluate(() => window.behind.digest('marionette'));
+const digest = page => page.evaluate(() => window.behind.digest('sample'));
 const focused = page => page.evaluate(() => {
   const e = document.activeElement;
   return e ? { tag: e.tagName, text: e.textContent, placeholder: e.getAttribute('placeholder'), inDialog: !!e.closest('[data-slot="dialog-content"], [data-slot="sheet-content"]') } : null;
@@ -68,12 +68,12 @@ const versionShown = (page, version) => header(page).getByText(version, { exact:
 // ---------- Add input ----------
 await test('Add input: an address that is no input and a request that is too long are said in place and nothing is sent; then the run starts on the file the page read, its card shows it, and at its end the project is read again at its new version', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const read = await digest(page);
   await button(page, 'Add input…').click();
   const dlg = dialog(page);
   await dlg.getByRole('heading', { name: 'Add an input' }).waitFor();
-  await dlg.getByText('Marionette: the AI pins the input, reads it and harmonizes it with the others.', { exact: true }).waitFor();
+  await dlg.getByText('Sample: the AI pins the input, reads it and harmonizes it with the others.', { exact: true }).waitFor();
   await until(async () => (await focused(page))?.placeholder === 'https://github.com/owner/repository', 'the focus starts on the input');
   const source = dlg.getByRole('textbox', { name: 'Input', exact: true });
   await button(dlg, 'Add input').click();
@@ -100,7 +100,7 @@ await test('Add input: an address that is no input and a request that is too lon
   await page.screenshot({ path: shots + '/write-add-input.png' });
   await button(dlg, 'Add input').click();
   await dlg.waitFor({ state: 'detached' });
-  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'marionette', digest: read, operation: 'add_input', budget_usd: 2.5, step: 'minor', request: 'Take its layout rules.', source: 'https://github.com/example/x' }]);
+  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'sample', digest: read, operation: 'add_input', budget_usd: 2.5, step: 'minor', request: 'Take its layout rules.', source: 'https://github.com/example/x' }]);
   const title = 'Add the input https://github.com/example/x';
   await card(page).getByRole('heading', { name: title }).waitFor();
   const facts = await card(page).textContent();
@@ -125,7 +125,7 @@ await test('Add input: an address that is no input and a request that is too lon
 // ---------- Harmonize again ----------
 await test('Harmonize again: the request and the step go to the run; while it runs no other change of the project is offered and the buttons and the foot say why; the card stays when the project is left and opened again; at its end the changes come back at the version the step moved to', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const read = await digest(page);
   assert.equal(await button(page, 'Review decisions…').isDisabled(), true);
   assert.equal(await button(page, 'Review decisions…').getAttribute('title'), 'Coming with the review', 'the runtime has no operation that runs the review');
@@ -139,7 +139,7 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   await segment(dlg, 'Minor').click();
   await button(dlg, 'Harmonize').click();
   await dlg.waitFor({ state: 'detached' });
-  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'marionette', digest: read, operation: 'harmonize', budget_usd: 5, step: 'minor', request: 'Merge the two review steps.' }]);
+  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'sample', digest: read, operation: 'harmonize', budget_usd: 5, step: 'minor', request: 'Merge the two review steps.' }]);
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
   const reason = busyWith('Harmonize again');
   for (const name of ['Harmonize again…', 'Add input…', 'Edit details…']) {
@@ -158,7 +158,7 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   await button(page, 'All projects').click();
   await tab(page, 'Sync').click();
   await tab(page, 'Projects').click();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
   await finish(page);
   await versionShown(page, '0.6.0');
@@ -170,7 +170,7 @@ await test('Harmonize again: the request and the step go to the run; while it ru
 // ---------- Cancel ----------
 await test('Cancel during the agent: the run is asked to stop and the card says it is stopping until the runtime ends it, then that it was cancelled or timed out and the file was not changed; the project stays at its version', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await app.flags({ cancelHolds: true });
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
@@ -192,7 +192,7 @@ await test('Cancel during the agent: the run is asked to stop and the card says 
 
 await test('Cancel between the steps of a run: the job was cancelled and the file was not changed', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await app.flags({ cancelHolds: true });
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
@@ -208,7 +208,7 @@ await test('Cancel between the steps of a run: the job was cancelled and the fil
 
 await test('Saving: while the project is built and saved the card offers no Cancel and says why, and the run ends as it would have', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
   await dialog(page).waitFor({ state: 'detached' });
@@ -245,7 +245,7 @@ await test('A run of another project or an adaptation: its card, with Cancel, is
 
 await test('A run another client started: the refusal is shown, and the page reads the runs again, so its card shows and the dialog cannot start another', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await page.evaluate(() => window.behind.adapt('docs-writer', 'opencode'));
   assert.equal(await card(page).count(), 0, 'the page was not told');
   await button(page, 'Harmonize again…').click();
@@ -263,7 +263,7 @@ await test('A run another client started: the refusal is shown, and the page rea
 // ---------- the records wait for a run ----------
 await test('Records: while a run changes the project the panel offers no edit, Add record, Edit and Delete say why, and they come back when the run ends', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
   await dialog(page).waitFor({ state: 'detached' });
@@ -284,7 +284,7 @@ await test('Records: while a run changes the project the panel offers no edit, A
 // ---------- a failed run ----------
 await test('A run that failed is said on the project page with its reason and its log until it is put away; the project is as it was', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await button(page, 'Harmonize again…').click();
   await button(dialog(page), 'Harmonize').click();
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
@@ -297,20 +297,20 @@ await test('A run that failed is said on the project page with its reason and it
   await until(() => button(page, 'Harmonize again…').isEnabled(), 'the changes come back');
   // Leaving the project and coming back still says it, until it is put away.
   await button(page, 'All projects').click();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await card(page).getByText(said, { exact: true }).waitFor();
   await button(card(page), 'Dismiss').click();
   await card(page).waitFor({ state: 'detached' });
   await button(page, 'All projects').click();
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await card(page).count(), 0, 'put away for the session');
 });
 
 // ---------- Move pin and Remove ----------
 await test('Inputs: Move pin checks for updates first and starts from the release it reports; a frozen pin has Move pin off, with the reason; Remove asks with the focus on Cancel, names its input, and goes on the file the first run left', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const read = await digest(page);
   await segment(page, 'Inputs').click();
   const frozen = button(page, 'Move pin of superpowers');
@@ -331,10 +331,10 @@ await test('Inputs: Move pin checks for updates first and starts from the releas
   await button(dlg, 'Check for updates').click();
   await dlg.getByText('v9.9.9 available', { exact: true }).waitFor();
   assert.equal(await to.inputValue(), 'v9.9.9', 'the release the check reports fills the field');
-  assert.deepEqual(await callsOf(app, 'project_updates'), [{ id: 'marionette' }, { id: 'marionette' }]);
+  assert.deepEqual(await callsOf(app, 'project_updates'), [{ id: 'sample' }, { id: 'sample' }]);
   await button(dlg, 'Move pin').click();
   await dlg.waitFor({ state: 'detached' });
-  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'marionette', digest: read, operation: 'move_pin', budget_usd: 5, step: 'patch', request: '', input: 'taste-skill', to: 'v9.9.9' }]);
+  assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'sample', digest: read, operation: 'move_pin', budget_usd: 5, step: 'patch', request: '', input: 'taste-skill', to: 'v9.9.9' }]);
   await finish(page);
   await versionShown(page, '0.5.1');
   assert.match(await row(page, 'taste-skill').textContent(), /v9\.9\.9 · published release/);
@@ -344,7 +344,7 @@ await test('Inputs: Move pin checks for updates first and starts from the releas
   await until(() => remove.isEnabled(), 'Remove comes back');
   await remove.click();
   await dlg.getByRole('heading', { name: 'Remove genoffice' }).waitFor();
-  await dlg.getByText('What only genoffice brought leaves Marionette. The AI harmonizes what remains.', { exact: true }).waitFor();
+  await dlg.getByText('What only genoffice brought leaves Sample. The AI harmonizes what remains.', { exact: true }).waitFor();
   await until(async () => { const f = await focused(page); return f?.text === 'Cancel' && f.inDialog; }, 'the focus starts on Cancel');
   assert.equal(await button(dlg, 'Remove input').getAttribute('data-variant'), 'destructive');
   await button(dlg, 'Cancel').click();
@@ -364,7 +364,7 @@ await test('Inputs: Move pin checks for updates first and starts from the releas
 // ---------- Instructions ----------
 await test('Instructions: nothing changed is said and nothing is sent; a file that is no Markdown is refused in place; only the files that changed are sent, a removed one with no text', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Inputs').click();
   await button(page, 'Instructions…').click();
   const dlg = dialog(page);
@@ -408,7 +408,7 @@ await test('Instructions: nothing changed is said and nothing is sent; a file th
 // ---------- what the runtime refuses ----------
 await test('Codex as the agent: every change says what is needed before the run and cannot start; Escape closes the dialog', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await page.evaluate(() => window.behind.settings({ ai: { engine: 'harness', harness: 'codex', budget_usd: 0.5, api_base: '', model: '', api_key_env: 'MURO_API_KEY' }, agent: 'codex' }));
   await page.evaluate(() => window.shown?.());
   await button(page, 'Harmonize again…').click();
@@ -430,11 +430,11 @@ await test('Codex as the agent: every change says what is needed before the run 
 
 await test('A file changed behind the page: the runtime refuses the change in its words, the dialog stays open with what was typed, and no run starts', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await button(page, 'Harmonize again…').click();
   const dlg = dialog(page);
   await dlg.getByRole('textbox', { name: 'Your request', exact: true }).fill('Keep the <b> & "quoted" names.');
-  await page.evaluate(() => window.behind.touch('marionette'));
+  await page.evaluate(() => window.behind.touch('sample'));
   await button(dlg, 'Harmonize').click();
   await dlg.getByRole('alert').getByText(CHANGED, { exact: true }).waitFor();
   assert.equal(await dlg.getByRole('textbox', { name: 'Your request', exact: true }).inputValue(), 'Keep the <b> & "quoted" names.', 'what was typed is kept, as text');

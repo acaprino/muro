@@ -12,10 +12,10 @@ import { becameParts, pinnedOf, projectData, runsOf, said, tagOf } from '../src/
 // ---------- fixtures ----------
 const ai = (over: Record<string, unknown> = {}) => ({ engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY', ...over });
 const note = (settings: Record<string, unknown>) => noteText(engineOf(settings));
-const meta = (repository: unknown) => ({ schema: 1, name: 'Marionette', slug: 'marionette', version: '0.5.0', author: 'acaprino', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository, builtin: true });
-const REPO = { url: 'https://github.com/acaprino/marionette', branch: 'main', tag_prefix: 'marionette-v' };
+const meta = (repository: unknown) => ({ schema: 1, name: 'Sample', slug: 'sample', version: '0.5.0', author: 'acaprino', created: '2026-11-10T09:00:00Z', changed: '2026-11-18T12:00:00Z', repository, builtin: true });
+const REPO = { url: 'https://github.com/owner/sample', branch: 'main', tag_prefix: 'sample-v' };
 const info = (over: Record<string, unknown> = {}): ProjectInfo => ({
-  project: meta(REPO), plugin: { name: 'Marionette', slug: 'marionette', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: [], records: [], history: [], changelog: '', prompts: [],
+  project: meta(REPO), plugin: { name: 'Sample', slug: 'sample', version: '0.5.0', description: 'One plugin' }, inputs: [], decisions: [], records: [], history: [], changelog: '', prompts: [],
   graph: { entries: [], capabilities: [], examples: [] }, files: [], digest: 'sha256:a', ...over,
 } as unknown as ProjectInfo);
 const data = (over: Record<string, unknown> = {}) => projectData(info(over));
@@ -66,7 +66,7 @@ test('the runs are newest first, and current is the newest completed run of the 
 });
 
 test('the tag of a run comes from the repository\'s tag prefix, and a project with no repository has none', () => {
-  assert.equal(tagOf(info(), '0.5.0'), 'marionette-v0.5.0');
+  assert.equal(tagOf(info(), '0.5.0'), 'sample-v0.5.0');
   assert.equal(tagOf(info({ project: meta({ url: 'https://example.com/x', branch: 'main', tag_prefix: 'v' }) }), '0.5.0'), 'v0.5.0');
   assert.equal(tagOf(info({ project: meta(null) }), '0.5.0'), '');
   assert.equal(tagOf(info(), ''), '', 'a run with no version has no tag');
@@ -100,7 +100,7 @@ test('a listed project says its inputs and its capabilities, one in the singular
 });
 
 test('the details of an open project: its repository and branch, who made it and when; with no repository, that it has none', () => {
-  assert.equal(aboutLine(info()), 'Repository github.com/acaprino/marionette · main · by acaprino · created 2026-11-10');
+  assert.equal(aboutLine(info()), 'Repository github.com/owner/sample · main · by acaprino · created 2026-11-10');
   assert.equal(aboutLine(info({ project: meta(null) })), 'No Git repository set · by acaprino · created 2026-11-10');
   assert.equal(aboutLine(info({ project: { ...meta({ url: { at: 'x' }, branch: 3 }), author: null, created: '' } })), 'No Git repository set', 'a field in another shape is left out');
 });

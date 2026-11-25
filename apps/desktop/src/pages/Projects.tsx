@@ -95,8 +95,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
     finally { setOpening(false); }
   }
 
-  /** The entry goes, never the file. A save the service refuses because the registry moved behind the page's back is sent once more with the revision read again; the
-   * project Muro ships is refused by the service, whatever the page shows. */
+  /** The entry goes, never the file. A save the service refuses because the registry moved behind the page's back is sent once more with the revision read again. */
   async function remove(p: ProjectSummary): Promise<void> {
     setRemoving(true);
     try {
@@ -184,9 +183,8 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   );
 }
 
-/** One project file of the list: its name (which opens it), its version, whether Muro ships it, its file and what it holds; or, for a file that cannot be read, why.
- * "Remove from list" and "Delete…" are on every project but the one Muro ships (`included`, which the runtime says: never a field of the file, which anyone can write).
- * "Delete…" is off while an AI run is changing the project (`deleteReason` says why). */
+/** One project file of the list: its name (which opens it), its version, its file and what it holds; or, for a file that cannot be read, why.
+ * "Remove from list" and "Delete…" are on every project. "Delete…" is off while an AI run is changing the project (`deleteReason` says why). */
 function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: ProjectSummary; deleteReason: string | null; onOpen: () => void; onRemove: () => void; onDelete: () => void }) {
   const name = nameOf(p), counts = countsOf(p);
   return (
@@ -198,7 +196,6 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
               ? <Text variant="strong" pre title={p.path}>{fileOf(p.path)}</Text>
               : <Button variant="link" size="xs" title={name} onClick={onOpen}>{name}</Button>}
             {!p.error && p.plugin?.version ? <Text variant="note">{p.plugin.version}</Text> : null}
-            {p.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
             {p.error ? <Badge tone="danger">Cannot be read</Badge> : null}
           </Cluster>
           <Text variant="note" pre title={p.path}>{p.path}</Text>
@@ -206,14 +203,12 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
         </Column>
       </TableCell>
       <TableCell align="end">
-        {p.included ? null : (
-          <Cluster justify="end">
-            <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>
-            <span title={deleteReason ?? undefined}>
-              <Button variant="outline" size="sm" aria-label={`Delete ${name}…`} disabled={deleteReason !== null} onClick={onDelete}>Delete…</Button>
-            </span>
-          </Cluster>
-        )}
+        <Cluster justify="end">
+          <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>
+          <span title={deleteReason ?? undefined}>
+            <Button variant="outline" size="sm" aria-label={`Delete ${name}…`} disabled={deleteReason !== null} onClick={onDelete}>Delete…</Button>
+          </span>
+        </Cluster>
       </TableCell>
     </TableRow>
   );
