@@ -32,9 +32,9 @@ Anyone installs the plugin from the repository's address, for example
 
 ## The caller
 
-Copy this as `.github/workflows/release.yml`. Put your branch in `branches`, and in place of `<ref>` a Muro tag
-(`muro-v<version>`) or a full commit that holds the workflow. That ref is the Muro that runs: the factory is
-checked out at the commit of the workflow you call.
+Copy this as `.github/workflows/release.yml`, or let `muro project release --init` write it. Put your branch in
+`branches`, and in place of `<ref>` a Muro tag (`muro-v<version>`) or a full commit that holds the workflow. That
+ref is the Muro that runs: the factory is checked out at the commit of the workflow you call.
 
 ```yaml
 name: Release
@@ -60,6 +60,28 @@ Inputs, all optional, under `with:`:
 | `project` | the only `.mp` at the root | The file's name, when the root holds several |
 | `tests` | `tests` | The folder of the repository's own tests; skipped when it is absent |
 | `muro_ref` | none | The commit or tag of Muro to run, only if a run fails with "The runner did not say which commit of Muro this workflow is from" |
+
+## Releasing from your computer
+
+`muro project release <slug>.mp` puts the file into the repository its `project.json` names, with your own Git:
+
+```sh
+muro project edit <slug>.mp --expect-digest <sha256> --repository https://github.com/<owner>/<repository> --tag-prefix <slug>-v
+muro project release <slug>.mp --init
+```
+
+It checks the file as the workflow will (`muro project verify`, the version, the tag, the built plugin), fetches the tip
+of the branch, and commits the file as `<slug>.mp` on top of it with the message `<name> <version>`. Then it pushes,
+and the push is the release. `--init` adds the caller above for the project's branch, pinned to the tag of the Muro
+that runs the command (`muro-v<version>`), when the repository has no workflow that calls the store workflow; without
+it the command warns that nothing will build the store. `--dry-run` pushes nothing and says what it would push.
+
+The same file pushed twice does nothing. Another file under a version whose tag exists is refused before it leaves,
+with the sentence of the table below. A branch that moved is reported as Git says it, and nothing is forced. The
+command is in [the command reference](cli.md#muro-project-release-filemp---expect-digest-sha256---init---dry-run---cache-dir).
+
+Muro handles no token: the push uses the credentials your Git already has. A credential that adds a file under
+`.github/workflows/` may need the right to change workflows (on GitHub, the `workflow` scope of a token).
 
 ## What a push does
 
@@ -125,8 +147,9 @@ Only `pytest` is installed for them.
 
 ## Not done yet
 
-- Releasing from Muro. There is no command and no action of the app that puts a project's file into its
-  repository or takes a newer one from it. Until then the file is committed and pushed with Git by hand.
+- Releasing from the app. `muro project release` puts a project's file into its repository; no action of the app
+  runs it yet, and neither a command nor an action takes a newer file from the repository.
+- `muro project release` has not pushed to a repository on GitHub. See "Not run" in the ADR.
 - Moving an existing repository to this model.
 - `AGENTS.md` still describes a package as an unpacked directory in its own repository.
 - Git LFS. The file is committed as it is. GitHub refuses a file over 100 MB, and the run reads the file of a

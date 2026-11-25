@@ -5,7 +5,7 @@ title: A project's repository is a plugin store built from its project file
 status: Proposed
 author: Claude Code
 scope:
-  paths: [.github/workflows/project-store.yml, .github/scripts/project_store.py, docs/project-store.md, tests/test_project_store.py]
+  paths: [.github/workflows/project-store.yml, .github/scripts/project_store.py, muro/project_store.py, muro/project_release.py, docs/project-store.md, tests/test_project_store.py, tests/test_project_release.py]
   modules: []
   domains: [projects, release, repositories]
 governs_symbols: []
@@ -77,13 +77,46 @@ and runs the repository's own tests on the unpacked file (`MURO_ROOT`,
 `MURO_PROJECT`). `publish` has `contents: write`, needs `gate`, and runs neither the
 build nor the tests. It checks that the file still has the SHA-256 the gate read.
 
-**The decisions are one script.** `.github/scripts/project_store.py` holds what
-reads a value of the file or decides: the file at the root, the repository a project
-names, the identity and the tag, the refusals, the action for a tag, the top entry of
-the changelog and the notes. The shell steps only run commands. Reading and checking
-a project file stays the factory's: the script takes the identity from
-`muro.project.summary`, and the workflow runs `muro project verify`, `muro project
-unpack` and `muro marketplace`. No factory command was added.
+**The decisions are Python, and each rule lives once.** The shell steps only run
+commands. The rules a project file is held to are in the factory,
+`muro/project_store.py`: the repository a project names, the identity and the tag,
+the refusals, the folder a release replaces, the action for a tag, and the text of
+the caller. `.github/scripts/project_store.py` is the workflow's side and imports
+them: the file at the root, the top entry of the changelog, the notes and the step's
+outputs. The workflow runs it with the Muro checkout on `PYTHONPATH`, so the script
+and the rules are of one commit. Reading and checking a project file stays the
+factory's: the script takes the identity from `muro.project.summary`, and the
+workflow runs `muro project verify`, `muro project unpack` and `muro marketplace`.
+
+**Releasing from a computer** (amendment of 2026-11-25, on the owner's "muro deve
+rilasciare e aggiornare mp"). `muro project release FILE.mp` (`muro/project_release.py`)
+puts a project's file into the repository its `project.json` names, with the
+person's own Git: Muro handles no token and forces nothing. It holds the file to the
+same rules before it leaves (`identity_refusals`, `release_problem`,
+`folder_problem`, `tag_action`), after `muro project verify`'s check. The choices:
+
+- It reads a copy of the file, so the bytes it checks are the bytes it commits.
+- The tip of the branch is fetched one commit deep, with no checkout: a store's tree
+  is not written to the disk, only `<slug>/sources.json` for the folder rule. The
+  file enters the commit byte for byte (`git hash-object --no-filters`), on top of
+  the tip, with the message `<name> <version>`.
+- Only Git is asked, never GitHub: the tip that already holds this very file is
+  nothing to do; a version whose tag exists, with another file on the branch, is
+  refused with the workflow's sentence. The file of the tagged commit and of the
+  GitHub release are not read, so a file that was released and later replaced on
+  the branch is refused too, with that sentence.
+- The address is `https://`, or `file:///` for a folder of this computer (never
+  another host, which Windows would sign in to), and the branch a plain name,
+  because both come from a file and become arguments of Git. A user name or a
+  password in the address is never printed.
+- A repository with no branch is allowed and gets its first commit; one that has
+  branches but not the project's is refused.
+- `--init` writes the caller, pinned to `muro-v<version>` of the Muro that runs,
+  when no workflow of the repository contains `project-store.yml`. It never
+  replaces a file. Muro's own repository and tag prefix are constants of
+  `muro/project_store.py`; a test holds the page's caller, the workflow's fallback
+  and `.github/release.json` to them.
+- A push that Git refuses (a branch that moved) is reported with Git's text.
 
 **The rules**, each a red failure with one sentence:
 
@@ -157,9 +190,9 @@ run that waits is replaced by a newer one that waits: the newest file wins.
 
 ## Not in this record
 
-- The command and the action of the app that put a project's file into its
-  repository, and the ones that take a newer file from it. Until they exist, the
-  file is pushed with Git by hand.
+- The action of the app that puts a project's file into its repository. The command
+  exists (`muro project release`); nothing in the app runs it yet.
+- The command and the action that take a newer file from a repository.
 - Moving any existing repository to this model.
 - `AGENTS.md`. It still describes a package as a directory in its own repository,
   released by a workflow of its own. It was left as it is, to be changed with the
@@ -177,7 +210,25 @@ run that waits is replaced by a newer one that waits: the newest file wins.
 - Run on the developer machine, 2026-11-25: `python -m pytest -q
   tests/test_project_store.py -p no:cacheprovider`, 82 passed. They prove the
   functions of the script on small project files packed by the factory, and what the
-  workflow's text promises. The workflow file was parsed as YAML once.
+  workflow's text promises. The workflow file was parsed as YAML once. Run again
+  after the rules moved to `muro/project_store.py`: 82 passed.
+- `muro project release`, run on the developer machine (Windows, Git 2.55),
+  2026-11-25: `python -m pytest -q tests/test_project_release.py -p
+  no:cacheprovider`, 47 passed. Every remote is a bare repository on the disk, named
+  by a `file://` address, and the person's Git is a configuration of the test's own.
+  They prove what the command reads, decides, commits and pushes, and what it refuses.
+- `muro project release` has never pushed to GitHub. Proven only there: the person's
+  credential helper and a credential that is missing (Git does not prompt in the
+  terminal; a helper's own window is not Muro's to close, and the time limit ends
+  it); a push that adds `.github/workflows/release.yml`, which a token without the
+  right to change workflows is refused; that the push of the file and its caller in
+  one commit starts the caller; a protected branch; and the shallow fetch of a real
+  store with its file of tens of megabytes.
+- The caller that `--init` writes names `muro-v<version>` of the Muro that runs. A
+  released Muro names its own tag. A checkout between two releases names the last
+  one, which may not hold the workflow: `muro-v0.9.1` does not (`git cat-file -e
+  muro-v0.9.1:.github/workflows/project-store.yml` fails), so the first Muro whose
+  `--init` writes a caller that works is the release that carries this workflow.
 - Run once by hand on the developer machine, on the fixture project with a release
   built by the factory, in a Git repository with a local bare remote. The shell of
   these steps was taken from the workflow file and run with Bash: "Which Muro" (with

@@ -18,12 +18,16 @@ _MIT_BODY_SHA = "fe2a9817987f862eaced948f0468c7f51d2fedfc48c5c505b246a49a3870e9a
 _APACHE_SHA = "0ffddef9e48f8a09aed5caf2d44f7ba1c1be2d9b8e0a6f693b1635b2d5566645"
 
 
-def _git(path: Path, *args: str) -> bytes:
+def _git(path: Path, *args: str, timeout: float = 45) -> bytes:
+    """Run Git in `path` with an argv list and no prompt: a missing credential fails, it does not wait.
+
+    `timeout` is for the steps that move a whole file over the network (a project's release); the rest keep 45 s.
+    """
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
     try:
         result = subprocess.run(["git", "-C", str(path), *args], capture_output=True,
-                                env=env, timeout=45, check=False)
+                                env=env, timeout=timeout, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ValueError(f"Git unavailable or timed out: {exc}") from exc
     if result.returncode:

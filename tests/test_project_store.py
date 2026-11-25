@@ -1,9 +1,10 @@
 """A project's repository is a plugin store built from its `.mp` file (ADR-0034, docs/project-store.md).
 
 The reusable workflow `.github/workflows/project-store.yml` runs only on GitHub, so these tests prove two things
-and no more: the functions of `.github/scripts/project_store.py` that read and decide, on small project files
-packed by the factory, and what the workflow's text promises (how it is called, what its token may do, which
-Muro it runs). Nothing here proves a run.
+and no more: the functions that read and decide, on small project files packed by the factory, and what the
+workflow's text promises (how it is called, what its token may do, which Muro it runs). The rules are the
+factory's (`muro/project_store.py`) and are reached here through `.github/scripts/project_store.py`, as the
+workflow reaches them. Nothing here proves a run.
 """
 import importlib.util
 import json
