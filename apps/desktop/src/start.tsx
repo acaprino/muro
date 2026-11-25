@@ -1,7 +1,8 @@
 // The window's one entry, for the program (main.tsx) and the tests (tests/harness.html) alike: Muro in Imago's shell, on a transport.
 // The shell has no StrictMode, which would run the mount effects twice under the dev server: the browser tests count the requests the page makes.
 import { defineApp, startApp } from '@acaprino/imago';
-import './styles.css';
+import '@acaprino/sigrid/styles.css';
+import '@acaprino/sigrid/graph.css';
 import type { Transport } from './types.ts';
 import { RegistryProvider } from './state/registry.tsx';
 import { App } from './App.tsx';

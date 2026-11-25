@@ -6,8 +6,8 @@ The desktop UI is React on `@acaprino/sigrid` (owner decision of 2026-11-23,
 ADR-0031). Every component, layout, style and UI behaviour comes from Sigrid,
 the graph canvas included. Muro owns only domain data, operations and screen
 composition; it keeps no design system of its own: no components that restyle
-or repeat Sigrid's, no CSS rules beyond the Tailwind entry, no literal colours
-or sizes. What Sigrid lacks is asked of Sigrid. Keep the shell body stable
+or repeat Sigrid's, no class, no stylesheet, no literal colours or sizes. What
+Sigrid lacks is asked of Sigrid. Keep the shell body stable
 across renders while a modal is open.
 
 Every app of the suite (Daodan, Xiox, Shinatama, Mukade, Muro and the others on
@@ -55,9 +55,8 @@ never build a control of your own (the suite's rule above). Report conflicts and
 Run `npx --no sigrid-check apps/desktop/src` and `npx --no imago-check` before you
 say UI work is done: they read files and build nothing. They need the packages
 installed; the Tests workflow runs both, and both gate. Where they were not run, say
-so. The rule `own-class` of `sigrid-check` is not on yet: the screens still lay out with
-Tailwind classes (`styles.css` is the Tailwind entry), and a class that is written
-again is replaced by Sigrid's `Column`, `Cluster`, `Split`, `Cell` and `Text`. The
+so. The rule `own-class` of `sigrid-check` is on
+(`sigrid-check.config.json`): no class, no style and no stylesheet. The
 artifact `muro-shots` of Tests holds every screen in both schemes, wide and narrow: look
 at it after a change of a screen.
 

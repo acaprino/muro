@@ -182,7 +182,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   return (
     <Column fill gap="xs">
       <header>
-        <Column pad="sm" gap="xs">
+        <Column pad="md" gap="xs">
           <Cluster>
             <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>
             <Heading size="small" level={1}><Text pre>{name}</Text></Heading>
@@ -202,21 +202,19 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
       </header>
       <Separator decorative />
       <JobCard projectId={view.id} inset />
-      <Cell grow>
-        {narrow ? (
-          <>
-            <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>
-              <SheetContent side="left">
-                <SheetHeader><SheetTitle>Project panel</SheetTitle></SheetHeader>
-                {panel}
-              </SheetContent>
-            </Sheet>
-            {pane}
-          </>
-        ) : <ContentSplit aside={panel} asideLabel="Project panel" step={0}>{pane}</ContentSplit>}
-      </Cell>
+      {narrow ? (
+        <>
+          <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>
+            <SheetContent side="left">
+              <SheetHeader><SheetTitle>Project panel</SheetTitle></SheetHeader>
+              {panel}
+            </SheetContent>
+          </Sheet>
+          {pane}
+        </>
+      ) : <Cell grow><ContentSplit aside={panel} asideLabel="Project panel" step={0}>{pane}</ContentSplit></Cell>}
       <Separator decorative />
-      <Cluster pad="sm" justify="end">
+      <Cluster pad="md" justify="end">
         <Text variant="note" role="status">{busy ?? ''}</Text>
         <Spacer />
         <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>

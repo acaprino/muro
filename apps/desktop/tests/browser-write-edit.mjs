@@ -144,7 +144,8 @@ await test('Edit details: a file that changed after the page read it is refused 
   await save(dialog).click();
   const refusal = dialog.getByRole('alert').filter({ hasText: CHANGED });
   await refusal.waitFor();
-  assert.equal((await refusal.textContent()).trim(), `Not saved. ${CHANGED}`, 'the runtime\'s sentence, whole');
+  assert.equal(await refusal.locator('[data-slot="note-description"]').textContent(), CHANGED, 'the runtime\'s sentence, whole');
+  assert.match(await refusal.locator('[data-slot="note-title"]').textContent(), /Not saved/);
   assert.deepEqual(await editsOf(app), [{ id: 'marionette', digest: read, name: 'Marionette Plus' }], 'the edit named the file the page had read');
   assert.equal(await digest(page), touched, 'the file was not written');
   assert.equal(await dialog.isVisible(), true, 'the window stays so what was typed is not lost');
@@ -270,7 +271,7 @@ await test('Records: what is missing is said before anything is sent, and a file
   await save(dialog).click();
   const refusal = dialog.getByRole('alert').filter({ hasText: CHANGED });
   await refusal.waitFor();
-  assert.equal((await refusal.textContent()).trim(), `Not saved. ${CHANGED}`);
+  assert.equal(await refusal.locator('[data-slot="note-description"]').textContent(), CHANGED);
   const edits = await editsOf(app);
   assert.equal(edits.length, 1);
   assert.equal(edits[0].digest, read, 'the edit named the file the page had read');

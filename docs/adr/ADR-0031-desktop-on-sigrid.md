@@ -244,5 +244,6 @@ since this date: `@acaprino/imago` 1.0.1 and the crate `imago-shell` 1.0.1 as a 
 amendment (the npm package only for its window glue) and decision 6 (the design check does not gate, no `imago-check`) no
 longer hold: `window.ts`, `theme.ts`, `sigridTheme.ts`, `mount.tsx`, `ErrorBoundary.tsx`, `state/notices.tsx` and Muro's
 own frame are gone, and `sigrid-check` and `imago-check` both gate. The theme has one default, dark, in every app of the
-suite; a choice kept under `muro.theme` stays. The rule `own-class` is not on: the screens still carry Tailwind classes.
+suite; a choice kept under `muro.theme` stays. The rule `own-class` is on since the same
+day: the screens are laid out with Sigrid's parts, and Tailwind is gone (`@acaprino/sigrid/styles.css` is the one stylesheet).
 The browser tests run in a pretended window of Tauri; the real window is the crate's own proof and the owner's eye.

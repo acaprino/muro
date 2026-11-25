@@ -17,13 +17,10 @@ async function files(directory: string): Promise<string[]> {
 const code = async () => (await files(source)).filter(path => /\.tsx?$/.test(path));
 const name = (path: string) => relative(source, path).replace(/\\/g, '/');
 
-test('desktop appearance is imported from Sigrid, with no application stylesheet rules (ADR-0031)', async () => {
-  const styles = (await files(source)).filter(path => path.endsWith('.css'));
-  assert.equal(styles.length, 1);
-  const css = await readFile(styles[0], 'utf8');
-  assert.match(css, /@import "@acaprino\/sigrid\/theme\.css";/);
-  assert.doesNotMatch(css, /[{}]/, 'the entry imports and declares sources: it holds no rule of its own');
-  assert.doesNotMatch(css, /fonts\.css/, 'the font is the system\'s');
+test('desktop appearance is Sigrid\'s: no stylesheet and no class of the application (ADR-0031)', async () => {
+  assert.deepEqual((await files(source)).filter(path => path.endsWith('.css')), []);
+  for (const path of await code()) assert.doesNotMatch(await readFile(path, 'utf8'), /\b\w*[cC]lassName\b|classList/, name(path));
+  assert.match(await readFile(join(source, 'start.tsx'), 'utf8'), /import '@acaprino\/sigrid\/styles\.css';/);
 });
 
 test('the application has no private SVG renderer, inline style or HTML string, in a .ts or a .tsx file', async () => {

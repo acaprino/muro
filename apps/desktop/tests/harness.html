@@ -2,7 +2,7 @@
 // The window on the fake transport (fake-transport.js). ?scenario=<name> picks the data; window.calls lists every request
 // and window.flags holds the knobs a test turns (blockPlan, rejectSave, rejectSettings, autostartUnsupported...);
 // window.behind changes the registry the way the background worker does, without telling the page.
-// The stylesheet comes with the window (start.tsx imports it), as in the program; the window around it is browser-helper.mjs's.
+// The stylesheet is Sigrid's and comes with the window (start.tsx imports it), as in the program; the window around it is browser-helper.mjs's.
 import {start} from '/src/start.tsx';
 import {createTransport} from './fake-transport.js';
 const {request,calls,flags,behind}=createTransport(new URLSearchParams(location.search).get('scenario')||'default');
