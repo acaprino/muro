@@ -5,7 +5,7 @@
 // The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); "Sync N changes" under a harness opens the review
 // sheet on the plan of that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
 import * as React from 'react';
-import { Badge, Button, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Column, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
 import { cellState, harnessState, stamp, versionOf, type CellStatus } from '../../model.ts';
 import { plural } from '../../words.ts';
@@ -50,17 +50,11 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
   }
 
   return (
-    <Table id="sync-table" aria-label="Your plugins on your harnesses" containerClassName="rounded-md border border-line">
+    <Table id="sync-table" aria-label="Your plugins on your harnesses">
       <TableHeader>
         <TableRow>
-          <TableHead className="py-2 align-top">
-            <span className="block">Plugin</span>
-            <span className="block font-normal">{plural(plugins.length, 'plugin')} in your list</span>
-          </TableHead>
-          <TableHead className="py-2 align-top">
-            <span className="block">Latest version</span>
-            <span className="block font-normal">Checked {stamp(snapshot.sync.last_check)}</span>
-          </TableHead>
+          <TableHead><TwoLines first="Plugin" second={`${plural(plugins.length, 'plugin')} in your list`} /></TableHead>
+          <TableHead><TwoLines first="Latest version" second={`Checked ${stamp(snapshot.sync.last_check)}`} /></TableHead>
           {targets.map(t => (
             <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} asking={asking === t.id} onOpen={onOpenHarness} onReview={id => void reviewHarness(id)} />
           ))}
@@ -74,6 +68,9 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
     </Table>
   );
 }
+
+/** A heading of two lines: what the column holds, and a fact about it. */
+const TwoLines = ({ first, second }: { first: string; second: string }) => <Column gap="xs"><Text>{first}</Text><Text variant="caption">{second}</Text></Column>;
 
 interface HarnessHeadProps {
   target: Target;
@@ -105,21 +102,19 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
       line = <Badge tone="warning">{state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read'}</Badge>;
       break;
     case 'unseen':
-      line = <span className="text-ink">Check to see the changes</span>;
+      line = <Text variant="strong">Check to see the changes</Text>;
       break;
     default:
       line = <Badge tone="success">In sync</Badge>;
   }
   return (
-    <TableHead className="py-2 align-top">
-      <div className="flex flex-col items-start gap-1 font-normal">
-        <Button variant="ghost" size="sm" className="max-w-48" title={target.name} onClick={event => onOpen(target.id, event.currentTarget)}>
-          <span className="min-w-0 truncate">{target.name}</span>
-        </Button>
+    <TableHead>
+      <Column gap="xs" align="start">
+        <Button variant="ghost" size="sm" title={target.name} onClick={event => onOpen(target.id, event.currentTarget)}>{target.name}</Button>
         {line}
         {builds ? <Badge tone="warning">{needBuild(builds)}</Badge> : null}
-        <span title={`Last sync ${stamp(times?.synced ?? null)}`}>Checked {stamp(times?.checked ?? null)}</span>
-      </div>
+        <Text variant="caption" title={`Last sync ${stamp(times?.synced ?? null)}`}>Checked {stamp(times?.checked ?? null)}</Text>
+      </Column>
     </TableHead>
   );
 }
@@ -139,28 +134,29 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
   const v = versionOf(plugin);
   return (
     <TableRow>
-      <TableCell className="w-full min-w-40 max-w-0">
-        <div className="flex min-w-0 flex-col items-start">
+      <TableCell>
+        <Column gap="xs" align="start">
           <Button
             variant="link"
-            className="h-auto max-w-full justify-start px-0"
+            size="xs"
             data-row-button=""
+            title={plugin.name}
             tabIndex={tabStop ? 0 : -1}
             onFocus={() => onFocusRow(plugin.id)}
             onClick={event => onOpen(plugin.id, event.currentTarget)}
           >
-            <span className="truncate" title={plugin.name}>{plugin.name}</span>
+            {plugin.name}
           </Button>
-          <span className="max-w-full truncate text-xs text-ink-mute" title={plugin.source}>{plugin.source}</span>
-        </div>
+          <Text variant="note" pre title={plugin.source}>{plugin.source}</Text>
+        </Column>
       </TableCell>
-      <TableCell className="whitespace-nowrap">
-        <div className="flex flex-col">
-          <span className="font-medium text-ink">{v.version || 'Not checked'}</span>
-          <span className="text-xs text-ink-mute">{POLICY[plugin.policy] ?? ''}{v.commit ? ` · ${v.commit}` : ''}</span>
-        </div>
+      <TableCell>
+        <Column gap="xs">
+          <Text variant="strong">{v.version || 'Not checked'}</Text>
+          <Text variant="note">{POLICY[plugin.policy] ?? ''}{v.commit ? ` · ${v.commit}` : ''}</Text>
+        </Column>
       </TableCell>
-      {targets.map(t => <TableCell key={t.id} className="whitespace-nowrap"><Cell state={cellState(plugin, t, snapshot, plan)} /></TableCell>)}
+      {targets.map(t => <TableCell key={t.id}><Cell state={cellState(plugin, t, snapshot, plan)} /></TableCell>)}
     </TableRow>
   );
 }
@@ -168,15 +164,15 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
 /** One plugin on one harness: the installed version, or the change a sync would make there, or why it cannot say. */
 function Cell({ state }: { state: CellStatus }) {
   switch (state.kind) {
-    case 'ok': return <span className="inline-flex items-center gap-1 text-ink tabular-nums"><span className="flex text-success"><Icon name="check" /></span>{state.to}</span>;
+    case 'ok': return <Cluster gap="xs" wrap={false}><Icon name="check" /><Text variant="strong">{state.to}</Text></Cluster>;
     case 'update': return <Badge tone="info">Update {state.from} → {state.to}</Badge>;
     case 'install': return <Badge tone="info">Install {state.to}</Badge>;
     case 'reinstall': return <Badge tone="info">Reinstall {state.to}</Badge>;
     case 'activate': return <Badge tone="info">Activate {state.to}</Badge>;
     case 'remove': return <Badge tone="danger">Remove {state.from}</Badge>;
     case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
-    case 'unknown': return <span className="text-ink-mute">Unknown</span>;
-    case 'paused': return <span className="text-ink-mute">Paused</span>;
-    default: return <><span aria-hidden="true" className="text-ink-mute">—</span><span className="sr-only">Not installed here</span></>;
+    case 'unknown': return <Text variant="muted">Unknown</Text>;
+    case 'paused': return <Text variant="muted">Paused</Text>;
+    default: return <Text variant="muted" role="img" aria-label="Not installed here">—</Text>;
   }
 }

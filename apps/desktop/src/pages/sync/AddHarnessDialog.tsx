@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Icon, RadioGroup, RadioGroupItem } from '@acaprino/sigrid/primitives';
+import { Button, Cluster, Column, Heading, Icon, RadioGroup, RadioGroupItem, Split, Text } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Discovered, Target } from '../../types.ts';
 import { useNotify } from '@acaprino/imago';
@@ -35,6 +35,19 @@ interface Session { open: boolean; pick: string; values: HarnessValues; tried: b
 const fresh = (open: boolean): Session => ({ open, pick: '', values: BLANK, tried: false, error: null });
 interface Search { busy: boolean; found: Discovered[] | null; error: string | null }
 const LOOKING: Search = { busy: true, found: null, error: null };
+
+/** A harness to choose, with a line about it. */
+function Choice({ id, value, label, disabled = false, children }: { id: string; value: string; label: string; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <Cluster gap="md" align="start" wrap={false} title={disabled ? 'Plugin installation is not supported by this harness' : undefined}>
+      <RadioGroupItem id={id} value={value} disabled={disabled} aria-describedby={`${id}-about`} />
+      <Column gap="xs">
+        <label htmlFor={id}><Text variant="strong">{label}</Text></label>
+        <Text variant="note" pre id={`${id}-about`}>{children}</Text>
+      </Column>
+    </Cluster>
+  );
+}
 
 export function AddHarnessDialog({ open, onOpenChange }: AddHarnessDialogProps) {
   const { snapshot, request } = useRegistry();
@@ -115,43 +128,30 @@ export function AddHarnessDialog({ open, onOpenChange }: AddHarnessDialogProps) 
         </>
       )}
     >
-      <form id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h3 className="min-w-0 flex-1 text-sm font-semibold text-ink">Found on this computer</h3>
-            <Button variant="outline" size="sm" loading={search.busy} loadingText="Looking…" onClick={() => void look()}><Icon name="refresh" />Search again</Button>
-          </div>
-          {search.error ? <RefusalLine>{`Harness detection failed: ${search.error}`}</RefusalLine> : null}
-          {search.busy && !offered.length ? <p role="status" className="text-xs text-ink-mute">Looking for harnesses…</p> : null}
-          {!search.busy && !search.error && !offered.length ? <p role="status" className="text-xs text-ink-mute">No other harness found on this computer</p> : null}
-          <RadioGroup aria-label="Harness to add" value={session.pick} onValueChange={choose}>
-            {offered.map((d, i) => {
-              const id = `${formId}-found-${i}`;
-              return (
-                <div key={keyOf(d)} className="flex min-w-0 items-start gap-3" title={d.supported ? undefined : 'Plugin installation is not supported by this harness'}>
-                  <RadioGroupItem id={id} value={keyOf(d)} disabled={!d.supported} aria-describedby={`${id}-about`} />
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <label htmlFor={id} className="text-sm font-medium text-ink">{d.name}</label>
-                    <span id={`${id}-about`} className="min-w-0 text-xs break-all text-ink-mute">
-                      {d.supported ? null : 'No plugin support yet. '}
-                      <span className="font-mono">{[d.version, d.config_root ?? 'no configuration folder found', d.executable].filter(Boolean).join(' · ')}</span>
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-            <div className="flex min-w-0 items-start gap-3">
-              <RadioGroupItem id={`${formId}-hand`} value="hand" aria-describedby={`${formId}-hand-about`} />
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <label htmlFor={`${formId}-hand`} className="text-sm font-medium text-ink">Another harness, by hand</label>
-                <span id={`${formId}-hand-about`} className="text-xs text-ink-mute">For one Muro did not find, or one installed somewhere else.</span>
-              </div>
-            </div>
-          </RadioGroup>
-        </div>
-        <p className="text-xs text-ink-mute">{chosen?.config_root ? 'Muro filled in the folder where this harness keeps its plugin configuration by default. Change it for a custom installation.' : 'Tell Muro where this harness keeps its plugin configuration.'}</p>
-        <HarnessFields values={session.values} problems={shown} refs={refs} onChange={values => setHeld(now => ({ ...now, values: { ...now.values, ...values } }))} />
-        {session.error ? <NotSaved text={session.error} /> : null}
+      <form id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }}>
+        <Column gap="lg">
+          <Column gap="md">
+            <Split>
+              <Heading size="small">Found on this computer</Heading>
+              <Button variant="outline" size="sm" loading={search.busy} loadingText="Looking…" onClick={() => void look()}><Icon name="refresh" />Search again</Button>
+            </Split>
+            {search.error ? <RefusalLine>{`Harness detection failed: ${search.error}`}</RefusalLine> : null}
+            {search.busy && !offered.length ? <Text as="p" variant="note" role="status">Looking for harnesses…</Text> : null}
+            {!search.busy && !search.error && !offered.length ? <Text as="p" variant="note" role="status">No other harness found on this computer</Text> : null}
+            <RadioGroup aria-label="Harness to add" value={session.pick} onValueChange={choose}>
+              {offered.map((d, i) => (
+                <Choice key={keyOf(d)} id={`${formId}-found-${i}`} value={keyOf(d)} label={d.name} disabled={!d.supported}>
+                  {d.supported ? null : 'No plugin support yet. '}
+                  <code>{[d.version, d.config_root ?? 'no configuration folder found', d.executable].filter(Boolean).join(' · ')}</code>
+                </Choice>
+              ))}
+              <Choice id={`${formId}-hand`} value="hand" label="Another harness, by hand">For one Muro did not find, or one installed somewhere else.</Choice>
+            </RadioGroup>
+          </Column>
+          <Text as="p" variant="note">{chosen?.config_root ? 'Muro filled in the folder where this harness keeps its plugin configuration by default. Change it for a custom installation.' : 'Tell Muro where this harness keeps its plugin configuration.'}</Text>
+          <HarnessFields values={session.values} problems={shown} refs={refs} onChange={values => setHeld(now => ({ ...now, values: { ...now.values, ...values } }))} />
+          {session.error ? <NotSaved text={session.error} /> : null}
+        </Column>
       </form>
     </Dialog>
   );

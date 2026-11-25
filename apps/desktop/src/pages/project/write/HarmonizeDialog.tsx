@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Button, Column, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Column, Input, Text, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField, Note } from '@acaprino/sigrid/components';
 import type { ChangeOperation, ProjectInfo, VersionStep } from '../../../types.ts';
 import { text } from '../../../model.ts';
 import { useRegistry } from '../../../state/registry.tsx';
@@ -110,9 +110,9 @@ export function useRunForm({ id, info, open, onOpenChange }: ChangeDialogProps, 
   };
 }
 
-/** A sentence the dialog says in place, on the soft fill of an error: the runtime's refusal, or why no run can start. */
+/** A sentence a surface says in place, as an error: the runtime's refusal, or why no run can start. */
 export function RefusalLine({ children }: { children: React.ReactNode }) {
-  return <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{children}</p>;
+  return <Note tone="error" title={<Text>{children}</Text>} />;
 }
 
 /** The fields every change has, after the dialog's own: the request in words, the version step, who runs it and at what cost, the budget, and what the runtime said. */

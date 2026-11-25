@@ -19,7 +19,7 @@ export const useBlocked = (id: string): string | null => busyReason(runningOn(us
 
 /** What the runtime refused, or the page could not send, shown as it was said: a box in the window that failed, with a word that says it besides the colour. */
 export function NotSaved({ text: said }: { text: string }) {
-  return <p role="alert" className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive"><span className="font-medium">Not saved. </span>{said}</p>;
+  return <Note tone="error" title="Not saved">{said}</Note>;
 }
 
 /** An edit by hand of the project `id`, on the file `info` shows. */

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button } from '@acaprino/sigrid/primitives';
+import { Button, Column } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Snapshot, Target } from '../../types.ts';
 import { useNotify } from '@acaprino/imago';
@@ -140,10 +140,10 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
       )}
     >
       {asking ? null : (
-        <form key="form" id={formId} noValidate className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); void add(); }}>
+        <form key="form" id={formId} noValidate onSubmit={e => { e.preventDefault(); void add(); }}><Column gap="lg">
           <PluginFields ids={ids} form={form} onChange={change} problems={problems} targets={targets} saved={false} advanced={advanced} onAdvanced={value => patch({ advanced: value })} />
           {fault ? <NotSaved text={fault} /> : null}
-        </form>
+        </Column></form>
       )}
     </Dialog>
   );

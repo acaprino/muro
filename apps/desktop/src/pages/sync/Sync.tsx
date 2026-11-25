@@ -6,8 +6,8 @@
 // shows is the registry (useRegistry) and the sync state (useSync), and its buttons ask useSync; the dialogs of a plugin, a new plugin and a new harness are
 // their own files, and the harness inspector is the frame's (App.tsx), so the table stays usable beside it.
 import * as React from 'react';
-import { Button, Icon } from '@acaprino/sigrid/primitives';
-import { Empty } from '@acaprino/sigrid/components';
+import { Button, Card, Cluster, Column, Heading, Icon, Split, Text } from '@acaprino/sigrid/primitives';
+import { Empty, Note } from '@acaprino/sigrid/components';
 import type { Snapshot } from '../../types.ts';
 import { syncHeadline } from '../../model.ts';
 import { plural } from '../../words.ts';
@@ -33,7 +33,7 @@ export function Sync({ openHarness }: SyncProps) {
   const pluginOpener = React.useRef<HTMLElement | null>(null);
   const [addingPlugin, setAddingPlugin] = React.useState(false);
   const [addingHarness, setAddingHarness] = React.useState(false);
-  if (!snapshot) return <p role="status" className="p-4 text-sm text-ink-mute sm:p-6">Reading your registry…</p>;
+  if (!snapshot) return <Column pad="xl"><Text as="p" variant="muted" role="status">Reading your registry…</Text></Column>;
 
   const { plugins, targets } = snapshot.registry;
   const noHarness = targets.length === 0, noPlugin = plugins.length === 0;
@@ -42,28 +42,31 @@ export function Sync({ openHarness }: SyncProps) {
   // Each button once on the page: where an empty state offers it, the head does not.
   const listEmpty = noPlugin && !noHarness;
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="text-xl font-semibold text-ink">Sync</h1>
-          <p className="text-sm text-ink-mute">Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <Column gap="lg" pad="xl">
+      <Split>
+        <Column gap="xs">
+          <Heading level={1}>Sync</Heading>
+          <Text as="p" variant="muted">Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.</Text>
+        </Column>
+        <Cluster>
           {noHarness ? null : addHarness}
           {listEmpty ? null : addPlugin}
-        </div>
-      </header>
+        </Cluster>
+      </Split>
       {noHarness ? (
-        <Empty
-          className="rounded-md border border-line px-4 py-8"
-          title="No harness is managed"
-          description="Muro needs at least one harness to install plugins into: add the coding agents whose plugins it keeps in line with your list."
-          action={addHarness}
-        />
+        <Card variant="quiet" pad="xl">
+          <Empty
+            title="No harness is managed"
+            description="Muro needs at least one harness to install plugins into: add the coding agents whose plugins it keeps in line with your list."
+            action={addHarness}
+          />
+        </Card>
       ) : <SyncNote snapshot={snapshot} />}
       <CheckErrors snapshot={snapshot} />
       {listEmpty ? (
-        <Empty className="rounded-md border border-line px-4 py-8" title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
+        <Card variant="quiet" pad="xl">
+          <Empty title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
+        </Card>
       ) : noPlugin ? null : (
         <SyncTable snapshot={snapshot} onOpenPlugin={(id, opener) => { pluginOpener.current = opener; setPlugin({ id, open: true }); }} onOpenHarness={openHarness} />
       )}
@@ -73,33 +76,23 @@ export function Sync({ openHarness }: SyncProps) {
       {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} restoreFocusTo={pluginOpener} /> : null}
       <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} />
       <AddHarnessDialog open={addingHarness} onOpenChange={setAddingHarness} />
-    </div>
+    </Column>
   );
 }
 
-const TONE_ICON: Record<NoteTone, 'check' | 'info' | 'alert'> = { ok: 'check', info: 'info', warn: 'alert' };
-const TONE_SURFACE: Record<NoteTone, string> = { ok: 'bg-success-soft', info: 'bg-raised', warn: 'bg-warning-soft' };
-const TONE_INK: Record<NoteTone, string> = { ok: 'text-success', info: 'text-ink-soft', warn: 'text-warning' };
+const TONE: Record<NoteTone, 'success' | 'info' | 'warning'> = { ok: 'success', info: 'info', warn: 'warning' };
 
-/** The sync note: what the last check found, in a title and a sentence, and when it was checked, synced and is checked next. The status row repeats it as a chip. */
+/** The sync note: what the last check found, in a title and a sentence, and when it was checked, synced and is checked next. The status row repeats it as a chip, and is what is announced. */
 function SyncNote({ snapshot }: { snapshot: Snapshot }) {
   const sync = useSync();
   const note = noteOf(snapshot, sync.plan, { checking: sync.checking, progress: sync.progress });
   return (
-    <section
-      id="sync-state"
-      data-kind={note.kind}
-      aria-labelledby="sync-state-title"
-      aria-describedby="sync-state-text"
-      className={`flex min-w-0 items-start gap-3 rounded-md border border-line px-4 py-3 ${note.tone ? TONE_SURFACE[note.tone] : 'bg-raised'}`}
-    >
-      <span className={`mt-0.5 shrink-0 ${note.tone ? TONE_INK[note.tone] : 'text-ink-mute'}`}><Icon name={note.tone ? TONE_ICON[note.tone] : 'refresh'} /></span>
-      <div className="flex min-w-0 flex-col gap-1">
-        <h2 id="sync-state-title" className="break-words text-sm font-semibold text-ink">{note.title}</h2>
-        <p id="sync-state-text" className="break-words text-sm text-ink-soft">{note.text}</p>
-        <p className="text-xs text-ink-mute">{timesLine(snapshot)}</p>
-      </div>
-    </section>
+    <Note id="sync-state" data-kind={note.kind} tone={note.tone ? TONE[note.tone] : 'info'} announce={false} title={<Text id="sync-state-title">{note.title}</Text>}>
+      <Column gap="xs">
+        <Text id="sync-state-text">{note.text}</Text>
+        <Text variant="note">{timesLine(snapshot)}</Text>
+      </Column>
+    </Note>
   );
 }
 
@@ -109,16 +102,13 @@ function CheckErrors({ snapshot }: { snapshot: Snapshot }) {
   if (!errors.length) return null;
   const nameOf = (id: string): string => snapshot.registry.plugins.find(p => p.id === id)?.name ?? id;
   return (
-    <section id="check-errors" aria-labelledby="check-errors-title" className="flex min-w-0 flex-col gap-2 rounded-md border border-line bg-warning-soft px-4 py-3">
-      <h2 id="check-errors-title" className="flex items-center gap-2 text-sm font-semibold text-ink">
-        <span className="text-warning"><Icon name="alert" /></span>{plural(errors.length, 'source')} could not be checked
-      </h2>
-      <ul className="flex flex-col gap-1 text-sm">
-        {errors.map((e, i) => (
-          <li key={`${e.plugin_id}-${i}`} className="min-w-0 break-words"><span className="font-medium text-ink">{nameOf(e.plugin_id)}</span><span className="text-ink-soft">: {e.message}</span></li>
-        ))}
-      </ul>
-    </section>
+    <Note
+      id="check-errors"
+      tone="warning"
+      announce={false}
+      title={<Text>{plural(errors.length, 'source')} could not be checked</Text>}
+      items={errors.map(e => <><Text variant="strong">{nameOf(e.plugin_id)}</Text>: {e.message}</>)}
+    />
   );
 }
 
@@ -145,7 +135,7 @@ export function SyncActions() {
   }
 
   return (
-    <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
+    <Cluster justify="end">
       <Button variant={note.lead ? 'default' : 'outline'} loading={sync.checking} disabled={sync.progress !== null} onClick={() => void sync.check()}>
         <Icon name="refresh" />Check now
       </Button>
@@ -155,6 +145,6 @@ export function SyncActions() {
       {applyAll ? (
         <Button variant="default" loading={pressed === 'apply'} onClick={() => void run('apply', () => sync.applyAll())}>{allLabel.current}</Button>
       ) : null}
-    </div>
+    </Cluster>
   );
 }

@@ -9,12 +9,13 @@
 // - A refusal stays in the sheet, in its own line: a notice would cover its buttons. A plan refused because the registry moved is made again by useSync, and the
 //   sheet shows the new one.
 import * as React from 'react';
-import { Badge, Button, Cluster, Icon, Text } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Column, Heading, Icon, Text } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Operation, Review } from '../../types.ts';
 import { removalLabel, removals } from '../../model.ts';
 import { plural } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
+import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
 import { useSync } from './useSync.tsx';
 import type { Choice } from './words.ts';
 
@@ -95,40 +96,40 @@ export function ReviewSheet() {
       description={`${scope ? 'Only the changes of this harness. ' : ''}Nothing changes until you apply.`}
       footer={footer}
     >
-      <div data-review-sheet="" className="flex min-w-0 flex-col gap-4">
+      <Column gap="lg" data-review-sheet="">
         {groups.map((g, i) => (
-          <section key={g.id} aria-labelledby={`${uid}-group-${i}`} className="flex min-w-0 flex-col gap-1">
-            <h3 id={`${uid}-group-${i}`} className="truncate text-sm font-semibold text-ink" title={g.name}>{g.name}</h3>
-            <ul className="flex flex-col">
+          <Column key={g.id} as="section" aria-labelledby={`${uid}-group-${i}`}>
+            <Heading size="small" id={`${uid}-group-${i}`}>{g.name}</Heading>
+            <Column as="ul" gap="md">
               {g.ops.map((o, k) => (
-                <li key={`${o.plugin_id}-${o.kind}-${k}`} data-operation={o.kind} className="flex min-w-0 items-start gap-3 border-b border-line py-2">
+                <Cluster key={`${o.plugin_id}-${o.kind}-${k}`} as="li" data-operation={o.kind} gap="md" align="start" wrap={false}>
                   <Badge tone={o.kind === 'remove' ? 'danger' : 'info'}>{KINDS[o.kind] ?? o.kind}</Badge>
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-medium text-ink" title={o.name}>{o.name}</span>
-                    <span className="break-words text-xs text-ink-mute">{detailOf(o)}</span>
-                  </div>
-                </li>
+                  <Column gap="xs">
+                    <Text variant="strong" pre>{o.name}</Text>
+                    <Text variant="note" pre>{detailOf(o)}</Text>
+                  </Column>
+                </Cluster>
               ))}
-            </ul>
-          </section>
+            </Column>
+          </Column>
         ))}
-        {ops.length ? null : <p className="text-sm text-ink-mute">No change is ready to apply.</p>}
+        {ops.length ? null : <Text as="p" variant="muted">No change is ready to apply.</Text>}
         {plan.blockers.length > 0 && !running ? (
-          <section aria-labelledby={`${uid}-blockers`} className="flex min-w-0 flex-col gap-1">
-            <h3 id={`${uid}-blockers`} className="flex items-center gap-2 text-sm font-semibold text-ink"><span className="text-warning"><Icon name="alert" /></span>Not ready yet</h3>
-            <ul className="flex flex-col">
+          <Column as="section" aria-labelledby={`${uid}-blockers`}>
+            <Heading size="small" id={`${uid}-blockers`} icon={<Icon name="alert" />}>Not ready yet</Heading>
+            <Column as="ul" gap="md">
               {plan.blockers.map((b, k) => (
-                <li key={k} className="flex min-w-0 flex-col border-b border-line py-2">
-                  <span className="break-words font-medium text-ink">{b}</span>
-                  <span className="text-xs text-ink-mute">It is left out of this sync.</span>
-                </li>
+                <Column key={k} as="li" gap="xs">
+                  <Text variant="strong" pre>{b}</Text>
+                  <Text variant="note">It is left out of this sync.</Text>
+                </Column>
               ))}
-            </ul>
-          </section>
+            </Column>
+          </Column>
         ) : null}
         {gone.total > 0 && !running ? <Text variant="note" as="p">{removalNote(gone)}</Text> : null}
-        {sync.error && !running ? <p role="alert" className="break-words rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{sync.error}</p> : null}
-      </div>
+        {sync.error && !running ? <RefusalLine>{sync.error}</RefusalLine> : null}
+      </Column>
     </Dialog>
   );
 }

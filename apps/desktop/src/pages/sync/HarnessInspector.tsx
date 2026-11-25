@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Button, Checkbox, Icon, Input, Select } from '@acaprino/sigrid/primitives';
-import { Dialog, FormField } from '@acaprino/sigrid/components';
+import { Button, Cell, Checkbox, Cluster, Column, Heading, Icon, Input, Select, Split, Text } from '@acaprino/sigrid/primitives';
+import { Dialog, FormField, SettingRow } from '@acaprino/sigrid/components';
 import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { filesMissing, harnessNames, inList, stamp } from '../../model.ts';
@@ -65,10 +65,10 @@ export function HarnessFields({ values, problems, refs, onChange }: { values: Ha
         <Select options={KINDS} value={values.harness} onValueChange={harness => onChange({ harness })} />
       </FormField>
       <FormField label="Configuration folder" required help="Where the harness keeps its settings. OpenCode: the folder of opencode.json. Pi: the folder of settings.json." error={problems.root}>
-        <Input ref={refs.root} name="root" autoComplete="off" spellCheck={false} className="font-mono" value={values.root} onChange={e => onChange({ root: e.currentTarget.value })} />
+        <Input ref={refs.root} name="root" autoComplete="off" spellCheck={false} value={values.root} onChange={e => onChange({ root: e.currentTarget.value })} />
       </FormField>
       <FormField label="Executable" required error={problems.executable}>
-        <Input ref={refs.executable} name="executable" autoComplete="off" spellCheck={false} className="font-mono" value={values.executable} onChange={e => onChange({ executable: e.currentTarget.value })} />
+        <Input ref={refs.executable} name="executable" autoComplete="off" spellCheck={false} value={values.executable} onChange={e => onChange({ executable: e.currentTarget.value })} />
       </FormField>
     </>
   );
@@ -100,13 +100,13 @@ export interface HarnessInspectorProps {
 /** A checkbox with its label and a sentence under it that says what it does (the checkbox waits for Save). */
 function CheckRow({ id, label, help, checked, onChange }: { id: string; label: string; help: string; checked: boolean; onChange(next: boolean): void }) {
   return (
-    <div className="flex items-start gap-3">
+    <Cluster gap="md" align="start" wrap={false}>
       <Checkbox id={id} aria-describedby={`${id}-help`} checked={checked} onCheckedChange={next => onChange(next === true)} />
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <label htmlFor={id} className="text-sm font-medium text-ink">{label}</label>
-        <span id={`${id}-help`} className="text-xs text-ink-mute">{help}</span>
-      </div>
-    </div>
+      <Column gap="xs">
+        <label htmlFor={id}><Text variant="strong">{label}</Text></label>
+        <Text variant="note" id={`${id}-help`}>{help}</Text>
+      </Column>
+    </Cluster>
   );
 }
 
@@ -115,30 +115,28 @@ function InstalledHere({ snapshot, target, adding, error, note, noteRef, onAdd }
   const inventory = snapshot.inventory.find(i => i.target_id === target.id);
   const plugins = inventory?.plugins ?? [];
   return (
-    <section aria-labelledby={`${target.id}-installed`} className="flex flex-col gap-2">
-      <h3 id={`${target.id}-installed`} className="text-sm font-semibold text-ink">Installed here</h3>
+    <Column as="section" aria-labelledby={`${target.id}-installed`}>
+      <Heading size="small" id={`${target.id}-installed`}>Installed here</Heading>
       {inventory && !inventory.complete && inventory.error ? <RefusalLine>{inventory.error}</RefusalLine> : null}
       {plugins.length ? (
-        <ul className="flex flex-col divide-y divide-line">
+        <Column as="ul" gap="xs">
           {plugins.map(p => {
-            const listed = inList(snapshot, target, p), line = `${p.version} · ${listed ? 'in your list' : 'not in your list'}${filesMissing(p)}`, key = `${target.id}:${p.id}`;
+            const listed = inList(snapshot, target, p), addable = !listed && listable(p), key = `${target.id}:${p.id}`;
             return (
-              <li key={p.id} className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 py-2">
-                <div className="min-w-0 flex-1 basis-32">
-                  <p className="truncate text-sm font-medium text-ink" title={p.name}>{p.name}</p>
-                  <p className="truncate text-xs text-ink-mute" title={line}>{line}</p>
-                </div>
-                {listed ? null : listable(p)
-                  ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${p.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => onAdd(p)}><Icon name="plus" />Add to my list</Button>
-                  : <span className="min-w-0 basis-full text-xs text-ink-mute">{NO_FOLDER}</span>}
+              <li key={p.id}>
+                <SettingRow
+                  label={<Text variant="strong" pre>{p.name}</Text>}
+                  description={<Text pre>{`${p.version} · ${listed ? 'in your list' : 'not in your list'}${filesMissing(p)}${listed || addable ? '' : `. ${NO_FOLDER}`}`}</Text>}
+                  control={addable ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${p.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => onAdd(p)}><Icon name="plus" />Add to my list</Button> : undefined}
+                />
               </li>
             );
           })}
-        </ul>
-      ) : <p className="text-xs text-ink-mute">No plugins installed here.</p>}
+        </Column>
+      ) : <Text as="p" variant="note">No plugins installed here.</Text>}
       {error ? <RefusalLine>{error}</RefusalLine> : null}
-      {note ? <p ref={noteRef} role="status" tabIndex={-1} className="text-xs text-ink-mute outline-none">{note}</p> : null}
-    </section>
+      {note ? <p ref={noteRef} role="status" tabIndex={-1}><Text variant="note">{note}</Text></p> : null}
+    </Column>
   );
 }
 
@@ -284,24 +282,24 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
         // the key has not reached yet) and close at once: so the question waits until the key is dispatched.
         onOpenChange={next => { if (!next) setTimeout(() => closing.current(), 0); }}
         footer={target ? (
-          <div className="flex w-full flex-wrap items-center gap-2">
-            <Button variant="outline" className="text-destructive" disabled={saving} onClick={() => patch({ confirm: 'stop', stopError: null })}>Stop managing</Button>
-            <div className="ms-auto flex items-center gap-2">
+          <Cell grow><Split gap="sm">
+            <Button variant="outline" disabled={saving} onClick={() => patch({ confirm: 'stop', stopError: null })}>Stop managing</Button>
+            <Cluster wrap={false}>
               <Button variant="outline" onClick={requestClose}>Cancel</Button>
               <Button variant="secondary" type="submit" form={formId} loading={saving} loadingText="Saving…" disabled={!dirty}>Save</Button>
-            </div>
-          </div>
+            </Cluster>
+          </Split></Cell>
         ) : undefined}
       >
         {target && form && snapshot ? (
-          <form ref={region} id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }} className="flex flex-col gap-4">
-            <p className="text-xs text-ink-mute">{`Checked ${stamp(times?.checked ?? null)} · last sync ${stamp(times?.synced ?? null)}`}</p>
+          <form ref={region} id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }}><Column gap="lg">
+            <Text as="p" variant="note">{`Checked ${stamp(times?.checked ?? null)} · last sync ${stamp(times?.synced ?? null)}`}</Text>
             <HarnessFields values={form} problems={shown} refs={refs} onChange={values => edit(values)} />
             <CheckRow id={`${formId}-enabled`} label="Keep this harness in sync" help="Switch off to pause: Muro leaves it alone." checked={form.enabled} onChange={enabled => edit({ enabled })} />
             <CheckRow id={`${formId}-exclusive`} label="Uninstall plugins that are not in my list" help="Muro asks before it uninstalls. Only on this harness." checked={form.exclusive} onChange={exclusive => edit({ exclusive })} />
             <InstalledHere snapshot={snapshot} target={target} adding={adding} error={session.listError} note={session.listNote} noteRef={note} onAdd={installed => void addToList(installed)} />
             {session.saveError ? <NotSaved text={session.saveError} /> : null}
-          </form>
+          </Column></form>
         ) : null}
       </Inspector>
       <Dialog
