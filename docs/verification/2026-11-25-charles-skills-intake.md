@@ -118,7 +118,7 @@ dependencies.
 
 ## Not executed
 
-- The full suite in GitHub Actions: nothing was committed or pushed (no commit was requested).
+- The full suite in GitHub Actions had not run when this record was written. Added after the owner asked for the commit and the push the same day: the change is commit `fac9458` on `develop`, and both workflows passed on it, `Marionette` (run 45635591015) and `Tests` (run 45635590494). The three skills absorbed later that day are in `2026-11-25-charles-drops-intake.md`.
 - The routing evaluation (`--prepare-eval` and `--score-eval`) with a host AI: the eight new cases are authored, not
   scored. `muro eval prepare` refused to stage it because the eval workbench still holds a `decisions.json` of
   2026-11-19, which was left where it is. The new test selects the capabilities through explicit decision fixtures, which prove mechanics only.

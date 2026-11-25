@@ -29,7 +29,7 @@ def packaged_paths(text):
 
 
 def test_all_capabilities_are_covered():
-    assert len(CAPABILITIES) == 40
+    assert len(CAPABILITIES) == 43
 
 
 @pytest.mark.parametrize("path", CAPABILITIES, ids=lambda p: p.stem)

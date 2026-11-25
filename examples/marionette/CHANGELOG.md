@@ -1,14 +1,18 @@
 # Marionette 0.7.0
 
-Marionette absorbs two of Charles Liu's design skills, from charles-skills, as two new
+Marionette absorbs five of Charles Liu's design skills, from charles-skills, as five new
 on-demand capabilities. `interface-polish` (charles-polish) takes an interface that
-already works from fine to finished: it scores it, fixes the details people feel and
-checks its motion frame by frame, or reviews it without changing it. `color-critique`
+already works from fine to finished and checks its motion frame by frame. `color-critique`
 (charles-color-analysis) measures the colours of a visual, a page, an app screen or a
-palette and gives the corrections as exact OKLCH and hex values with before/after
-previews. The catalog goes from 38 to 40 capabilities and from 17 to 18 sources;
-nothing new acts in every session. The upstream has no release or tag, so the pin
-follows its head (83de509d).
+palette and gives exact OKLCH and hex corrections with previews. `ux-laws`
+(charles-design-laws) designs or reviews a screen or a flow by twenty laws of UX.
+`design-tips` (charles-design-tips) applies or checks twenty practical tips on type,
+spacing, colour, forms and copy. `interaction-motion` (charles-ux-animation) builds or
+reviews, in the project's code, how an interface moves and responds. The last three
+each have a build and a review intent. ui-ux-pro-max stays the lookup: where sources
+give different numbers none is rewritten, and a system you recorded comes first. The
+catalog goes from 38 to 43 capabilities and from 17 to 18 sources; nothing new acts in
+every session. The upstream has no release or tag, so the pin follows its head (83de509d).
 
 # Marionette 0.6.0
 

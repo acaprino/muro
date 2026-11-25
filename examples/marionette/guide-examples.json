@@ -589,6 +589,51 @@
       ],
       "reason": "Un solo passo: misura l'immagine, risponde punto per punto alla critica altrui e mostra l'anteprima prima/dopo delle due correzioni principali. Non sceglie una palette nuova e non modifica i file del progetto.",
       "questions": []
+    },
+    {
+      "title": "Un checkout che confonde",
+      "task": "Il checkout è confuso: troppi campi, la spedizione express a pagamento è già selezionata e alla fine c'è solo un redirect. Sistemalo nel codice.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "ux-laws",
+          "intent": "ui.ux-laws",
+          "reason": "Serve decidere cosa chiede lo schermo alle persone, cosa preseleziona e come finisce il flusso, e correggerlo nel codice legge per legge."
+        }
+      ],
+      "reason": "Un solo passo, in ordine fisso: prima cosa tagliare e cosa può compilare il prodotto, poi i gruppi, poi l'unica cosa in evidenza, il progresso e la schermata finale. Le regole consultate con la ricerca restano proposte.",
+      "questions": []
+    },
+    {
+      "title": "Uno schermo che sembra buttato lì",
+      "task": "La pagina impostazioni funziona ma sembra buttata lì: paragrafi lunghi centrati, grigi piatti, un'ombra enorme, bottoni «Submit» e campi con solo il placeholder. Sistemala nei nostri token Tailwind.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "design-tips",
+          "intent": "ui.design-tips",
+          "reason": "I problemi nominati sono dettagli misurabili di testo, colore, ombre, etichette e copy: i venti consigli pratici, applicati nei token del progetto."
+        }
+      ],
+      "reason": "Un solo passo: prima l'inventario di stili, colori e box, poi le sei aree in ordine con le misure. Un valore registrato in un DESIGN.md del progetto viene segnalato, non cambiato.",
+      "questions": []
+    },
+    {
+      "title": "Animazioni e feedback di un modal",
+      "task": "Aggiungi le animazioni al modal e al drawer del carrello nel nostro progetto React (Motion è già installato): apertura, chiusura, feedback alla pressione e stato di caricamento del bottone Paga.",
+      "stack_tokens": [],
+      "status": "selected",
+      "selections": [
+        {
+          "capability": "interaction-motion",
+          "intent": "ui.interaction-motion",
+          "reason": "Il comportamento è chiesto direttamente e va scritto nel codice: se deve muoversi, durata, curva, origine, interrompibilità e stati di attesa."
+        }
+      ],
+      "reason": "Un solo passo, senza specifica separata perché la richiesta dice già cosa serve. Se esiste una specifica di movimento registrata, i suoi tempi vincono su quelli del metodo.",
+      "questions": []
     }
   ]
 }
