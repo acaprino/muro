@@ -83,6 +83,10 @@ command is in [the command reference](cli.md#muro-project-release-filemp---expec
 Muro handles no token: the push uses the credentials your Git already has. A credential that adds a file under
 `.github/workflows/` may need the right to change workflows (on GitHub, the `workflow` scope of a token).
 
+The desktop app does the same from the workspace of an open project: **Release…**, which runs this command through the
+runtime's `release_project` and has one switch for `--init`. It is described in
+[the desktop guide](desktop.md#changing-a-project).
+
 ## What a push does
 
 The job `gate` reads only:
@@ -147,12 +151,14 @@ Only `pytest` is installed for them.
 
 ## Not done yet
 
-- Releasing from the app. `muro project release` puts a project's file into its repository; no action of the app
-  runs it yet, and neither a command nor an action takes a newer file from the repository.
+- Taking a newer file from the repository: neither a command nor an action of the app does it.
+- No release has been made from the app. Its action (**Release…**, `release_project`) is written and tested against
+  stand-ins only: see "Not run" in the ADR.
 - `muro project release` has not pushed to a repository on GitHub. See "Not run" in the ADR.
 - Moving an existing repository to this model.
 - `AGENTS.md` still describes a package as an unpacked directory in its own repository.
 - Git LFS. The file is committed as it is. GitHub refuses a file over 100 MB, and the run reads the file of a
   tagged commit through an interface with the same limit.
 - A protected branch. The workflow pushes with its own token, which a rule that asks for a pull request refuses.
-- The workflow has not run on GitHub. See "Not run" in the ADR.
+- The workflow has run once, on a probe repository (`docs/verification/2026-11-25-project-store.md`). See "Not run" in
+  the ADR for what that run does not show.

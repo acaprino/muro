@@ -42,6 +42,7 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
         "create_project" => project_jobs::create(data, &payload),
         "project_job" => project_jobs::change(data, &payload),
         "edit_project" => project_jobs::edit(data, &payload),
+        "release_project" => project_jobs::release(data, &payload),
         "delete_project" => project_jobs::delete(data, &payload),
         "project_updates" => project_jobs::updates(data, &payload),
         "env_present" => projects::env_present(&payload),

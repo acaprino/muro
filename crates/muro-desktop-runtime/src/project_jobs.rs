@@ -10,6 +10,10 @@
 //! the file the run started from. A change no AI judges (the name, the author, the repository, the records,
 //! the changelog) is `muro project edit`. Nothing is installed on a harness: a project's plugin is installed
 //! from its Install step, through a plan the person applies.
+//!
+//! Releasing a project (ADR-0034) is `muro project release`: the factory puts the file into the repository its
+//! `project.json` names, with the person's own Git, and that repository's workflow makes the release. The runtime
+//! passes the request on and answers what the command printed; it asks for no credential and keeps none.
 use crate::{exec::Captured, factory::Factory, jobs, projects};
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
@@ -52,6 +56,13 @@ const MAX_INSTRUCTION_FILES: usize = 50;
 /// What `edit` and `updates` may take: a repack of a large project, or a look at every input's upstream.
 const EDIT_LIMIT: Duration = Duration::from_secs(600);
 const UPDATES_LIMIT: Duration = Duration::from_secs(300);
+/// What `release` may take, the fetch of the branch's tip and the push of the file included: the simulator's limit,
+/// which is under the 600 seconds the CLI boundary waits for one request, so a release that is stopped says the
+/// sentence below and not the boundary's. The command gives each of its own network steps 15 minutes: a file that
+/// needs longer than this to reach its repository is released from the command line (`muro project release`).
+const RELEASE_LIMIT: Duration = crate::simulate::LIMIT;
+/// What a release the runtime stopped at its limit says after the limit: Git may have pushed before it was stopped.
+pub const RELEASE_STOPPED: &str = "The file may or may not have reached the repository: release again to find out, since a repository that already holds this file is pushed nothing";
 /// How long the work folder of a project run that failed, was cancelled or was interrupted is kept, for its log to
 /// be read against: a whole unpack of the project each.
 const KEEP_WORK: Duration = Duration::from_secs(7 * 24 * 60 * 60);
@@ -705,6 +716,51 @@ pub fn edit(data: &Path, payload: &Value) -> Result<Value> {
     Ok(result)
 }
 
+/// A switch of a request: absent or null is off, and anything but true or false is refused.
+fn switch(payload: &Value, key: &str) -> Result<bool> {
+    match &payload[key] {
+        Value::Null => Ok(false),
+        value => value.as_bool().with_context(|| format!("{key} must be true or false")),
+    }
+}
+
+/// `release_project {id, digest, init?, dry_run?}`: the project's file is put into the repository its `project.json`
+/// names (`muro project release`, ADR-0034), while the file still has `digest`, and that repository's workflow makes
+/// the release. `init` adds the workflow that calls Muro's when the repository has none; `dry_run` does everything
+/// but the push. The push is Git's, with the person's own identity and credentials: nothing here asks for one, reads
+/// one or keeps one. Answers what the command printed, `{repository, branch, file, version, tag, pushed, commit,
+/// initialized, reason}`; a release it refused is its sentence, without the command's own prefix. Refused while an
+/// AI run changes the project, like an edit.
+pub fn release(data: &Path, payload: &Value) -> Result<Value> {
+    let id = payload["id"].as_str().unwrap_or("");
+    let current = registry(data)?;
+    let file = projects::listed_file(&current, id)?;
+    let digest = payload["digest"].as_str().unwrap_or("");
+    ensure!(digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()), "Open the project again: the release names no version of its file");
+    let (init, dry_run) = (switch(payload, "init")?, switch(payload, "dry_run")?);
+    ensure!(!running_on(data, id)?, "An AI run is changing this project: wait for it to finish");
+    let mut args = vec!["project".to_owned(), "release".into(), file.to_string_lossy().into_owned(), "--expect-digest".into(), digest.to_owned(),
+        "--cache".into(), projects::cache_dir(data).to_string_lossy().into_owned()];
+    if init {
+        args.push("--init".into());
+    }
+    if dry_run {
+        args.push("--dry-run".into());
+    }
+    let factory = Factory::from_settings(&current["settings"])?;
+    factory.json(&args, "Releasing the project", &|| false, RELEASE_LIMIT).map_err(release_failure)
+}
+
+/// What a release that did not succeed says: the command's own sentence, without its prefix (`Project release
+/// failed: `, docs/cli.md); for one the runtime stopped at its limit, that it was stopped and `RELEASE_STOPPED`.
+fn release_failure(error: anyhow::Error) -> anyhow::Error {
+    let reason = format!("{error:#}");
+    if crate::exec::out_of_time(&error) {
+        return anyhow::anyhow!("{reason}. {RELEASE_STOPPED}");
+    }
+    anyhow::anyhow!("{}", reason.strip_prefix("Project release failed: ").unwrap_or(&reason).to_owned())
+}
+
 /// `delete_project {id, revision}`: the project leaves the list and its file is deleted. A project an AI run is
 /// changing cannot be deleted. A plugin installed from the project stays installed as it is.
 pub fn delete(data: &Path, payload: &Value) -> Result<Value> {
@@ -791,6 +847,18 @@ mod tests {
             "The package does not validate; see output.log"
         );
         assert!(commit_reason("Traceback (most recent call last):\n", status).starts_with(&format!("{SAVING} failed (")));
+    }
+
+    #[test]
+    fn a_release_that_failed_says_the_commands_sentence_and_one_stopped_at_its_limit_that_the_push_may_have_gone() {
+        let refused = anyhow::anyhow!("Project release failed: The repository cannot be reached: no route to host");
+        assert_eq!(format!("{:#}", release_failure(refused)), "The repository cannot be reached: no route to host");
+        assert_eq!(format!("{:#}", release_failure(anyhow::anyhow!("Cannot start python"))), "Cannot start python");
+        let mut sleeper = std::process::Command::new(if cfg!(windows) { "python" } else { "python3" });
+        sleeper.args(["-c", "import time; time.sleep(60)"]);
+        let stopped = crate::exec::capture(sleeper, "Releasing the project", &|| false, Duration::from_millis(600)).err().unwrap();
+        let said = format!("{:#}", release_failure(stopped));
+        assert!(said.starts_with("Releasing the project ran out of time (") && said.ends_with(&format!(". {RELEASE_STOPPED}")), "{said}");
     }
 
     #[test]

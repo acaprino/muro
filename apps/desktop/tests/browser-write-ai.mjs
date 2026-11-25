@@ -142,7 +142,8 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'sample', digest: read, operation: 'harmonize', budget_usd: 5, step: 'minor', request: 'Merge the two review steps.' }]);
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
   const reason = busyWith('Harmonize again');
-  for (const name of ['Harmonize again…', 'Add input…', 'Edit details…']) {
+  // Release… is no AI run, and still waits for a run that changes this project, as Edit details… does.
+  for (const name of ['Harmonize again…', 'Add input…', 'Edit details…', 'Release…']) {
     assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);
     assert.equal(await button(page, name).getAttribute('title'), reason, `${name} says why`);
   }
@@ -164,6 +165,7 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   await versionShown(page, '0.6.0');
   await until(() => button(page, 'Harmonize again…').isEnabled(), 'Harmonize again… comes back');
   assert.equal(await button(page, 'Edit details…').isDisabled(), false);
+  assert.equal(await button(page, 'Release…').isDisabled(), false);
   assert.equal(await page.getByRole('status').filter({ hasText: reason }).count(), 0, 'the foot no longer says a run goes');
 });
 
@@ -258,6 +260,7 @@ await test('A run another client started: the refusal is shown, and the page rea
   await card(page).getByRole('heading', { name: 'The adaptation of docs-writer' }).waitFor();
   assert.equal(await button(page, 'Add input…').isDisabled(), true, 'no change is offered while it goes');
   assert.equal(await button(page, 'Add input…').getAttribute('title'), busyWith('The adaptation of docs-writer'));
+  assert.equal(await button(page, 'Release…').isDisabled(), false, 'a release is no AI run: a run that does not change this project does not hold it back');
 });
 
 // ---------- the records wait for a run ----------
