@@ -207,6 +207,8 @@ desktop app then find the plugin from the repository's address. Every file is
 read before any is written: a folder that is not inside the repository, or
 holds no built Claude Code or Codex adapter, writes nothing and exits `1`.
 It is made for the release workflow of a package that publishes its build in a folder of its own repository.
+The reusable workflow `.github/workflows/project-store.yml` runs it for a project's repository, after it has put
+the release a project file carries in `<slug>/` ([a project's repository is a plugin store](project-store.md)).
 
 ```sh
 muro marketplace ./package my-package
