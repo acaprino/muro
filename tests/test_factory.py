@@ -217,4 +217,3 @@ def test_package_outside_the_factory_uses_the_factory_prompts_and_runtime(tmp_pa
     assert prompts_dir(tmp_path) == tmp_path / "prompts"
     for name in ("capabilities", "ROUTER.md", "sources.json", "guide-examples.json"):
         assert not (FACTORY_ROOT / name).exists(), name
-        assert (FACTORY_ROOT / "examples" / "marionette" / name).exists(), name

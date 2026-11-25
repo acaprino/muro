@@ -20,7 +20,6 @@ from muro.delivery import (ALWAYS_ON_PER_SOURCE, always_on_limit, claude_code_ho
 from muro.factory import harmonize_prompt, prepare_intake
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 HOSTS = ("claude-code", "codex", "pi", "opencode", "hermes")
 
 
@@ -190,15 +189,6 @@ def test_hook_wirings_are_checked(over, message):
     assert any(message in error for error in errors), errors
 
 
-def test_marionette_records_a_decision_for_every_source():
-    manifest = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))
-    document = json.loads((MARIONETTE / "delivery.json").read_text(encoding="utf-8"))
-    capabilities = parse_capabilities(MARIONETTE / "capabilities")
-    assert validate_delivery(document, capabilities, {s["id"] for s in manifest["sources"]}) == []
-    assert {d["source"] for d in document["decisions"]} == ({s["id"] for s in manifest["sources"]}
-                                                         | set(document["custom_instructions"]["files"]))
-
-
 def test_a_package_without_the_document_registers_nothing(portable_project, tmp_path):
     release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
     assert not (release / "delivery.json").exists()
@@ -303,8 +293,6 @@ def test_the_delivery_prompt_states_the_judgment_and_keeps_python_out_of_it():
     rules = (ROOT / "prompts" / "delivery.md").read_text(encoding="utf-8")
     for required in ("every session", "on demand", "reason", "delivery.json", "never"):
         assert required in rules, required
-    # Factory prompts carry no package knowledge (ADR-0011).
-    assert "marionette" not in rules.lower()
 
 
 def test_the_guide_shows_the_recorded_decisions(portable_project, tmp_path):

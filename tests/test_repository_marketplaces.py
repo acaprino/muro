@@ -1,7 +1,7 @@
 """A package repository that publishes its release in a subfolder is a marketplace at its root.
 
-Owner, 2026-11-21: Muro (the desktop app) did not find Marionette from the address of its own
-repository, acaprino/marionette, because the release sits in `marionette/` and nothing at the
+Owner, 2026-11-21: Muro (the desktop app) did not find a package from the address of its own
+repository, because the release sits in a folder of that repository and nothing at the
 root says where the plugin is. Claude Code and Codex find a plugin in a repository the same way:
 through their marketplace file at its root. `muro marketplace` writes those files, derived from
 the marketplaces the build already wrote in each adapter folder, so the format lives in one place.

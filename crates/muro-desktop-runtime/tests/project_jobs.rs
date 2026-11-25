@@ -191,7 +191,6 @@ fn a_new_project_refuses_what_it_cannot_be_before_any_run() {
     fs::write(taken.join("my-plugin.mp"), b"x").unwrap();
     let cases: Vec<(Box<dyn FnOnce(&mut Value)>, &str)> = vec![
         (Box::new(|p: &mut Value| p["slug"] = json!("My Plugin")), "lowercase letters and digits"),
-        (Box::new(|p: &mut Value| p["slug"] = json!("marionette")), "the project Muro ships"),
         (Box::new(|p: &mut Value| p["name"] = json!("  ")), "The project name is required"),
         (Box::new(|p: &mut Value| p["folder"] = json!("relative/folder")), "full path"),
         (Box::new(move |p: &mut Value| p["folder"] = json!(taken)), "already exists"),
@@ -509,12 +508,20 @@ fn deleting_a_project_takes_it_off_the_list_and_deletes_its_file() {
 }
 
 #[test]
-fn the_project_muro_ships_cannot_be_deleted() {
+fn a_project_file_kept_in_the_data_directory_is_listed_and_deleted_like_any_other() {
+    // A registry may list a file inside Muro's own data folder: no id and no place is kept from deletion.
     let home = Home::new();
-    let file = home.listed("marionette", json!({"plugin":plugin("Marionette","marionette")}));
-    let refused = home.call("delete_project", json!({"id":"marionette","revision":home.registry()["revision"]}));
-    assert!(error_of(refused).contains("cannot be deleted"));
-    assert!(file.exists());
+    let file = project_file(&home.data.join("projects").join("sample.mp"), json!({"plugin":plugin("Sample","sample")}));
+    let other = home.listed("other", json!({"plugin":plugin("Other","other")}));
+    let mut all = home.registry()["projects"].as_array().cloned().unwrap();
+    all.insert(0, json!({"id":"sample","path":file}));
+    request(&home.data, "save_projects", json!({"revision":home.registry()["revision"],"projects":all})).unwrap();
+    let shown = home.call("projects", json!({})).unwrap();
+    assert_eq!((shown[0]["id"].as_str(), shown[0]["error"].as_str()), (Some("sample"), None), "{}", shown[0]);
+    assert_eq!(shown[0].get("included"), None, "no project is marked as Muro's own");
+    let saved = home.call("delete_project", json!({"id":"sample","revision":home.registry()["revision"]})).unwrap();
+    assert_eq!(saved["registry"]["projects"], json!([{"id":"other","path":other}]));
+    assert!(!file.exists() && other.exists());
 }
 
 // --- updates of the inputs --------------------------------------------------------------------------

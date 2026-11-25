@@ -12,8 +12,6 @@ import type {
 
 // ---------- what the runtime says ----------
 
-/** The id of the project every Muro ships: it cannot be a new project's plugin id and cannot be deleted. */
-export const SHIPPED_ID = 'marionette';
 /** The budget of an AI run, in US dollars, when the person says nothing (the runtime's own default), and the most it accepts. */
 export const DEFAULT_BUDGET = 5;
 export const MAX_BUDGET = 100;
@@ -108,12 +106,11 @@ const isSlug = (id: string): boolean => id.length <= 64 && /^[a-z0-9]+(-[a-z0-9]
 export interface Listed { projects?: readonly string[]; plugins?: readonly string[] }
 const isIds = (value: readonly string[] | Listed): value is readonly string[] => Array.isArray(value);
 
-/** The plugin id of a new project (the runtime's `create`): kebab-case of at most 64 characters, not the shipped project's, not a project or a plugin already listed. `listed` is the ids of the
+/** The plugin id of a new project (the runtime's `create`): kebab-case of at most 64 characters, not a project or a plugin already listed. `listed` is the ids of the
  * projects (`list.map(p => p.id)`), or `{projects, plugins}` (`snapshot.registry.plugins`). */
 export function checkSlug(slug: string, listed: readonly string[] | Listed = []): string | null {
   const id = slug.trim();
   if (!isSlug(id)) return BAD_SLUG;
-  if (id === SHIPPED_ID) return `The plugin id ${id} is the project Muro ships: choose another`;
   const taken: Listed = isIds(listed) ? { projects: listed } : listed;
   if (taken.projects?.includes(id)) return `A project for ${id} is already in your list`;
   if (taken.plugins?.includes(id)) return `A plugin named ${id} is already in your list: choose another plugin id`;

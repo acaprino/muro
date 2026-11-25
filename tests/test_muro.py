@@ -15,7 +15,6 @@ from muro import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def test_validate_plugin_identity_rejects_reserved_and_non_kebab():
@@ -52,33 +51,6 @@ def test_legacy_role_resolver_requires_host_ai_even_with_compatible_candidates(c
     ]
     with pytest.raises(ValueError, match="host AI classification"):
         resolve_plan(rows[:candidate_count], ["analysis"], set(), set())
-
-
-def test_repository_capabilities_and_router_are_valid():
-    from muro import parse_capability, validate_capabilities_and_router
-    cap_dir = PACKAGE / "capabilities"
-    router_path = PACKAGE / "ROUTER.md"
-    capabilities = []
-    for f in sorted(cap_dir.glob("*.md")):
-        capabilities.append(parse_capability(f))
-    # Parse ROUTER.md
-    text = (PACKAGE / "ROUTER.md").read_text(encoding="utf-8")
-    router_rows = []
-    for ln in text.splitlines():
-        ln = ln.strip()
-        if ln.startswith("|") and ln.endswith("|"):
-            parts = [p.strip() for p in ln.split("|")[1:-1]]
-            if all(all(c in "- " for c in p) for p in parts):
-                continue
-            if parts and parts[0].lower() == "id":
-                continue
-            if len(parts) >= 5:
-                router_rows.append(RouterRow(
-                    id=parts[0], role=parts[1], when=parts[2],
-                    after=parts[3], outputs=parts[4], intents=parts[5]
-                ))
-    errors = validate_capabilities_and_router(capabilities, router_rows)
-    assert errors == []
 
 
 def test_build_release_emits_branded_package_and_notices(tmp_path: Path, portable_project: Path):

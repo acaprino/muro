@@ -994,8 +994,8 @@ mod tests {
     }
     #[test]
     fn the_plugin_name_of_an_entry_is_the_name_the_harness_installed_it_under() {
-        assert_eq!(plugin_name("claude-code", &json!({"id":"marionette@marionette","name":"marionette@marionette"})), "marionette");
-        assert_eq!(plugin_name("codex", &json!({"id":"marionette@muro-marionette","name":"marionette"})), "marionette");
+        assert_eq!(plugin_name("claude-code", &json!({"id":"sample@sample","name":"sample@sample"})), "sample");
+        assert_eq!(plugin_name("codex", &json!({"id":"sample@muro-sample","name":"sample"})), "sample");
         assert_eq!(plugin_name("codex", &json!({"id":"nomarket"})), Value::Null);
         assert_eq!(plugin_name("hermes", &json!({"id":"tidy","name":"tidy"})), "tidy");
         for h in ["opencode", "pi"] {

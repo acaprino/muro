@@ -5,7 +5,7 @@ import type { ProjectSummary, Snapshot, Transport } from '../../../types.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
-import { SHIPPED_ID, deletePayload } from './jobs.ts';
+import { deletePayload } from './jobs.ts';
 import { RefusalLine } from './HarmonizeDialog.tsx';
 
 /** The words of a listed project: the name its file gives it, else its plugin's, else its id. */
@@ -35,8 +35,8 @@ export interface DeleteDialogProps {
   focusAfter?: React.RefObject<HTMLElement | null> | undefined;
 }
 
-/** Delete project: it leaves the list and its file is deleted (`delete_project`). This cannot be taken back, so it asks first, names the file and says what stays. The project Muro ships
- * cannot be deleted: the dialog says so and offers nothing to confirm (the runtime refuses it as well, whatever the page shows). Focus starts on Cancel. */
+/** Delete project: it leaves the list and its file is deleted (`delete_project`). This cannot be taken back, so it asks first, names the file and says what stays.
+ * Focus starts on Cancel. */
 export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfter }: DeleteDialogProps) {
   const { request, snapshot, adopt } = useRegistry();
   const notify = useNotify();
@@ -53,7 +53,6 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfte
     if (open) { setFailure(null); gone.current = false; }
   }
   const name = nameOf(project);
-  const shipped = project.included === true || project.id === SHIPPED_ID;
 
   async function remove(): Promise<void> {
     setDeleting(true);
@@ -74,23 +73,19 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfte
       open={open}
       onOpenChange={next => { if (!next && deleting) return; onOpenChange(next); }}
       onCloseAutoFocus={event => { if (gone.current) { event.preventDefault(); focusAfter?.current?.focus(); } }}
-      title={shipped ? `${name} cannot be deleted` : `Delete ${name}?`}
-      description={shipped ? 'The default project stays in the list' : 'The project leaves your list and its file is deleted. This cannot be undone. Its plugin stays installed where it is, as it is.'}
-      footer={shipped ? (
-        <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-      ) : (
+      title={`Delete ${name}?`}
+      description="The project leaves your list and its file is deleted. This cannot be undone. Its plugin stays installed where it is, as it is."
+      footer={(
         <>
           <Button variant="outline" disabled={deleting} onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button variant="destructive" loading={deleting} loadingText="Deleting…" onClick={() => void remove()}>Delete {name}</Button>
         </>
       )}
     >
-      {shipped ? null : (
-        <Column gap="xs">
-          <Text variant="note">The file that is deleted</Text>
-          <Text mono>{project.path}</Text>
-        </Column>
-      )}
+      <Column gap="xs">
+        <Text variant="note">The file that is deleted</Text>
+        <Text mono>{project.path}</Text>
+      </Column>
       {failure ? <RefusalLine>{failure}</RefusalLine> : null}
     </Dialog>
   );

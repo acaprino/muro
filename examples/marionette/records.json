@@ -287,6 +287,17 @@
       "text": "2026-11-25: charles-skills (LemonFace0309/charles-skills, head 83de509d: no release upstream) is absorbed as two on-demand roles; nothing acts in every session. The owner asked for charles-color-analysis and then charles-polish, so the other skills of the repository are not sources and were not read. color-critique measures the colour of a visual, page, app screen or palette and reports ranked corrections with previews; it writes no palette and no file of the project. interface-polish scores a working interface, climbs it and verifies its motion frame by frame, or reviews it without edits; it was compared with design-review's polish pass and kept apart, because that pass audits and gives a readiness verdict. Decided here: a recorded motion-spec or a design file's motion values win over the polish source's timings; a recorded design system is reported, not changed; the hand-off to charles-unslop is answered by design-review's generic-look pass; both hit-area minimums (40px desktop there, 44px in design-review) are kept as written. Left open: which of the two polishing roles a bare \"polish this\" selects is judged per request by the classifier, and no routing evaluation was scored.",
       "author": "muro",
       "binding": false
+    },
+    {
+      "id": "harmonization-24",
+      "date": "2026-11-25",
+      "subjects": [
+        "charles-skills",
+        "ui-ux-pro-max"
+      ],
+      "text": "2026-11-25, later the same day: three more skills of charles-skills are absorbed, from its drops shelf, as three on-demand roles, each with a build and a review intent. The owner asked for the whole skills folder, then asked what to take and chose the first group of a recommendation made on the skills' descriptions: charles-design-laws (ux-laws), charles-design-tips (design-tips) and charles-ux-animation (interaction-motion). The rest of the repository is left out by that choice and was not read; charles-unslop is under CC BY 4.0, which the license gate does not accept. The owner asked for harmony with ui-ux-pro-max and the others (\"MI RACOCMANDO, armonia con ui pro max ecc ecc\") and how the overlaps are handled. Decided: design-guidance stays the lookup and its results stay proposals; no source is rewritten where numbers differ (body line height 1.4-1.5 against 1.5-1.75, exits 20-30% against about 30-40% shorter, 44px against 48dp, springs, confirmation against undo); the order is the one of 2026-11-17 (the request, a project DESIGN.md, a Master or tokens in the repository, a recorded direction or motion-spec), then the step's own source; a body names the value that satisfies both where there is one and otherwise reports the difference. The laws stated in both charles-design-laws and charles-ux-animation stay in both files, and the request decides the owner. interaction-motion is the first owner of non-scroll animation code; motion-principles keeps the specification and the timing.",
+      "author": "muro",
+      "binding": false
     }
   ]
 }

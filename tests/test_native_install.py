@@ -1,6 +1,6 @@
 """An adapter is something a host can install with its own command (owner, 2026-11-12).
 
-"Se installo Marionette in una harness" has to mean one documented command per host,
+"Se installo [il plugin] in una harness" has to mean one documented command per host,
 after which what `delivery.json` declares is active. The Claude Code and Codex adapters
 were plugin folders with no marketplace manifest, so neither host could install them
 permanently; `INSTALL.md` named no command. These tests cover the generated manifests

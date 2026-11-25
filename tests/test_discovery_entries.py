@@ -15,7 +15,6 @@ from muro import build_release, parse_capabilities
 from muro.entries import validate_entries
 
 ROOT = Path(__file__).resolve().parent.parent
-MARIONETTE = ROOT / "examples" / "marionette"
 PLUGIN = {"slug": "muro", "name": "Muro", "command": "muro", "version": "0.1.0"}
 
 
@@ -54,14 +53,6 @@ def test_entry_documents_are_checked_for_shape_naming_and_references(broken, mes
 def test_every_absorbed_capability_must_be_discoverable():
     errors = validate_entries(doc(), [Cap("x"), Cap("y")], PLUGIN)
     assert any("y" in e and "no entry" in e for e in errors), errors
-
-
-def test_marionette_entries_cover_everything_its_intake_absorbed():
-    caps = parse_capabilities(MARIONETTE / "capabilities")
-    plugin = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))["plugin"]
-    data = json.loads((MARIONETTE / "entries.json").read_text(encoding="utf-8"))
-    assert set(data) == {"entries"} and validate_entries(data, caps, plugin) == []
-    assert {c for e in data["entries"] for c in e["capabilities"]} == {c.id for c in caps}
 
 
 def test_release_emits_one_hidden_entry_skill_per_area_that_drives_the_same_runtime(portable_project, tmp_path):
@@ -118,12 +109,3 @@ def test_a_description_with_yaml_syntax_is_quoted_so_hosts_can_load_the_skill(po
         assert json.loads(line.split(": ", 1)[1]) == tricky   # the author's words are not altered
 
 
-def test_every_marionette_skill_description_is_a_loadable_yaml_scalar(tmp_path):
-    from muro.adapters import _skill
-    caps = parse_capabilities(MARIONETTE / "capabilities")
-    plugin = json.loads((MARIONETTE / "sources.json").read_text(encoding="utf-8"))["plugin"]
-    entries = json.loads((MARIONETTE / "entries.json").read_text(encoding="utf-8"))["entries"]
-    for entry in [None, *entries]:
-        front = _skill(plugin, "claude-code", capabilities=caps, entry=entry).split("---", 2)[1]
-        value = next(l for l in front.splitlines() if l.startswith("description:"))[len("description: "):]
-        assert value.startswith('"') or (": " not in value and " #" not in value and not value.endswith(":")), value

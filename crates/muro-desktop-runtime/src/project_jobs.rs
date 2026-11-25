@@ -13,7 +13,7 @@
 use crate::{exec::Captured, factory::Factory, jobs, projects};
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
-use muro_registry::projects::{self as list, DEFAULT_ID};
+use muro_registry::projects as list;
 use serde_json::{Value, json};
 use std::{
     fs::{self, OpenOptions},
@@ -30,7 +30,7 @@ pub const NEEDS_CLAUDE: &str =
 pub const CHANGED: &str = "The project file changed since it was opened: open it again and repeat the change";
 /// How long each step of a project run may take: the AI run, and each factory command around it (starting or
 /// opening the project, building and saving it). Intake and harmonization of several inputs, or harmonizing
-/// Marionette again, take far longer than the 30 minutes of AI adaptation (`jobs::ADAPTATION_LIMIT`). A step that
+/// a large project again, take far longer than the 30 minutes of AI adaptation (`jobs::ADAPTATION_LIMIT`). A step that
 /// reaches it is stopped with the processes it started, and the run fails saying "The AI run reached its limit of
 /// 120 minutes" (or the step it was).
 pub const PROJECT_LIMIT: Duration = Duration::from_secs(120 * 60);
@@ -551,7 +551,6 @@ pub fn create(data: &Path, payload: &Value) -> Result<Value> {
     let slug = payload["slug"].as_str().unwrap_or("").trim().to_owned();
     ensure!(!is_device_name(&slug), "The plugin id {slug} is a name Windows keeps for a device: choose another");
     ensure!(is_slug(&slug), "The plugin id is lowercase letters and digits joined by dashes, such as my-plugin");
-    ensure!(slug != DEFAULT_ID, "The plugin id {slug} is the project Muro ships: choose another");
     let author = line(&payload["author"], "The author")?;
     let folder = line(&payload["folder"], "The folder")?;
     let folder = PathBuf::from(folder);
@@ -706,12 +705,10 @@ pub fn edit(data: &Path, payload: &Value) -> Result<Value> {
     Ok(result)
 }
 
-/// `delete_project {id, revision}`: the project leaves the list and its file is deleted. The project Muro ships
-/// cannot be deleted (it cannot leave the list), and neither can one an AI run is changing. A plugin installed
-/// from the project stays installed as it is.
+/// `delete_project {id, revision}`: the project leaves the list and its file is deleted. A project an AI run is
+/// changing cannot be deleted. A plugin installed from the project stays installed as it is.
 pub fn delete(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
-    ensure!(id != DEFAULT_ID, "The project Muro ships cannot be deleted");
     let current = registry(data)?;
     let entry = current["projects"]
         .as_array()

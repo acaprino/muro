@@ -481,14 +481,23 @@ tests that name it (`-m marionette`), the manifest validation, the source check,
 package build and the default-project pack run in `.github/workflows/marionette.yml`
 (when Marionette's paths change, or `gh workflow run marionette.yml --ref <branch>`);
 the gate of its own release stays in `release-marionette.yml`. The release of Muro
-(`release.yml`) runs no Marionette test or check and builds nothing of it (owner decision
-of 2026-11-22: "Muro prende dalla repository, punto. È Marionette a essere costruita con
-Muro"): `build-release.bat` runs `scripts/desktop_resources.py`, which takes the latest
-published release of `acaprino/marionette` (built with Muro by `release-marionette.yml`),
-checks its `.sha256` and places the zip, unchanged, under `projects/` in the bundle. The
-runtime only installs `projects/marionette.mp`, which nothing makes any more, so the zip
-is carried and not read: a new Muro has no default project until the runtime reads the
-release (`docs/desktop-cli.md`).
+(`release.yml`) runs no package test or check and bundles no package (owner decision of
+2026-11-25, below): `build-release.bat` runs `scripts/desktop_resources.py`, which stages
+the private Python and the factory and nothing else. Muro ships no project and reserves no
+id: a project that an earlier Muro copied into its data folder stays listed as an ordinary
+project (`docs/desktop-cli.md`).
+
+Owner rule of 2026-11-25 ("Muro di [un pacchetto] non deve saperne nulla", "elimina ogni
+riferimento"): nothing that runs in Muro names a package built with it. No code, test,
+fixture, workflow, script, app text, help text or instruction of this file names one; a
+package reaches the factory only as data given by whoever uses it (a manifest path, a
+repository address). The records of what was decided and verified (`docs/adr/`,
+`docs/verification/`, `docs/releases/`, `docs/frd/`, `docs/mockups/`) keep the names they
+were written with (owner's answer of the same day: "Solo ciò che esegue"). Add nothing new
+that names a package. What still does is on its way out, in this order: the factory tests
+move to a neutral fixture and back into the `Tests` run; the package under `examples/`,
+its own tests and its two workflows move to the package's repository; the passages of
+this file that name it are rewritten with the thing they describe.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 examples/marionette/sources.json --validate`. For source/build changes also run

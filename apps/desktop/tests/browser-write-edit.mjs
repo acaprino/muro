@@ -28,15 +28,15 @@ const texts = loc => loc.evaluateAll(elements => elements.map(e => e.textContent
 const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); };
-const openMarionette = async page => {
+const openSample = async page => {
   await goProjects(page);
-  await page.getByRole('button', { name: 'Marionette', exact: true }).click();
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
 };
 const segment = (page, name) => page.locator('[data-slot="toggle-group-item"]').filter({ hasText: new RegExp(`^${name}$`) });
 const notice = (page, text) => page.locator('[data-toasts]').getByText(text, { exact: true });
 /** The digest of the project's file now, as the fake holds it (what the page's digest has to be to be current). */
-const digest = page => page.evaluate(() => window.behind.digest('marionette'));
+const digest = page => page.evaluate(() => window.behind.digest('sample'));
 /** The side panel of Edit details (Sigrid's drawer form) and the window of a record (Sigrid's dialog), by what they say. */
 const detailsOf = page => page.locator('[data-slot="sheet-content"]').filter({ hasText: 'Edit details' });
 const windowOf = (page, title) => page.locator('[data-slot="dialog-content"]').filter({ hasText: title });
@@ -57,18 +57,18 @@ const save = dialog => dialog.getByRole('button', { name: 'Save', exact: true })
 // ---------- the details ----------
 await test('Edit details: name, author and the repository taken away go on the digest the page read, the page reads the file again, and the next edit names the file this one wrote', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const first = await digest(page);
   const dialog = await openDetails(page);
   await page.waitForFunction(() => document.activeElement?.getAttribute('name') === 'name');
-  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Marionette');
+  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Sample');
   assert.equal(await dialog.locator('input[name="author"]').inputValue(), 'acaprino');
-  assert.equal(await dialog.locator('input[name="repository-url"]').inputValue(), 'https://github.com/acaprino/marionette');
+  assert.equal(await dialog.locator('input[name="repository-url"]').inputValue(), 'https://github.com/owner/sample');
   assert.equal(await dialog.locator('input[name="repository-branch"]').inputValue(), 'main');
-  assert.equal(await dialog.locator('input[name="repository-tag_prefix"]').inputValue(), 'marionette-v');
+  assert.equal(await dialog.locator('input[name="repository-tag_prefix"]').inputValue(), 'sample-v');
   assert.equal(await save(dialog).isDisabled(), true, 'nothing changed: nothing to save');
   const author = 'Ann <i>Lee</i> & "Co"';
-  await dialog.locator('input[name="name"]').fill('Marionette Plus');
+  await dialog.locator('input[name="name"]').fill('Sample Plus');
   await dialog.locator('input[name="author"]').fill(author);
   await dialog.getByRole('button', { name: 'Take the repository away', exact: true }).click();
   assert.equal(await dialog.locator('input[name="repository-url"]').inputValue(), '', 'the address is empty');
@@ -77,8 +77,8 @@ await test('Edit details: name, author and the repository taken away go on the d
   await save(dialog).click();
   await dialog.waitFor({ state: 'detached' });
   await notice(page, 'Details saved.').waitFor();
-  await page.getByRole('heading', { name: 'Marionette Plus', level: 1 }).waitFor();
-  assert.deepEqual(await editsOf(app), [{ id: 'marionette', digest: first, name: 'Marionette Plus', author, repository: null }], 'only what changed, on the digest the page showed, with the repository as null');
+  await page.getByRole('heading', { name: 'Sample Plus', level: 1 }).waitFor();
+  assert.deepEqual(await editsOf(app), [{ id: 'sample', digest: first, name: 'Sample Plus', author, repository: null }], 'only what changed, on the digest the page showed, with the repository as null');
   const head = await page.locator('main header').first().textContent();
   assert.ok(head.includes('No Git repository set') && head.includes(`by ${author}`), `the page shows the file as it is now: ${head}`);
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('main i')].filter(e => e.textContent.includes('Lee')).length), 0, 'the author is text, not markup');
@@ -87,18 +87,18 @@ await test('Edit details: name, author and the repository taken away go on the d
 
   // The window opens on the file as it is now, and the second edit names the digest the first one left.
   const again = await openDetails(page);
-  assert.equal(await again.locator('input[name="name"]').inputValue(), 'Marionette Plus');
+  assert.equal(await again.locator('input[name="name"]').inputValue(), 'Sample Plus');
   assert.equal(await again.locator('input[name="repository-url"]').inputValue(), '');
-  await again.locator('textarea[name="changelog"]').fill('# Marionette Plus\n\nEdited by hand.\n');
+  await again.locator('textarea[name="changelog"]').fill('# Sample Plus\n\nEdited by hand.\n');
   await save(again).click();
   await again.waitFor({ state: 'detached' });
   const edits = await editsOf(app);
   assert.equal(edits.length, 2);
-  assert.deepEqual(edits[1], { id: 'marionette', digest: second, changelog: '# Marionette Plus\n\nEdited by hand.\n' });
+  assert.deepEqual(edits[1], { id: 'sample', digest: second, changelog: '# Sample Plus\n\nEdited by hand.\n' });
   const third = await digest(page);
   assert.notEqual(third, second);
   const last = await openDetails(page);
-  assert.equal(await last.locator('textarea[name="changelog"]').inputValue(), '# Marionette Plus\n\nEdited by hand.\n', 'the changelog is the one the file holds now');
+  assert.equal(await last.locator('textarea[name="changelog"]').inputValue(), '# Sample Plus\n\nEdited by hand.\n', 'the changelog is the one the file holds now');
   await last.getByRole('button', { name: 'Cancel', exact: true }).click();
   await last.waitFor({ state: 'detached' });
   assert.equal((await editsOf(app)).length, 2, 'Cancel sends nothing');
@@ -106,13 +106,13 @@ await test('Edit details: name, author and the repository taken away go on the d
 
 await test('Edit details: Cancel and Escape send nothing and the window starts again from the file; what is wrong is said before anything is sent', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   let dialog = await openDetails(page);
   await dialog.locator('input[name="name"]').fill('Something else');
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'detached' });
   dialog = await openDetails(page);
-  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Marionette', 'what was typed is not kept');
+  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Sample', 'what was typed is not kept');
   assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
 
   await dialog.locator('input[name="name"]').fill('  ');
@@ -122,7 +122,7 @@ await test('Edit details: Cancel and Escape send nothing and the window starts a
   await dialog.getByText('The repository address must be an https:// address', { exact: true }).waitFor();
   assert.equal((await editsOf(app)).length, 0, 'nothing is sent while the form is wrong');
   await dialog.locator('input[name="name"]').fill('A'.repeat(201));
-  await dialog.locator('input[name="repository-url"]').fill('https://github.com/acaprino/marionette');
+  await dialog.locator('input[name="repository-url"]').fill('https://github.com/owner/sample');
   await dialog.getByText('The project name must be one line of at most 200 characters', { exact: true }).waitFor();
   assert.equal(await dialog.getByText('The repository address must be an https:// address', { exact: true }).count(), 0, 'what was fixed is no longer said');
   await save(dialog).click();
@@ -134,11 +134,11 @@ await test('Edit details: Cancel and Escape send nothing and the window starts a
 
 await test('Edit details: a file that changed after the page read it is refused in the runtime\'s words, the window stays open and the file is as it was', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   const read = await digest(page);
   const dialog = await openDetails(page);
-  await dialog.locator('input[name="name"]').fill('Marionette Plus');
-  await page.evaluate(() => window.behind.touch('marionette'));
+  await dialog.locator('input[name="name"]').fill('Sample Plus');
+  await page.evaluate(() => window.behind.touch('sample'));
   const touched = await digest(page);
   assert.notEqual(touched, read);
   await save(dialog).click();
@@ -146,20 +146,20 @@ await test('Edit details: a file that changed after the page read it is refused 
   await refusal.waitFor();
   assert.equal(await refusal.locator('[data-slot="note-description"]').textContent(), CHANGED, 'the runtime\'s sentence, whole');
   assert.match(await refusal.locator('[data-slot="note-title"]').textContent(), /Not saved/);
-  assert.deepEqual(await editsOf(app), [{ id: 'marionette', digest: read, name: 'Marionette Plus' }], 'the edit named the file the page had read');
+  assert.deepEqual(await editsOf(app), [{ id: 'sample', digest: read, name: 'Sample Plus' }], 'the edit named the file the page had read');
   assert.equal(await digest(page), touched, 'the file was not written');
   assert.equal(await dialog.isVisible(), true, 'the window stays so what was typed is not lost');
-  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Marionette Plus');
+  assert.equal(await dialog.locator('input[name="name"]').inputValue(), 'Sample Plus');
   await page.screenshot({ path: shots + '/write-details-refused.png' });
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   await dialog.waitFor({ state: 'detached' });
-  await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
 });
 
 // ---------- the records ----------
 await test('Records: one added, one changed and one deleted, each on the digest the last edit left; a record with < & and quotes is text', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Records').click();
   const list = page.getByRole('list', { name: 'Decision records' });
   const digests = [await digest(page)];
@@ -255,7 +255,7 @@ await test('Records: one added, one changed and one deleted, each on the digest 
 
 await test('Records: what is missing is said before anything is sent, and a file that changed is refused in the runtime\'s words', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await segment(page, 'Records').click();
   const read = await digest(page);
   await page.getByRole('button', { name: 'Add record…', exact: true }).click();
@@ -267,7 +267,7 @@ await test('Records: what is missing is said before anything is sent, and a file
   assert.equal((await editsOf(app)).length, 0, 'nothing is sent while the decision is empty');
   await dialog.locator('textarea[name="text"]').fill('A decision.');
   assert.equal(await dialog.getByText('Write the decision and its reason.', { exact: true }).count(), 0, 'what was fixed is no longer said');
-  await page.evaluate(() => window.behind.touch('marionette'));
+  await page.evaluate(() => window.behind.touch('sample'));
   await save(dialog).click();
   const refusal = dialog.getByRole('alert').filter({ hasText: CHANGED });
   await refusal.waitFor();
@@ -283,7 +283,7 @@ await test('Records: what is missing is said before anything is sent, and a file
 
 await test('Records: at 500px the panel is a drawer, and a record added from it is saved and the drawer is still there', 'projects', {}, async app => {
   const { page } = app;
-  await openMarionette(page);
+  await openSample(page);
   await page.setViewportSize({ width: 500, height: 900 });
   await page.getByRole('button', { name: 'Project panel', exact: true }).click();
   const drawer = page.locator('[data-slot="sheet-content"][data-side="left"]');

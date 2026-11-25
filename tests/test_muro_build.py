@@ -13,7 +13,6 @@ from muro_build import (
 )
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 def test_validate_plugin_identity_rejects_reserved_and_non_kebab():
@@ -51,11 +50,6 @@ def test_legacy_build_export_rejects_role_and_intent_token_routing():
     ]
     with pytest.raises(ValueError, match="host AI classification"):
         resolve_plan(rows, ["scroll-code"], {"intent:ui", "intent:animation", "stack:gsap"}, set())
-
-
-def test_repository_capabilities_and_router_are_valid():
-    errors = validate_capabilities_and_router(PACKAGE / "capabilities", PACKAGE / "ROUTER.md")
-    assert errors == []
 
 
 def test_build_release_emits_branded_package_and_notices(tmp_path: Path, portable_project: Path):

@@ -20,7 +20,7 @@ export interface ChangeDialogProps { id: string; info: ProjectInfo; open: boolea
 
 /** The project's name in the words of a dialog: its own, else its plugin's, else its id. */
 export const projectName = (info: ProjectInfo, id: string): string => text(info.project?.name) || text(info.plugin?.name) || id;
-/** A sentence after a name and a colon: its first letter in lower case ("Marionette: the AI reads…"). */
+/** A sentence after a name and a colon: its first letter in lower case ("My package: the AI reads…"). */
 export const afterColon = (sentence: string): string => sentence.charAt(0).toLowerCase() + sentence.slice(1);
 const REQUEST_HINT = 'Optional. In your words, for the AI. A binding record still wins: the AI stops rather than break one.';
 

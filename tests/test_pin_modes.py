@@ -15,7 +15,6 @@ from muro import check_sources
 from test_regressions import MIT
 
 ROOT = Path(__file__).resolve().parent.parent
-PACKAGE = ROOT / "examples" / "marionette"  # the example plugin the factory builds
 
 
 @pytest.fixture
@@ -119,27 +118,3 @@ def test_every_source_must_declare_its_pin_mode(repo, fields):
     assert found and "pin must be one of release, head, static" in found[0]
 
 
-def test_manifest_declares_a_mode_for_every_source():
-    sources = json.loads((PACKAGE / "sources.json").read_text(encoding="utf-8"))["sources"]
-    modes = {src["id"]: (src.get("pin"), src.get("release")) for src in sources}
-    assert modes == {
-        "open-paper-skills": ("head", None),
-        "tokeneconomizer": ("release", "v0.1.0"),
-        "wayfinder": ("release", "v1.3.2"),
-        "ui-ux-pro-max": ("release", "v2.15.0"),
-        "genoffice": ("release", "v0.12.852"),
-        "ponytail": ("release", "v5.3.3"),
-        "i-have-adhd": ("release", "v0.4.1"),
-        "egm": ("release", "v0.1.1"),
-        "superpowers": ("release", "v7.0.2"),
-        "zero-slop-design": ("release", "v0.2.1"),
-        "claude-design-system-prompt": ("release", "v1-design-prompt"),
-        # These upstreams publish no release or tag: the owner follows their HEAD.
-        "motion-design": ("head", None),
-        "gsap-scrolltrigger": ("head", None),
-        "ai-design-skills": ("head", None),
-        "explain-this": ("head", None),
-        "text-humanizer": ("head", None),
-        "better-layout": ("head", None),
-        "charles-skills": ("head", None),
-    }

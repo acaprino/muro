@@ -1,14 +1,13 @@
 //! Projects in the desktop runtime (ADR-0028): the `.mp` files the registry lists, read through the
-//! bundled factory (`muro project info`), opened from anywhere, put on the harnesses as a registry
-//! plugin, and the default project Muro ships. The factory owns the format; the registry owns the
-//! list and the plugins; this module connects them and decides nothing about what a project means.
+//! bundled factory (`muro project info`), opened from anywhere and put on the harnesses as a registry
+//! plugin. The factory owns the format; the registry owns the list and the plugins; this module
+//! connects them and decides nothing about what a project means.
 use crate::factory::Factory;
 use anyhow::{Context, Result, bail, ensure};
-use muro_registry::projects::{self as list, DEFAULT_ID, same_file};
+use muro_registry::projects::{self as list, same_file};
 use serde_json::{Value, json};
 use std::{
     collections::HashSet,
-    io::Write,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
 };
@@ -20,11 +19,6 @@ pub const HARNESSES: [&str; 5] = ["claude-code", "codex", "opencode", "pi", "her
 /// directory, so a portable Muro keeps it with its data.
 pub fn cache_dir(data: &Path) -> PathBuf {
     data.join("project-cache")
-}
-
-/// Where the project Muro ships is kept: a copy that is the person's own from then on.
-pub fn projects_dir(data: &Path) -> PathBuf {
-    data.join("projects")
 }
 
 fn registry(data: &Path) -> Result<Value> {
@@ -73,33 +67,24 @@ fn update(
     unreachable!("the last attempt returns")
 }
 
-/// Whether a listed project is the one Muro ships: the default project's id AND the copy Muro put in its
-/// own data directory. This is the only way a project is "Included with Muro": the `builtin` field a
-/// project file carries about itself is anyone's to write, and no foreign file may wear the badge.
-pub fn is_included(data: &Path, id: &str, path: &str) -> bool {
-    id == DEFAULT_ID && same_file(path) == same_file(&default_file(data).to_string_lossy())
-}
-
-/// A listed project that cannot be read, as the page shows it: its id and path, the reason, and whether it is
-/// the one Muro ships (that entry cannot be removed from the list, readable or not).
-fn failed(data: &Path, id: &str, path: &str, error: &str) -> Value {
-    json!({"id":id,"path":path,"error":error,"included":is_included(data, id, path)})
+/// A listed project that cannot be read, as the page shows it: its id and path, and the reason.
+fn failed(id: &str, path: &str, error: &str) -> Value {
+    json!({"id":id,"path":path,"error":error})
 }
 
 /// The summary of one listed file as the page shows it: its id and path, and what `info --summary` says,
 /// or the reason it cannot be read. A file that is gone is not worth a factory run.
 fn summary(factory: &Factory, data: &Path, id: &str, path: &str) -> Result<Value> {
     if !Path::new(path).is_file() {
-        return Ok(failed(data, id, path, &missing(path)));
+        return Ok(failed(id, path, &missing(path)));
     }
     let read = factory.project_info(Path::new(path), &cache_dir(data), true)?;
     if let Some(error) = read["error"].as_str() {
-        return Ok(failed(data, id, path, error));
+        return Ok(failed(id, path, error));
     }
     let mut shown = read;
     shown["id"] = json!(id);
     shown["path"] = json!(path);
-    shown["included"] = json!(is_included(data, id, path));
     Ok(shown)
 }
 
@@ -117,7 +102,7 @@ pub fn projects(data: &Path) -> Result<Value> {
         let (id, path) = (item["id"].as_str().unwrap_or(""), item["path"].as_str().unwrap_or(""));
         // A file the factory cannot read at all (it crashed, it ran out of time) is that project's own
         // error: it must not hide the others from the list.
-        shown.push(summary(&factory, data, id, path).unwrap_or_else(|error| failed(data, id, path, &format!("{error:#}"))));
+        shown.push(summary(&factory, data, id, path).unwrap_or_else(|error| failed(id, path, &format!("{error:#}"))));
     }
     Ok(json!(shown))
 }
@@ -128,16 +113,9 @@ pub fn project(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
     let current = registry(data)?;
     let file = listed_file(&current, id)?;
-    match Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false) {
-        Ok(mut info) => {
-            info["included"] = json!(is_included(data, id, &file.to_string_lossy()));
-            Ok(info)
-        }
-        Err(error) => {
-            discard_unpack(data, &current, &file);
-            Err(error)
-        }
-    }
+    Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false).inspect_err(|_| {
+        discard_unpack(data, &current, &file);
+    })
 }
 
 /// The unpack of a file the factory refused is deleted: a hostile file is no reason for the cache to hold
@@ -193,7 +171,6 @@ pub fn open(data: &Path, payload: &Value) -> Result<Value> {
         next.push(json!({"id":slug,"path":path}));
         Ok(Some(("save_projects", json!({"projects":next}))))
     })?;
-    shown["included"] = json!(is_included(data, shown["id"].as_str().unwrap_or(""), path));
     sweep_cache(data);
     Ok(shown)
 }
@@ -354,137 +331,10 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     Ok(json!({"id":id,"plugin":plugin,"digest":digest,"harnesses":kinds,"targets":target_ids}))
 }
 
-// --- the project Muro ships ------------------------------------------------------------------
-
-/// What `install_default` found and did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DefaultProject {
-    /// This Muro carries no default project (a build made without resources).
-    NotBundled,
-    /// Done before, or a file of the person's own is there: kept as it is, listed or not (it may have
-    /// been removed on purpose).
-    AlreadyThere,
-    /// Another project of the list already has the id: the person's own, left alone.
-    IdTaken,
-    /// Copied into the data directory and listed.
-    Installed,
-    /// The copy Muro put there, which the person never changed, was replaced by the newer one this Muro ships.
-    Updated,
-}
-
-/// The mark that the default project was put in this data directory once: a project the person
-/// removed or deleted is not brought back at every start. It holds the SHA-256 of the file Muro copied
-/// (nothing when the file there is the person's own): the copy is Muro's to replace only while it still
-/// has that digest.
-fn installed_mark(data: &Path) -> PathBuf {
-    projects_dir(data).join(".default-installed")
-}
-
-/// Where the default project's copy lives: `<data>/projects/marionette.mp`.
-fn default_file(data: &Path) -> PathBuf {
-    projects_dir(data).join(format!("{DEFAULT_ID}.mp"))
-}
-
-/// Writes `bundled` beside `target`, whole and flushed, and puts it in place: replacing `target` when
-/// `replace`, else only where nothing is. Returns whether it was put there.
-fn put_copy(bundled: &Path, target: &Path, replace: bool) -> Result<bool> {
-    let folder = target.parent().context("The project folder")?;
-    let mut copy = tempfile::NamedTempFile::new_in(folder)?;
-    std::io::copy(&mut std::fs::File::open(bundled)?, &mut copy)?;
-    copy.flush()?;
-    copy.as_file().sync_all()?;
-    if replace {
-        copy.persist(target).map_err(|error| error.error)?;
-        return Ok(true);
-    }
-    match copy.persist_noclobber(target) {
-        Ok(_) => Ok(true),
-        Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
-        Err(error) => Err(error.error.into()),
-    }
-}
-
-/// A later start: the project Muro ships replaces the copy it put in this data directory when, and only
-/// when, that copy still is exactly the file Muro copied (its digest is the mark's) and the shipped
-/// one differs. A file with any other digest is the person's, edited or newer, and is never touched;
-/// so is a link, and a mark that records nothing. The new file is written beside and then put in place,
-/// and the mark moves last: a start that ended in between finds the shipped file already there and only
-/// moves the mark.
-fn refresh_default(bundled: &Path, target: &Path, mark: &Path) -> Result<DefaultProject> {
-    let recorded = std::fs::read_to_string(mark).unwrap_or_default();
-    let recorded = recorded.trim();
-    let plain = std::fs::symlink_metadata(target).is_ok_and(|meta| meta.file_type().is_file());
-    if recorded.is_empty() || !plain {
-        return Ok(DefaultProject::AlreadyThere);
-    }
-    let (shipped, held) = (list::file_digest(bundled)?, list::file_digest(target)?);
-    if held == shipped {
-        if recorded != shipped {
-            std::fs::write(mark, &shipped)?;
-        }
-        return Ok(DefaultProject::AlreadyThere);
-    }
-    if held != recorded {
-        return Ok(DefaultProject::AlreadyThere);
-    }
-    put_copy(bundled, target, true)?;
-    std::fs::write(mark, &shipped)?;
-    Ok(DefaultProject::Updated)
-}
-
-/// First start: the project Muro ships (`<resources>/projects/marionette.mp`) is copied to
-/// `<data>/projects/marionette.mp` and listed, once. An existing file there is never replaced, changed
-/// or listed again: it is the person's own, which may be newer or edited. The entry is listed before
-/// the file is copied and the mark is written last, with the digest of the copy, so a start that ended in
-/// between is finished by the next one, and the file only ever appears whole. At a later start the copy
-/// is replaced by a newer shipped one only while it is still the file Muro copied (`refresh_default`).
-pub fn install_default(data: &Path, resources: &Path) -> Result<DefaultProject> {
-    let bundled = resources.join("projects").join(format!("{DEFAULT_ID}.mp"));
-    if !bundled.is_file() {
-        return Ok(DefaultProject::NotBundled);
-    }
-    let folder = projects_dir(data);
-    let mark = installed_mark(data);
-    let target = default_file(data);
-    if mark.exists() {
-        return refresh_default(&bundled, &target, &mark);
-    }
-    std::fs::create_dir_all(&folder)?;
-    if std::fs::symlink_metadata(&target).is_ok() {
-        std::fs::write(&mark, b"")?;
-        return Ok(DefaultProject::AlreadyThere);
-    }
-    let path = target.to_string_lossy().into_owned();
-    let mut taken = false;
-    update(data, |reg| {
-        let items = listed(reg);
-        if items.iter().any(|p| p["path"].as_str().is_some_and(|p| same_file(p) == same_file(&path))) {
-            return Ok(None);
-        }
-        if items.iter().any(|p| p["id"] == DEFAULT_ID) {
-            taken = true;
-            return Ok(None);
-        }
-        let mut next = items.to_vec();
-        next.push(json!({"id":DEFAULT_ID,"path":path}));
-        Ok(Some(("save_projects", json!({"projects":next}))))
-    })?;
-    if taken {
-        std::fs::write(&mark, b"")?;
-        return Ok(DefaultProject::IdTaken);
-    }
-    if !put_copy(&bundled, &target, false)? {
-        std::fs::write(&mark, b"")?;
-        return Ok(DefaultProject::AlreadyThere);
-    }
-    std::fs::write(&mark, list::file_digest(&target)?)?;
-    Ok(DefaultProject::Installed)
-}
-
 // --- removing a project, and keeping the cache to what is used ----------------------------------------
 
-/// `remove_project {id}`: the project leaves the list (never its file; the default project stays: the
-/// registry refuses it) and the cache folders nothing needs any more are removed.
+/// `remove_project {id}`: the project leaves the list (never its file) and the cache folders nothing
+/// needs any more are removed.
 pub fn remove(data: &Path, payload: &Value) -> Result<Value> {
     let result = muro_registry::service::request(data, "remove_project", payload.clone())?;
     sweep_cache(data);
