@@ -186,10 +186,11 @@ await test('Settings has the glass of the window, off at first; a press makes it
   await ready(page);
   await tab(page, 'Settings').click();
   const glass = content(page).getByRole('switch', { name: 'Glass' });
-  assert.equal(await glass.getAttribute('aria-checked'), 'false', 'the window is not glass until the person chooses');
+  assert.equal(await glass.isChecked(), false, 'the window is not glass until the person chooses');
   assert.equal(await page.evaluate(() => window.native.filter(([command]) => command === 'plugin:imago-shell|set_glass').length), 0, 'nothing is told at the start');
   await content(page).getByText('Settings is moving to the new window').waitFor();
-  await glass.click();
+  await glass.focus();
+  await page.keyboard.press('Space');
   await page.waitForFunction(() => document.documentElement.dataset.material === 'glass');
   await page.waitForFunction(() => window.native.some(([command]) => command === 'plugin:imago-shell|set_glass'));
   assert.deepEqual(await page.evaluate(() => window.native.filter(([command]) => command === 'plugin:imago-shell|set_glass').map(([, args]) => args)), [{ glass: true }]);
