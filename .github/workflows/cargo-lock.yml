@@ -1,0 +1,27 @@
+# TEMPORARY. Makes Cargo.lock once, because cargo is never run on the owner's machine: it resolves, builds nothing and
+# uploads the file, which is committed by hand. Deleted once the file is committed.
+name: Cargo lock
+
+on:
+  push:
+    branches: [imago-shell]
+    paths: ['.github/workflows/cargo-lock.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  lock:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: |
+          cargo metadata --format-version 1 > $null
+          if ($LASTEXITCODE) { cargo update -p tauri-plugin --precise 2.7.2; if ($LASTEXITCODE) { exit 1 } }
+          git diff Cargo.lock
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cargo-lock
+          path: Cargo.lock
+          retention-days: 1
+          if-no-files-found: error
