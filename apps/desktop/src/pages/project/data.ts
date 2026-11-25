@@ -89,3 +89,13 @@ export function tagOf(info: ProjectInfo, version: string): string {
   const repo = obj(info.project?.repository);
   return repo && version ? text(repo.tag_prefix) + version : '';
 }
+/** What a release of the project publishes, as its file says it: the repository and the branch its `project.json` names, the file as it is named there (`<plugin id>.mp`), the plugin's version
+ * and the tag of that version (`tagOf`). */
+export interface ReleaseFacts { repository: string; branch: string; file: string; version: string; tag: string }
+/** The release of the project as its file says it, or null for a project that names no repository: there is nowhere to release it to. A field the file holds in another shape reads as empty. */
+export function releaseOf(info: ProjectInfo): ReleaseFacts | null {
+  const repo = obj(info.project?.repository), repository = text(repo?.url).trim();
+  if (!repo || !repository) return null;
+  const version = text(info.plugin?.version);
+  return { repository, branch: text(repo.branch), file: `${text(info.plugin?.slug)}.mp`, version, tag: tagOf(info, version) };
+}

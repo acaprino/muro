@@ -5,7 +5,7 @@ title: A project's repository is a plugin store built from its project file
 status: Proposed
 author: Claude Code
 scope:
-  paths: [.github/workflows/project-store.yml, .github/scripts/project_store.py, muro/project_store.py, muro/project_release.py, docs/project-store.md, tests/test_project_store.py, tests/test_project_release.py]
+  paths: [.github/workflows/project-store.yml, .github/scripts/project_store.py, muro/project_store.py, muro/project_release.py, docs/project-store.md, tests/test_project_store.py, tests/test_project_release.py, crates/muro-desktop-runtime/src/project_jobs.rs, apps/desktop/src/pages/project/write/ReleaseDialog.tsx]
   modules: []
   domains: [projects, release, repositories]
 governs_symbols: []
@@ -19,7 +19,9 @@ accepted_on: null
 
 Date: 2026-11-25. Status: Proposed. The model is the owner's, in the words quoted
 below. The workflow, its rules and this text are implementation choices and are not
-separately approved. The workflow has not run on GitHub: see "Not run".
+separately approved. The workflow and the command ran once for real, on a probe
+repository (`docs/verification/2026-11-25-project-store.md`): see "Not run" for what
+that run does not show.
 
 ## Context
 
@@ -118,6 +120,31 @@ same rules before it leaves (`identity_refusals`, `release_problem`,
   and `.github/release.json` to them.
 - A push that Git refuses (a branch that moved) is reported with Git's text.
 
+**Releasing from the app** (amendment of 2026-11-25, on the same words of the owner). The workspace of an open project
+has **Release…**, and the runtime has the action `release_project {id, digest, init?, dry_run?}`
+(`crates/muro-desktop-runtime/src/project_jobs.rs`, `release`), which runs `muro project release FILE --expect-digest
+DIGEST --cache <data>/project-cache [--init] [--dry-run]` and answers what the command printed. The choices:
+
+- The app adds no rule and no word of its own to the release. The runtime checks only what it checks for an edit (the
+  project is in the list, the digest has the shape of one, no AI run is changing the project) and that the two switches
+  are true or false. Everything else is the command's, and a refusal is the command's sentence without its prefix.
+- No credential is asked for, read or stored, by the page or by the runtime. Git runs as the factory runs it, without a
+  prompt.
+- It is not an AI run and not a job: it holds no AI lock, has no card and no Cancel, and the dialog waits for it. The
+  runtime stops it after 540 seconds, under the 600 the boundary between the window and the runtime waits for one
+  request, so the person reads the runtime's sentence. A release stopped there may have pushed: the sentence says so,
+  and that releasing again is safe. The command's own limit, 15 minutes for each network step, is not reached from the
+  app; a file that needs longer is released from the command line.
+- The dialog says what the file says (`project.json`'s repository and branch, `<slug>.mp`, the plugin's version and
+  `<tag_prefix><version>`) and asks nothing of the network before the person agrees. It uses no dry run: the action
+  takes `dry_run` for a script, and the page does not send it.
+- One switch, off when the dialog opens, is `--init`. Off is the command's own default, and a push that adds a workflow
+  may need a right the person's credential lacks.
+- **Release…** is off, saying why, for a project that names no repository and while an AI run changes that project.
+  It is not hidden: the buttons of the action bar keep their places.
+- The dialog is Sigrid's `Dialog`, as the other dialogs of the page are. Sigrid's guide names `ConfirmDialog` for a
+  question before an action that is not taken back; no dialog of Muro uses it yet, and this one follows the page.
+
 **The rules**, each a red failure with one sentence:
 
 - the file is named `<slug>.mp` and is at the root of the repository;
@@ -190,9 +217,9 @@ run that waits is replaced by a newer one that waits: the newest file wins.
 
 ## Not in this record
 
-- The action of the app that puts a project's file into its repository. The command
-  exists (`muro project release`); nothing in the app runs it yet.
 - The command and the action that take a newer file from a repository.
+- A Cancel for a release that is on its way, and a release that lasts longer than one request of the window (a job,
+  as an AI run is).
 - Moving any existing repository to this model.
 - `AGENTS.md`. It still describes a package as a directory in its own repository,
   released by a workflow of its own. It was left as it is, to be changed with the
@@ -200,8 +227,11 @@ run that waits is replaced by a newer one that waits: the newest file wins.
 
 ## Not run
 
-- The workflow has never run on GitHub. No store repository calls it.
-- Proven only by such a run: that `job.workflow_sha` names the commit of the called
+- The workflow ran once on GitHub, on a private probe repository, and released at the
+  first run (`docs/verification/2026-11-25-project-store.md`). No real project's
+  repository calls it yet.
+- Shown by that one run, for a small file in a private repository, and by nothing
+  else: that `job.workflow_sha` names the commit of the called
   workflow; that a caller's token checks out Muro; that the `concurrency` of a
   called workflow holds a second run back; the three `gh` calls that read the tag,
   the asset of its release and the file of the tagged commit; the push to a
@@ -217,7 +247,8 @@ run that waits is replaced by a newer one that waits: the newest file wins.
   no:cacheprovider`, 47 passed. Every remote is a bare repository on the disk, named
   by a `file://` address, and the person's Git is a configuration of the test's own.
   They prove what the command reads, decides, commits and pushes, and what it refuses.
-- `muro project release` has never pushed to GitHub. Proven only there: the person's
+- `muro project release` pushed to GitHub once, to the probe repository, with the
+  person's stored credential. Still unproven, because that run did not meet it: the person's
   credential helper and a credential that is missing (Git does not prompt in the
   terminal; a helper's own window is not Muro's to close, and the time limit ends
   it); a push that adds `.github/workflows/release.yml`, which a token without the
@@ -238,7 +269,22 @@ run that waits is replaced by a newer one that waits: the newest file wins.
   by `github-actions[bot]` with only the generated paths, and the tag on it. The same
   step run again stopped with "main moved after this push". That run is not kept as a
   test: it needs a built release and Bash.
-- Never run anywhere: the step that asks whether the version was released (the three
+- Run once, on the probe only: the step that asks whether the version was released (the three
   `gh` calls), `--check-sources` and `--build` on an unpacked project, the zip, the
   `.sha256` files and `gh release create` or `upload`.
+- The action of the app (`release_project` and **Release…**), written on 2026-11-25. Nothing of it was compiled on
+  the developer machine: no Rust and no TypeScript build, and no window. The Rust tests (`tests/project_jobs.rs`, the
+  unit tests of `project_jobs.rs`, two assertions in `tests/simulate.rs`), the type check, `sigrid-check`,
+  `imago-check` and the browser tests (`browser-write-edit.mjs`, `browser-write-ai.mjs`, `browser-workspace.mjs`,
+  `shots.mjs`) wait for GitHub Actions. Run there, they prove the action against a stand-in factory and the page against
+  a fake service; neither reaches a repository.
+- Run on the developer machine for the action, 2026-11-25: `node --experimental-strip-types --test` on
+  `apps/desktop/tests/project-write.test.ts`, `project-data.test.ts`, `imago-ownership.test.ts` and
+  `fake-transport.test.ts` (54 passed: plain functions, the fake service and the rules for the sources, no build),
+  `node --check` on the browser test files that changed, and the `project release` branch of the stand-in factory, by
+  hand, with Python.
+- No release was made from the app. Proven only by one: which Git the app runs (the runtime puts the bundled Git of a
+  portable folder first on `PATH`) and whether that Git finds the person's name, email and credential helper; what the
+  dialog shows when a helper opens a window of its own; a push that lasts longer than 540 seconds; and the notice with a
+  real repository's answer.
 - The whole test suite waits for GitHub Actions.
