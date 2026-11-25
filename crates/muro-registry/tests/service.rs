@@ -1945,3 +1945,92 @@ fn claude_native_round_trip() {
 fn codex_native_round_trip() {
     marketplace_round_trip("codex", &std::env::var("MURO_CODEX_TEST_EXE").unwrap());
 }
+
+// Owner, 2026-11-25, "Muro deve funzionare": on the owner's computer one configured marketplace whose
+// folder was gone made `codex plugin list --json` answer nothing (codex-cli 0.169.0), Sync said that
+// Codex could not be read, and nothing could be installed there. Codex itself went on starting, adding
+// and removing. The executable is the stand-in of tests/bin/fake_codex.rs, which refuses as that
+// version does.
+#[test]
+fn codex_is_read_and_written_beside_a_marketplace_whose_folder_is_gone() {
+    let exe = env!("CARGO_BIN_EXE_fake-codex");
+    let (t, r, p, a) = fixture();
+    fs::create_dir_all(a.join(".codex-plugin")).unwrap();
+    fs::write(a.join(".codex-plugin").join("plugin.json"),r#"{"name":"muro-registry-test","version":"1.0.0","description":"Isolated registry verification"}"#).unwrap();
+    // The person's Codex: a plugin of their own, from a marketplace whose folder is gone.
+    let gone = t.path().join("gone-market");
+    fs::create_dir_all(p.join("plugins/cache/lost/keep/0.4.1")).unwrap();
+    let theirs = format!("[marketplaces.lost]\nsource_type = \"local\"\nsource = '{}'\n\n[plugins.\"keep@lost\"]\nenabled = true\n", gone.display());
+    fs::write(p.join("config.toml"), &theirs).unwrap();
+    let refused = std::process::Command::new(exe).args(["plugin", "list", "--json"]).env("CODEX_HOME", &p).output().unwrap();
+    assert!(!refused.status.success(), "the stand-in lists nothing beside a marketplace it cannot load");
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("failed to load configured marketplace snapshot(s)"));
+
+    request(&r,"save_target",json!({"revision":0,"target":{"id":"host","harness":"codex","name":"Codex","root":p,"executable":exe,"exclusive":false,"enabled":true}})).unwrap();
+    let s = snapshot(&r);
+    request(&r,"save_plugin",json!({"revision":s["registry"]["revision"],"plugin":{"id":"native-test","name":"Native test","source":a,"policy":"pinned","pinned_version":"1.0.0","targets":["host"],"distributions":[{"harness":"codex","path":a,"version":"1.0.0"}]}})).unwrap();
+    let warning = json!([format!("The marketplace lost points to a folder that is gone: {}", gone.display())]);
+    let ids = |s: &Value| -> Vec<String> {
+        s["inventory"][0]["plugins"].as_array().unwrap().iter().map(|i| i["id"].as_str().unwrap().to_owned()).collect()
+    };
+
+    // Read: what is installed is listed, the marketplace is named, and nothing blocks the plan. The
+    // list is the truth: the marketplace holds no plugin of the list, so the plan takes it out of Codex
+    // with the plugin configured from it, though this harness keeps what is outside the list.
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    let kinds = |plan: &Value| -> Vec<String> {
+        plan["operations"].as_array().unwrap().iter().map(|o| o["kind"].as_str().unwrap().to_owned()).collect()
+    };
+    assert_eq!(kinds(&plan), ["install", "remove-marketplace"], "{plan}");
+    let removal = &plan["operations"][1];
+    assert_eq!((&removal["name"], &removal["plugins"], &removal["reason"]), (&json!("lost"), &json!(["keep@lost"]), &warning[0]), "{plan}");
+    let s = snapshot(&r);
+    assert_eq!((&s["inventory"][0]["complete"], &s["inventory"][0]["error"]), (&json!(true), &Value::Null), "{s}");
+    assert_eq!(s["inventory"][0]["warnings"], warning, "the warning stays until the plan is applied");
+    assert_eq!(ids(&s), ["keep@lost"]);
+    assert_eq!(s["inventory"][0]["plugins"][0]["version"], "0.4.1");
+
+    // Written and repaired: the install runs beside the marketplace Codex cannot load, then the
+    // marketplace goes, with Codex's own commands. Codex lists again, and the next plan has nothing to do.
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let s = snapshot(&r);
+    assert_eq!(ids(&s), ["muro-registry-test@muro-native-test"], "{s}");
+    let ours = &s["inventory"][0]["plugins"][0];
+    assert_eq!((&ours["registry_id"], &ours["version"], &ours["managed"]), (&json!("native-test"), &json!("1.0.0"), &json!(true)));
+    assert_eq!(s["inventory"][0]["warnings"], json!([]), "{s}");
+    let listed = std::process::Command::new(exe).args(["plugin", "list", "--json"]).env("CODEX_HOME", &p).output().unwrap();
+    assert!(listed.status.success(), "Codex lists its plugins again");
+    let config = fs::read_to_string(p.join("config.toml")).unwrap();
+    assert!(!config.contains("marketplaces.lost"), "{config}");
+    assert!(!p.join("plugins/cache/lost/keep").exists());
+    assert_eq!(kinds(&request(&r, "plan", json!({})).unwrap()), Vec::<String>::new());
+
+    // Broken and in the list: the folder of the marketplace Muro installs this plugin from is gone.
+    // Muro installs the plugin again from its own source, which writes the marketplace anew.
+    let market = config.lines().find_map(|line| line.strip_prefix("source = ")).map(|path| path.trim_matches(['"', '\''])).unwrap().to_owned();
+    assert!(Path::new(&market).is_dir(), "{config}");
+    fs::remove_dir_all(&market).unwrap();
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!((kinds(&plan), &plan["blockers"]), (vec!["reinstall".to_owned()], &json!([])), "{plan}");
+    assert_eq!(plan["operations"][0]["reason"], "Its marketplace cannot be loaded");
+    let s = snapshot(&r);
+    assert_eq!(s["inventory"][0]["warnings"].as_array().unwrap().len(), 1, "{s}");
+    assert!(s["inventory"][0]["warnings"][0].as_str().unwrap().starts_with("The marketplace muro-native-test points to a folder that is gone: "), "{s}");
+    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let s = snapshot(&r);
+    assert_eq!((ids(&s), &s["inventory"][0]["warnings"]), (vec!["muro-registry-test@muro-native-test".to_owned()], &json!([])), "{s}");
+    assert!(Path::new(&market).is_dir());
+    assert_eq!(kinds(&request(&r, "plan", json!({})).unwrap()), Vec::<String>::new());
+
+    // Removed: with the plugin off the list and the harness kept to the list alone, the plan uninstalls
+    // the copy, and says how many removals it holds before it does.
+    request(&r,"remove_plugin",json!({"id":"native-test","revision":s["registry"]["revision"]})).unwrap();
+    let s = snapshot(&r);
+    request(&r,"save_target",json!({"revision":s["registry"]["revision"],"target":{"id":"host","harness":"codex","name":"Codex","root":p,"executable":exe,"exclusive":true,"enabled":true}})).unwrap();
+    let plan = request(&r, "plan", json!({})).unwrap();
+    assert_eq!((&plan["blockers"], removal_count(&plan)), (&json!([]), 1), "{plan}");
+    request(&r, "apply", confirmed(&plan)).unwrap();
+    let s = snapshot(&r);
+    assert_eq!(ids(&s), Vec::<String>::new(), "{s}");
+}
