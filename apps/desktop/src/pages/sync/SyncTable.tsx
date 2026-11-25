@@ -99,16 +99,16 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
       line = <Button variant="outline" size="sm" loading={asking} onClick={() => onReview(target.id)}><Icon name="refresh" />Sync {plural(state.count, 'change')}</Button>;
       break;
     case 'needs-build':
-      line = <span className="inline-flex items-center gap-1 text-warning"><Icon name="alert" />{needBuild(state.count)}</span>;
+      line = <Badge tone="warning">{needBuild(state.count)}</Badge>;
       break;
     case 'unknown':
-      line = <span className="inline-flex items-center gap-1 text-warning"><Icon name="alert" />{state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read'}</span>;
+      line = <Badge tone="warning">{state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read'}</Badge>;
       break;
     case 'unseen':
       line = <span className="text-ink">Check to see the changes</span>;
       break;
     default:
-      line = <span className="inline-flex items-center gap-1 text-ink-soft"><span className="text-success"><Icon name="check" /></span>In sync</span>;
+      line = <Badge tone="success">In sync</Badge>;
   }
   return (
     <TableHead className="py-2 align-top">
@@ -117,7 +117,7 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
           <span className="min-w-0 truncate">{target.name}</span>
         </Button>
         {line}
-        {builds ? <span className="inline-flex items-center gap-1 text-warning"><Icon name="alert" />{needBuild(builds)}</span> : null}
+        {builds ? <Badge tone="warning">{needBuild(builds)}</Badge> : null}
         <span title={`Last sync ${stamp(times?.synced ?? null)}`}>Checked {stamp(times?.checked ?? null)}</span>
       </div>
     </TableHead>
@@ -169,12 +169,12 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
 function Cell({ state }: { state: CellStatus }) {
   switch (state.kind) {
     case 'ok': return <span className="inline-flex items-center gap-1 text-ink tabular-nums"><span className="text-success"><Icon name="check" /></span>{state.to}</span>;
-    case 'update': return <Badge variant="outline">Update {state.from} → {state.to}</Badge>;
-    case 'install': return <Badge variant="secondary">Install {state.to}</Badge>;
-    case 'reinstall': return <Badge variant="secondary">Reinstall {state.to}</Badge>;
-    case 'activate': return <Badge variant="secondary">Activate {state.to}</Badge>;
-    case 'remove': return <Badge variant="destructive">Remove {state.from}</Badge>;
-    case 'needs-build': return <span className="inline-flex items-center gap-1 text-warning"><Icon name="alert" />Needs a build</span>;
+    case 'update': return <Badge tone="info">Update {state.from} → {state.to}</Badge>;
+    case 'install': return <Badge tone="info">Install {state.to}</Badge>;
+    case 'reinstall': return <Badge tone="info">Reinstall {state.to}</Badge>;
+    case 'activate': return <Badge tone="info">Activate {state.to}</Badge>;
+    case 'remove': return <Badge tone="danger">Remove {state.from}</Badge>;
+    case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
     case 'unknown': return <span className="text-ink-mute">Unknown</span>;
     case 'paused': return <span className="text-ink-mute">Paused</span>;
     default: return <><span aria-hidden="true" className="text-ink-mute">—</span><span className="sr-only">Not installed here</span></>;

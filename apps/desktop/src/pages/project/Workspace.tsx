@@ -7,7 +7,7 @@ import type { ProjectInfo } from '../../types.ts';
 import { text } from '../../model.ts';
 import { PANELS, sameSelected } from '../../state/project.ts';
 import type { Panel, Selected } from '../../state/project.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
 import { message, plural, unknownTo } from '../../words.ts';
@@ -140,8 +140,8 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
     if (!file) return;
     try { await request('open_folder', { path: file }); }
     catch (e) {
-      if (unknownTo(e, 'open_folder')) { noFolderShell = true; setNoFolder(true); notify('This version of Muro cannot open folders yet.', 'error'); }
-      else notify(message(e), 'error');
+      if (unknownTo(e, 'open_folder')) { noFolderShell = true; setNoFolder(true); notify('This version of Muro cannot open folders yet.', { kind: 'error' }); }
+      else notify(message(e), { kind: 'error' });
     }
   }
   const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);

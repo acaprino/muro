@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button, Checkbox, Input, Textarea } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRecord } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { checkRecords, newRecordId } from './jobs.ts';
 import { NotSaved, useEdit } from './DetailsDialog.tsx';
 

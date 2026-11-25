@@ -5,7 +5,7 @@
 //  - the plans the window makes for its own sake (after a mutation, after an apply, after a failure) go through `make`: a plan already being made makes one more after it, never two at once;
 //    the plans the person asks for (Review, Apply all, one harness's own) are requests of the person's, counted by `attempt`;
 //  - a snapshot a mutation returns plans again only when the registry revision moved and the plan held is not for it (`adopt`);
-//  - the 30 s refresh and the shell's `muro-shown` (state/registry.tsx) take no plan: the recorded check says what changed (the note reads it, model.ts `syncHeadline`);
+//  - the 30 s refresh and the shell's `onShown` (state/registry.tsx) take no plan: the recorded check says what changed (the note reads it, model.ts `syncHeadline`);
 //  - a plan counts only for the revision it was made for (model.ts `currentPlan`): `plan` is held as it came, and every reader asks `currentPlan` or a function that does;
 //  - an apply sends the plan's id, `allow_blocked` with blockers, and `confirm_removals` equal to the removals the sheet named or `skip_removals`: a plan that would run nothing is not sent
 //    (words.ts `applyRequest`). One the service refuses (the registry moved, a harness refused a change) leaves the sheet open with the service's words, the registry and the plan are read
@@ -15,7 +15,7 @@ import * as React from 'react';
 import type { ApplyProgress, CheckError, CheckResult, Plan, Review, Snapshot } from '../../types.ts';
 import { currentPlan, mustReview } from '../../model.ts';
 import { message } from '../../words.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { applyRequest, appliedMessage, type Choice } from './words.ts';
 
@@ -110,7 +110,7 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
   const report = React.useCallback((e: unknown) => {
     const text = message(e);
     setError(text);
-    if (!reviewRef.current) say.current(`That did not complete: ${text}`, 'error');
+    if (!reviewRef.current) say.current(`That did not complete: ${text}`, { kind: 'error' });
   }, []);
 
   /** One request of the person's at a time. Resolves with what `flow` returned, or undefined when another request was running or `flow` failed (and was reported). */

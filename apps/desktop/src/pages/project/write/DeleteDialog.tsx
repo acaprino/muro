@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { ProjectSummary, Snapshot, Transport } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
 import { SHIPPED_ID, deletePayload } from './jobs.ts';

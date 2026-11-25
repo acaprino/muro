@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Badge, Button, Count, Icon, RadioGroup, RadioGroupItem, Section } from '@acaprino/sigrid/primitives';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { exclusiveMode, filesMissing, listing, unlisted } from '../../model.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
 import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
@@ -119,7 +119,7 @@ export function Unlisted() {
                 <p className="truncate text-xs text-ink-mute" title={line}>{line}</p>
               </div>
               {target.exclusive
-                ? <Badge variant="outline" className="max-w-full text-destructive" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
+                ? <Badge tone="warning" className="max-w-full" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
                 : <span className="text-xs text-ink-mute">Left alone</span>}
               {listable(plugin)
                 ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>

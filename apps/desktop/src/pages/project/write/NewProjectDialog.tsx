@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button, Icon, Input, Textarea } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectRepository, ProjectSummary } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message, unknownTo } from '../../../words.ts';
 import {
@@ -125,7 +125,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
       if (path) setForm(f => ({ ...f, folder: path }));
     } catch (e) {
       if (unknownTo(e, 'pick_folder')) { noFolderShell = true; setNoPicker(true); }
-      else notify(message(e), 'error');
+      else notify(message(e), { kind: 'error' });
     } finally { setPicking(false); }
   }
 

@@ -4,7 +4,7 @@ import { Dialog, FormField } from '@acaprino/sigrid/components';
 import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
 import { filesMissing, harnessNames, inList, stamp } from '../../model.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
 import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';

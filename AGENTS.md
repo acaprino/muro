@@ -21,38 +21,45 @@ for every app; Muro's former look is never a reason to change it.
 
 The base of the window is Imago, the suite's shell in Xiox's style (window, title
 bar, frame, commands, palette, theme, notices), built with Sigrid: Muro brings
-only its screens, made of Sigrid's components, and has no frame, window or look
-of its own. What is missing in the shell is added to Imago, what is missing in a
-component is added to Sigrid. Until Imago's shell on Sigrid exists, Muro keeps
-its own composition of Sigrid's frame and adds none.
+only its screens, made of Sigrid's components, its accent and its mark, and has no
+frame, window or look of its own. `apps/desktop/src/start.tsx` defines the app
+(`defineApp`, `startApp`), `App.tsx` fills the regions of `AppWindow`, and a notice,
+the window and the place of a screen that fails are `useNotify`, `useWindow` and
+`ScreenBoundary` (`tests/imago-ownership.test.ts`). What is missing in the shell is
+added to Imago, what is missing in a component is added to Sigrid.
 
-Sigrid is not on npm. `package.json` names its GitHub Release tarball,
+Sigrid and Imago are not on npm. `package.json` names their GitHub Release tarballs,
 `https://github.com/acaprino/sigrid/releases/download/v<version>/acaprino-sigrid-<version>.tgz`
-(first `v3.3.9`), and the SHA-256 of that release's `manifest.json` is recorded
+and `https://github.com/acaprino/imago/releases/download/v<version>/acaprino-imago-<version>.tgz`;
+the SHA-256 of Sigrid's `manifest.json` and of Imago's tarball are recorded
 in `docs/verification/`. Never a `file:` path to a checkout, and never a git
-dependency that runs `prepare`. The lockfile records the tarball's integrity;
+dependency that runs `prepare`. The lockfile records the tarballs' integrity;
 it is generated in CI by a throwaway workflow, never by an install here. That
 workflow was removed once the lockfile was committed: for the next dependency
-change restore it with `git show 72dc3ac:.github/workflows/lockfile.yml`.
+change restore it with `git show c59eca2:.github/workflows/lockfile.yml`, with
+the branch that is worked on.
 
-Native window primitives (glass and native theme, caption controls, navigation
-guard) stay with the Rust crate `imago-shell`, pinned in
-`apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`, until the owner moves
-them. The npm package `@acaprino/imago` stays for its window glue
-(`@acaprino/imago/shell`, with its Tauri adapter) and nothing else of it: keep
-its tag in `package.json` and `package-lock.json` equal to the Rust pin
-(`imago-check` is gone: compare them by hand).
-`docs/imago-migration.md` is the history of what Muro took from Imago.
+The native side of the window is the Rust crate `imago-shell`, a Tauri plugin pinned
+in `apps/desktop/src-tauri/Cargo.toml` and `Cargo.lock`: its material, its place, the
+caption controls and Snap Layouts, the theme before the first frame, the navigation
+guard and the recovery of WebView2. The page reaches it through `@acaprino/imago`
+alone. The npm package and the crate are of one version (`imago-check`, rule
+`pin-mismatch`). `docs/imago-migration.md` is the history of the window before Sigrid.
 
-Before UI work, read `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
+Before UI work, read `node_modules/@acaprino/imago/docs/design-file.md`, which says
+what the shell does, and `node_modules/@acaprino/sigrid/AGENTS.md` and `DESIGN.md`
 (they ship in the package; `agents/catalog.json` lists every component and its
 props) and the component or style files they reference. Apply its tokens and
 confirmed design choices within the requested scope. Use its components and
 never build a control of your own (the suite's rule above). Report conflicts and keep unresolved choices explicit.
-Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done: it
-reads files and builds nothing. It needs the Sigrid package installed; the Tests
-workflow runs it ("Design rules (Sigrid)"), not blocking until its first output
-has been read (ADR-0031); where it was not run, say so.
+Run `npx --no sigrid-check apps/desktop/src` and `npx --no imago-check` before you
+say UI work is done: they read files and build nothing. They need the packages
+installed; the Tests workflow runs both, and both gate. Where they were not run, say
+so. The rule `own-class` of `sigrid-check` is not on yet: the screens still lay out with
+Tailwind classes (`styles.css` is the Tailwind entry), and a class that is written
+again is replaced by Sigrid's `Column`, `Cluster`, `Split`, `Cell` and `Text`. The
+artifact `muro-shots` of Tests holds every screen in both schemes, wide and narrow: look
+at it after a change of a screen.
 
 ## Product contract
 

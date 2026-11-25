@@ -19,7 +19,6 @@ import { useSync } from './useSync.tsx';
 import type { Choice } from './words.ts';
 
 const KINDS: Record<string, string> = { install: 'Install', update: 'Update', reinstall: 'Reinstall', activate: 'Activate', remove: 'Remove' };
-const badgeOf = (kind: string): 'destructive' | 'outline' | 'secondary' => (kind === 'remove' ? 'destructive' : kind === 'update' ? 'outline' : 'secondary');
 /** The versions an operation moves between, whether the entry it removes has its files, and why the service planned it. */
 const detailOf = (o: Operation): string => {
   const versions = o.kind === 'remove' ? o.from_version : o.kind === 'update' ? `${o.from_version} → ${o.to_version}` : o.to_version;
@@ -103,7 +102,7 @@ export function ReviewSheet() {
             <ul className="flex flex-col">
               {g.ops.map((o, k) => (
                 <li key={`${o.plugin_id}-${o.kind}-${k}`} data-operation={o.kind} className="flex min-w-0 items-start gap-3 border-b border-line py-2">
-                  <Badge variant={badgeOf(o.kind)}>{KINDS[o.kind] ?? o.kind}</Badge>
+                  <Badge tone={o.kind === 'remove' ? 'danger' : 'info'}>{KINDS[o.kind] ?? o.kind}</Badge>
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate font-medium text-ink" title={o.name}>{o.name}</span>
                     <span className="break-words text-xs text-ink-mute">{detailOf(o)}</span>

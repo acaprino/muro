@@ -95,7 +95,7 @@ function ExampleDetails({ example: e, data, known, onCapability }: { example: Ex
         {e.task ? <p className="text-sm text-ink-soft">“{e.task}”</p> : null}
         {e.stack.length ? <p className="text-xs text-ink-mute">With {e.stack.join(', ')}</p> : null}
       </div>
-      {e.status !== 'selected' ? <div><Badge variant="secondary">{e.status === 'no_match' ? 'No match' : 'Needs clarification'}</Badge></div> : null}
+      {e.status !== 'selected' ? <div><Badge tone="warning">{e.status === 'no_match' ? 'No match' : 'Needs clarification'}</Badge></div> : null}
       {e.steps.length ? (
         <section className="flex flex-col gap-2">
           <Heading icon="listOrdered">Steps, in order</Heading>

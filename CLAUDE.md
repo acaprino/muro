@@ -1,7 +1,7 @@
 @AGENTS.md
 
-For UI work, read node_modules/@acaprino/sigrid/AGENTS.md and DESIGN.md, apply them and inspect the project files they reference.
-Run `npx --no sigrid-check apps/desktop/src` before you say UI work is done (see "Desktop UI ownership" in AGENTS.md and ADR-0031).
+For UI work, read node_modules/@acaprino/imago/docs/design-file.md (the shell) and node_modules/@acaprino/sigrid/AGENTS.md and DESIGN.md, apply them and inspect the project files they reference.
+Run `npx --no sigrid-check apps/desktop/src` and `npx --no imago-check` before you say UI work is done (see "Desktop UI ownership" in AGENTS.md and ADR-0031).
 Every app of the suite has Sigrid's one look: never a component, class or stylesheet of Muro's own; a missing part is added to Sigrid (see "Desktop UI ownership" in AGENTS.md).
 
 

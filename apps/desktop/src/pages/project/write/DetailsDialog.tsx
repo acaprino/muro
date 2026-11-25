@@ -3,7 +3,7 @@ import { Button, Input, Textarea } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectRepository } from '../../../types.ts';
 import { text } from '../../../model.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
 import { REPOSITORY_FIELDS, busyReason, checkRepository, checkText, editPayload, repositoryOf, runningOn } from './jobs.ts';

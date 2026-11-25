@@ -236,3 +236,13 @@ and the CI run on the commit that makes the move is the first check of it. The r
   `set_window_theme` is told the choice too (System and Dark draw the same scheme), so that call stays Muro's whatever
   happens. Moving the controls, Snap Layouts, the zoom and the guard to it would let `@acaprino/imago` leave
   `package.json` and its lockfile; it waits for a run of the window in Tauri.
+
+## Note of 2026-11-25: Imago's shell
+
+The owner's decision of 2026-11-24 made Imago the base shell of the suite, built with Sigrid. Muro's window is that shell
+since this date: `@acaprino/imago` 1.0.1 and the crate `imago-shell` 1.0.1 as a plugin, with Sigrid 6.6.0. Decision 4 and its
+amendment (the npm package only for its window glue) and decision 6 (the design check does not gate, no `imago-check`) no
+longer hold: `window.ts`, `theme.ts`, `sigridTheme.ts`, `mount.tsx`, `ErrorBoundary.tsx`, `state/notices.tsx` and Muro's
+own frame are gone, and `sigrid-check` and `imago-check` both gate. The theme has one default, dark, in every app of the
+suite; a choice kept under `muro.theme` stays. The rule `own-class` is not on: the screens still carry Tailwind classes.
+The browser tests run in a pretended window of Tauri; the real window is the crate's own proof and the owner's eye.

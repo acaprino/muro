@@ -85,13 +85,14 @@ jobs:
       - name: Frontend build
         if: always()
         run: npm run build
-      # Sigrid's design check (ADR-0031, decision 6): it reads apps/desktop/src and builds nothing, from the folder whose
-      # package.json lists Sigrid. Not blocking until its first output has been read; then the owner decides whether it
-      # gates (it exits 1 on a finding) and which exceptions go in a sigrid-check.config.json.
+      # The design check of Sigrid (ADR-0031, decision 6) reads apps/desktop/src and builds nothing, from the folder whose
+      # package.json lists Sigrid; Imago's reads the "imago" block of package.json. Both gate.
       - name: Design rules (Sigrid)
         if: always()
-        continue-on-error: true
         run: npx --no sigrid-check apps/desktop/src
+      - name: Shell rules (Imago)
+        if: always()
+        run: npx --no imago-check
       # Nothing above compiles the shell (src-tauri), where the tray, the background worker and the
       # waiting for the registry live. It embeds the frontend build just made, and its resources
       # folder is staged by hand and not in Git: the build script refuses a missing one, so an empty
@@ -114,5 +115,17 @@ jobs:
         with:
           name: desktop-screenshots
           path: apps/desktop/tests/artifacts/*.png
+          retention-days: 7
+          if-no-files-found: warn
+      # Every screen in both schemes, wide and narrow: they are looked at, not compared.
+      - name: Photographs of every screen
+        if: always()
+        run: node apps/desktop/tests/shots.mjs
+      - name: Keep the photographs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-shots
+          path: apps/desktop/tests/shots/*.png
           retention-days: 7
           if-no-files-found: warn

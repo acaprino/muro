@@ -5,7 +5,7 @@ import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
 import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
 import { ProjectProvider, useProject } from '../state/useProject.tsx';
-import { useNotify } from '../state/notices.tsx';
+import { useFocusKept, useNotify } from '@acaprino/imago';
 import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
 import { DeleteDialog, atRevision, nameOf } from './project/write/DeleteDialog.tsx';
@@ -18,7 +18,7 @@ import { countsOf } from './project/lines.ts';
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
  * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). A new project is made by an AI run
  * (`NewProjectDialog`, followed by the job card above the list) and a project is deleted, file and all, after asking (`DeleteDialog`). The open project is the
- * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. Its notices are the window's one stack (`NoticesProvider`, mounted above the window in mount.tsx). */
+ * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. */
 export function Projects() {
   return (
     <ProjectProvider>
@@ -51,6 +51,8 @@ function ProjectsTab() {
   }, []);
   React.useEffect(() => { void loadList(); }, [loadList, settled]);
   const openId = project.view?.id ?? null;
+  // Opening a project takes its button away, and closing one takes "All projects".
+  useFocusKept(openId);
   // A project the list no longer holds (removed by another window, its file gone from the list) is closed.
   React.useEffect(() => { if (list && openId !== null && !list.some(p => p.id === openId)) project.close(); }, [list, openId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -82,8 +84,8 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
     let picked: { path: string | null } | null;
     try { picked = await request<{ path: string | null } | null>('pick_file', { filter: 'Muro project (*.mp)' }); }
     catch (e) {
-      if (unknownTo(e, 'pick_file')) { setNoPicker(true); notify('This version of Muro cannot open a file dialog yet.', 'error'); }
-      else notify(message(e), 'error');
+      if (unknownTo(e, 'pick_file')) { setNoPicker(true); notify('This version of Muro cannot open a file dialog yet.', { kind: 'error' }); }
+      else notify(message(e), { kind: 'error' });
       return;
     }
     const path = picked?.path;
@@ -94,7 +96,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
       const read = await loadList();
       const added = read?.find(p => flat(p.path) === flat(path));
       notify(`${added ? nameOf(added) : 'The project'} added to your list.`);
-    } catch (e) { notify(message(e), 'error'); }
+    } catch (e) { notify(message(e), { kind: 'error' }); }
     finally { setOpening(false); }
   }
 
@@ -110,7 +112,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
       notify(`${nameOf(p)} removed from your list.`);
     } catch (e) {
       setRemoval(r => ({ ...r, open: false }));
-      notify(message(e), 'error');
+      notify(message(e), { kind: 'error' });
     } finally { setRemoving(false); }
   }
 
@@ -202,7 +204,7 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
               : <Button variant="link" className="h-auto max-w-full px-0" onClick={onOpen}><span className="truncate" title={name}>{name}</span></Button>}
             {!p.error && p.plugin?.version ? <span className="text-xs text-ink-mute tabular-nums">{p.plugin.version}</span> : null}
             {p.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
-            {p.error ? <Badge variant="destructive">Cannot be read</Badge> : null}
+            {p.error ? <Badge tone="danger">Cannot be read</Badge> : null}
           </div>
           <span className="truncate text-xs text-ink-mute" title={p.path}>{p.path}</span>
           {p.error ? <span className="text-xs text-destructive">{p.error}</span> : counts ? <span className="text-xs text-ink-mute">{counts}</span> : null}

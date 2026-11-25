@@ -621,7 +621,7 @@ await test('the drawer of a plugin stays inside a window of 500 at 200% zoom (25
   }
 });
 
-await test('the drawer in a phone-width window, in the light theme', 'changes', { viewport: { width: 390, height: 844 }, colorScheme: 'light' }, async app => {
+await test('the drawer in a phone-width window, in the light theme', 'changes', { viewport: { width: 390, height: 844 }, theme: 'light' }, async app => {
   const { page } = app;
   const s = await openPlugin(page, 'Package');
   await fold(s, 'More').click();

@@ -1,5 +1,7 @@
 # Desktop on Imago
 
+> **Closed on 2026-11-25.** Muro stands on Imago's shell made with Sigrid (npm package and crate 1.0.1): nothing below is in use.
+
 > **Historical since [ADR-0031](adr/ADR-0031-desktop-on-sigrid.md) (2026-11-23).** The desktop window moves to
 > React on `@acaprino/sigrid`, and this file describes the window it replaces. What stays true after the move is
 > the crate `imago-shell` (the native window, "The window" below and "The pin" for the Rust side). The rest (the

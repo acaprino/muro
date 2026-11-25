@@ -3,11 +3,12 @@
 // waiting and refuses a second request that arrives meanwhile; the actions in `ALONE` take no lock and go at once.
 //
 // The background worker and the tray move the registry while the window is open or hidden, and tell the window
-// nothing. So the window reads it again (the behaviour of the Imago window's `startMuro`, app.ts): when it is shown
-// again (the shell's `muro-shown`, since WebView2 gives the page no focus event then), when it gets the focus, and
+// nothing. So the window reads it again (the behaviour of the earlier window): when it is shown
+// again (the shell's `onShown`, since WebView2 gives the page no focus event then), when it gets the focus, and
 // every REFRESH_MS while it has it, and only while nothing the person asked for is under way. Such a refresh asks
 // for no plan, shows no error (the next one tries again) and changes nothing when the registry did not move.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useWindow } from '@acaprino/imago';
 import type { Snapshot, Transport } from '../types.ts';
 import { serial, ALONE } from '../queue.ts';
 
@@ -43,12 +44,11 @@ const merged = (next: Snapshot, before: Snapshot | null): Snapshot => ({ ...next
 export interface RegistryProviderProps {
   /** How the service is reached: the shell's `request` (api.ts), or the fake of the tests. */
   transport: Transport;
-  /** The host's way to say the window was shown again; it returns how to stop listening (api.ts `onShown`). */
-  shown?: ((wake: () => void) => () => void) | undefined;
   children?: ReactNode;
 }
 
-export function RegistryProvider({ transport, shown, children }: RegistryProviderProps) {
+export function RegistryProvider({ transport, children }: RegistryProviderProps) {
+  const window_ = useWindow();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   // What the refresh compares with and merges into, without waiting for a render.
@@ -94,9 +94,9 @@ export function RegistryProvider({ transport, shown, children }: RegistryProvide
     // A hidden window has no focus: WebView2 keeps `visibilityState` "visible" for it, so that says nothing.
     const timer = setInterval(() => { if (document.hasFocus()) wake(); }, REFRESH_MS);
     window.addEventListener('focus', wake);
-    const stopShown = shown?.(wake);
-    return () => { clearInterval(timer); window.removeEventListener('focus', wake); stopShown?.(); };
-  }, [refresh, shown]);
+    const stopShown = window_.onShown(wake);
+    return () => { clearInterval(timer); window.removeEventListener('focus', wake); stopShown(); };
+  }, [refresh, window_]);
 
   const value = useMemo<RegistryState>(() => ({ snapshot, request, reload, adopt, error }), [snapshot, request, reload, adopt, error]);
   return <RegistryContext.Provider value={value}>{children}</RegistryContext.Provider>;

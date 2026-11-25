@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Badge, Count, Icon } from '@acaprino/sigrid/primitives';
+import { Badge, Count, Icon, type BadgeTone } from '@acaprino/sigrid/primitives';
 import { Empty } from '@acaprino/sigrid/components';
 import type { ProjectRun } from '../../types.ts';
 import { at } from '../../words.ts';
@@ -9,13 +9,14 @@ import { harnessName } from './lines.ts';
 
 /** The runs of the harmonization, newest first, read only: the version each made (and its tag when the project has a repository), its changelog entry, its result,
  * its budget and its engine. Harmonizing again is a later plan. */
-const RESULTS: Record<ProjectRun['status'], { label: string; tone: string }> = {
-  completed: { label: 'Built and validated', tone: 'text-success' },
-  cancelled: { label: 'Cancelled', tone: 'text-ink-soft' },
-  failed: { label: 'Failed', tone: 'text-destructive' },
+type Result = { label: string; tone?: BadgeTone };
+const RESULTS: Record<ProjectRun['status'], Result> = {
+  completed: { label: 'Built and validated', tone: 'success' },
+  cancelled: { label: 'Cancelled' },
+  failed: { label: 'Failed', tone: 'danger' },
 };
 /** A result this window does not know is shown as it came (a status such as `constructor` is none of the three either). */
-const resultOf = (status: string): { label: string; tone: string } => Object.hasOwn(RESULTS, status) ? RESULTS[status as ProjectRun['status']] : { label: status || '—', tone: 'text-ink-soft' };
+const resultOf = (status: string): Result => Object.hasOwn(RESULTS, status) ? RESULTS[status as ProjectRun['status']] : { label: status || '—' };
 const agent = (engine: string | null): string => engine ? harnessName(engine) : '';
 
 export function RunsPanel({ data }: { data: ProjectData }) {
@@ -37,9 +38,9 @@ export function RunsPanel({ data }: { data: ProjectData }) {
                   {tag ? <span className="min-w-0 truncate font-mono text-xs text-ink-mute" title={tag}>{tag}</span> : null}
                 </div>
                 <p className="text-sm text-ink-soft">{r.changelog || '—'}</p>
-                <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                <dl className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                   <div className="flex gap-1"><dt className="text-ink-mute">When</dt><dd className="text-ink tabular-nums">{at(r.time)}</dd></div>
-                  <div className="flex gap-1"><dt className="text-ink-mute">Result</dt><dd className={`font-medium ${result.tone}`}>{result.label}</dd></div>
+                  <div className="flex items-center gap-1"><dt className="text-ink-mute">Result</dt><dd><Badge variant="secondary" tone={result.tone}>{result.label}</Badge></dd></div>
                   <div className="flex gap-1"><dt className="text-ink-mute">Budget</dt><dd className="text-ink tabular-nums">{typeof r.budget_usd === 'number' ? `$${r.budget_usd.toFixed(2)}` : '—'}</dd></div>
                   <div className="flex gap-1"><dt className="text-ink-mute">Engine</dt><dd className="text-ink">{who || '—'}</dd></div>
                 </dl>

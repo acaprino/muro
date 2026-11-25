@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { cn } from '@acaprino/sigrid';
-import { Badge, Button, Icon, Progress } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Icon, Progress, type BadgeTone } from '@acaprino/sigrid/primitives';
 import type { ButtonProps } from '@acaprino/sigrid/primitives';
 import type { Job } from '../../../types.ts';
-import { useNotify } from '../../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { message, money } from '../../../words.ts';
 import { NOT_CANCELLABLE, canCancel, isRunning, jobTitle, lastOver, outcomeOf, runLimit, runningOn, startedAt } from './jobs.ts';
 import { useJobs } from './useJobs.tsx';
@@ -23,6 +23,7 @@ const dismissed = new Set<string>();
 
 /** What a run became, in a word beside its outcome. */
 const ENDED: Record<string, string> = { completed: 'Done', failed: 'Failed', cancelled: 'Cancelled', interrupted: 'Interrupted' };
+const TONES: Record<string, BadgeTone> = { completed: 'success', failed: 'danger', cancelled: 'warning', interrupted: 'warning' };
 const CARD = 'flex shrink-0 flex-wrap items-start rounded-lg bg-raised p-3 shadow-sm';
 
 /** A time a run has been going, from seconds: "48 s", "6 min 12 s", "1 h 4 min". */
@@ -63,14 +64,14 @@ export function JobCard({ projectId, className }: JobCardProps) {
   const last = own ? null : projectId === null ? [...jobs.jobs].filter(j => !isRunning(j) && mine(j)).sort((a, b) => startedAt(b) - startedAt(a))[0] ?? null : lastOver(jobs.jobs, projectId);
   const said = last && !dismissed.has(last.id) && !(last.status === 'completed' && !seen.has(last.id)) ? outcomeOf(last) : null;
   if (!running && !said) return null;
-  const cancel = (): void => { if (running) jobs.cancel(running.id).catch(e => notify(message(e), 'error')); };
+  const cancel = (): void => { if (running) jobs.cancel(running.id).catch(e => notify(message(e), { kind: 'error' })); };
   const dismiss = (): void => { if (last) { dismissed.add(last.id); put(n => n + 1); } };
   return (
     <>
       {last && said ? (
         <section aria-label="AI run" className={cn(CARD, 'gap-x-4 gap-y-2', className)}>
           <div role={said.error ? 'alert' : 'status'} className="flex min-w-0 flex-1 flex-col gap-1">
-            <div><Badge variant={said.error ? 'destructive' : 'secondary'}>{ENDED[last.status] ?? last.status}</Badge></div>
+            <div><Badge variant="secondary" tone={TONES[last.status]}>{ENDED[last.status] ?? last.status}</Badge></div>
             <p className="text-sm text-ink">{said.text}</p>
             {last.status !== 'completed' && last.log_path ? <p className="break-all font-mono text-xs text-ink-mute select-text">Log: {last.log_path}</p> : null}
           </div>
@@ -103,7 +104,7 @@ export function RunningCard({ job, cancelling, onCancel, elsewhere = false, clas
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Icon name="ai" />
           <h2 className="min-w-0 truncate text-sm font-semibold text-ink" title={title}>{title}</h2>
-          <Badge variant="secondary">{cancelling && !saving ? 'Stopping' : 'Running'}</Badge>
+          <Badge tone={cancelling && !saving ? 'warning' : 'info'}>{cancelling && !saving ? 'Stopping' : 'Running'}</Badge>
         </div>
         <p role="status" className="text-sm text-ink-soft">{job.phase}</p>
         <Progress value={null} size="sm" aria-label={`${title}: in progress`} />

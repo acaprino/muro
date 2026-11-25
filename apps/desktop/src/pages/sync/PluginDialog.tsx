@@ -4,7 +4,7 @@ import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { Distribution, Plan, Plugin, Snapshot, Target, Transport } from '../../types.ts';
 import { engineOf, harnessNames, versionOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';

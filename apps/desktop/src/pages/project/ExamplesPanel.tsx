@@ -4,7 +4,7 @@ import { Empty, FormField, ItemList, ItemRow } from '@acaprino/sigrid/components
 import { engineOf } from '../../model.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { useProject } from '../../state/useProject.tsx';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { noteTold, tellNote } from '../../state/project.ts';
 import { message, plural } from '../../words.ts';
 import { outputsOf, readAnswer } from './graph-model.ts';
@@ -135,7 +135,7 @@ function Result({ outcome: o, known, onCapability, onClear }: { outcome: Outcome
   const asked = <p className="text-sm text-ink-soft">“{o.asked}”</p>;
   if (o.kind === 'failed') return (
     <div role="alert" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div><Badge variant="destructive">Could not run</Badge></div>
+      <div><Badge tone="danger">Could not run</Badge></div>
       {asked}
       <p className="text-sm font-semibold text-ink">The simulation could not run</p>
       <p className="text-sm text-ink-soft">{o.message}</p>
@@ -145,7 +145,7 @@ function Result({ outcome: o, known, onCapability, onClear }: { outcome: Outcome
   );
   if (o.kind === 'invalid') return (
     <div role="status" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div><Badge variant="destructive">Invalid answer</Badge></div>
+      <div><Badge tone="danger">Invalid answer</Badge></div>
       {asked}
       <p className="text-sm font-semibold text-ink">The AI's answer was not a valid decision</p>
       {o.errors.length ? <ul className="flex list-disc flex-col gap-1 ps-5 text-sm text-ink-soft">{o.errors.map((x, i) => <li key={i}>{x}</li>)}</ul> : <p className="text-xs text-ink-mute">No reason was given.</p>}
@@ -157,7 +157,7 @@ function Result({ outcome: o, known, onCapability, onClear }: { outcome: Outcome
   const status = o.status === 'selected' ? plural(o.steps.length, 'step') : o.status === 'no_match' ? 'No match' : 'Needs clarification';
   return (
     <div role="status" className="flex flex-col gap-2 rounded-lg bg-raised p-3 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{status}</Badge>{o.stack.length ? <span className="text-xs text-ink-mute">With {o.stack.join(', ')}</span> : null}</div>
+      <div className="flex flex-wrap items-center gap-2"><Badge tone={o.status === 'selected' ? 'success' : 'warning'}>{status}</Badge>{o.stack.length ? <span className="text-xs text-ink-mute">With {o.stack.join(', ')}</span> : null}</div>
       {asked}
       {o.steps.length ? <><Heading icon="listOrdered">Steps, in order</Heading><StepList steps={o.steps} known={known} onCapability={onCapability} /></> : null}
       {o.reason ? <p className="text-sm text-ink-soft">{o.reason}</p> : null}

@@ -1,7 +1,6 @@
-/* Tailwind, then Sigrid's fonts, theme and graph canvas (after the theme, as its README asks). Sigrid's sources are read for the classes its components use, and this
+/* Tailwind, then Sigrid's theme and graph canvas (the font is the system's) (after the theme, as its README asks). Sigrid's sources are read for the classes its components use, and this
    folder for the app's own screens; nothing else is scanned (source(none)), so the tests' words are not classes. */
 @import "tailwindcss" source(none);
-@import "@acaprino/sigrid/fonts.css";
 @import "@acaprino/sigrid/theme.css";
 @import "@acaprino/sigrid/graph.css";
 @source "./";

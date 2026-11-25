@@ -465,7 +465,7 @@ await test('a record or a run holding an object where the file should hold text 
   assert.match(await page.getByRole('list', { name: 'Runs' }).locator(':scope > li').first().textContent(), /\{"en":"Moved taste-skill to v1\.2\.0\."\}/);
   assert.equal(await frameButtons(page).count(), 3, 'the title bar and its three buttons are there');
   await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
-  assert.equal(await page.getByText('This page could not be shown').count(), 0, 'the page itself did not fail');
+  assert.equal(await page.getByText('This screen could not be shown').count(), 0, 'the page itself did not fail');
 });
 
 // ---------- what the session keeps ----------

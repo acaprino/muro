@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button, Icon, RadioGroup, RadioGroupItem } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Discovered, Target } from '../../types.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';

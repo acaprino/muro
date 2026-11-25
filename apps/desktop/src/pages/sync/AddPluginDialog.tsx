@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Button } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Snapshot, Target } from '../../types.ts';
-import { useNotify } from '../../state/notices.tsx';
+import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';
@@ -105,7 +105,7 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
       added.current = plugin.name;
       latest.current.adopt(after);
       if (unresolved === null) latest.current.notify(`${plugin.name} added to your list.`);
-      else latest.current.notify(`${plugin.name} was added to your list, but its source could not be checked: ${unresolved}`, 'error');
+      else latest.current.notify(`${plugin.name} was added to your list, but its source could not be checked: ${unresolved}`, { kind: 'error' });
       if (live.current) onOpenChange(false);
     } finally {
       busy.current = false;
