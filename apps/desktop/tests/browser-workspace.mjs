@@ -34,7 +34,7 @@ const openMarionette = async page => {
   await page.getByRole('button', { name: 'Marionette', exact: true }).click();
   await page.getByRole('heading', { name: 'Marionette', level: 1 }).waitFor();
 };
-const panelOf = page => page.locator('section[aria-label="Project panel"]');
+const panelOf = page => page.locator('[data-slot="content-split-aside"]');
 const graphPane = page => page.locator('section[aria-labelledby="graph-heading"]');
 const canvas = (page, name = 'Marionette') => page.getByRole('tree', { name: `Decision graph of ${name}` });
 const node = (page, id) => page.locator(`[data-slot="graph-node"][data-node-id="${id}"]`);
@@ -235,7 +235,7 @@ await test('each example says its request, its intents and its outputs; a click 
   await openMarionette(page);
   assert.equal(await segment(page, 'Examples').getAttribute('aria-pressed'), 'true', 'a project opens on its examples');
   const landing = row(page, 'A landing page'), letter = row(page, 'A letter');
-  const lines = async r => texts(r.locator('[data-slot="item-row-description"] > span'));
+  const lines = async r => texts(r.locator('[data-slot="item-row-description"], [data-slot="item-row-fact"]'));
   assert.deepEqual(await lines(landing), ['Design a landing page · With stack:react', 'Intent design-taste-intent → design-review-intent', 'Output design-brief']);
   assert.deepEqual(await lines(letter), ['Write a letter as a Word file', 'Intent office-docs-intent'], 'a prerequisite has no intent, and a step that makes nothing adds no output line');
   await landing.click();
@@ -303,7 +303,7 @@ await test('the simulator: an empty request is refused in place, the note names 
   await box.fill('Write a letter');
   assert.equal(await page.locator('[data-slot="field-error"]').count(), 0, 'typing takes the error away');
   await go.click();
-  const result = page.locator('section[aria-label="Project panel"] [role=status]').filter({ hasText: '“Write a letter”' });
+  const result = panelOf(page).locator('[role=status]').filter({ hasText: '“Write a letter”' });
   await result.getByText('2 steps', { exact: true }).waitFor();
   assert.deepEqual(await texts(result.locator('ol[aria-label="Steps, in order"] > li')), ['1office-pdfPrerequisiteA prerequisite the plugin declares, added before the step that needs it.', '2office-docsoffice-docs-intentThe request asks for a Word file.']);
   await result.getByText('Asked Claude Code · $0.12 · 4.2 s', { exact: true }).waitFor();
@@ -446,7 +446,7 @@ await test('two examples with one title are two rows, each chosen on its own; a 
   assert.deepEqual([await letters.nth(0).getAttribute('aria-current'), await letters.nth(1).getAttribute('aria-current')], ['true', null]);
   await numbered(page, 'office-docs', 2);
   const odd = row(page, ODD_TITLE);
-  assert.deepEqual(await texts(odd.locator('[data-slot="item-row-description"] > span')), [ODD_TASK, `Intent ${ODD_INTENT}`, `Output ${ODD_OUTPUT}`]);
+  assert.deepEqual(await texts(odd.locator('[data-slot="item-row-description"], [data-slot="item-row-fact"]')), [ODD_TASK, `Intent ${ODD_INTENT}`, `Output ${ODD_OUTPUT}`]);
   await odd.click();
   await inspector(page).getByRole('heading', { name: ODD_TITLE, level: 3 }).waitFor();
   await inspector(page).getByText(ODD_INTENT, { exact: true }).waitFor();
@@ -524,7 +524,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   await page.setViewportSize({ width: 500, height: 900 });
   const opener = page.getByRole('button', { name: 'Project panel', exact: true });
   await opener.waitFor();
-  assert.equal(await panelOf(page).count(), 0, 'under 620px the left panel is out of the layout');
+  assert.equal(await panelOf(page).count(), 0, 'under 850px the left panel is out of the layout');
   await frames(page);
   assert.ok(await sideways(page) <= 0, '500px, the graph');
   for (const name of ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Add input…', 'All projects', 'Project panel']) {

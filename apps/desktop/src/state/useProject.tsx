@@ -1,17 +1,24 @@
 import * as React from 'react';
 import { fresh, recall, remember, sameSelected } from './project.ts';
 import type { Panel, ProjectView, Selected, SimState } from './project.ts';
+import type { ProjectInfo } from '../types.ts';
 import { useRegistry } from './registry.tsx';
 
-/** The open project of the Projects tab, for the components of the workspace. The state is `state/project.ts`'s; this only holds it in React and writes it to the
+/** The open project of the Projects tab, for the workspace and for the window's inspector.
+ * The state is `state/project.ts`'s; this only holds it in React and writes it to the
  * session at every change, so a reload, or leaving the tab and coming back, finds the same project, panel, selection and request. A free-text request still waited
  * for when the project is closed, another one is opened or the tab is left is stopped (`cancel_simulation`): nobody would see its answer, and the AI would go on. */
 export interface ProjectApi {
   view: ProjectView | null;
+  /** What the service said of the open project, while its workspace is on screen. */
+  info: ProjectInfo | null;
+  setInfo(info: ProjectInfo | null): void;
   /** The latest state, for a caller that awaited something and must check it is still the one it started from (a simulation waited for). */
   current(): ProjectView | null;
   open(id: string): void;
   close(): void;
+  /** The Projects tab was left: a request waited for is stopped, and the project is as the session keeps it. */
+  leave(): void;
   setPanel(panel: Panel): void;
   /** A new selection, or a function of the one there is (to clear only what an inspector was showing). */
   select(next: Selected | ((now: Selected) => Selected)): void;
@@ -26,6 +33,7 @@ export function ProjectProvider({ children }: { children?: React.ReactNode }) {
   const send = React.useRef(request);
   send.current = request;
   const [view, setView] = React.useState<ProjectView | null>(() => recall());
+  const [info, setInfo] = React.useState<ProjectInfo | null>(null);
   const latest = React.useRef(view);
   latest.current = view;
   React.useEffect(() => { remember(view); }, [view]);
@@ -44,9 +52,12 @@ export function ProjectProvider({ children }: { children?: React.ReactNode }) {
     });
     return {
       view,
+      info,
+      setInfo,
       current: () => latest.current,
       open: id => { stopRun(); setView(() => (latest.current = fresh(id))); },
       close: () => { stopRun(); setView(() => (latest.current = null)); },
+      leave: () => { stopRun(); remember(latest.current); setView(() => (latest.current = recall())); },
       setPanel: panel => change(v => v.panel === panel ? v : { ...v, panel }),
       select: next => change(v => {
         const selected = typeof next === 'function' ? next(v.selected) : next;
@@ -57,7 +68,7 @@ export function ProjectProvider({ children }: { children?: React.ReactNode }) {
         return made ? { ...v, sim: { ...v.sim, ...made } } : v;
       }),
     };
-  }, [view, stopRun]);
+  }, [view, info, stopRun]);
   return <ProjectContext.Provider value={api}>{children}</ProjectContext.Provider>;
 }
 

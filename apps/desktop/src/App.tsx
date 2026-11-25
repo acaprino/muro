@@ -18,6 +18,8 @@ import { Sync, SyncActions } from './pages/sync/Sync.tsx';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
 import { Moved } from './pages/Moved.tsx';
 import { Projects } from './pages/Projects.tsx';
+import { ProjectInspector } from './pages/project/Workspace.tsx';
+import { ProjectProvider } from './state/useProject.tsx';
 
 /** The four pages, in the order of the bar. */
 const PAGES: readonly AppView<Page>[] = [
@@ -98,7 +100,7 @@ function Muro() {
         <ScreenBoundary of={harness.id}>
           <HarnessInspector targetId={harness.id} open={harness.open} onOpenChange={harnessOpenChange} />
         </ScreenBoundary>
-      ) : undefined}
+      ) : page === 'projects' ? <ScreenBoundary><ProjectInspector /></ScreenBoundary> : undefined}
     >
       {!snapshot && error ? (
         <Empty fill title="Registry not available" description={error} action={<Button onClick={() => { void reload(); }}>Try again</Button>} />
@@ -107,7 +109,7 @@ function Muro() {
   );
 }
 
-/** The window, with the sync state (`useSync`) and the AI runs of the runtime (`useJobs`) available to every page of it. */
+/** The window, with the sync state (`useSync`), the AI runs of the runtime (`useJobs`) and the open project (`useProject`) available to every page of it. */
 export function App() {
-  return <SyncProvider><ProjectJobsProvider><Muro /></ProjectJobsProvider></SyncProvider>;
+  return <SyncProvider><ProjectJobsProvider><ProjectProvider><Muro /></ProjectProvider></ProjectJobsProvider></SyncProvider>;
 }

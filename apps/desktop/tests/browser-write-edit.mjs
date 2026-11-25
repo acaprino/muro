@@ -243,7 +243,7 @@ await test('Records: one added, one changed and one deleted, each on the digest 
   await dialog.waitFor({ state: 'detached' });
   await notice(page, 'Record deleted.').waitFor();
   // The Delete button went with the record: focus is on the heading of the panel, not on the page.
-  await page.waitForFunction(() => document.activeElement?.tagName === 'H3' && document.activeElement.textContent.includes('Decision records'));
+  await page.waitForFunction(() => document.activeElement?.closest('h3')?.textContent === 'Decision records');
   edits = await editsOf(app);
   assert.equal(edits.length, 4);
   assert.equal(edits[3].digest, digests[3]);

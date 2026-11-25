@@ -4,7 +4,7 @@ import { Dialog, Empty, SettingRow } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
 import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
-import { ProjectProvider, useProject } from '../state/useProject.tsx';
+import { useProject } from '../state/useProject.tsx';
 import { useFocusKept, useNotify } from '@acaprino/imago';
 import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
@@ -15,24 +15,19 @@ import { NewProjectDialog } from './project/write/NewProjectDialog.tsx';
 import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
 
+const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
+const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
  * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). A new project is made by an AI run
  * (`NewProjectDialog`, followed by the job card above the list) and a project is deleted, file and all, after asking (`DeleteDialog`). The open project is the
  * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. */
 export function Projects() {
-  return (
-    <ProjectProvider>
-      <ProjectsTab />
-    </ProjectProvider>
-  );
-}
-
-const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
-const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
-
-function ProjectsTab() {
   const { request } = useRegistry();
   const project = useProject();
+  const leave = React.useRef(project.leave);
+  leave.current = project.leave;
+  React.useEffect(() => () => leave.current(), []);
   // `settled` counts the jobs that ended: the list is read again when one does (a new project, a deleted one, a version moved).
   const { settled } = useJobs();
   const sendRef = React.useRef(request);
@@ -269,6 +264,11 @@ function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | nu
     );
     return () => { live = false; };
   }, [id, attempt, settled]);
+  const { setInfo } = project;
+  React.useEffect(() => {
+    setInfo(read.info);
+    return () => setInfo(null);
+  }, [setInfo, read.info]);
   const back = <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>;
   if (read.error) return (
     <Column gap="lg" pad="xl">
