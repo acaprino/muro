@@ -1,4 +1,4 @@
-// The page's requests wait for each other. Found on the real executable (native.mjs): `adopt` plans in the background after a
+// The page's requests wait for each other. Found on the real executable: `adopt` plans in the background after a
 // save, and the first run's next step sent `scan` two milliseconds later: "Registry is busy". The fake transport has no lock.
 import test from 'node:test';
 import assert from 'node:assert/strict';

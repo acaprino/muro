@@ -1,4 +1,4 @@
-// Photographs of every screen of the window, on the fake transport and in the fake window of browser-helper.mjs: dark and light, 1440 and 620 px wide, in
+// Photographs of every screen of the window, on the fake transport and in the fake window of browser-helper.mjs: dark and light, 1440, 860 and 620 px wide, in
 // apps/desktop/tests/shots (the artifact `muro-shots` of Tests), which a person judges. A screen that cannot be reached, or that overflows sideways, fails the run.
 //   node apps/desktop/tests/shots.mjs        (MURO_UI_PORT moves the dev server off 1422)
 import { mkdir } from 'node:fs/promises';
@@ -19,6 +19,7 @@ const panel = async (page, name) => {
   if (await opener.count()) await opener.click();
   await segment(page, name).click();
 };
+const checked = async page => { await button(page, 'Check now').click(); await button(page, 'Review').waitFor(); };
 const addInput = async page => { await project(page); await button(page, 'Add input…').click(); await page.getByRole('heading', { name: 'Add an input' }).waitFor(); };
 
 /** The screens: the data, and the way to each from the window as it opens. */
@@ -27,7 +28,8 @@ const SCREENS = [
   ['sync-in-sync', 'demo-synced', async () => {}],
   ['sync-no-harness', 'default', async () => {}],
   ['sync-unlisted', 'unlisted', async () => {}],
-  ['sync-review', 'demo', async page => { await button(page, 'Review').click(); await page.locator('[data-review-sheet]').waitFor(); }],
+  ['sync-checked', 'demo', checked],
+  ['sync-review', 'demo', async page => { await checked(page); await button(page, 'Review').click(); await page.locator('[data-review-sheet]').waitFor(); }],
   ['sync-plugin', 'changes', async page => { await page.locator('#rows button').first().click(); await page.locator('[data-slot="sheet-content"]').waitFor(); }],
   ['sync-add-plugin', 'changes', async page => { await button(page, 'Add plugin').first().click(); await page.locator('[data-slot="sheet-content"]').waitFor(); }],
   ['sync-add-harness', 'changes', async page => { await button(page, 'Add harness').first().click(); await page.getByRole('heading', { name: 'Add a harness' }).waitFor(); }],
@@ -57,7 +59,7 @@ const SCREENS = [
 ];
 
 const failed = [];
-for (const scheme of ['dark', 'light']) for (const width of [1440, 620]) for (const [name, scenario, reach] of SCREENS) {
+for (const scheme of ['dark', 'light']) for (const width of [1440, 860, 620]) for (const [name, scenario, reach] of SCREENS) {
   const shot = `${name}-${scheme}-${width}`;
   const app = await open(scenario, { viewport: { width, height: 900 }, theme: scheme, reducedMotion: 'reduce' });
   app.page.setDefaultTimeout(10000);
@@ -73,4 +75,4 @@ for (const scheme of ['dark', 'light']) for (const width of [1440, 620]) for (co
   await app.close().catch(error => failed.push(`${shot}: ${error.message}`));
 }
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }
-console.log(`PASS: ${SCREENS.length * 4} photographs`);
+console.log(`PASS: ${SCREENS.length * 6} photographs`);

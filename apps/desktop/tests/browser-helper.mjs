@@ -43,11 +43,11 @@ function fakeWindow() {
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
 }
 
-/** options: viewport, colorScheme (Windows' own), theme (the choice kept; the window is dark without one), reducedMotion, query (appended to the harness URL after ?scenario=). */
+/** options: viewport, colorScheme (Windows' own), theme (the choice kept; the window is dark without one), reducedMotion (reduce: a drawer that still slides in is not where it will be), query (appended to the harness URL after ?scenario=). */
 export async function open(scenario = 'default', options = {}) {
   refs++;
   try { await (starting ||= start()); } catch (e) { refs--; await stop(); throw e; }
-  const page = await browser.newPage({ viewport: options.viewport || { width: 1512, height: 982 }, colorScheme: options.colorScheme || 'dark', reducedMotion: options.reducedMotion || 'no-preference' });
+  const page = await browser.newPage({ viewport: options.viewport || { width: 1512, height: 982 }, colorScheme: options.colorScheme || 'dark', reducedMotion: options.reducedMotion || 'reduce' });
   if (options.clock) await page.clock.install();
   await page.addInitScript(fakeWindow);
   if (options.theme) await page.addInitScript(theme => { if (!localStorage.getItem('muro.theme')) localStorage.setItem('muro.theme', theme); }, options.theme);

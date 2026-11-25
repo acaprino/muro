@@ -168,7 +168,7 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
 /** One plugin on one harness: the installed version, or the change a sync would make there, or why it cannot say. */
 function Cell({ state }: { state: CellStatus }) {
   switch (state.kind) {
-    case 'ok': return <span className="inline-flex items-center gap-1 text-ink tabular-nums"><span className="text-success"><Icon name="check" /></span>{state.to}</span>;
+    case 'ok': return <span className="inline-flex items-center gap-1 text-ink tabular-nums"><span className="flex text-success"><Icon name="check" /></span>{state.to}</span>;
     case 'update': return <Badge tone="info">Update {state.from} → {state.to}</Badge>;
     case 'install': return <Badge tone="info">Install {state.to}</Badge>;
     case 'reinstall': return <Badge tone="info">Reinstall {state.to}</Badge>;

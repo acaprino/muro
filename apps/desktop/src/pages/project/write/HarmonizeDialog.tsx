@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Button, Column, Input, Textarea, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import type { ChangeOperation, ProjectInfo, VersionStep } from '../../../types.ts';
 import { text } from '../../../model.ts';
@@ -144,9 +144,9 @@ export function RunFooter({ form, submit, destructive = false, cancelFirst = fal
   return (
     <>
       <Button variant="outline" disabled={form.busy} autoFocus={cancelFirst} onClick={() => form.onOpenChange(false)}>Cancel</Button>
-      <span title={form.stop ?? undefined}>
+      <Column title={form.stop ?? undefined}>
         <Button type="submit" form={form.formId} variant={destructive ? 'destructive' : 'default'} disabled={form.stop !== null} title={form.stop ?? undefined} loading={form.busy} loadingText="Starting…">{submit}</Button>
-      </span>
+      </Column>
     </>
   );
 }

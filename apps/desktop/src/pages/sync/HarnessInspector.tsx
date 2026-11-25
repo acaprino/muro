@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Checkbox, Icon, Input, Select, Spacer } from '@acaprino/sigrid/primitives';
+import { Button, Checkbox, Icon, Input, Select } from '@acaprino/sigrid/primitives';
 import { Dialog, FormField } from '@acaprino/sigrid/components';
 import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
@@ -286,9 +286,10 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
         footer={target ? (
           <div className="flex w-full flex-wrap items-center gap-2">
             <Button variant="outline" className="text-destructive" disabled={saving} onClick={() => patch({ confirm: 'stop', stopError: null })}>Stop managing</Button>
-            <Spacer />
-            <Button variant="outline" onClick={requestClose}>Cancel</Button>
-            <Button variant="secondary" type="submit" form={formId} loading={saving} loadingText="Saving…" disabled={!dirty}>Save</Button>
+            <div className="ms-auto flex items-center gap-2">
+              <Button variant="outline" onClick={requestClose}>Cancel</Button>
+              <Button variant="secondary" type="submit" form={formId} loading={saving} loadingText="Saving…" disabled={!dirty}>Save</Button>
+            </div>
           </div>
         ) : undefined}
       >

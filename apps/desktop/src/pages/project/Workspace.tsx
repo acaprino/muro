@@ -33,7 +33,7 @@ import { DetailsDialog } from './write/DetailsDialog.tsx';
 
 /** The workspace of an open project, in the frame of the window: the panel at the left (inputs, examples, records, runs), the decision graph at the centre, the details
  * of what is selected in the inspector, and the actions of the project at the foot. The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
- * is a panel over the end of the graph, and where the frame has no room for a sidebar (under 620px) the left panel opens as a drawer from a button.
+ * is a panel over the end of the graph, and where the frame has no room for a sidebar (under 850px) the left panel opens as a drawer from a button.
  *
  * What lights the graph is the decision shown (a documented example, or the AI's answer to a free-text request: `sim`), whose steps the canvas numbers as its path, or
  * the input selected, whose capabilities (what its decisions went to) the canvas marks as chosen together; what the inspector shows is `selected`. The two are apart, so
@@ -58,7 +58,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const { request } = useRegistry();
   const notify = useNotify();
   const { sidebar } = useAppShell();
-  const narrow = sidebar === 'drawer';
+  const narrow = sidebar !== 'full';
   const [drawer, setDrawer] = React.useState(false);
   const [noFolder, setNoFolder] = React.useState(noFolderShell);
   const jobs = useJobs();
@@ -168,8 +168,10 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
           <span className="min-w-0 truncate" title={about}>{about}</span>
         </div>
       </header>
+      {/* A run's card and a low window leave the graph less than it needs: this part scrolls, and the actions stay in sight. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <JobCard projectId={view.id} className="mx-4 mt-3" />
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-128 flex-1">
         {narrow ? (
           <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>
             <SheetContent side="left" className="gap-0 p-0">
@@ -215,6 +217,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
         <Inspector title={detail ? TITLES[detail.kind] : 'Details'} open={detail !== null} onOpenChange={open => { if (!open) closeDetails(); }}>
           {detail ? <Details shown={detail} data={data} onSelect={select} /> : null}
         </Inspector>
+      </div>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-2">
         <span role="status" className="me-auto min-w-0 truncate text-xs text-ink-mute" title={busy ?? undefined}>{busy ?? ''}</span>
