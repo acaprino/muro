@@ -114,7 +114,7 @@ function RecordDialog({ id, info, records, target, open, onClose }: Props & { op
           <Input type="date" name="date" value={form.date} onChange={e => change({ date: e.currentTarget.value })} />
         </FormField>
         <FormField label="About" help="The capabilities or inputs this decision is about, separated by commas.">
-          <Input name="subjects" autoComplete="off" spellCheck={false} placeholder="capability-id, input-id" value={form.subjects} onChange={e => change({ subjects: e.currentTarget.value })} />
+          <Input name="subjects" mono autoComplete="off" spellCheck={false} placeholder="capability-id, input-id" value={form.subjects} onChange={e => change({ subjects: e.currentTarget.value })} />
         </FormField>
         <FormField label="Decision" required help="What was decided, and why." error={tried && missing.text ? 'Write the decision and its reason.' : null}>
           <Textarea name="text" rows={6} value={form.text} onChange={e => change({ text: e.currentTarget.value })} />

@@ -41,7 +41,7 @@ function StatusLine({ snapshot, error }: { snapshot: Snapshot | null; error: str
   return (
     <>
       <Badge tone={doing ? 'info' : chip.tone === 'ok' ? 'success' : 'warning'}>{doing ?? chip.text}</Badge>
-      {narrow ? null : <Text>{checkedLine(snapshot)}</Text>}
+      {narrow ? null : <Text truncate>{checkedLine(snapshot)}</Text>}
       <Spacer />
       <Text>{plural(snapshot.registry.targets.length, 'harness', 'harnesses')}</Text>
     </>

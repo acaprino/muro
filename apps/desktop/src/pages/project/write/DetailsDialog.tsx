@@ -192,6 +192,7 @@ export function DetailsDialog({ id, info, open, onOpenChange }: DetailsDialogPro
                 name={`repository-${field.key}`}
                 autoComplete="off"
                 spellCheck={false}
+                mono={field.key === 'url'}
                 placeholder={field.placeholder}
                 value={form.repository[field.key]}
                 onChange={e => change({ repository: { ...form.repository, [field.key]: e.currentTarget.value } })}
@@ -205,7 +206,7 @@ export function DetailsDialog({ id, info, open, onOpenChange }: DetailsDialogPro
           ) : null}
         </Column>
         <FormField label="Changelog" help="CHANGELOG.md of the project: one entry per version. Muro writes one at each harmonization; you can edit it.">
-          <Textarea name="changelog" rows={10} spellCheck={false} value={form.changelog} onChange={e => change({ changelog: e.currentTarget.value })} />
+          <Textarea name="changelog" rows={10} maxRows={14} mono spellCheck={false} value={form.changelog} onChange={e => change({ changelog: e.currentTarget.value })} />
         </FormField>
         {edit.blocked ? <Text as="p" variant="note" role="status">{edit.blocked}</Text> : !dirty ? <Text as="p" variant="note">Nothing has changed yet.</Text> : null}
         {edit.error ? <NotSaved text={edit.error} /> : null}

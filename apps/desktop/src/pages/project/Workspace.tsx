@@ -183,18 +183,18 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
         <Column pad="md" gap="xs">
           <Cluster>
             <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>
-            <Heading size="small" level={1}><Text pre>{name}</Text></Heading>
+            <Heading size="small" level={1} truncate>{name}</Heading>
             {version ? <Text variant="note">{version}</Text> : null}
             {info.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
-            <Text variant="note">{summary}</Text>
+            <Text variant="note" truncate>{summary}</Text>
             <Spacer />
             <GatedButton off={editBusy} variant="outline" size="sm" onClick={() => show('details')}>Edit details…</GatedButton>
             {narrow ? <Button variant="outline" size="sm" aria-expanded={drawer} onClick={() => setDrawer(true)}><Icon name="sidebarOpen" />Project panel</Button> : null}
           </Cluster>
           <Cluster>
-            {file ? <Text variant="note" pre><code>{file}</code></Text> : null}
+            {file ? <Text mono truncate>{file}</Text> : null}
             {file && !noFolder ? <Button variant="outline" size="sm" onClick={() => void openFolder()}>Open folder</Button> : null}
-            <Text variant="note" pre>{about}</Text>
+            <Text variant="note" truncate>{about}</Text>
           </Cluster>
         </Column>
       </header>

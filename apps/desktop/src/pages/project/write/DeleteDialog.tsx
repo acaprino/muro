@@ -88,7 +88,7 @@ export function DeleteDialog({ project, open, onOpenChange, onDeleted, focusAfte
       {shipped ? null : (
         <Column gap="xs">
           <Text variant="note">The file that is deleted</Text>
-          <Text pre><code>{project.path}</code></Text>
+          <Text mono>{project.path}</Text>
         </Column>
       )}
       {failure ? <RefusalLine>{failure}</RefusalLine> : null}

@@ -116,7 +116,7 @@ export function Unlisted() {
           return (
             <li key={key}>
               <SettingRow
-                label={<Text variant="strong" pre>{plugin.name}</Text>}
+                label={<Text variant="strong" truncate>{plugin.name}</Text>}
                 description={<Text pre>{lineOf(plugin, target)}{listable(plugin) ? '' : ` ${NO_FOLDER}`}</Text>}
                 control={(
                   <Cluster justify="end">

@@ -191,18 +191,18 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
   const name = nameOf(p), counts = countsOf(p);
   return (
     <TableRow>
-      <TableCell>
-        <Column gap="xs" align="start">
-          <Cluster>
+      <TableCell grow>
+        <Column gap="xs">
+          <Cluster wrap={false}>
             {p.error
-              ? <Text variant="strong" pre title={p.path}>{fileOf(p.path)}</Text>
-              : <Button variant="link" size="xs" title={name} onClick={onOpen}>{name}</Button>}
+              ? <Text variant="strong" truncate title={p.path}>{fileOf(p.path)}</Text>
+              : <Button variant="link" size="inline" onClick={onOpen}><Text truncate>{name}</Text></Button>}
             {!p.error && p.plugin?.version ? <Text variant="note">{p.plugin.version}</Text> : null}
             {p.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
             {p.error ? <Badge tone="danger">Cannot be read</Badge> : null}
           </Cluster>
-          <Text variant="note" pre title={p.path}>{p.path}</Text>
-          {p.error ? <Text variant="soft" pre>{p.error}</Text> : counts ? <Text variant="note">{counts}</Text> : null}
+          <Text variant="note" truncate>{p.path}</Text>
+          {p.error ? <Text tone="danger">{p.error}</Text> : counts ? <Text variant="note">{counts}</Text> : null}
         </Column>
       </TableCell>
       <TableCell align="end">
@@ -233,8 +233,8 @@ function Published({ snapshot }: { snapshot: Snapshot }) {
           return (
             <li key={p.id}>
               <SettingRow
-                label={<Text pre><Text variant="strong">{p.name}</Text>{version ? <Text variant="muted"> {version}</Text> : null}</Text>}
-                description={<Text pre>{p.source}</Text>}
+                label={<Text truncate title={p.name}><Text variant="strong">{p.name}</Text>{version ? <Text variant="muted"> {version}</Text> : null}</Text>}
+                description={<Text truncate>{p.source}</Text>}
                 control={missing.length ? <Badge tone="warning">Needs a build for {missing.map(t => t.name).join(', ')}</Badge> : undefined}
               />
             </li>

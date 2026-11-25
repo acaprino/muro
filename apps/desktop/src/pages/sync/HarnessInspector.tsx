@@ -65,10 +65,10 @@ export function HarnessFields({ values, problems, refs, onChange }: { values: Ha
         <Select options={KINDS} value={values.harness} onValueChange={harness => onChange({ harness })} />
       </FormField>
       <FormField label="Configuration folder" required help="Where the harness keeps its settings. OpenCode: the folder of opencode.json. Pi: the folder of settings.json." error={problems.root}>
-        <Input ref={refs.root} name="root" autoComplete="off" spellCheck={false} value={values.root} onChange={e => onChange({ root: e.currentTarget.value })} />
+        <Input ref={refs.root} name="root" mono autoComplete="off" spellCheck={false} value={values.root} onChange={e => onChange({ root: e.currentTarget.value })} />
       </FormField>
       <FormField label="Executable" required error={problems.executable}>
-        <Input ref={refs.executable} name="executable" autoComplete="off" spellCheck={false} value={values.executable} onChange={e => onChange({ executable: e.currentTarget.value })} />
+        <Input ref={refs.executable} name="executable" mono autoComplete="off" spellCheck={false} value={values.executable} onChange={e => onChange({ executable: e.currentTarget.value })} />
       </FormField>
     </>
   );
@@ -125,7 +125,7 @@ function InstalledHere({ snapshot, target, adding, error, note, noteRef, onAdd }
             return (
               <li key={p.id}>
                 <SettingRow
-                  label={<Text variant="strong" pre>{p.name}</Text>}
+                  label={<Text variant="strong" truncate>{p.name}</Text>}
                   description={<Text pre>{`${p.version} · ${listed ? 'in your list' : 'not in your list'}${filesMissing(p)}${listed || addable ? '' : `. ${NO_FOLDER}`}`}</Text>}
                   control={addable ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${p.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => onAdd(p)}><Icon name="plus" />Add to my list</Button> : undefined}
                 />

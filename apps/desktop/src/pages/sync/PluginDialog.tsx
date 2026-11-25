@@ -207,7 +207,7 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
         help={saved ? 'Changing the source removes the prepared builds: check for updates or adapt again after saving.' : 'A repository or a folder on this computer. For a plugin in a folder of its repository, add #folder to the address.'}
         error={problems.source}
       >
-        <Input name="source" autoFocus autoComplete="off" spellCheck={false} placeholder="https://github.com/owner/repository" value={form.source} onChange={e => onChange({ source: e.currentTarget.value })} />
+        <Input name="source" mono autoFocus autoComplete="off" spellCheck={false} placeholder="https://github.com/owner/repository" value={form.source} onChange={e => onChange({ source: e.currentTarget.value })} />
       </FormField>
       <FormField id={fieldId(ids, 'name')} label="Name" required error={problems.name}>
         <Input name="name" autoComplete="off" value={form.name} onChange={e => onChange({ name: e.currentTarget.value })} />
@@ -235,7 +235,7 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
           label="Custom instructions folder"
           help="Optional. Full path of a folder with your own .md notes, subfolders included. Leave empty to use the folder Muro keeps. After editing the files, adapt the plugin again."
         >
-          <Input name="custom_instructions_dir" autoComplete="off" spellCheck={false} value={form.dir} onChange={e => onChange({ dir: e.currentTarget.value })} />
+          <Input name="custom_instructions_dir" mono autoComplete="off" spellCheck={false} value={form.dir} onChange={e => onChange({ dir: e.currentTarget.value })} />
         </FormField>
         <Column gap="sm" role="group" aria-labelledby={fieldId(ids, 'builds')}>
           <Text variant="strong" id={fieldId(ids, 'builds')}>Prepared builds</Text>
@@ -246,7 +246,7 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
                 <Select options={optionsFor(row.harness)} value={row.harness} onValueChange={harness => editBuild(row.key, { harness })} />
               </FormField>
               <FormField id={fieldId(ids, `build-${row.key}-path`)} label="Build folder">
-                <Input name="distribution_path" autoComplete="off" spellCheck={false} value={row.path} onChange={e => editBuild(row.key, { path: e.currentTarget.value })} />
+                <Input name="distribution_path" mono autoComplete="off" spellCheck={false} value={row.path} onChange={e => editBuild(row.key, { path: e.currentTarget.value })} />
               </FormField>
               <FormField id={fieldId(ids, `build-${row.key}-version`)} label="Version">
                 <Input name="distribution_version" autoComplete="off" spellCheck={false} value={row.version} onChange={e => editBuild(row.key, { version: e.currentTarget.value })} />
@@ -494,7 +494,7 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
           <Select options={ADAPT_HARNESSES} value={ui.harness} onValueChange={harness => patchUi({ harness })} />
         </FormField>
         <FormField id={fieldId(ids, 'budget')} label="Maximum budget (USD)" help="Checked between turns: the run can end slightly above it." error={ui.budgetProblem}>
-          <Input name="budget" autoFocus inputMode="decimal" autoComplete="off" value={ui.budget} onChange={e => patchUi({ budget: e.currentTarget.value, budgetProblem: null })} />
+          <Input name="budget" short="sm" autoFocus inputMode="decimal" autoComplete="off" value={ui.budget} onChange={e => patchUi({ budget: e.currentTarget.value, budgetProblem: null })} />
         </FormField>
         {!codex && stop ? <RefusalLine>{stop}</RefusalLine> : null}
         {fault ? <RefusalLine>{fault.text}</RefusalLine> : null}
@@ -534,8 +534,8 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
           {stale.length ? <Note tone="warning" announce={false} title={<Text>{`Instructions changed. Adapt again for: ${stale.map(h => harnessNames[h] ?? h).join(', ')}.`}</Text>} /> : null}
           <Fold label={`Custom instructions · ${files.length ? plural(files.length, 'Markdown file') : 'none yet'}`} open={ui.notes} onToggle={() => patchUi({ notes: !ui.notes })}>
             <Text as="p" variant="muted">Your own Markdown notes. The AI reads them with the source when it adapts this plugin.</Text>
-            {folder ? <Text pre><code>{folder}</code></Text> : null}
-            {files.length ? <Column as="ul" gap="xs">{files.map(file => <li key={file}><Text variant="soft" pre><code>{file}</code></Text></li>)}</Column> : null}
+            {folder ? <Text mono>{folder}</Text> : null}
+            {files.length ? <Column as="ul" gap="xs">{files.map(file => <li key={file}><Text variant="soft" mono>{file}</Text></li>)}</Column> : null}
             <Cell align="start"><Button variant="outline" size="sm" loading={working === 'reload'} loadingText="Reading…" disabled={working !== null && working !== 'reload'} onClick={reload}><Icon name="refresh" />Reload files</Button></Cell>
           </Fold>
           <Text as="p" variant="note" role="status">{ui.status}</Text>
