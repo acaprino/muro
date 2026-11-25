@@ -71,9 +71,10 @@ await test('the window opens on Sync; the four tabs are in the title bar in orde
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name], `${name} is the current tab`);
     assert.equal(await content(page).getAttribute('aria-label'), name, 'the content is named after the page');
-    await content(page).getByText(`${name} is moving to the new window`).waitFor();
-    assert.equal(await content(page).getByText(/is moving to the new window/).count(), 1, 'one page at a time');
   }
+  await content(page).getByRole('heading', { name: 'Appearance' }).waitFor();
+  await tab(page, 'Activity').click();
+  await content(page).getByText('Activity is moving to the new window').waitFor();
   await content(page).getByText('the background worker goes on checking your registry; with automatic sync on it also applies the changes').waitFor();
   await tab(page, 'Sync').click();
   assert.deepEqual(await texts(currentTab(page)), ['Sync'], 'Sync is a page of its own now (browser-sync.mjs tests it)');
@@ -116,8 +117,8 @@ await test('from 250px up nothing sticks out sideways: the tabs go under the bar
   for (const name of ['Settings', 'Activity']) {
     await tab(page, name).click();
     assert.deepEqual(await texts(currentTab(page)), [name]);
-    await content(page).getByText(`${name} is moving to the new window`).waitFor();
   }
+  await content(page).getByText('Activity is moving to the new window').waitFor();
   assert.equal(await controls(page).count(), 3, 'the window buttons stay at 500px');
   await titleBar(page).getByRole('button', { name: 'Commands', exact: true }).waitFor();
 });
@@ -188,7 +189,6 @@ await test('Settings has the glass of the window, off at first; a press makes it
   const glass = content(page).getByRole('switch', { name: 'Glass' });
   assert.equal(await glass.isChecked(), false, 'the window is not glass until the person chooses');
   assert.equal(await page.evaluate(() => window.native.filter(([command]) => command === 'plugin:imago-shell|set_glass').length), 0, 'nothing is told at the start');
-  await content(page).getByText('Settings is moving to the new window').waitFor();
   await glass.focus();
   await page.keyboard.press('Space');
   await page.waitForFunction(() => document.documentElement.dataset.material === 'glass');
@@ -197,6 +197,24 @@ await test('Settings has the glass of the window, off at first; a press makes it
   await page.screenshot({ path: shots + '/shell-glass.png' });
   await page.keyboard.press('Control+k');
   assert.equal(await options(page).filter({ hasText: 'Glass' }).getAttribute('aria-checked'), 'true', 'the command of the look is checked');
+});
+
+await test('Settings chooses the theme with the shell\'s own commands: dark at first, light and system from the page, kept as the palette keeps it', 'default', { colorScheme: 'light' }, async app => {
+  const { page } = app;
+  await ready(page);
+  await tab(page, 'Settings').click();
+  const theme = content(page).getByRole('group', { name: 'Theme' });
+  const item = name => theme.locator('[data-slot="toggle-group-item"]').filter({ hasText: name });
+  assert.deepEqual(await texts(theme.locator('[data-slot="toggle-group-item"]')), ['Light theme', 'Dark theme', 'System theme']);
+  assert.equal(await item('Dark theme').getAttribute('aria-pressed'), 'true', 'dark until the person chooses');
+  await item('Light theme').click();
+  await page.waitForFunction(() => document.documentElement.dataset.scheme === 'light');
+  assert.equal((await painted(page)).stored, 'light');
+  await item('System theme').click();
+  await page.waitForFunction(() => localStorage.getItem('muro.theme') === 'system');
+  assert.equal((await painted(page)).scheme, 'light', 'the system\'s look, here light');
+  await page.keyboard.press('Control+k');
+  assert.equal(await options(page).filter({ hasText: 'System theme' }).getAttribute('aria-checked'), 'true', 'the palette says the same choice');
 });
 
 // ---------- the registry, read again ----------
