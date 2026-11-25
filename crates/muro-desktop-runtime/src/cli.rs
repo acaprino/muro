@@ -315,7 +315,8 @@ pub fn serve(data: &Path) -> Result<()> {
     lease
         .try_lock_exclusive()
         .context("A Muro CLI server already owns this data directory")?;
-    initialize(data)?;
+    // Another writer may hold the registry at this moment: the server waits for it, rather than end.
+    retry_while_busy(Duration::from_secs(15), Duration::from_millis(250), || initialize(data))?;
     // The project cache and the simulations' folders are tidied once, when the server starts: what no project
     // and no installed build needs, and what a process that ended in the middle left behind.
     crate::projects::sweep(data);
