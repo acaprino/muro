@@ -175,7 +175,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
         {narrow ? (
           <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>
             <SheetContent side="left" className="gap-0 p-0">
-              <SheetTitle className="sr-only">Project panel</SheetTitle>
+              <SheetTitle className="px-3 pt-3">Project panel</SheetTitle>
               {panel}
             </SheetContent>
           </Sheet>

@@ -9,7 +9,7 @@
 // - A refusal stays in the sheet, in its own line: a notice would cover its buttons. A plan refused because the registry moved is made again by useSync, and the
 //   sheet shows the new one.
 import * as React from 'react';
-import { Badge, Button, Icon } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Cluster, Icon, Text } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
 import type { Operation, Review } from '../../types.ts';
 import { removalLabel, removals } from '../../model.ts';
@@ -64,8 +64,8 @@ export function ReviewSheet() {
 
   const skipping = running && choice === 'skip';
   const footer = (
-    <>
-      {gone.total > 0 && !running ? <span className="self-center text-xs text-ink-mute sm:me-auto">{removalNote(gone)}</span> : null}
+    // Three buttons whose words count what they do: they wrap where the dialog has no room for them on one line.
+    <Cluster justify="end">
       <Button variant="outline" disabled={running} onClick={() => sync.closeReview()}>{ops.length ? 'Cancel' : 'Close'}</Button>
       {gone.total > 0 && ops.length > gone.total ? (
         <Button variant="outline" loading={skipping} loadingText={`Applying ${plural(sync.progress?.total ?? ops.length - gone.total, 'change')}…`} disabled={running && !skipping} onClick={() => void apply('skip')}>
@@ -84,7 +84,7 @@ export function ReviewSheet() {
           {removalLabel(plan)}
         </Button>
       ) : null}
-    </>
+    </Cluster>
   );
 
   return (
@@ -126,6 +126,7 @@ export function ReviewSheet() {
             </ul>
           </section>
         ) : null}
+        {gone.total > 0 && !running ? <Text variant="note" as="p">{removalNote(gone)}</Text> : null}
         {sync.error && !running ? <p role="alert" className="break-words rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive">{sync.error}</p> : null}
       </div>
     </Dialog>
