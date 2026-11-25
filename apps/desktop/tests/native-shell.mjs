@@ -8,20 +8,26 @@
 // A registry that is held while the window asks (section 8): a source that takes seconds to answer makes a check hold the
 // registry lock that long. It is a git clone of a local server that accepts the connection and hangs up after a while.
 //
-// Not covered here: the tray menu itself. It is a native menu with no way in from a page.
+// Not covered here: the tray menu itself, and the kept place and theme, which .github/scripts/desktop-smoke.ps1 covers.
+//
+// Runs in the job `program` of tests.yml, on the release program. Its engine must open a debugging port of its own choice
+// (--remote-debugging-port=0, by the policy AdditionalBrowserArguments of WebView2, as that job sets it): the port is read
+// from the engine's folder, one for each data directory.
 import { chromium } from '@playwright/test';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
-import { mkdtemp, mkdir, writeFile, readFile, rm, access } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { resolve, join, dirname } from 'node:path';
 import assert from 'node:assert/strict';
 
 const executable = resolve(process.env.MURO_DESKTOP_EXE || 'target/debug/muro-desktop.exe');
-await access(executable);
+const ctl = [join(dirname(executable), 'tools', 'muroctl.exe'), join(dirname(executable), 'muroctl.exe')].find(existsSync);
+assert.ok(existsSync(executable) && ctl, `${executable} and its muroctl.exe are built`);
 const root = await mkdtemp(join(tmpdir(), 'muro-native-shell-'));
 const data = join(root, 'data'), profile = join(root, 'opencode'), artifact = join(root, 'package');
 await Promise.all([mkdir(data), mkdir(profile), mkdir(artifact)]);
@@ -54,18 +60,18 @@ public static class MuroWindow {
   delegate bool EnumProc(IntPtr window, IntPtr parameter);
   [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback, IntPtr parameter);
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder text, int count);
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr window, uint message, IntPtr w, IntPtr l);
-  public static IntPtr Find(uint process, string title) {
+  public static IntPtr Find(uint process, string name) {
     IntPtr found = IntPtr.Zero;
     EnumWindows(delegate (IntPtr window, IntPtr parameter) {
       uint owner;
       GetWindowThreadProcessId(window, out owner);
       if (owner != process) return true;
       StringBuilder text = new StringBuilder(256);
-      GetWindowText(window, text, 256);
-      if (text.ToString() != title) return true;
+      GetClassName(window, text, 256);
+      if (text.ToString() != name) return true;
       found = window;
       return false;
     }, IntPtr.Zero);
@@ -79,7 +85,7 @@ Add-Type -TypeDefinition $source
 $found = $false; $visible = $false; $posted = $false
 $end = [DateTime]::UtcNow.AddMilliseconds($Milliseconds)
 do {
-  $window = [MuroWindow]::Find($ProcessId, 'Muro')
+  $window = [MuroWindow]::Find($ProcessId, 'Tauri Window')
   if ($window -ne [IntPtr]::Zero) {
     $found = $true
     if ([MuroWindow]::Visible($window)) { $visible = $true }
@@ -114,26 +120,25 @@ const exited = async (app, ms) => {
 const json = async file => JSON.parse(await readFile(file, 'utf8'));
 const automation = () => json(join(data, 'automation-status.json'));
 
-const port = Number(process.env.MURO_CDP_PORT || 9228);
-// A second Muro, on another data directory, needs a debugging port of its own.
-for (const cdp of [port, port + 1]) {
-  try { await fetch(`http://127.0.0.1:${cdp}/json/version`); throw Error(`CDP port ${cdp} is already in use`); } catch (e) { if (e.message.includes('already in use')) throw e; }
-}
-
 const running = new Set();
 /** Starts the executable with `args` and reaches its page over CDP. The window is not hidden by the
  *  operating system's start-up flags: whether it shows is the shell's own doing. */
-async function launch(args = [], { dataDir = data, cdpPort = port } = {}) {
-  const endpoint = `http://127.0.0.1:${cdpPort}`;
+async function launch(args = [], { dataDir = data } = {}) {
+  const portFile = join(dataDir, 'webview', 'EBWebView', 'DevToolsActivePort');
+  await rm(portFile, { force: true });
   const app = spawn(executable, args, {
-    env: { ...process.env, MURO_DATA_DIR: dataDir, MURO_AUTOSTART_NAME: valueName, WEBVIEW2_USER_DATA_FOLDER: join(root, 'webview'), WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${cdpPort}` },
+    env: { ...process.env, MURO_DATA_DIR: dataDir, MURO_AUTOSTART_NAME: valueName },
     stdio: 'pipe', windowsHide: false,
   });
   running.add(app);
   let output = '';
   app.stdout.on('data', b => output += b); app.stderr.on('data', b => output += b);
   try {
-    await until('CDP', async () => { if (app.exitCode !== null) throw Error(`App exited ${app.exitCode}: ${output}`); return (await fetch(endpoint + '/json/version')).ok; });
+    const endpoint = await until('CDP', async () => {
+      if (app.exitCode !== null) throw Error(`App exited ${app.exitCode}: ${output}`);
+      const at = `http://127.0.0.1:${(await readFile(portFile, 'utf8')).split('\n')[0].trim()}`;
+      return (await fetch(`${at}/json/version`)).ok && at;
+    });
     const browser = await chromium.connectOverCDP(endpoint);
     const page = await until('page', () => browser.contexts().flatMap(c => c.pages()).find(p => !p.url().startsWith('devtools:')));
     await page.waitForFunction(() => window.__TAURI_INTERNALS__?.invoke);
@@ -262,7 +267,7 @@ try {
 
   // Another data directory is another Muro: its own backend and window, the first one untouched.
   const otherData = join(root, 'other-data');
-  const other = await launch([], { dataDir: otherData, cdpPort: port + 1 });
+  const other = await launch([], { dataDir: otherData });
   await until('window of the other data directory', () => windowOf(other.app, 'look').visible);
   assert.equal((await other.call('snapshot')).data_dir, otherData);
   assert.equal(backends(otherData), 1);
@@ -321,8 +326,6 @@ try {
   const slowData = join(root, 'slow-data'), slowProfile = join(root, 'slow-profile');
   await mkdir(slowProfile);
   await writeFile(join(slowProfile, 'opencode.json'), '{}');
-  const ctl = join(dirname(executable), 'muroctl.exe');
-  await access(ctl);
   const seed = async (action, payload) => {
     const file = join(root, 'payload.json');
     await writeFile(file, JSON.stringify(payload));
@@ -338,9 +341,17 @@ try {
   // 8a. Muro starts while another process holds the registry: it waits for it, and shows its page.
   holdRegistry();
   await until('the registry is held', registryBusy, 15000);
-  const slow = await launch([], { dataDir: slowData, cdpPort: port + 1 });
-  await slow.page.locator('#sync-state').waitFor({ timeout: 60000 });
-  results.push('a launch while the registry is held waits for it and shows the Sync page');
+  const slow = await launch([], { dataDir: slowData });
+  const sync = async () => {
+    await slow.page.locator('[data-window-control="close"]').waitFor({ timeout: 60000 });
+    await slow.page.keyboard.press('Control+k');
+    await slow.page.getByRole('dialog').waitFor();
+    await slow.page.keyboard.type('go to sync');
+    await slow.page.keyboard.press('Enter');
+  };
+  await slow.page.locator('[data-window-control="close"]').waitFor({ timeout: 60000 });
+  await slow.call('snapshot');
+  results.push('a launch while the registry is held waits for it and shows its page');
 
   // 8b. The worker's first check could not resolve the source: the run is a failed one, with the plugin's name.
   const first8 = await until('the worker checked', async () => { const s = await slowAutomation(); return s.action === 'Background check' && s; }, 60000);
@@ -359,11 +370,10 @@ try {
   await until('the registry is held again', registryBusy, 15000);
   const began = Date.now();
   await slow.page.reload();
-  await slow.page.locator('#sync-state').waitFor({ timeout: 60000 });
+  await sync();
+  await slow.page.getByText('1 source could not be checked').first().waitFor({ timeout: 60000 });
   assert.ok(Date.now() - began >= 1000, `the first request did not wait (${Date.now() - began} ms)`);
   assert.equal(await slow.page.evaluate(() => window.__unavailable), false, 'the page said the registry is not available');
-  assert.equal(await slow.page.locator('#sync-state b').first().textContent(), '1 source could not be checked');
-  assert.match(await slow.page.locator('.im-status').textContent(), /Sources not checked/);
   results.push('a request that meets a held registry waits for it; the window opens on the recorded check, with the source it could not resolve');
 
   // 8d. A sync in progress is waited for by any request, however long it lasts (here longer than the 15 s a busy registry is

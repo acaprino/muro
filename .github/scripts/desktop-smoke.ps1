@@ -39,11 +39,11 @@ public static class W {
       if (p == pid && Name(h, true) == cls && (!visible || IsWindowVisible(h))) { R r; GetWindowRect(h, out r); found = h.ToInt64() + "|" + Name(h, false) + "|" + r.L + "," + r.T + "," + (r.Rr - r.L) + "," + (r.B - r.T); return false; }
       return true; }, IntPtr.Zero);
     return found; }
-  // Every window of `pid` a person could see: class and title.
+  // Every window of `pid` a person could see: class and title. Two helpers of the libraries count as visible and are not seen.
   public static string[] Seen(uint pid) {
     var all = new List<string>();
     EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); R r; GetWindowRect(h, out r);
-      if (p == pid && IsWindowVisible(h) && r.Rr > r.L && r.B > r.T && Name(h, true) != "tray_icon_app") all.Add(Name(h, true) + " '" + Name(h, false) + "'"); return true; }, IntPtr.Zero);
+      if (p == pid && IsWindowVisible(h) && r.Rr > r.L && r.B > r.T && Name(h, true) != "tray_icon_app" && Name(h, true) != "Tao Thread Event Target") all.Add(Name(h, true) + " '" + Name(h, false) + "'"); return true; }, IntPtr.Zero);
     return all.ToArray(); }
   public static string Child(IntPtr parent, string cls) {
     string found = null;

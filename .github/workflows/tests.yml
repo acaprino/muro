@@ -194,6 +194,16 @@ jobs:
       - name: The program on a real window
         timeout-minutes: 12
         run: ./.github/scripts/desktop-smoke.ps1 -Exe "$PWD/release/Muro.exe" -Data "$env:RUNNER_TEMP/muro-data" -Out "$env:RUNNER_TEMP/muro-window"
+      # The engine chooses its port here: this test runs two copies of Muro at a time.
+      - name: Closing, quitting and the worker (native-shell.mjs)
+        if: ${{ !cancelled() && hashFiles('release/Muro.exe') != '' }}
+        timeout-minutes: 8
+        run: |
+          $policy = 'HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+          New-Item -Path $policy -Force | Out-Null
+          New-ItemProperty -Path $policy -Name Muro.exe -Value '--remote-debugging-port=0' -Force | Out-Null
+          $env:MURO_DESKTOP_EXE = "$PWD/release/Muro.exe"
+          node apps/desktop/tests/native-shell.mjs
       - name: Pictures of the window
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
