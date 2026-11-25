@@ -120,7 +120,8 @@ fn run(target: &Value, args: &[String]) -> Result<String> {
 pub fn inventory(target: &Value, receipts: &Value) -> Value {
     let tid = target["id"].as_str().unwrap_or("");
     let h = target["harness"].as_str().unwrap_or("");
-    let result = scan(target).map(|(mut entries, fingerprint, warnings)| {
+    let result = scan(target).map(|(mut entries, fingerprint, broken)| {
+        let warnings: Vec<&Value> = broken.iter().map(|b| &b["message"]).collect();
         for p in &mut entries {
             let name = plugin_name(h, p);
             p["plugin_name"] = name;
@@ -132,18 +133,21 @@ pub fn inventory(target: &Value, receipts: &Value) -> Value {
                 }
             }
         }
-        json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"plugins":entries,"fingerprint":fingerprint})
+        json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"broken":broken,"plugins":entries,"fingerprint":fingerprint})
     });
     match result {
         Ok(v) => v,
         Err(e) => {
-            json!({"target_id":tid,"complete":false,"supported":supported(h),"error":format!("{e:#}"),"warnings":[],"plugins":[],"fingerprint":""})
+            json!({"target_id":tid,"complete":false,"supported":supported(h),"error":format!("{e:#}"),"warnings":[],"broken":[],"plugins":[],"fingerprint":""})
         }
     }
 }
-/// What is installed on the target, the fingerprint of what was read, and the warnings: what the
-/// harness holds that it cannot load itself and Muro read around (`codex_broken_marketplaces`).
-fn scan(target: &Value) -> Result<(Vec<Value>, String, Vec<String>)> {
+/// What is installed on the target, the fingerprint of what was read, and what is broken: what the
+/// harness holds that it cannot load itself and Muro read around (`codex_broken_marketplaces`), each
+/// `{"name","message","plugins"}`: the marketplace, the sentence for the person, and the ids of the
+/// plugins the harness has configured from it. The inventory carries them as `broken`, and their
+/// sentences as `warnings`.
+fn scan(target: &Value) -> Result<(Vec<Value>, String, Vec<Value>)> {
     let h = str_field(target, "harness")?;
     ensure!(
         supported(h),
@@ -216,13 +220,20 @@ fn scan(target: &Value) -> Result<(Vec<Value>, String, Vec<String>)> {
                         Ok(config) if refused(&refusal) => config,
                         _ => return Err(refusal),
                     };
-                    let warnings = codex_broken_marketplaces(&config, &format!("{refusal:#}"));
-                    if warnings.is_empty() {
+                    let broken: Vec<Value> =
+                        codex_broken_marketplaces(&config, &format!("{refusal:#}"))
+                            .into_iter()
+                            .map(|(name, message)| {
+                                let plugins = codex_plugins_of(&config, &name);
+                                json!({"name":name,"message":message,"plugins":plugins})
+                            })
+                            .collect();
+                    if broken.is_empty() {
                         return Err(refusal);
                     }
                     let rows = codex_rows(&config, root);
-                    let fingerprint = hash(&json!({"files":rows}));
-                    return Ok((codex_entries(&rows, root), fingerprint, warnings));
+                    let fingerprint = hash(&json!({"files":rows,"broken":broken}));
+                    return Ok((codex_entries(&rows, root), fingerprint, broken));
                 }
             };
             let doc: Value =
@@ -362,11 +373,24 @@ fn version_order(version: &str) -> (Vec<(bool, u64, &str)>, bool) {
         .collect();
     (parts, core.len() == version.len())
 }
-/// The configured marketplaces Codex cannot load, each in a sentence for the person, in the order of
+/// The ids of the plugins `config.toml` has a table for from the marketplace `market`, with or without
+/// a copy in the cache, in order.
+fn codex_plugins_of(config: &Value, market: &str) -> Vec<String> {
+    let mut ids: Vec<String> = config["plugins"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(id, _)| id.clone())
+        .filter(|id| id.split_once('@').is_some_and(|(_, of)| of == market))
+        .collect();
+    ids.sort();
+    ids
+}
+/// The configured marketplaces Codex cannot load, each with a sentence for the person, in the order of
 /// their names: a local one whose folder is gone (Muro looks), and any other one that `refusal`, what
 /// Codex answered, names between backticks, with Codex's reason. One of them is enough for
 /// `codex plugin list` and `codex plugin marketplace list` to answer nothing (codex-cli 0.169.0).
-fn codex_broken_marketplaces(config: &Value, refusal: &str) -> Vec<String> {
+fn codex_broken_marketplaces(config: &Value, refusal: &str) -> Vec<(String, String)> {
     let mut names: Vec<&String> = config["marketplaces"]
         .as_object()
         .into_iter()
@@ -382,17 +406,18 @@ fn codex_broken_marketplaces(config: &Value, refusal: &str) -> Vec<String> {
             .filter(|_| market["source_type"] == "local")
             .map(native_arg);
         if let Some(folder) = folder.filter(|folder| !Path::new(folder).is_dir()) {
-            broken.push(format!(
-                "The marketplace {name} points to a folder that is gone: {folder}"
+            broken.push((
+                name.clone(),
+                format!("The marketplace {name} points to a folder that is gone: {folder}"),
             ));
         } else if let Some(line) = refusal
             .lines()
             .find(|line| line.contains(&format!("`{name}`")))
         {
             let reason = line.rsplit_once(": ").map_or(line, |(_, reason)| reason);
-            broken.push(format!(
-                "The marketplace {name} cannot be loaded: {}",
-                reason.trim()
+            broken.push((
+                name.clone(),
+                format!("The marketplace {name} cannot be loaded: {}", reason.trim()),
             ));
         }
     }
@@ -764,6 +789,35 @@ fn install_commands(h: &str, id: &str, previous: Option<&str>) -> Vec<(Vec<Strin
         Some(old) if !codex => vec![(uninstall(old), false), (add, false)],
         _ => vec![(add, false)],
     }
+}
+/// Takes a marketplace Codex cannot load out of Codex, with Codex's own commands, which go on working
+/// beside it (read on codex-cli 0.169.0): `codex plugin remove` for each of `plugins`, the plugins
+/// configured from it, then `codex plugin marketplace remove`, which alone leaves their tables and
+/// their copies behind. A plugin that is already gone does not stop the rest.
+pub fn remove_marketplace(target: &Value, name: &str, plugins: &[&str]) -> Result<()> {
+    ensure!(
+        str_field(target, "harness")? == "codex",
+        "Marketplace removal unavailable for this harness"
+    );
+    for selector in plugins.iter().chain([&name]) {
+        ensure!(
+            !selector.starts_with('-') && !selector.is_empty(),
+            "Invalid native selector"
+        );
+    }
+    for id in plugins {
+        let _ = run(target, &["plugin".into(), "remove".into(), (*id).into()]);
+    }
+    run(
+        target,
+        &[
+            "plugin".into(),
+            "marketplace".into(),
+            "remove".into(),
+            name.into(),
+        ],
+    )?;
+    Ok(())
 }
 pub fn activate(target: &Value, native_id: &str) -> Result<()> {
     ensure!(
@@ -1213,6 +1267,9 @@ enabled = true
         assert_eq!(last(&["1.10.0", "abc", "2.0.0-beta"]), "abc");
         assert_eq!(last(&["1.10.0", "local", "2.0.0-beta"]), "local");
     }
+    fn said(broken: Vec<(String, String)>) -> Vec<String> {
+        broken.into_iter().map(|(_, message)| message).collect()
+    }
     #[test]
     fn a_marketplace_codex_cannot_load_is_named_in_a_sentence() {
         let here = tempfile::tempdir().unwrap();
@@ -1229,7 +1286,7 @@ enabled = true
             here.path().display()
         );
         assert_eq!(
-            codex_broken_marketplaces(&config, &refusal),
+            said(codex_broken_marketplaces(&config, &refusal)),
             vec![
                 "The marketplace empty cannot be loaded: marketplace root does not contain a supported manifest".to_owned(),
                 "The marketplace lost points to a folder that is gone: Z:\\nowhere\\lost".to_owned(),
@@ -1239,10 +1296,24 @@ enabled = true
         // A refusal that names no marketplace, with every folder there: nothing to read around.
         let whole = json!({"marketplaces":{"here":{"source_type":"local","source":here.path().to_string_lossy()}}});
         assert_eq!(
-            codex_broken_marketplaces(&whole, "Harness command failed: Error: not logged in"),
+            said(codex_broken_marketplaces(
+                &whole,
+                "Harness command failed: Error: not logged in"
+            )),
             Vec::<String>::new()
         );
-        assert_eq!(codex_broken_marketplaces(&json!({}), &refusal), Vec::<String>::new());
+        assert_eq!(
+            said(codex_broken_marketplaces(&json!({}), &refusal)),
+            Vec::<String>::new()
+        );
+        let names: Vec<String> = codex_broken_marketplaces(&config, &refusal)
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert_eq!(names, ["empty", "lost", "remote"]);
+        let tables = json!({"plugins":{"b@lost":{},"a@lost":{"enabled":false},"c@kept":{},"nomarket":{}}});
+        assert_eq!(codex_plugins_of(&tables, "lost"), ["a@lost", "b@lost"]);
+        assert_eq!(codex_plugins_of(&json!({}), "lost"), Vec::<String>::new());
     }
     #[test]
     fn only_a_command_the_harness_ran_and_failed_is_a_refusal() {

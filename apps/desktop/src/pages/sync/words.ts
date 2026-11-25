@@ -33,7 +33,7 @@ export function appliedMessage(plan: Plan, answer: Pick<Snapshot, 'skipped_remov
 }
 
 /** What each operation kind is called in the list of what a check found. */
-const CHANGE_WORDS: [string, string][] = [['install', 'install'], ['update', 'update'], ['reinstall', 'reinstall'], ['activate', 'activation'], ['remove', 'removal']];
+const CHANGE_WORDS: [string, string][] = [['install', 'install'], ['update', 'update'], ['reinstall', 'reinstall'], ['activate', 'activation'], ['remove', 'removal'], ['remove-marketplace', 'broken marketplace']];
 /** One or two names as they are; more, the first and how many are left. */
 export const nameList = (names: string[]): string => (names.length > 2 ? `${names[0]} and ${names.length - 1} more` : names.join(' and '));
 

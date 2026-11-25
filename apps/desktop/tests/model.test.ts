@@ -351,3 +351,13 @@ test('harnessWarnings: what a harness cannot load is told with its harness, and 
  assert.equal(cellState(plugin,t,s,plan([])).kind,'ok');
  s.registry.targets[0].enabled=false;assert.deepEqual(harnessWarnings(s),[],'a paused harness says nothing');
 });
+test('a broken marketplace to take out of a harness is a change of the plan, counted on its harness, and Apply all shows it first',()=>{
+ const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
+ const out:Operation={target_id:'target',plugin_id:'',name:'old-notes',kind:'remove-marketplace',from_version:'',to_version:'',reason:'The marketplace old-notes points to a folder that is gone: D:/gone',plugins:['notes@old-notes']};
+ const p=plan([out]);
+ assert.deepEqual(harnessState(t,s,p),{kind:'changes',count:1});
+ assert.deepEqual(syncSummary(s,p).byKind,{'remove-marketplace':1});assert.equal(syncHeadline(s,p).kind,'changes');
+ assert.deepEqual(removals(p),{total:0,uninstall:0,missing:0},'not one of the removals a person confirms by their number');
+ assert.deepEqual(applyPayload(p,'confirm'),{plan_id:p.id});
+ assert.equal(mustReview(p,p),true,'the sheet names what goes with it');
+});

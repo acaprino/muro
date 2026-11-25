@@ -114,7 +114,7 @@ function CheckErrors({ snapshot }: { snapshot: Snapshot }) {
 }
 
 /** What a harness holds that it cannot load itself (model.ts `harnessWarnings`: a marketplace of Codex whose folder is gone), in the service's words. Muro read around it, so the
- * harness is listed and managed and the sync note says its state; this says what to repair there, and stays until a check no longer finds it. */
+ * harness is listed and managed and the sync note says its state. The plan holds the repair (a marketplace that is not in the list is removed, a plugin of the list is installed again); this stays until a check no longer finds it. */
 function HarnessWarnings({ snapshot }: { snapshot: Snapshot }) {
   const warnings = harnessWarnings(snapshot);
   if (!warnings.length) return null;
@@ -127,7 +127,7 @@ function HarnessWarnings({ snapshot }: { snapshot: Snapshot }) {
       title={<Text>{nameList(names)} {names.length > 1 ? 'hold' : 'holds'} {warnings.length > 1 ? 'entries' : 'an entry'} that cannot be loaded</Text>}
       items={warnings.map(w => <><Text variant="strong">{w.target.name}</Text>: {w.message}</>)}
     >
-      <Text>Muro read what is installed there from the harness's own files, and still installs, updates and removes its plugins. Repair or remove the entry in the harness to clear this.</Text>
+      <Text>Muro read what is installed there from the harness's own files, and still installs, updates and removes its plugins. The next sync repairs it: what is not in your list is removed from the harness, and what is in your list is installed again.</Text>
     </Note>
   );
 }

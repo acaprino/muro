@@ -19,9 +19,12 @@ import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
 import { useSync } from './useSync.tsx';
 import type { Choice } from './words.ts';
 
-const KINDS: Record<string, string> = { install: 'Install', update: 'Update', reinstall: 'Reinstall', activate: 'Activate', remove: 'Remove' };
+const KINDS: Record<string, string> = { install: 'Install', update: 'Update', reinstall: 'Reinstall', activate: 'Activate', remove: 'Remove', 'remove-marketplace': 'Remove' };
+/** What an operation changes: a plugin by its name; a marketplace the harness cannot load, said as such. */
+const subjectOf = (o: Operation): string => (o.kind === 'remove-marketplace' ? `The broken marketplace ${o.name}` : o.name);
 /** The versions an operation moves between, whether the entry it removes has its files, and why the service planned it. */
 const detailOf = (o: Operation): string => {
+  if (o.kind === 'remove-marketplace') return [o.reason, o.plugins?.length ? `With it: ${o.plugins.join(', ')}` : ''].filter(Boolean).join(' · ');
   const versions = o.kind === 'remove' ? o.from_version : o.kind === 'update' ? `${o.from_version} → ${o.to_version}` : o.to_version;
   return [versions, o.present === false ? 'files missing' : '', o.reason].filter(Boolean).join(' · ');
 };
@@ -103,9 +106,9 @@ export function ReviewSheet() {
             <Column as="ul" gap="md">
               {g.ops.map((o, k) => (
                 <Cluster key={`${o.plugin_id}-${o.kind}-${k}`} as="li" data-operation={o.kind} gap="md" align="start" wrap={false}>
-                  <Badge tone={o.kind === 'remove' ? 'danger' : 'info'}>{KINDS[o.kind] ?? o.kind}</Badge>
+                  <Badge tone={o.kind === 'remove' || o.kind === 'remove-marketplace' ? 'danger' : 'info'}>{KINDS[o.kind] ?? o.kind}</Badge>
                   <Column gap="xs">
-                    <Text variant="strong" truncate>{o.name}</Text>
+                    <Text variant="strong" truncate>{subjectOf(o)}</Text>
                     <Text variant="note" pre>{detailOf(o)}</Text>
                   </Column>
                 </Cluster>

@@ -5,7 +5,8 @@
 //   rejectSave, rejectSettings   the next save_* / settings request fails with a version conflict
 //   blockPlan                    every plan carries one blocker besides its operations
 //   unreadable                   the first harness cannot be read (incomplete inventory)
-//   brokenMarketplace            the first harness holds a marketplace it cannot load: it is read all the same (complete inventory), with the service's warning
+//   brokenMarketplace            the first harness holds a marketplace it cannot load: it is read all the same (complete inventory), with the service's warning, and every plan
+//                                takes the marketplace out of it (remove-marketplace, whatever `exclusive` says); applying that turns the flag off
 //   checkErrors                  check reports a source it could not resolve
 //   checkDelay, applyDelay (ms)  check / apply take that long; rejectApply makes apply fail
 //   autostartUnsupported         autostart answers supported:false
@@ -238,6 +239,8 @@ export function createTransport(scenario = 'default') {
       }
       if (t.exclusive && blockers.length === before) for (const i of inv.plugins) if (!wanted.has(i.id)) operations.push({ target_id: t.id, plugin_id: i.registry_id || '', name: i.name, kind: 'remove', from_version: i.version, to_version: '', reason: 'Not in desired registry for this target', ...(i.present === false ? { present: false } : {}) });   // the service's Contract 2: a removal copies the entry's `present` when it is false
     }
+    const broken = reg.targets.find(t => t.enabled && (!only || t.id === only) && inventory(t).warnings?.length);
+    if (broken) operations.push({ target_id: broken.id, plugin_id: '', name: 'old-notes', kind: 'remove-marketplace', from_version: '', to_version: '', reason: inventory(broken).warnings[0], plugins: ['notes@old-notes'] });
     if (flags.blockPlan) blockers.push('Codex isolated test: Inventory incomplete');
     operations.sort((a, b) => (a.kind === 'remove') - (b.kind === 'remove'));
     const plan = { id: 'plan-' + ++planNumber, revision: reg.revision, operations, blockers };
@@ -610,6 +613,7 @@ export function createTransport(scenario = 'default') {
     if (!skip && removals && payload.confirm_removals !== removals) throw new Error(`This plan uninstalls ${removals} ${removals === 1 ? 'plugin' : 'plugins'}; review it and confirm the removals`);
     const executed = skip ? plan.operations.filter(o => o.kind !== 'remove') : plan.operations;
     for (const op of executed) {
+      if (op.kind === 'remove-marketplace') { flags.brokenMarketplace = false; continue; }
       const list = installed[op.target_id] ||= [], at = list.findIndex(i => (op.plugin_id ? i.registry_id === op.plugin_id : i.name === op.name));
       if (op.kind === 'remove') { if (at >= 0) list.splice(at, 1); continue; }
       if (at >= 0) list[at] = { ...list[at], version: op.to_version };

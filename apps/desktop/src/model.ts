@@ -28,7 +28,7 @@ export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'
 export interface CellStatus { kind:CellKind; from?:string; to?:string }
 const cell=(kind:CellKind,from?:string,to?:string):CellStatus=>({kind,...(from?{from}:{}),...(to?{to}:{})});
 /** The operation kinds the service plans: each one is a change waiting to be applied. */
-export const CHANGES=new Set<string>(['install','update','reinstall','activate','remove']);
+export const CHANGES=new Set<string>(['install','update','reinstall','activate','remove','remove-marketplace']);
 /** One plugin on one target: the operation of a current plan for that pair, otherwise what the snapshot shows. A removal is only ever read from a plan, because a harness with a blocker gets none. */
 export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Plan|null):CellStatus {
   if(!target.enabled) return cell('paused');
@@ -106,8 +106,8 @@ export function applyPayload(plan:Plan,choice:'confirm'|'skip'):Record<string,un
 }
 /** What the notice says after an apply: the changes it applied, and the removals it left out (`skipped`, from the service's answer). */
 export const appliedNotice=(applied:number,skipped=0):string=>`${plural(applied,'change')} applied.${skipped?` ${plural(skipped,'removal')} left out.`:''}`;
-/** Whether Apply all must open the review sheet instead of applying: a fresh plan that has blockers, nothing to do or a removal, or is not what was shown, was not seen as it is. A removal is never applied without the person's confirmation in the sheet. */
-export const mustReview=(shown:Plan|null,fresh:Plan):boolean=>!!fresh.blockers.length||!fresh.operations.length||removals(fresh).total>0||!sameOperations(shown,fresh);
+/** Whether Apply all must open the review sheet instead of applying: a fresh plan that has blockers, nothing to do, a removal or a broken marketplace to take out of a harness (the sheet names what goes with it), or is not what was shown, was not seen as it is. A removal is never applied without the person's confirmation in the sheet. */
+export const mustReview=(shown:Plan|null,fresh:Plan):boolean=>!!fresh.blockers.length||!fresh.operations.length||removals(fresh).total>0||fresh.operations.some(o=>o.kind==='remove-marketplace')||!sameOperations(shown,fresh);
 /** Installed on an enabled harness that was read completely, and that the list does not hold (`inList`: not put there by Muro, and not added to the list since): `index` is its place in the inventory. */
 export function unlisted(snapshot:Snapshot):{target:Target;plugin:InstalledPlugin;index:number}[] {
   return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!inList(snapshot,target,u.plugin)):[];});

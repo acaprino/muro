@@ -6,8 +6,9 @@
 //! It behaves as codex-cli 0.169.0 was seen to on 2026-11-25, in an isolated home: `plugin list --json`
 //! and `plugin marketplace list --json` answer nothing, with exit code 1 and that version's words, when
 //! one configured local marketplace has no marketplace file, while `plugin marketplace add`,
-//! `plugin add` and `plugin remove` go on working beside it. The list holds a plugin that has its
-//! table, its marketplace configured and its copy.
+//! `plugin add`, `plugin remove` and `plugin marketplace remove` go on working beside it. The list
+//! holds a plugin that has its table, its marketplace configured and its copy; removing a plugin that
+//! is not there succeeds, and removing a marketplace leaves the tables and the copies of its plugins.
 use serde_json::{Value, json};
 use std::{
     env, fs,
@@ -66,6 +67,15 @@ fn main() {
             config["marketplaces"][&name] = json!({"source_type":"local","source":root});
             save(&file, &config);
             println!("Added marketplace `{name}` from {root}.");
+        }
+        // As Codex does: the marketplace goes, the tables and the copies of its plugins stay.
+        ["plugin", "marketplace", "remove", name] => {
+            let removed = config["marketplaces"].as_object_mut().and_then(|all| all.remove(*name));
+            if removed.is_none() {
+                fail(&format!("marketplace `{name}` is not configured or installed"))
+            }
+            save(&file, &config);
+            println!("Removed marketplace `{name}`.");
         }
         ["plugin", "add", id] => {
             let (name, market) = id.split_once('@').expect("PLUGIN@MARKETPLACE");

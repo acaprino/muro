@@ -27,7 +27,8 @@ export interface SyncStatus { last_check:string|null; last_sync:string|null; rev
 export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[]; left_out?:string[]; skipped_removals?:number }
 export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }
 /** `present` is on a removal, and only when the entry it removes has no files (false); a removal without it uninstalls a real copy. */
-export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean }
+/** `kind` "remove-marketplace" takes a marketplace the harness cannot load out of the harness: `name` is the marketplace, `reason` what is wrong with it, `plugins` the ids of the plugins configured from it, which go with it; it has no plugin of the list (`plugin_id` is empty). */
+export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean; plugins?:string[] }
 export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
 export interface CheckResult { snapshot:Snapshot; plan:Plan; errors:{plugin_id:string;message:string}[] }
 /** A source the last check could not resolve, with the service's words. */
