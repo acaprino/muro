@@ -1,9 +1,10 @@
 name: Tests
 
 # Muro's own tests run here, not on a developer machine (owner rule of 2026-11-17): see AGENTS.md, "Changes and
-# verification". Muro has no tests on Marionette (owner rule of 2026-11-22): the Python tests that name it, and its
-# validation, source check, build and default-project pack, are in marionette.yml, so a problem of the package (an
-# upstream that moved) cannot fail this workflow or, through it, a release of Muro.
+# verification". The whole Python suite runs: it names no package built with Muro (owner rule of 2026-11-25) and uses the
+# neutral fixture tests/fixtures/package, which needs no network. A package has its tests, its source check and its build
+# in its own repository, so a problem of a package (an upstream that moved) cannot fail this workflow or, through it, a
+# release of Muro.
 #
 # Triggers and cache as in the CI standard of all the repositories: the push to develop, the pull requests to develop and
 # by hand (`gh workflow run tests.yml --ref <branch>`); never the develop -> main release pull request or main, whose
@@ -31,10 +32,9 @@ jobs:
         with:
           python-version: "3.13"
       - name: Test
-        # tests/conftest.py marks every test module that names Marionette; marionette.yml runs those.
         run: |
           python -m pip install pytest
-          python -m pytest -q -rf --tb=short -m "not marionette"
+          python -m pytest -q -rf --tb=short
 
   # The desktop app: the job above builds none of it. Windows, because the app is
   # Windows-first and its start-with-Windows tests write the per-user Run key.
