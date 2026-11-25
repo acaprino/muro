@@ -166,14 +166,14 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
           <Input autoFocus autoComplete="off" placeholder="My plugin" value={form.name} onChange={e => changeName(e.currentTarget.value)} onBlur={() => touch('name')} />
         </FormField>
         <FormField id={fieldId('slug')} label="Plugin id" help="Lowercase letters and digits joined by dashes: how the harnesses name the plugin. It cannot change later." error={say('slug')}>
-          <Input autoComplete="off" spellCheck={false} placeholder="my-plugin" value={form.slug} onChange={e => changeSlug(e.currentTarget.value)} onBlur={() => touch('slug')} />
+          <Input mono autoComplete="off" spellCheck={false} placeholder="my-plugin" value={form.slug} onChange={e => changeSlug(e.currentTarget.value)} onBlur={() => touch('slug')} />
         </FormField>
         <FormField id={fieldId('author')} label="Author" error={say('author')}>
           <Input autoComplete="off" {...text('author')} />
         </FormField>
         <Column>
           <FormField id={fieldId('folder')} label="Save in folder" help="The project is one file in this folder, named after the plugin id." error={say('folder')}>
-            <Input autoComplete="off" spellCheck={false} {...text('folder')} />
+            <Input mono autoComplete="off" spellCheck={false} {...text('folder')} />
           </FormField>
           {noPicker ? <Text as="p" variant="note">This version of Muro cannot open a folder dialog yet: type the path.</Text> : <Cell align="start"><Button variant="outline" size="sm" loading={picking} loadingText="Choosing…" onMouseDown={keepFocus} onClick={() => void chooseFolder()}>Choose folder…</Button></Cell>}
         </Column>
@@ -183,7 +183,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
           help="One per line: a repository address (https://…; a folder of it after #) or the full path of a folder on this computer. What the inputs do, the plugin does."
           error={say('inputs')}
         >
-          <Textarea rows={4} spellCheck={false} {...text('inputs')} />
+          <Textarea rows={4} maxRows={10} mono spellCheck={false} {...text('inputs')} />
         </FormField>
         <FormField id={fieldId('request')} label="Your request (optional)" help="In your words: what to take from the inputs, how to fit them together. The AI reads it with the inputs." error={say('request')}>
           <Textarea rows={3} {...text('request')} />
@@ -200,7 +200,7 @@ export function NewProjectDialog({ open, onOpenChange, listed, restoreFocusTo, f
           </Disclosure>
         </div>
         <FormField id={fieldId('budget')} label="Maximum budget (USD)" help={BUDGET_HINT} error={say('budget')}>
-          <Input autoComplete="off" inputMode="decimal" {...text('budget')} />
+          <Input short="sm" autoComplete="off" inputMode="decimal" {...text('budget')} />
         </FormField>
         <Text as="p" variant="note">{words.does} {AI_RUN_NOTE}</Text>
         {refusal ? <RefusalLine>{refusal}</RefusalLine> : null}

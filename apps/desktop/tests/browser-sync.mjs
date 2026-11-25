@@ -406,7 +406,7 @@ await test('the table: a row per plugin with its source, version and policy, a c
   assert.equal(await cells(page, 'docs-writer').nth(4).textContent(), 'Needs a build');
   const s = cells(page, 'sql-companion');
   assert.equal(await s.nth(1).textContent(), 'Not checkedLatest commit', 'no version yet, on the latest commit');
-  assert.equal(await s.nth(2).getByRole('img', { name: 'Not installed here' }).textContent(), '—');
+  assert.equal(await s.nth(2).textContent(), '—Not installed here');
   await head(page, 'Claude Code').getByRole('button', { name: 'Sync 2 changes', exact: true }).waitFor();
   await head(page, 'Codex').getByText('In sync', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByRole('button', { name: 'Sync 1 change', exact: true }).waitFor();

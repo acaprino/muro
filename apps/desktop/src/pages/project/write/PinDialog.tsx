@@ -122,6 +122,7 @@ export function PinDialog(props: PinDialogProps) {
             placeholder="v2.0.0"
             autoComplete="off"
             spellCheck={false}
+            mono
             onChange={e => { typed.current = true; setTo(e.currentTarget.value); setToError(undefined); }}
           />
         </FormField>

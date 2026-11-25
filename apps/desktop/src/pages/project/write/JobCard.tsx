@@ -74,7 +74,7 @@ export function JobCard({ projectId, inset = false }: JobCardProps) {
               <Column gap="xs" role={said.error ? 'alert' : 'status'}>
                 <Cluster><Badge variant="secondary" tone={TONES[last.status]}>{ENDED[last.status] ?? last.status}</Badge></Cluster>
                 <Text as="p">{said.text}</Text>
-                {last.status !== 'completed' && last.log_path ? <Text as="p" variant="note" pre>Log: <code>{last.log_path}</code></Text> : null}
+                {last.status !== 'completed' && last.log_path ? <Text as="p" variant="note">Log: <Text mono>{last.log_path}</Text></Text> : null}
               </Column>
             </Cell>
             <Button variant="ghost" size="sm" onClick={dismiss}>Dismiss</Button>
@@ -103,7 +103,7 @@ export function RunningCard({ job, cancelling, onCancel, elsewhere = false }: { 
       <Grid min="md" gap="xl">
         <Column>
           <Cluster>
-            <Heading size="small" level={2} icon={<Icon name="ai" />}><Text pre>{title}</Text></Heading>
+            <Heading size="small" level={2} icon={<Icon name="ai" />}><Text truncate>{title}</Text></Heading>
             <Badge tone={cancelling && !saving ? 'warning' : 'info'}>{cancelling && !saving ? 'Stopping' : 'Running'}</Badge>
           </Cluster>
           <Text as="p" variant="soft" role="status">{job.phase}</Text>

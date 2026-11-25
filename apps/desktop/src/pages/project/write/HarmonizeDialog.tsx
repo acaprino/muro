@@ -131,7 +131,7 @@ export function RunFields({ form }: { form: RunForm }) {
       </Column>
       {form.stop ? <RefusalLine>{form.stop}</RefusalLine> : <Text as="p" variant="soft">{AI_RUN_NOTE}</Text>}
       <FormField label="Maximum budget (USD)" help={BUDGET_HINT} error={form.errors.budget}>
-        <Input inputMode="decimal" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} />
+        <Input inputMode="decimal" short="sm" autoComplete="off" value={form.budget} onChange={e => form.setBudget(e.currentTarget.value)} />
       </FormField>
       {form.failure ? <RefusalLine>{form.failure}</RefusalLine> : null}
     </>
