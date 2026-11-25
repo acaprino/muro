@@ -170,7 +170,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
       </header>
       {/* A run's card and a low window leave the graph less than it needs: this part scrolls, and the actions stay in sight. */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <JobCard projectId={view.id} className="mx-4 mt-3" />
+      <JobCard projectId={view.id} inset />
       <div className="flex min-h-128 flex-1">
         {narrow ? (
           <Sheet open={drawer} onOpenChange={open => setDrawer(open)}>

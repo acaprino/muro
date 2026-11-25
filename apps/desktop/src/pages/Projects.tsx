@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Badge, Button, Count, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@acaprino/sigrid/primitives';
-import { Dialog, Empty } from '@acaprino/sigrid/components';
+import { Badge, Button, Cluster, Column, Count, Heading, Icon, Page, Section, Split, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
+import { Dialog, Empty, SettingRow } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
 import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
@@ -74,7 +74,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const [deletion, setDeletion] = React.useState<{ open: boolean; target: ProjectSummary | null }>({ open: false, target: null });
   const newButton = React.useRef<HTMLButtonElement>(null);
   /** The heading of the page: where focus goes when the button it was on is gone (a project deleted) or off (a run started). */
-  const heading = React.useRef<HTMLHeadingElement>(null);
+  const heading = React.useRef<HTMLSpanElement>(null);
   const latest = React.useRef(snapshot);
   latest.current = snapshot;
   // One AI run goes at a time: while one does, a new project is not offered, and the button says why.
@@ -120,14 +120,14 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const openButton = noPicker ? null : <Button variant="outline" loading={opening} loadingText="Opening the project file…" onClick={() => void openFile()}>Open project file…</Button>;
   let body: React.ReactNode;
   if (list === null && error) body = <Empty title="Projects could not be read" description={error} action={<Button variant="outline" onClick={() => void loadList()}>Try again</Button>} />;
-  else if (list === null) body = <p role="status" className="text-sm text-ink-mute">Reading the projects…</p>;
+  else if (list === null) body = <Text as="p" variant="muted" role="status">Reading the projects…</Text>;
   else if (!list.length) body = <Empty title="No project yet" description="Make one from the plugins and skills you want in it, or open a project file to add it here." action={openButton} />;
   else body = (
     <Table aria-label="Projects">
       <TableHeader>
         <TableRow>
           <TableHead>Project</TableHead>
-          <TableHead><span className="sr-only">Actions</span></TableHead>
+          <TableHead aria-label="Actions" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -147,19 +147,19 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
 
   const asked = removal.target, installed = !!asked && !!snapshot?.registry.plugins.some(x => x.project === asked.id);
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold text-ink outline-none">Projects</h1>
-          <p className="text-sm text-ink-mute">A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+    <Page>
+      <Split>
+        <Column gap="xs">
+          <Heading level={1}><span ref={heading} tabIndex={-1}>Projects</span></Heading>
+          <Text as="p" variant="muted">A project turns plugins and skills into one plugin, harmonized by the AI, for every harness.</Text>
+        </Column>
+        <Cluster>
           <span title={busy ?? undefined}>
             <Button ref={newButton} disabled={busy !== null} onClick={() => setMaking(true)}><Icon name="plus" />New project…</Button>
           </span>
           {list && !list.length ? null : openButton}
-        </div>
-      </header>
+        </Cluster>
+      </Split>
       <JobCard projectId={null} />
       {body}
       {snapshot ? <Published snapshot={snapshot} /> : null}
@@ -185,7 +185,7 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
           focusAfter={heading}
         />
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -196,28 +196,28 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
   const name = nameOf(p), counts = countsOf(p);
   return (
     <TableRow>
-      <TableCell className="w-full max-w-0">
-        <div className="flex min-w-0 flex-col gap-0.5 py-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+      <TableCell>
+        <Column gap="xs" align="start">
+          <Cluster>
             {p.error
-              ? <span className="truncate font-medium text-ink" title={p.path}>{fileOf(p.path)}</span>
-              : <Button variant="link" className="h-auto max-w-full px-0" onClick={onOpen}><span className="truncate" title={name}>{name}</span></Button>}
-            {!p.error && p.plugin?.version ? <span className="text-xs text-ink-mute tabular-nums">{p.plugin.version}</span> : null}
+              ? <Text variant="strong" pre title={p.path}>{fileOf(p.path)}</Text>
+              : <Button variant="link" size="xs" title={name} onClick={onOpen}>{name}</Button>}
+            {!p.error && p.plugin?.version ? <Text variant="note">{p.plugin.version}</Text> : null}
             {p.included ? <Badge variant="secondary">Included with Muro</Badge> : null}
             {p.error ? <Badge tone="danger">Cannot be read</Badge> : null}
-          </div>
-          <span className="truncate text-xs text-ink-mute" title={p.path}>{p.path}</span>
-          {p.error ? <span className="text-xs text-destructive">{p.error}</span> : counts ? <span className="text-xs text-ink-mute">{counts}</span> : null}
-        </div>
+          </Cluster>
+          <Text variant="note" pre title={p.path}>{p.path}</Text>
+          {p.error ? <Text variant="soft" pre>{p.error}</Text> : counts ? <Text variant="note">{counts}</Text> : null}
+        </Column>
       </TableCell>
-      <TableCell className="text-end">
+      <TableCell align="end">
         {p.included ? null : (
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <Cluster justify="end">
             <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>
             <span title={deleteReason ?? undefined}>
               <Button variant="outline" size="sm" aria-label={`Delete ${name}…`} disabled={deleteReason !== null} onClick={onDelete}>Delete…</Button>
             </span>
-          </div>
+          </Cluster>
         )}
       </TableCell>
     </TableRow>
@@ -229,29 +229,24 @@ function Published({ snapshot }: { snapshot: Snapshot }) {
   const own = snapshot.registry.plugins.filter(p => !p.project);
   if (!own.length) return null;
   return (
-    <section aria-labelledby="published-heading" className="flex flex-col gap-2">
-      <h2 id="published-heading" className="flex items-center gap-2 text-base font-semibold text-ink">
-        <Icon name="archive" />
-        <span>Installed as published</span>
-        <Count value={own.length} label={own.length === 1 ? 'plugin' : 'plugins'} />
-      </h2>
-      <p className="text-sm text-ink-mute">Plugins Muro installs as their author ships them.</p>
-      <ul role="list" aria-label="Installed as published" className="flex flex-col">
+    <Section title="Installed as published" icon={<Icon name="archive" />} end={<Count value={own.length} label={own.length === 1 ? 'plugin' : 'plugins'} />}>
+      <Text as="p" variant="note">Plugins Muro installs as their author ships them.</Text>
+      <Column as="ul" gap="xs" aria-label="Installed as published">
         {own.map(p => {
           const missing = snapshot.registry.targets.filter(t => t.enabled && p.targets.includes(t.id) && cellState(p, t, snapshot, null).kind === 'needs-build');
           const version = versionOf(p).version;
           return (
-            <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2">
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-medium text-ink" title={p.name}>{p.name}{version ? <span className="font-normal text-ink-mute"> {version}</span> : null}</span>
-                <span className="truncate text-xs text-ink-mute" title={p.source}>{p.source}</span>
-              </div>
-              {missing.length ? <span className="text-xs font-medium text-warning">Needs a build for {missing.map(t => t.name).join(', ')}</span> : null}
+            <li key={p.id}>
+              <SettingRow
+                label={<Text pre><Text variant="strong">{p.name}</Text>{version ? <Text variant="muted"> {version}</Text> : null}</Text>}
+                description={<Text pre>{p.source}</Text>}
+                control={missing.length ? <Badge tone="warning">Needs a build for {missing.map(t => t.name).join(', ')}</Badge> : undefined}
+              />
             </li>
           );
         })}
-      </ul>
-    </section>
+      </Column>
+    </Section>
   );
 }
 
@@ -276,16 +271,16 @@ function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | nu
   }, [id, attempt, settled]);
   const back = <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>;
   if (read.error) return (
-    <div className="flex flex-col gap-4 p-6">
-      <div>{back}</div>
+    <Column gap="lg" pad="xl">
+      <Cluster>{back}</Cluster>
       <Empty title="This project could not be read" description={read.error} action={<Button variant="outline" onClick={() => setAttempt(n => n + 1)}>Try again</Button>} />
-    </div>
+    </Column>
   );
   if (!read.info) return (
-    <div className="flex flex-col gap-4 p-6">
-      <div>{back}</div>
-      <p role="status" className="text-sm text-ink-mute">Reading the project…</p>
-    </div>
+    <Column gap="lg" pad="xl">
+      <Cluster>{back}</Cluster>
+      <Text as="p" variant="muted" role="status">Reading the project…</Text>
+    </Column>
   );
   return <Workspace info={read.info} file={summary?.path ?? null} />;
 }
