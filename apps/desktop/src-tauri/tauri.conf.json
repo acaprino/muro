@@ -14,13 +14,10 @@
       {
         "label": "main",
         "title": "Muro",
-        "visible": false,
         "width": 1512,
         "height": 982,
         "minWidth": 500,
         "minHeight": 580,
-        "transparent": true,
-        "backgroundColor": "#00000000",
         "create": false,
         "decorations": false
       }

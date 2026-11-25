@@ -129,3 +129,76 @@ jobs:
           path: apps/desktop/tests/shots/*.png
           retention-days: 7
           if-no-files-found: warn
+
+  # The program as a release hands it out (build-release.bat, without the install), and what its window
+  # does on a real WebView2. The artifact `muro-desktop` is the portable folder: it keeps its data beside itself, so
+  # trying it touches no installed Muro.
+  program:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Cargo cache key
+        id: cargo-key
+        run: |
+          $info = rustc -vV
+          if ($LASTEXITCODE) { exit 1 }
+          $release = ($info | Select-String '^release: (\S+)').Matches[0].Groups[1].Value
+          $commit = ($info | Select-String '^commit-hash: (\w{9})').Matches[0].Groups[1].Value
+          $pins = Select-String -Path Cargo.lock -Pattern '^(source|checksum) = ' | ForEach-Object Line
+          $lock = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($pins -join "`n"))).Substring(0, 20).ToLower()
+          "toolchain=$release-$commit" >> $env:GITHUB_OUTPUT
+          "lock=$lock" >> $env:GITHUB_OUTPUT
+      - name: Restore the compiled Rust dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-release-${{ steps.cargo-key.outputs.toolchain }}-${{ steps.cargo-key.outputs.lock }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-${{ steps.cargo-key.outputs.toolchain }}-
+      - name: Inno Setup
+        # build-release.bat asks for it in CI; most Windows images have it.
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") -and -not (Get-Command ISCC.exe -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE) { exit 1 }
+          }
+      - name: Build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cmd /c "build-release.bat --ci --no-install"
+          if ($LASTEXITCODE) { exit 1 }
+          Remove-Item release/installer -Recurse -ErrorAction SilentlyContinue
+      - name: The program
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-desktop
+          path: release
+          retention-days: 14
+          if-no-files-found: error
+      - name: The program on a real window
+        timeout-minutes: 12
+        run: ./.github/scripts/desktop-smoke.ps1 -Exe "$PWD/release/Muro.exe" -Data "$env:RUNNER_TEMP/muro-data" -Out "$env:RUNNER_TEMP/muro-window"
+      - name: Pictures of the window
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: muro-window
+          path: ${{ runner.temp }}/muro-window
+          retention-days: 7
+          if-no-files-found: ignore

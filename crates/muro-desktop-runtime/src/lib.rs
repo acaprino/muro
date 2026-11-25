@@ -8,7 +8,6 @@ mod process_tree;
 pub mod project_jobs;
 pub mod projects;
 pub mod simulate;
-pub mod single_instance;
 pub mod sync_gate;
 pub mod tray;
 

@@ -5,8 +5,7 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "core:window:allow-set-theme",
+    "imago-shell:default",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
     "core:window:allow-close",
