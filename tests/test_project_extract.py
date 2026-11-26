@@ -28,6 +28,19 @@ def files(folder):
     return sorted(path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file())
 
 
+def test_export_uses_the_archive_version_sync_checked(tmp_path, mp, capsys):
+    cache_args = ["--cache", str(tmp_path / "kept")]
+    assert main(["project", "verify", str(mp), "--build-info", *cache_args]) == 0
+    checked = json.loads(capsys.readouterr().out)
+    assert checked == {"verified": True, "digest": project.digest(mp), "slug": SLUG, "version": "0.1.0"}
+    out = tmp_path / "export"
+    args = ["project", "extract", str(mp), "--harness", "codex", "--out", str(out), *cache_args, "--expect-digest"]
+    assert main([*args, "0" * 64]) == 1
+    assert "changed" in capsys.readouterr().err and not out.exists()
+    assert main([*args, checked["digest"]]) == 0
+    assert (out / "codex" / "INSTALL.md").is_file()
+
+
 def test_only_the_named_harness_is_written_byte_for_byte(tmp_path, mp):
     written = project.extract(mp, "codex", tmp_path / "out", tmp_path / "kept")
     assert written == [tmp_path / "out" / "codex"]

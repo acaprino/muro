@@ -6,13 +6,14 @@
 // shows is the registry (useRegistry) and the sync state (useSync), and its buttons ask useSync; the dialogs of a plugin, a new plugin and a new harness are
 // their own files, and the harness inspector is the frame's (App.tsx), so the table stays usable beside it.
 import * as React from 'react';
-import { Button, Card, Cluster, Column, Heading, Icon, Split, Text } from '@acaprino/sigrid/primitives';
-import { Empty, Note } from '@acaprino/sigrid/components';
+import { Button, Card, Cluster, Column, Heading, Icon, Section, Split, Text } from '@acaprino/sigrid/primitives';
+import { Empty, Note, SettingRow } from '@acaprino/sigrid/components';
 import type { Snapshot } from '../../types.ts';
 import { harnessWarnings, syncHeadline } from '../../model.ts';
 import { plural } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
-import { useSync } from './useSync.tsx';
+import { indexProjectPlugins } from '../project/write/jobs.ts';
+import { useCheckProgress, useSync } from './useSync.tsx';
 import { nameList, noteOf, timesLine, type NoteTone } from './words.ts';
 import { SyncTable } from './SyncTable.tsx';
 import { ReviewSheet } from './ReviewSheet.tsx';
@@ -21,32 +22,41 @@ import { AddPluginDialog } from './AddPluginDialog.tsx';
 import { AddHarnessDialog } from './AddHarnessDialog.tsx';
 import { Unlisted } from './Unlisted.tsx';
 
+export type SyncEntry = { pluginId: string } | { source: string; name: string };
 export interface SyncProps {
   /** Opens a harness in the window's inspector, which the frame holds (App.tsx); `opener` is the button focus goes back to when it closes. */
   openHarness(targetId: string, opener: HTMLElement | null): void;
+  entry?: SyncEntry;
 }
 
-export function Sync({ openHarness }: SyncProps) {
+export function Sync({ openHarness, entry }: SyncProps) {
   const { snapshot } = useRegistry();
   // The plugin whose dialog is open, kept while it closes, and the row it was opened from, where focus goes back.
-  const [plugin, setPlugin] = React.useState<{ id: string; open: boolean } | null>(null);
+  const [plugin, setPlugin] = React.useState<{ id: string; open: boolean } | null>(() => entry && 'pluginId' in entry ? { id: entry.pluginId, open: true } : null);
   const pluginOpener = React.useRef<HTMLElement | null>(null);
-  const [addingPlugin, setAddingPlugin] = React.useState(false);
+  const [initialSource, setInitialSource] = React.useState(() => entry && 'source' in entry ? entry : undefined);
+  const [addingPlugin, setAddingPlugin] = React.useState(!!initialSource);
   const [addingHarness, setAddingHarness] = React.useState(false);
+  const registry = snapshot?.registry;
+  const availableProjects = React.useMemo(() => {
+    if (!registry?.projects?.length) return [];
+    const findPlugin = indexProjectPlugins(registry.plugins);
+    return registry.projects.filter(project => !findPlugin(project));
+  }, [registry]);
   if (!snapshot) return <Column pad="xl"><Text as="p" variant="muted" role="status">Reading your registry…</Text></Column>;
 
   const { plugins, targets } = snapshot.registry;
   const noHarness = targets.length === 0, noPlugin = plugins.length === 0;
-  const addPlugin = <Button variant="outline" onClick={() => setAddingPlugin(true)}><Icon name="plus" />Add plugin</Button>;
+  const addPlugin = <Button variant="outline" onClick={() => { setInitialSource(undefined); setAddingPlugin(true); }}><Icon name="plus" />Add plugin</Button>;
   const addHarness = <Button variant="outline" onClick={() => setAddingHarness(true)}><Icon name="plus" />Add harness</Button>;
   // Each button once on the page: where an empty state offers it, the head does not.
-  const listEmpty = noPlugin && !noHarness;
+  const listEmpty = noPlugin && !noHarness && availableProjects.length === 0;
   return (
     <Column gap="lg" pad="xl">
       <Split>
         <Column gap="xs">
           <Heading level={1}>Sync</Heading>
-          <Text as="p" variant="muted">Rows are your plugins, columns are your harnesses. Muro keeps each harness in line with this table.</Text>
+          <Text as="p" variant="muted">Choose Install or Update under the harness you want to change. Add plugin accepts a .mp file, a folder or a repository.</Text>
         </Column>
         <Cluster>
           {noHarness ? null : addHarness}
@@ -64,6 +74,23 @@ export function Sync({ openHarness }: SyncProps) {
       ) : <SyncNote snapshot={snapshot} />}
       <CheckErrors snapshot={snapshot} />
       <HarnessWarnings snapshot={snapshot} />
+      {availableProjects.length > 0 ? (
+        <Section title="Install from a project">
+          <Column as="ul" gap="xs">
+            {availableProjects.map(project => {
+              const filename = project.path.split(/[\\/]/).pop() || project.id;
+              return <li key={project.id}><SettingRow
+                label={<Text variant="strong">{filename}</Text>}
+                description={<Text truncate title={project.path}>{project.path}</Text>}
+                control={<Button variant="outline" aria-label={`Choose harnesses for ${filename}`} onClick={() => {
+                  setInitialSource({ source: project.path, name: filename.replace(/\.mp$/i, '') });
+                  setAddingPlugin(true);
+                }}>Choose harnesses…</Button>}
+              /></li>;
+            })}
+          </Column>
+        </Section>
+      ) : null}
       {listEmpty ? (
         <Card variant="quiet" pad="xl">
           <Empty title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
@@ -75,7 +102,7 @@ export function Sync({ openHarness }: SyncProps) {
       <ReviewSheet />
       {/* One dialog for each plugin opened: another row starts a dialog of its own, with nothing of the last one's form. */}
       {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} restoreFocusTo={pluginOpener} /> : null}
-      <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} />
+      <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} initial={initialSource} />
       <AddHarnessDialog open={addingHarness} onOpenChange={setAddingHarness} />
     </Column>
   );
@@ -86,11 +113,15 @@ const TONE: Record<NoteTone, 'success' | 'info' | 'warning'> = { ok: 'success', 
 /** The sync note: what the last check found, in a title and a sentence, and when it was checked, synced and is checked next. The status row repeats it as a chip, and is what is announced. */
 function SyncNote({ snapshot }: { snapshot: Snapshot }) {
   const sync = useSync();
+  const progress = useCheckProgress();
   const note = noteOf(snapshot, sync.plan, { checking: sync.checking, progress: sync.progress });
+  const detail = progress?.phase === 'source'
+    ? `Checking source ${progress.index} of ${progress.total} · ${progress.name}`
+    : progress?.phase === 'plan' ? 'Reading installed plugins and preparing changes.' : note.text;
   return (
     <Note id="sync-state" data-kind={note.kind} tone={note.tone ? TONE[note.tone] : 'info'} announce={false} title={<Text id="sync-state-title">{note.title}</Text>}>
       <Column gap="xs">
-        <Text id="sync-state-text">{note.text}</Text>
+        <Text id="sync-state-text" aria-live={sync.checking ? 'polite' : 'off'}>{detail}</Text>
         <Text variant="note">{timesLine(snapshot)}</Text>
       </Column>
     </Note>

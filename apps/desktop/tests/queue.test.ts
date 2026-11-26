@@ -119,3 +119,18 @@ test('a request made while the queue is empty is sent at once', async () => {
   m.answer('registry');
   await two;
 });
+
+test('a native picker can finish while a check is still running', async () => {
+  const m = manual(), request = serial(m.send, ALONE);
+  const check = request('check'), picker = request('pick_file'), save = request('save_plugin');
+  await later();
+  assert.deepEqual([...m.sent].sort(), ['check', 'pick_file']);
+  m.answer('pick_file');
+  await picker;
+  m.answer('check');
+  await check;
+  await later();
+  assert.equal(m.sent.at(-1), 'save_plugin');
+  m.answer('save_plugin');
+  await save;
+});

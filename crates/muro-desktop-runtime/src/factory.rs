@@ -4,6 +4,7 @@
 //! it could not do what it was asked, a reason on stderr with exit code 1 (docs/cli.md).
 use crate::exec::{self, Captured};
 use anyhow::{Context, Result, bail, ensure};
+use muro_registry::projects::VerifiedBuild;
 use serde_json::Value;
 use std::{
     path::{Path, PathBuf},
@@ -75,17 +76,23 @@ impl Factory {
         serde_json::from_str(done.stdout.trim()).with_context(|| format!("{what} did not print JSON"))
     }
 
-    /// `muro project verify FILE`: the plugin the file carries was built from the package it carries.
-    /// The factory's reason is the error, without the command's own prefix.
-    pub fn project_verify(&self, file: &Path, cache: &Path) -> Result<()> {
-        let args = vec!["project".to_owned(), "verify".into(), file.to_string_lossy().into_owned(), "--cache".into(), cache.to_string_lossy().into_owned()];
-        match self.json(&args, "Checking the project's plugin", &|| false, READ_LIMIT) {
-            Ok(_) => Ok(()),
-            Err(error) => {
+    /// The pinned release in the cache and its version come from the very snapshot the factory checked.
+    pub fn verified_build(&self, file: &Path, cache: &Path) -> Result<VerifiedBuild> {
+        let args = vec!["project".to_owned(), "verify".into(), file.to_string_lossy().into_owned(),
+            "--cache".into(), cache.to_string_lossy().into_owned(), "--build-info".into()];
+        let info = self.json(&args, "Checking the project's plugin", &|| false, READ_LIMIT)
+            .map_err(|error| {
                 let reason = format!("{error:#}");
-                bail!("{}", reason.strip_prefix("Project verify failed: ").unwrap_or(&reason))
-            }
-        }
+                anyhow::anyhow!("{}", reason.strip_prefix("Project verify failed: ").unwrap_or(&reason))
+            })?;
+        let digest = info["digest"].as_str().context("The factory gave no archive digest")?;
+        let slug = info["slug"].as_str().context("The archive names no plugin")?;
+        let version = info["version"].as_str().context("The archive names no plugin version")?;
+        ensure!(digest.len() == 64 && digest.bytes().all(|c| c.is_ascii_hexdigit()), "Invalid archive digest");
+        ensure!(Path::new(slug).file_name() == Some(slug.as_ref()) && !slug.is_empty(), "Invalid archive plugin id");
+        let release = cache.join(digest).join("release").join(slug);
+        ensure!(release.is_dir(), "The project's build is missing");
+        Ok(VerifiedBuild { release, digest: digest.to_owned(), version: version.to_owned() })
     }
 
     /// `muro project info FILE --summary` (or the full info) through the cache folder.

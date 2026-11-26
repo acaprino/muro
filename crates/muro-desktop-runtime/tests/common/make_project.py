@@ -6,7 +6,7 @@ It reuses the fixtures the factory's own tests pack with (`tests/test_project_fi
 package that validates), so there is one copy of how a valid package is made. Those modules import pytest at
 the top; only their fixtures are used here, so a stand-in for pytest is enough and none is required on the
 machine. `variant` changes the CHANGELOG, so two variants are two different files of one project. The
-release the file carries has an OpenCode adapter and a Claude Code one.
+release the file carries has OpenCode, Claude Code and Codex adapters.
 """
 import json
 import sys
@@ -43,10 +43,18 @@ def main(repository: Path, out: Path, variant: str) -> None:
     (adapters / "opencode").mkdir(parents=True)
     (adapters / "opencode" / "package.json").write_text(
         json.dumps({"name": fixtures.SLUG, "version": "0.1.0", "type": "module", "main": "index.js"}), encoding="utf-8")
-    (adapters / "opencode" / "index.js").write_text("export default async () => ({})\n", encoding="utf-8")
+    (adapters / "opencode" / "index.js").write_text(
+        f"// {variant}\nexport default async () => ({{}})\n", encoding="utf-8")
+    (adapters / "opencode" / "INSTALL.md").write_text(
+        "# Install\nAdd this folder's file URL to `plugins` in `opencode.json`.\n", encoding="utf-8")
     (adapters / "claude-code" / ".claude-plugin").mkdir(parents=True)
     (adapters / "claude-code" / ".claude-plugin" / "plugin.json").write_text(
         json.dumps({"name": fixtures.SLUG, "version": "0.1.0"}), encoding="utf-8")
+    codex = adapters / "codex"
+    (codex / ".codex-plugin").mkdir(parents=True)
+    (codex / ".codex-plugin" / "plugin.json").write_text(
+        json.dumps({"name": fixtures.SLUG, "version": "0.1.0"}), encoding="utf-8")
+    (codex / "INSTALL.md").write_text(f"# Codex\n{variant}\n", encoding="utf-8")
     print(project.pack(package, out / f"{variant}.mp", sources_cache=work / "cache", release_dir=staged))
 
 

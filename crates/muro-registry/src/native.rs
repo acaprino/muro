@@ -125,20 +125,37 @@ pub fn inventory(target: &Value, receipts: &Value) -> Value {
         for p in &mut entries {
             let name = plugin_name(h, p);
             p["plugin_name"] = name;
-            for (rid,r) in receipts.as_object().into_iter().flatten() {
-                if r["target_id"] == tid && r["native_id"] == p["id"] {
-                    p["managed"]=json!(true);
-                    p["registry_id"]=r["plugin_id"].clone();
-                    p["receipt_id"]=json!(rid);
-                }
-            }
         }
-        json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"broken":broken,"plugins":entries,"fingerprint":fingerprint})
+        let mut inventory = json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"broken":broken,"plugins":entries,"fingerprint":fingerprint});
+        bind_receipts(&mut inventory, tid, receipts);
+        inventory
     });
     match result {
         Ok(v) => v,
         Err(e) => {
             json!({"target_id":tid,"complete":false,"supported":supported(h),"error":format!("{e:#}"),"warnings":[],"broken":[],"plugins":[],"fingerprint":""})
+        }
+    }
+}
+/// Ownership belongs to the registry. A cached observation of the host's files must show
+/// the same owners as a fresh scan after an adoption, takeover or removal from the list.
+pub(crate) fn bind_receipts(inventory: &mut Value, target_id: &str, receipts: &Value) {
+    let Some(plugins) = inventory["plugins"].as_array_mut() else { return };
+    for plugin in plugins {
+        let Some(fields) = plugin.as_object_mut() else { continue };
+        fields.remove("registry_id");
+        fields.remove("receipt_id");
+        fields.remove("component");
+        plugin["managed"] = json!(false);
+        if let Some((key, receipt)) = receipts.as_object().into_iter().flatten().find(|(_, r)| {
+            r["target_id"] == target_id && r["native_id"] == plugin["id"]
+        }) {
+            plugin["managed"] = json!(true);
+            plugin["registry_id"] = receipt["plugin_id"].clone();
+            plugin["receipt_id"] = json!(key);
+            if let Some(component) = receipt.get("component") {
+                plugin["component"] = component.clone();
+            }
         }
     }
 }
@@ -503,6 +520,19 @@ pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
     ensure!(valid_name(h, &name), "Invalid native plugin name");
     Ok((name, v["version"].as_str().unwrap_or("").to_owned()))
 }
+
+pub const HERMES_MCP: &str = "hermes-mcp";
+
+/// Hermes loads its MCP package as a second, portable plugin (ADR-0030).
+fn hermes_mcp_identity(path: &Path) -> Result<(String, String)> {
+    ensure!(path.join("mcp.json").is_file() && !path.join("plugin.yaml").exists()
+        && !path.join("plugin.yml").exists(), "Expected a portable Hermes MCP package");
+    let manifest = read(&path.join("plugin.json"))?;
+    let name = str_field(&manifest, "name")?;
+    ensure!(valid_name("hermes", name), "Invalid Hermes MCP plugin name");
+    Ok((name.to_owned(), str_field(&manifest, "version")?.to_owned()))
+}
+
 /// The name and version a harness installs the plugin in `path` under, `recorded` being its
 /// distribution or receipt: the manifest's. Claude Code needs neither in the manifest, nor the
 /// manifest itself: it takes them from the marketplace entry, which Muro writes from `recorded`
@@ -510,7 +540,9 @@ pub fn identity(h: &str, artifact: &Path) -> Result<(String, String)> {
 pub fn distribution_identity(h: &str, path: &Path, recorded: &Value) -> Result<(String, String)> {
     let version = recorded["version"].as_str().unwrap_or("");
     let claude = h == "claude-code";
-    let (name, declared) = if claude && !path.join(manifest(h)?).exists() {
+    let (name, declared) = if h == "hermes" && recorded["component"] == HERMES_MCP {
+        hermes_mcp_identity(path)?
+    } else if claude && !path.join(manifest(h)?).exists() {
         let name = recorded["name"].as_str().unwrap_or("");
         ensure!(
             valid_name(h, name),
@@ -621,7 +653,10 @@ pub fn install(
             .and_then(Path::parent)
             .and_then(Path::parent)
             .context("Artifact data root")?;
-        let repo = data.join("native-sources").join("hermes").join(plugin_id);
+        // Hermes records the source URL of each plugin, including its exact revision.
+        // Give the two independently updatable packages distinct Git sources.
+        let transport = if artifact.join("plugin.yaml").is_file() { "hermes" } else { HERMES_MCP };
+        let repo = data.join("native-sources").join(transport).join(plugin_id);
         if !repo.exists() {
             fs::create_dir_all(repo.parent().unwrap())?;
             command(
@@ -874,6 +909,18 @@ pub fn remove(target: &Value, native_id: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hermes_server_package_uses_its_own_portable_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("plugin.json"), r#"{"name":"demo-mcp","version":"1.0"}"#).unwrap();
+        fs::write(tmp.path().join("mcp.json"), "{}").unwrap();
+        let record = json!({"version":"1.0","component":HERMES_MCP});
+        assert_eq!(distribution_identity("hermes", tmp.path(), &record).unwrap(), ("demo-mcp".into(), "1.0".into()));
+        assert!(identity("hermes", tmp.path()).is_err());
+        fs::write(tmp.path().join("plugin.yaml"), "{}").unwrap();
+        assert!(distribution_identity("hermes", tmp.path(), &record).is_err());
+    }
 
     #[test]
     fn pi_replacement_preserves_resource_filters() {

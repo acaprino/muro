@@ -426,11 +426,15 @@ await test('Extract: the window sends the project, the harness and the folder ch
   await openSample(page);
   const read = await digest(page);
   await app.flags({ pickFolder: 'D:/Out' });
-  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
-  const dialog = windowOf(page, 'Extract Sample');
+  await page.getByRole('button', { name: 'Export to folder…', exact: true }).click();
+  const dialog = windowOf(page, 'Export Sample');
   await dialog.waitFor();
   assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
-  const confirm = dialog.getByRole('button', { name: 'Extract', exact: true });
+  await dialog.getByRole('combobox').click();
+  await page.getByRole('option', { name: 'Claude Code', exact: true }).waitFor();
+  assert.deepEqual(await page.getByRole('option').allTextContents(), ['Claude Code', 'Codex', 'OpenCode']);
+  await page.getByRole('option', { name: 'Claude Code', exact: true }).click();
+  const confirm = dialog.getByRole('button', { name: 'Export', exact: true });
   await dialog.locator('input').last().fill('Out');
   await confirm.click();
   await dialog.getByText('Choose the folder with its full path', { exact: true }).waitFor();
@@ -440,11 +444,11 @@ await test('Extract: the window sends the project, the harness and the folder ch
   await page.screenshot({ path: shots + '/write-extract.png' });
   await confirm.click();
   await dialog.waitFor({ state: 'detached' });
-  await notice(page, 'Extracted to D:/Out/claude-code').waitFor();
+  await notice(page, 'Exported to D:/Out/claude-code').waitFor();
   assert.deepEqual((await callsOf(app, 'extract_project')).map(c => c.payload), [{ id: 'sample', harness: 'claude-code', folder: 'D:/Out' }]);
   assert.equal(await digest(page), read, 'the project file is only read');
   // The same folder again: the command's refusal is said, and the window stays.
-  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
+  await page.getByRole('button', { name: 'Export to folder…', exact: true }).click();
   await dialog.waitFor();
   await confirm.click();
   await dialog.getByRole('alert').getByText('D:/Out/claude-code already exists: choose another folder', { exact: true }).waitFor();

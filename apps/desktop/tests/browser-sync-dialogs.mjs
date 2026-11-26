@@ -107,6 +107,7 @@ await test('Add plugin: wrong fields say so, the name follows the source, a refu
   await field(s, 'name').fill('<Test plugin>');
   await field(s, 'source').fill('https://example.com/plugin');
   assert.equal(await field(s, 'name').inputValue(), '<Test plugin>', 'a name that was typed stays');
+  await fold(s, 'Advanced').click();
   await s.getByRole('radio', { name: 'Pinned version' }).click();
   await field(s, 'pinned_version').waitFor();
   await addSubmit(s).click();
@@ -114,7 +115,6 @@ await test('Add plugin: wrong fields say so, the name follows the source, a refu
   await onField(page, 'pinned_version');
   await s.getByRole('radio', { name: 'Latest release' }).click();
   await field(s, 'pinned_version').waitFor({ state: 'detached' });
-  await fold(s, 'Advanced').click();
   await field(s, 'custom_instructions_dir').fill('D:/custom notes');
   await fold(s, 'Add build').click();
   await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'combobox');
@@ -145,6 +145,192 @@ await test('Add plugin: wrong fields say so, the name follows the source, a refu
   assert.deepEqual((await callsOf(app, 'resolve')).at(-1).payload, { id: sent.plugin.id }, 'the source that is checked is the plugin that was saved');
   // The button the drawer was opened from (the empty list's) went with the empty list: the keyboard is on the row of the plugin that was added.
   await page.waitForFunction(() => document.activeElement?.textContent?.trim() === '<Test plugin>');
+});
+
+await test('a file picked in Add plugin installs through Sync without a separate export', 'default', {}, async app => {
+  const { page } = app;
+  const file = 'D:/Shared/notes.mp';
+  await app.flags({ pickPath: null, holdResolution: true, projectSources: { [file]: { file, digest: '3'.repeat(64), harnesses: ['codex'], version: '1.4.0' } } });
+  const s = await openAdd(page);
+  const picker = fold(s, 'Choose .mp file…');
+  await field(s, 'source').fill('https://github.com/owner/original');
+  await picker.click();
+  assert.equal(await field(s, 'source').inputValue(), 'https://github.com/owner/original', 'closing the picker keeps the typed source');
+  await app.flags({ pickPath: file });
+  await picker.click();
+  await page.waitForFunction(expected => document.querySelector('input[name="source"]')?.value === expected, file);
+  assert.deepEqual((await callsOf(app, 'pick_file')).map(c => c.payload), Array(2).fill({ filter: 'Muro project (*.mp)' }));
+  assert.equal(await field(s, 'name').inputValue(), 'notes');
+  await addSubmit(s).click();
+  await s.waitFor({ state: 'detached' });
+  await page.getByRole('row').filter({ has: rowOf(page, 'notes') }).getByRole('status').filter({ hasText: 'Checking source…' }).waitFor();
+  assert.equal(await addButton(page).isEnabled(), true, 'the page is usable while the source is being read');
+  await page.evaluate(() => window.behind.finishResolution());
+  await page.locator('[data-toasts]').getByText(/notes added to your list.*The \.mp includes Codex/i).waitFor();
+  const saved = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin;
+  assert.equal(saved.source, file);
+  assert.deepEqual(saved.targets, ['t1']);
+  assert.deepEqual((await callsOf(app, 'resolve')).map(c => c.payload.id), [saved.id]);
+  const codexCell = page.getByRole('row').filter({ has: rowOf(page, 'notes') }).getByRole('cell').last();
+  await codexCell.getByRole('button', { name: 'Install 1.4.0 · notes on Codex isolated test', exact: true }).click();
+  await notice(page, '1 change applied.').waitFor();
+  await codexCell.getByText('1.4.0', { exact: true }).waitFor();
+  assert.ok((await callsOf(app, 'plan')).some(c => c.payload.target_id === 't1' && c.payload.plugin_id === saved.id));
+  assert.equal((await callsOf(app, 'plan')).length, 1, 'adding and installing an archive only scans the selected harness');
+  for (const separate of ['check', 'open_project', 'extract_plugin', 'extract_project', 'adapt']) {
+    assert.equal((await callsOf(app, separate)).length, 0, separate);
+  }
+});
+
+await test('Sync discovers a known Fieldnotes project before it has a plugin row and installs it on Codex CLI', 'fieldnotes-project', {}, async app => {
+  const { page } = app;
+  const file = 'D:/Projects/fieldnotes/fieldnotes.mp';
+  await app.flags({ projectSources: { [file]: { file, digest: '8'.repeat(64), harnesses: ['codex'], version: '1.4.0' } } });
+  await ready(page);
+  const candidate = page.getByRole('button', { name: 'Choose harnesses for fieldnotes.mp', exact: true });
+  await candidate.click();
+  const drawer = sheet(page);
+  assert.equal(await field(drawer, 'source').inputValue(), file);
+  assert.equal(await field(drawer, 'name').inputValue(), 'fieldnotes');
+  assert.equal(await drawer.getByRole('checkbox', { name: 'Codex CLI', exact: true }).isChecked(), true);
+  for (const lookup of ['projects', 'project', 'open_project', 'pick_file', 'inspect_plugin_source']) assert.equal((await callsOf(app, lookup)).length, 0);
+  await addSubmit(drawer).click();
+  await drawer.waitFor({ state: 'detached' });
+  await candidate.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Install 1.4.0 · fieldnotes on Codex CLI', exact: true }).click();
+  await notice(page, '1 change applied.').waitFor();
+  assert.equal((await callsOf(app, 'save_plugin')).length, 1);
+  assert.equal(await page.getByRole('heading', { name: 'Install from a project' }).count(), 0);
+});
+
+await test('a cold Codex profile checks the installation and names the actual next action', 'cold-codex', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await page.getByRole('button', { name: 'Check installation · Package on Codex isolated test', exact: true }).click();
+  const review = page.getByRole('dialog', { name: 'Review Package on Codex isolated test', exact: true });
+  await review.getByRole('button', { name: 'Install Package', exact: true }).click();
+  await notice(page, '1 change applied.').waitFor();
+  assert.deepEqual((await callsOf(app, 'plan')).map(c => c.payload), [{ plugin_id: 'p1', target_id: 't1' }]);
+});
+
+await test('a refused installation refreshes just its target, and a failed refresh discards the refused plan', 'cold-codex', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await page.getByRole('button', { name: /^Check installation · Package/ }).click();
+  const review = page.getByRole('dialog', { name: 'Review Package on Codex isolated test', exact: true });
+  const apply = review.getByRole('button', { name: 'Install Package', exact: true });
+  await app.flags({ rejectApply: true });
+  const before = (await app.calls()).length;
+  await apply.click();
+  await review.getByRole('alert').filter({ hasText: 'The harness refused the change' }).waitFor();
+  const recovery = (await app.calls()).slice(before);
+  assert.deepEqual(recovery.map(call => call.action), ['apply', 'plan', 'snapshot']);
+  assert.deepEqual(recovery[1].payload, { plugin_id: 'p1', target_id: 't1' });
+  await app.flags({ rejectPluginPlan: true });
+  await apply.click();
+  await review.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: /^Check installation · Package/ }).waitFor();
+  assert.equal((await callsOf(app, 'apply')).length, 2);
+});
+
+await test('selecting a compatible harness exposes Install for that plugin and leaves other pending updates alone', 'changes', {}, async app => {
+  const { page } = app;
+  const file = 'D:/plugins/fieldnotes.mp';
+  await app.flags({ projectSources: { [file]: { file, digest: '7'.repeat(64), harnesses: ['codex'], version: '1.4.0' } } });
+  const s = await openAdd(page);
+  await field(s, 'source').fill(file);
+  await s.getByRole('checkbox', { name: 'Codex isolated test' }).click();
+  await addSubmit(s).click();
+  await s.waitFor({ state: 'detached' });
+  const row = page.getByRole('row').filter({ has: rowOf(page, 'fieldnotes') });
+  await row.getByRole('button', { name: /Select for sync/ }).click();
+  await row.getByRole('button', { name: /Install 1\.4\.0/ }).click();
+  await row.getByText('1.4.0', { exact: true }).last().waitFor();
+  await notice(page, '1 change applied.').waitFor();
+  await page.getByRole('button', { name: /Update 1 → 2 · Package on Codex/ }).waitFor();
+  assert.equal((await callsOf(app, 'select_plugin_target')).length, 1);
+  assert.equal((await callsOf(app, 'apply')).length, 1);
+});
+
+await test('Check source previews without saving; a late answer for a replaced source is ignored and the selected targets survive the next check', 'two-harnesses', {}, async app => {
+  const { page } = app;
+  const first = 'D:/Shared/first.mp', second = 'D:/Shared/second.mp';
+  await app.flags({ holdInspection: true, projectSources: {
+    [first]: { file: first, digest: '1'.repeat(64), harnesses: ['codex'], version: '1.0.0' },
+    [second]: { file: second, digest: '2'.repeat(64), harnesses: ['opencode'], version: '2.0.0' },
+  } });
+  const s = await openAdd(page);
+  const check = fold(s, 'Check source');
+  await field(s, 'source').fill(first);
+  await check.click();
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'inspect_plugin_source'));
+  await s.getByRole('checkbox', { name: 'Codex isolated test', exact: true }).click();
+  await field(s, 'source').fill(second);
+  await app.flags({ holdInspection: false });
+  await page.evaluate(async () => {
+    window.behind.finishInspection();
+    await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  const preview = s.getByRole('region', { name: 'Source preview' });
+  assert.equal(await preview.getByText(/1\.0\.0/).count(), 0, 'the old archive version never describes its replacement');
+  await check.click();
+  await preview.getByText(/2\.0\.0/).waitFor();
+  assert.match(await preview.innerText(), /Included[^\n]*OpenCode/);
+  assert.match(await preview.innerText(), /Missing[^\n]*Codex/);
+  assert.equal(await s.getByRole('checkbox', { name: 'Codex isolated test', exact: true }).isChecked(), false);
+  assert.equal(await s.getByRole('checkbox', { name: 'OpenCode isolated test', exact: true }).isChecked(), true);
+  assert.deepEqual((await callsOf(app, 'inspect_plugin_source')).map(c => c.payload.plugin.source), [first, second]);
+  for (const action of ['save_plugin', 'apply', 'resolve']) assert.equal((await callsOf(app, action)).length, 0, action);
+  await addSubmit(s).click();
+  await s.waitFor({ state: 'detached' });
+  const saved = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin;
+  assert.equal(saved.source, second);
+  assert.deepEqual(saved.targets, ['t2']);
+});
+
+await test('a repository with an .mp shows its variants and exports a selected one independently of the Sync targets', 'default', {}, async app => {
+  const { page } = app;
+  const source = 'https://github.com/owner/tools';
+  const file = 'D:/isolated/data/sources/123/tools.mp';
+  const digest = '7'.repeat(64);
+  await app.flags({ projectSources: { [source]: { file, digest, harnesses: ['claude-code', 'codex'], version: '1.4.0' } } });
+  const add = await openAdd(page);
+  await field(add, 'source').fill(source);
+  await addSubmit(add).click();
+  await add.waitFor({ state: 'detached' });
+  const id = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin.id;
+  const s = await openPlugin(page, 'tools');
+  const builds = s.getByRole('region', { name: 'Project file builds' });
+  await builds.waitFor();
+  assert.match(await builds.innerText(), /Included[\s\S]*Claude Code[\s\S]*Codex/);
+  assert.match(await builds.innerText(), /Missing[\s\S]*OpenCode/);
+  const exportButton = fold(s, 'Export to folder…');
+  await exportButton.waitFor();
+  await field(s, 'source').fill('https://github.com/owner/replacement');
+  assert.ok(!(await exportButton.count()) || await exportButton.isDisabled(), 'an edited source cannot export the previous file');
+  await field(s, 'source').fill(source);
+  await exportButton.click();
+  const dialog = page.getByRole('dialog', { name: /export tools/i });
+  const picker = dialog.getByRole('combobox');
+  await picker.click();
+  await page.getByRole('option', { name: 'Codex', exact: true }).waitFor();
+  const options = page.getByRole('option');
+  assert.deepEqual((await options.allTextContents()).sort(), ['Claude Code', 'Codex']);
+  await page.getByRole('option', { name: 'Claude Code', exact: true }).click();
+  await dialog.getByRole('textbox').fill('D:/Export only');
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await notice(page, 'Exported to D:/Export only/claude-code').waitFor();
+  assert.deepEqual((await callsOf(app, 'extract_plugin')).map(c => c.payload), [{ id, digest, harness: 'claude-code', folder: 'D:/Export only' }]);
+  for (const separate of ['apply', 'extract_project', 'adapt']) assert.equal((await callsOf(app, separate)).length, 0, separate);
+
+  await app.flags({ projectSources: { [source]: { error: 'The updated archive could not be verified' } } });
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'check'));
+  const stale = await openPlugin(page, 'tools');
+  await stale.getByText(/The updated archive could not be verified/).waitFor();
+  const staleExport = fold(stale, 'Export to folder…');
+  assert.ok(!(await staleExport.count()) || await staleExport.isDisabled(), 'a failed source check cannot export the older build');
 });
 
 await test('Add plugin from a list that has plugins: the keyboard goes back to Add plugin', 'changes', {}, async app => {
@@ -274,9 +460,9 @@ await test('the install-on boxes, the update policy and the builds are saved as 
   assert.equal(await s.getByRole('checkbox', { name: 'Codex isolated test' }).isChecked(), true);
   assert.equal(await s.getByRole('checkbox', { name: 'OpenCode isolated test' }).isChecked(), true);
   await s.getByRole('checkbox', { name: 'OpenCode isolated test' }).click();
+  await fold(s, 'Advanced').click();
   await s.getByRole('radio', { name: 'Pinned version' }).click();
   await field(s, 'pinned_version').fill('2');
-  await fold(s, 'Advanced').click();
   assert.equal(await s.locator('[role=group][aria-label^="Build "]').count(), 2, 'one row per prepared build');
   await s.getByRole('button', { name: 'Remove build 2', exact: true }).click();
   assert.equal(await s.locator('[role=group][aria-label^="Build "]').count(), 1);

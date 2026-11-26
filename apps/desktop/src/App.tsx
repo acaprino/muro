@@ -2,19 +2,21 @@
 // action bar and the inspector of the page: of Sync its actions and the harness, of an open project its actions and what is selected.
 // Every tab is a page of the window now; it opens on Sync.
 import { useCallback, useRef, useState } from 'react';
-import { AppWindow, ScreenBoundary, focusContent, type AppView } from '@acaprino/imago';
+import { AppWindow, ScreenBoundary, focusContent, useNotify, type AppView } from '@acaprino/imago';
 import { useMedia } from '@acaprino/sigrid';
 import { Badge, Button, Icon, Spacer, Text } from '@acaprino/sigrid/primitives';
 import { Empty } from '@acaprino/sigrid/components';
 import { useCommand } from '@acaprino/sigrid/assemblies';
 import type { Page, Snapshot } from './types.ts';
 import { stamp, syncHeadline } from './model.ts';
-import { plural } from './words.ts';
+import { message, plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
 import { ProjectJobsProvider } from './pages/project/write/useJobs.tsx';
 import { SyncProvider, useSync } from './pages/sync/useSync.tsx';
 import { checkedLine, chipOf } from './pages/sync/words.ts';
-import { Sync, SyncActions } from './pages/sync/Sync.tsx';
+import { Sync, SyncActions, type SyncEntry } from './pages/sync/Sync.tsx';
+import { resolvePlugin } from './pages/sync/registryWrite.ts';
+import { indexProjectPlugins } from './pages/project/write/jobs.ts';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
 import { Activity } from './pages/activity/Activity.tsx';
 import { Projects } from './pages/Projects.tsx';
@@ -55,10 +57,14 @@ const footLine = (snapshot: Snapshot): string =>
 
 /** The window with the page of the view. */
 function Muro() {
-  const { snapshot, error, reload } = useRegistry();
-  const { busy, check } = useSync();
+  const { snapshot, error, reload, request } = useRegistry();
+  const { busy, check, adopt } = useSync();
+  const notify = useNotify();
   const project = useProject();
   const [page, setPage] = useState<Page>('sync');
+  const [syncEntry, setSyncEntry] = useState<SyncEntry>();
+  const [checkingProject, setCheckingProject] = useState(false);
+  const projectCheck = useRef<symbol | null>(null);
   // The harness open in the inspector (Sync's column heads open it), kept while it closes, and the button it was opened from, where focus goes back.
   const [harness, setHarness] = useState<{ id: string; open: boolean } | null>(null);
   const harnessOpener = useRef<HTMLElement | null>(null);
@@ -80,10 +86,35 @@ function Muro() {
     }, 0);
   }, []);
   const go = useCallback((to: Page) => {
+    projectCheck.current = null;
+    setCheckingProject(false);
+    setSyncEntry(undefined);
     setPage(to);
     // The inspector is Sync's: another page closes it.
     if (to !== 'sync') setHarness(null);
   }, []);
+  async function installProject(): Promise<void> {
+    const { view, info } = project;
+    if (!view || !info?.file || !snapshot || projectCheck.current) return;
+    const findPlugin = indexProjectPlugins(snapshot.registry.plugins);
+    const existing = findPlugin({ id: view.id, path: info.file });
+    if (existing?.project === view.id && !existing.resolved_project) {
+      const token = Symbol();
+      projectCheck.current = token;
+      setCheckingProject(true);
+      try {
+        adopt(await resolvePlugin(request, existing.id, adopt));
+        if (projectCheck.current !== token || project.current()?.id !== view.id) return;
+      } catch (e) {
+        if (projectCheck.current === token && project.current()?.id === view.id) notify(message(e), { kind: 'error' });
+        return;
+      } finally {
+        if (projectCheck.current === token) { projectCheck.current = null; setCheckingProject(false); }
+      }
+    }
+    setSyncEntry(existing ? { pluginId: existing.id } : { source: info.file, name: info.project.name || info.plugin.name });
+    setPage('sync');
+  }
   // From any page: the status row says what it found. Dimmed while another request about the sync runs.
   useCommand({ id: 'muro.check', label: 'Check now', group: 'Sync', keywords: 'sync refresh', icon: <Icon name="refresh" />, when: !busy, run: () => { void check(); } });
 
@@ -96,7 +127,7 @@ function Muro() {
       status={<StatusLine snapshot={snapshot} error={error} />}
       footer={snapshot ? <Text>{footLine(snapshot)}</Text> : undefined}
       // The actions and the details of a page are regions of the frame: the bar under the content, the inspector beside it (docked from 1000px, a drawer under).
-      actions={onSync ? snapshot && <SyncActions /> : page === 'projects' && project.view && project.info ? <ProjectActions /> : undefined}
+      actions={onSync ? snapshot && <SyncActions /> : page === 'projects' && project.view && project.info ? <ProjectActions onInstall={() => void installProject()} checkingProject={checkingProject} /> : undefined}
       inspector={onSync && harness ? (
         // One inspector for every harness: another column changes its `targetId`, and the inspector decides what becomes of a form with changes.
         <ScreenBoundary of={harness.id}>
@@ -106,7 +137,7 @@ function Muro() {
     >
       {!snapshot && error ? (
         <Empty fill title="Registry not available" description={error} action={<Button onClick={() => { void reload(); }}>Try again</Button>} />
-      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} /> : page === 'settings' ? <Settings /> : <Activity />}
+      ) : page === 'projects' ? <Projects /> : onSync ? <Sync openHarness={openHarness} entry={syncEntry} /> : page === 'settings' ? <Settings /> : <Activity />}
     </AppWindow>
   );
 }

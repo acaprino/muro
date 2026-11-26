@@ -49,6 +49,7 @@ export function ReviewSheet() {
   const plan = review.plan, ops = plan.operations, gone = removals(plan);
   const targets = snapshot?.registry.targets ?? [];
   const scope = review.target_id ? targets.find(t => t.id === review.target_id)?.name ?? 'this harness' : null;
+  const plugin = review.plugin_id ? snapshot?.registry.plugins.find(p => p.id === review.plugin_id)?.name ?? review.plugin_id : null;
   const running = sync.progress !== null && sync.progress.plan_id === plan.id;
   // The operations harness by harness, in the order the plan holds them.
   const groups: { id: string; name: string; ops: Operation[] }[] = [];
@@ -85,7 +86,7 @@ export function ReviewSheet() {
           disabled={skipping}
           onClick={() => void apply('confirm')}
         >
-          {removalLabel(plan)}
+          {plugin && ops.length === 1 ? `${KINDS[ops[0]!.kind] ?? 'Apply'} ${plugin}` : removalLabel(plan)}
         </Button>
       ) : null}
     </Cluster>
@@ -95,8 +96,8 @@ export function ReviewSheet() {
     <Dialog
       open={sync.review !== null}
       onOpenChange={open => { if (!open) sync.closeReview(); }}
-      title={scope ? `Sync ${scope}` : 'Review changes'}
-      description={`${scope ? 'Only the changes of this harness. ' : ''}Nothing changes until you apply.`}
+      title={plugin ? `Review ${plugin} on ${scope}` : scope ? `Sync ${scope}` : 'Review changes'}
+      description={plugin ? 'Review the changes for this plugin before applying.' : `${scope ? 'Only the changes of this harness. ' : ''}Nothing changes until you apply.`}
       footer={footer}
     >
       <Column gap="lg" data-review-sheet="">

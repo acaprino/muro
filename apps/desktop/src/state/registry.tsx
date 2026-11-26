@@ -9,7 +9,7 @@
 // for no plan, shows no error (the next one tries again) and changes nothing when the registry did not move.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useWindow } from '@acaprino/imago';
-import type { Snapshot, Transport } from '../types.ts';
+import type { CheckProgress, Snapshot, Transport } from '../types.ts';
 import { serial, ALONE } from '../queue.ts';
 
 /** How often the open window reads the registry again while it has the focus. */
@@ -58,10 +58,10 @@ export function RegistryProvider({ transport, children }: RegistryProviderProps)
   // as it held no refresh back in the Imago window: the window keeps following the registry meanwhile.
   const pending = useRef(0);
   const queue = useMemo(() => serial(transport, ALONE), [transport]);
-  const request = useMemo<Transport>(() => <T,>(action: string, payload?: Record<string, unknown>): Promise<T> => {
-    if (ALONE.includes(action)) return queue<T>(action, payload);
+  const request = useMemo<Transport>(() => <T,>(action: string, payload?: Record<string, unknown>, onProgress?: (event: CheckProgress) => void): Promise<T> => {
+    if (ALONE.includes(action)) return queue<T>(action, payload, onProgress);
     pending.current++;
-    return queue<T>(action, payload).finally(() => { pending.current--; });
+    return queue<T>(action, payload, onProgress).finally(() => { pending.current--; });
   }, [queue]);
 
   const adopt = useCallback((next: Snapshot) => {

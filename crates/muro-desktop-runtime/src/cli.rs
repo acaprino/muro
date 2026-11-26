@@ -155,7 +155,10 @@ pub fn retry_while_busy<T>(
     }
 }
 
-type Reply = std::result::Result<Value, String>;
+enum Reply {
+    Progress(Value),
+    Finished(std::result::Result<Value, String>),
+}
 #[cfg(windows)]
 struct ChildJob(isize);
 #[cfg(windows)]
@@ -247,7 +250,12 @@ impl Client {
                     continue;
                 };
                 if let Some(id) = value["id"].as_u64() {
-                    if let Some(sender) = replies.lock().unwrap().remove(&id) {
+                    let mut pending = replies.lock().unwrap();
+                    if let Some(progress) = value.get("progress") {
+                        if let Some(sender) = pending.get(&id) {
+                            let _ = sender.send(Reply::Progress(progress.clone()));
+                        }
+                    } else if let Some(sender) = pending.remove(&id) {
                         let result = if value["ok"] == true {
                             Ok(value["result"].clone())
                         } else {
@@ -256,12 +264,12 @@ impl Client {
                                 .unwrap_or("CLI request failed")
                                 .into())
                         };
-                        let _ = sender.send(result);
+                        let _ = sender.send(Reply::Finished(result));
                     }
                 }
             }
             for (_, sender) in replies.lock().unwrap().drain() {
-                let _ = sender.send(Err("Muro CLI stopped; restart the app to reconnect".into()));
+                let _ = sender.send(Reply::Finished(Err("Muro CLI stopped; restart the app to reconnect".into())));
             }
         });
         Ok(Self(Arc::new(Inner {
@@ -274,15 +282,22 @@ impl Client {
         })))
     }
     pub fn request(&self, action: &str, payload: Value) -> Result<Value> {
+        self.request_with_progress(action, payload, None)
+    }
+
+    pub fn request_with_progress(
+        &self, action: &str, payload: Value, progress: Option<&dyn Fn(Value)>,
+    ) -> Result<Value> {
         let id = self.0.sequence.fetch_add(1, Ordering::Relaxed);
         let (send, receive) = mpsc::channel();
         self.0.pending.lock().unwrap().insert(id, send);
         let result = (|| -> Result<()> {
             let mut input = self.0.input.lock().unwrap();
-            serde_json::to_writer(
-                &mut *input,
-                &json!({"id":id,"action":action,"payload":payload}),
-            )?;
+            let mut frame = json!({"id":id,"action":action,"payload":payload});
+            if progress.is_some() {
+                frame["progress"] = json!(true);
+            }
+            serde_json::to_writer(&mut *input, &frame)?;
             input.write_all(b"\n")?;
             input.flush()?;
             Ok(())
@@ -291,13 +306,21 @@ impl Client {
             self.0.pending.lock().unwrap().remove(&id);
             return Err(error);
         }
-        match receive.recv_timeout(std::time::Duration::from_secs(600)) {
-            Ok(result) => result.map_err(anyhow::Error::msg),
-            Err(error) => {
-                self.0.pending.lock().unwrap().remove(&id);
-                bail!(
-                    "CLI response unavailable ({error}); inspect activity before retrying because the operation may still be running"
-                )
+        let deadline = Instant::now() + Duration::from_secs(600);
+        loop {
+            match receive.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+                Ok(Reply::Finished(result)) => return result.map_err(anyhow::Error::msg),
+                Ok(Reply::Progress(value)) => {
+                    if let Some(report) = progress {
+                        report(value);
+                    }
+                }
+                Err(error) => {
+                    self.0.pending.lock().unwrap().remove(&id);
+                    bail!(
+                        "CLI response unavailable ({error}); inspect activity before retrying because the operation may still be running"
+                    )
+                }
             }
         }
     }
@@ -328,6 +351,13 @@ pub fn serve(data: &Path) -> Result<()> {
         let output = stdout.clone();
         let data = data.to_owned();
         workers.push(thread::spawn(move || {
+            // Hold the output lock for one complete line, never for the request's work.
+            let emit = |frame: Value| {
+                let mut out = output.lock().unwrap();
+                let _ = serde_json::to_writer(&mut *out, &frame);
+                let _ = out.write_all(b"\n");
+                let _ = out.flush();
+            };
             let input: Result<Value> = serde_json::from_str(&line).map_err(Into::into);
             let id = input
                 .as_ref()
@@ -339,10 +369,17 @@ pub fn serve(data: &Path) -> Result<()> {
                     let input = input?;
                     ensure!(input["id"].is_u64(), "id must be an unsigned integer");
                     let action = input["action"].as_str().context("Missing action")?;
-                    crate::request(
+                    let report = |progress| emit(json!({"id":id,"progress":progress}));
+                    let observer: Option<&dyn Fn(Value)> = if input["progress"] == true {
+                        Some(&report)
+                    } else {
+                        None
+                    };
+                    crate::request_with_progress(
                         &data,
                         action,
                         input.get("payload").cloned().unwrap_or(json!({})),
+                        observer,
                     )
                 }))
                 .unwrap_or_else(|_| {
@@ -354,10 +391,7 @@ pub fn serve(data: &Path) -> Result<()> {
                 Ok(value) => json!({"id":id,"ok":true,"result":value}),
                 Err(error) => json!({"id":id,"ok":false,"error":format!("{error:#}")}),
             };
-            let mut out = output.lock().unwrap();
-            let _ = serde_json::to_writer(&mut *out, &value);
-            let _ = out.write_all(b"\n");
-            let _ = out.flush();
+            emit(value);
         }));
         workers.retain(|worker| !worker.is_finished());
     }
@@ -462,6 +496,9 @@ fn relocate_owned_paths(data: &Path) -> Result<()> {
                             rebase(&mut plugin[key], &old, &current);
                         }
                         if let Some(path) = plugin.get_mut("custom_instructions_dir") {
+                            rebase(path, &old, &current);
+                        }
+                        if let Some(path) = plugin.get_mut("resolved_project").and_then(|archive| archive.get_mut("path")) {
                             rebase(path, &old, &current);
                         }
                         if let Some(distributions) = plugin["distributions"].as_array_mut() {

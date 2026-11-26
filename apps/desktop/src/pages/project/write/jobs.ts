@@ -1,5 +1,5 @@
 import type {
-  ChangeOperation, InstructionEdit, InstructionFile, Job, ProjectOperation, ProjectRecord, ProjectRelease, ProjectRepository, VersionStep,
+  ChangeOperation, InstructionEdit, InstructionFile, Job, Plugin, ProjectFile, ProjectOperation, ProjectRecord, ProjectRelease, ProjectRepository, Transport, VersionStep,
 } from '../../../types.ts';
 
 /** The write side of a project, as plain data (ADR-0032): the shapes of the requests the runtime reads (`crates/muro-desktop-runtime/src/project_jobs.rs`), the checks of what a person typed
@@ -342,7 +342,33 @@ export function releasedLine(done: Partial<ProjectRelease> | null | undefined): 
 // ---------- extracting a project for one harness ----------
 
 /** Extracting (ADR-0035): the runtime has the factory write the plugin the file carries for one harness into a folder (`extract_project`, `muro project extract`). Nothing is built. */
-export const EXTRACT_ABOUT = 'The plugin the project file carries for one harness is written into the folder you choose, in a new folder named after the harness. Nothing is built, the project file is only read and nothing already there is overwritten.';
+export const EXTRACT_ABOUT = 'Choose a harness and a destination. Muro writes an installable copy in a new folder named after the harness.';
+export async function pickProjectFile(request: Transport): Promise<string | null> {
+  const picked = await request<{ path: string | null } | null>('pick_file', { filter: 'Muro project (*.mp)' });
+  return picked?.path ?? null;
+}
+/** Windows reports full paths both with and without a verbatim prefix. POSIX paths keep their case. */
+export function projectFileKey(path: string): string {
+  const flat = path.replace(/\\/g, '/').replace(/^\/\/\?\/UNC\//i, '//').replace(/^\/\/\?\//, '').replace(/\/+$/, '');
+  return /^(?:[a-z]:\/|\/\/)/i.test(flat) ? flat.toLowerCase() : flat;
+}
+/** Workspace and Sync both identify the registered file before offering to add it again. */
+export function indexProjectPlugins(plugins: readonly Plugin[]): (project: ProjectFile) => Plugin | undefined {
+  const sources = new Map<string, Plugin>(), linked = new Map<string, Plugin>(), verified = new Map<string, Plugin>();
+  for (const plugin of plugins) {
+    const source = projectFileKey(plugin.source);
+    if (!sources.has(source)) sources.set(source, plugin);
+    if (plugin.project && !linked.has(plugin.project)) linked.set(plugin.project, plugin);
+    if (plugin.resolved_project) {
+      const path = projectFileKey(plugin.resolved_project.path);
+      if (!verified.has(path)) verified.set(path, plugin);
+    }
+  }
+  return project => {
+    const path = projectFileKey(project.path);
+    return sources.get(path) ?? linked.get(project.id) ?? verified.get(path);
+  };
+}
 /** The harnesses Muro builds an adapter for (the runtime's `HARNESSES`). A file whose build lacks one is refused by the command, which says which it has. */
 export const EXTRACT_HARNESSES = ['claude-code', 'codex', 'opencode', 'pi', 'hermes'] as const;
 export type ExtractPayload = { id: string; harness: string; folder: string };
@@ -350,7 +376,7 @@ export const extractPayload = (id: string, harness: string, folder: string): Ext
 /** What the page says once it is done: the folders written, as the command named them. */
 export function extractedLine(done: { folders?: unknown } | null | undefined): string {
   const folders = Array.isArray(done?.folders) ? done.folders : [];
-  return folders.length ? `Extracted to ${folders.join(' and ')}` : 'The plugin was extracted.';
+  return folders.length ? `Exported to ${folders.join(' and ')}` : 'The plugin was exported.';
 }
 
 // ---------- the runs the runtime holds ----------

@@ -62,7 +62,7 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
       </TableHeader>
       <TableBody id="rows" onKeyDown={move}>
         {plugins.map(p => (
-          <PluginRow key={p.id} plugin={p} targets={targets} snapshot={snapshot} plan={sync.plan} tabStop={p.id === current} onFocusRow={setActive} onOpen={onOpenPlugin} />
+          <PluginRow key={p.id} plugin={p} targets={targets} snapshot={snapshot} plan={sync.plan} resolving={sync.resolvingSources.includes(p.id)} tabStop={p.id === current} onFocusRow={setActive} onOpen={onOpenPlugin} />
         ))}
       </TableBody>
     </Table>
@@ -98,8 +98,14 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
     case 'needs-build':
       line = <Badge tone="warning">{needBuild(state.count)}</Badge>;
       break;
+    case 'unscanned':
+      line = <Text variant="muted">Not checked yet</Text>;
+      break;
     case 'unknown':
       line = <Badge tone="warning">{state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read'}</Badge>;
+      break;
+    case 'source-error':
+      line = <Badge tone="warning">{plural(state.count, 'source')} to check</Badge>;
       break;
     case 'unseen':
       line = <Text variant="strong">Check to see the changes</Text>;
@@ -125,12 +131,13 @@ interface PluginRowProps {
   snapshot: Snapshot;
   plan: Plan | null;
   tabStop: boolean;
+  resolving: boolean;
   onFocusRow(pluginId: string): void;
   onOpen(pluginId: string, opener: HTMLElement | null): void;
 }
 
 /** One plugin: its name (which opens it) and source, its latest version with the update policy, and one cell per harness. */
-function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpen }: PluginRowProps) {
+function PluginRow({ plugin, targets, snapshot, plan, resolving, tabStop, onFocusRow, onOpen }: PluginRowProps) {
   const v = versionOf(plugin);
   return (
     <TableRow>
@@ -151,27 +158,56 @@ function PluginRow({ plugin, targets, snapshot, plan, tabStop, onFocusRow, onOpe
       </TableCell>
       <TableCell>
         <Column gap="xs">
-          <Text variant="strong">{v.version || 'Not checked'}</Text>
+          <Text variant="strong" role={resolving ? 'status' : undefined}>{resolving ? 'Checking source…' : v.version || 'Not checked'}</Text>
           <Text variant="note">{POLICY[plugin.policy] ?? ''}{v.commit ? ` · ${v.commit}` : ''}</Text>
         </Column>
       </TableCell>
-      {targets.map(t => <TableCell key={t.id}><Cell state={cellState(plugin, t, snapshot, plan)} /></TableCell>)}
+      {targets.map(target => <TableCell key={target.id}>{resolving && target.enabled && plugin.targets.includes(target.id)
+        ? <Text variant="muted">Checking builds…</Text>
+        : <Cell state={cellState(plugin, target, snapshot, plan)} plugin={plugin} target={target} />}</TableCell>)}
     </TableRow>
   );
 }
 
 /** One plugin on one harness: the installed version, or the change a sync would make there, or why it cannot say. */
-function Cell({ state }: { state: CellStatus }) {
+function Cell({ state, plugin, target }: { state: CellStatus; plugin: Plugin; target: Target }) {
+  let action: string;
   switch (state.kind) {
     case 'ok': return <Cluster gap="xs" wrap={false}><Text tone="success"><Icon name="check" /></Text><Text variant="strong">{state.to}</Text></Cluster>;
-    case 'update': return <Badge tone="info">Update {state.from} → {state.to}</Badge>;
-    case 'install': return <Badge tone="info">Install {state.to}</Badge>;
-    case 'reinstall': return <Badge tone="info">Reinstall {state.to}</Badge>;
-    case 'activate': return <Badge tone="info">Activate {state.to}</Badge>;
+    case 'update': action = `Update ${state.from} → ${state.to}`; break;
+    case 'install': action = `Install ${state.to}`; break;
+    case 'reinstall': action = `Reinstall ${state.to}`; break;
+    case 'activate': action = `Activate ${state.to}`; break;
     case 'remove': return <Badge tone="danger">Remove {state.from}</Badge>;
     case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
+    case 'source-error': return <Column gap="xs" align="start"><Badge tone="warning">Check plugin source</Badge><Text variant="note" title={state.reason} truncate>{state.reason}</Text></Column>;
+    case 'changes': action = `Review ${plural(state.count ?? 0, 'change')}`; break;
+    case 'unscanned': action = 'Check installation'; break;
     case 'unknown': return <Text variant="muted">Unknown</Text>;
     case 'paused': return <Text variant="muted">Paused</Text>;
-    default: return <><Text variant="muted" aria-hidden="true">—</Text><Text srOnly>Not installed here</Text></>;
+    default:
+      if (plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path)) return <Text variant="muted">Not selected</Text>;
+      action = 'Select for sync';
   }
+  return <CellAction label={action} state={state} plugin={plugin} target={target} />;
+}
+
+function CellAction({ label, state, plugin, target }: { label: string; state: CellStatus; plugin: Plugin; target: Target }) {
+  const sync = useSync();
+  const [working, setWorking] = React.useState(false);
+  async function run(opener: HTMLButtonElement): Promise<void> {
+    const cell = opener.closest('td');
+    setWorking(true);
+    try {
+      if (state.kind === 'none') await sync.selectTarget(plugin.id, target.id);
+      else await sync.syncPlugin(plugin.id, target.id, state);
+    } finally {
+      setWorking(false);
+      if (cell?.isConnected && !opener.isConnected && document.activeElement === document.body) {
+        (cell.querySelector<HTMLButtonElement>('button') ?? cell.closest('tr')?.querySelector<HTMLButtonElement>('[data-row-button]'))?.focus();
+      }
+    }
+  }
+  return <Button variant="outline" size="sm" aria-label={`${label} · ${plugin.name} on ${target.name}`} loading={working} loadingText="Working…"
+    disabled={sync.busy && !working} onClick={e => void run(e.currentTarget)}>{label}</Button>;
 }

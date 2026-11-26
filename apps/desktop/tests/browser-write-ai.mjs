@@ -129,7 +129,6 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   const read = await digest(page);
   assert.equal(await button(page, 'Review decisions…').isDisabled(), true);
   assert.equal(await button(page, 'Review decisions…').getAttribute('title'), 'Coming with the review', 'the runtime has no operation that runs the review');
-  assert.equal(await button(page, 'Install on harnesses…').isDisabled(), true);
   await button(page, 'Harmonize again…').click();
   const dlg = dialog(page);
   await dlg.getByRole('heading', { name: 'Harmonize again' }).waitFor();
@@ -142,6 +141,7 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   assert.deepEqual(await callsOf(app, 'project_job'), [{ id: 'sample', digest: read, operation: 'harmonize', budget_usd: 5, step: 'minor', request: 'Merge the two review steps.' }]);
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
   const reason = busyWith('Harmonize again');
+  assert.equal(await button(page, 'Install via Sync…').isEnabled(), true, 'opening Sync can read the current project while a new version is being prepared');
   // Release… is no AI run, and still waits for a run that changes this project, as Edit details… does.
   for (const name of ['Harmonize again…', 'Add input…', 'Edit details…', 'Release…']) {
     assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);

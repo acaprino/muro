@@ -1,17 +1,18 @@
 import * as React from 'react';
 import { Button, Card, Cell, Checkbox, Cluster, Column, Icon, Input, RadioGroup, RadioGroupItem, Select, Text } from '@acaprino/sigrid/primitives';
 import { Dialog, Disclosure, FormField, Note } from '@acaprino/sigrid/components';
-import type { Distribution, Plan, Plugin, Snapshot, Target, Transport } from '../../types.ts';
+import type { Distribution, Plan, Plugin, ResolvedProject, Snapshot, Target, Transport } from '../../types.ts';
 import { engineOf, harnessNames, versionOf } from '../../model.ts';
 import type { Engine } from '../../model.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
-import { message, plural } from '../../words.ts';
+import { message, plural, unknownTo } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';
 import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
-import { busyReason, checkBudget, parseBudget } from '../project/write/jobs.ts';
+import { busyReason, checkBudget, EXTRACT_HARNESSES, parseBudget, pickProjectFile } from '../project/write/jobs.ts';
+import { ExtractDialog } from '../project/write/ExtractDialog.tsx';
 import { useJobs } from '../project/write/useJobs.tsx';
-import { registryWrite } from './registryWrite.ts';
+import { registryWrite, resolvePlugin } from './registryWrite.ts';
 import { useSync } from './useSync.tsx';
 
 /** The plugin of the list, in a drawer: its source, the harnesses it is installed on, how it is updated, the folder of the owner's own instructions and the builds that were prepared, and under More the
@@ -60,8 +61,16 @@ export const changed = (base: PluginForm, form: PluginForm): boolean =>
   base.source.trim() !== form.source.trim() || base.name.trim() !== form.name.trim() || targetsKey(base) !== targetsKey(form) || base.policy !== form.policy
   || base.pinned.trim() !== form.pinned.trim() || base.dir.trim() !== form.dir.trim() || buildsKey(base) !== buildsKey(form);
 
-/** The name a plugin gets from its source while nobody typed one: the last part of the address or folder, without `.git`. */
-export const lastPart = (source: string): string => (source.trim().split(/[\\/]/).filter(Boolean).pop() ?? '').replace(/\.git$/, '');
+/** Use the selected file, folder or repository as the default name. */
+export const lastPart = (source: string): string => (source.trim().split(/[\\/#]/).filter(Boolean).pop() ?? '').replace(/\.(git|mp)$/i, '');
+export const harnessList = (harnesses: readonly string[]): string => harnesses.map(h => harnessNames[h] ?? h).join(', ');
+export function BuildAvailability({ harnesses }: { harnesses: readonly string[] }) {
+  const missing = EXTRACT_HARNESSES.filter(h => !harnesses.includes(h));
+  return <>
+    <Text>Included · {harnessList(harnesses) || 'None'}</Text>
+    {missing.length ? <Text variant="note">Missing · {harnessList(missing)}</Text> : null}
+  </>;
+}
 
 /** The form after a change. A new plugin is named after its source until a name is typed. */
 export function nextForm(form: PluginForm, patch: Partial<PluginForm>): PluginForm {
@@ -120,7 +129,7 @@ export function newPlugin(id: string, form: PluginForm, targets: readonly Target
 }
 
 /** What a changed source leaves behind: the resolved source, version and revision of the old one, and when it was checked. */
-const UPSTREAM = ['resolved_source', 'upstream_revision', 'upstream_version', 'last_checked'] as const;
+const UPSTREAM = ['resolved_source', 'resolved_project', 'project_source_error', 'upstream_revision', 'upstream_version', 'last_checked'] as const;
 
 /** The plugin to save when a saved one was edited: `latest` is the plugin as the registry holds it now; only what the form changed against `base` (the form the drawer opened on) is put over it. A changed
  * source (one that is not the source the registry holds already) leaves no prepared build and no metadata of the old source; the instructions folder stays. An empty folder goes back to the one Muro keeps. */
@@ -131,6 +140,7 @@ export function editedPlugin(latest: Plugin, base: PluginForm, form: PluginForm,
   if (source !== base.source.trim()) next.source = source;
   if (moved) {
     for (const key of UPSTREAM) delete next[key];
+    delete next.project;
     next.distributions = [];
   }
   if (form.name.trim() !== base.name.trim()) next.name = form.name.trim();
@@ -177,6 +187,7 @@ export interface PluginFieldsProps {
   /** What is wrong, already filtered by whether the person tried to save. */
   problems: Problems;
   targets: readonly Target[];
+  sourcePreview?: React.ReactNode;
   /** The plugin is in the list already: the Source hint says what a change of source does. */
   saved: boolean;
   /** Whether Advanced (the instructions folder and the prepared builds) is open: the dialog keeps it, so it stays open when the drawer shows another view and comes back. */
@@ -185,7 +196,22 @@ export interface PluginFieldsProps {
 }
 
 /** Source, name, harnesses, update policy, and under Advanced the instructions folder and the prepared builds. */
-export function PluginFields({ ids, form, onChange, problems, targets, saved, advanced, onAdvanced }: PluginFieldsProps) {
+export function PluginFields({ ids, form, onChange, problems, targets, saved, sourcePreview, advanced, onAdvanced }: PluginFieldsProps) {
+  const { request } = useRegistry();
+  const [fileProblem, setFileProblem] = React.useState<string | null>(null);
+  const [noFilePicker, setNoFilePicker] = React.useState(false);
+  async function chooseFile(): Promise<void> {
+    setFileProblem(null);
+    try {
+      const path = await pickProjectFile(request);
+      if (path) onChange({ source: path });
+    } catch (e) {
+      if (unknownTo(e, 'pick_file')) {
+        setNoFilePicker(true);
+        setFileProblem('Type or paste the full path to the .mp file.');
+      } else setFileProblem(message(e));
+    }
+  }
   const add = React.useRef<HTMLButtonElement>(null);
   const toggle = (id: string, on: boolean): void => onChange({ targets: on ? (form.targets.includes(id) ? form.targets : [...form.targets, id]) : form.targets.filter(t => t !== id) });
   const editBuild = (key: number, patch: Partial<BuildRow>): void => onChange({ builds: form.builds.map(b => (b.key === key ? { ...b, ...patch } : b)) });
@@ -204,32 +230,36 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, ad
         id={fieldId(ids, 'source')}
         label="Source"
         required
-        help={saved ? 'Changing the source removes the prepared builds: check for updates or adapt again after saving.' : 'A repository or a folder on this computer. For a plugin in a folder of its repository, add #folder to the address.'}
+        help={saved ? 'Changing the source removes the prepared builds. Check for updates after saving.' : 'Enter a GitHub repository, a local folder or a .mp file. To select one file in a repository, append #path/to/plugin.mp.'}
         error={problems.source}
       >
-        <Input name="source" mono autoFocus autoComplete="off" spellCheck={false} placeholder="https://github.com/owner/repository" value={form.source} onChange={e => onChange({ source: e.currentTarget.value })} />
+        <Input name="source" mono autoFocus autoComplete="off" spellCheck={false} placeholder="https://github.com/owner/repository" value={form.source} onChange={e => { setFileProblem(null); onChange({ source: e.currentTarget.value }); }} />
       </FormField>
+      {noFilePicker ? null : <Cell align="start"><Button type="button" variant="outline" size="sm" onClick={() => void chooseFile()}>Choose .mp file…</Button></Cell>}
+      {fileProblem ? <RefusalLine>{fileProblem}</RefusalLine> : null}
       <FormField id={fieldId(ids, 'name')} label="Name" required error={problems.name}>
         <Input name="name" autoComplete="off" value={form.name} onChange={e => onChange({ name: e.currentTarget.value })} />
       </FormField>
       <Column gap="sm" role="group" aria-labelledby={fieldId(ids, 'targets')}>
         <Text variant="strong" id={fieldId(ids, 'targets')}>Install on</Text>
+        <Text as="p" variant="note">Select where you want this plugin. After saving, install it from its row in Sync.</Text>
+        {sourcePreview}
         {targets.length ? targets.map(t => (
           <Checkbox key={t.id} id={fieldId(ids, `target-${t.id}`)} label={t.name} checked={form.targets.includes(t.id)} onCheckedChange={on => toggle(t.id, on === true)} />
         )) : <Text as="p" variant="muted">No harness yet. Add one in Sync.</Text>}
       </Column>
-      <Column gap="sm">
-        <Text variant="strong" id={fieldId(ids, 'policy')}>Updates</Text>
-        <RadioGroup aria-labelledby={fieldId(ids, 'policy')} value={form.policy} onValueChange={value => { if (isPolicy(value)) onChange({ policy: value }); }}>
-          {POLICIES.map(p => <RadioGroupItem key={p.value} value={p.value}>{p.label}</RadioGroupItem>)}
-        </RadioGroup>
-        {form.policy === 'pinned' ? (
-          <FormField id={fieldId(ids, 'pinned')} label="Pinned version" error={problems.pinned}>
-            <Input name="pinned_version" autoComplete="off" spellCheck={false} placeholder="0.4.1" value={form.pinned} onChange={e => onChange({ pinned: e.currentTarget.value })} />
-          </FormField>
-        ) : null}
-      </Column>
-      <Fold label="Advanced" open={advanced || problems.builds !== undefined} onToggle={() => onAdvanced(!advanced)}>
+      <Fold label="Advanced" open={advanced || !!problems.pinned || !!problems.builds} onToggle={() => onAdvanced(!advanced)}>
+        <Column gap="sm">
+          <Text variant="strong" id={fieldId(ids, 'policy')}>Updates</Text>
+          <RadioGroup aria-labelledby={fieldId(ids, 'policy')} value={form.policy} onValueChange={value => { if (isPolicy(value)) onChange({ policy: value }); }}>
+            {POLICIES.map(p => <RadioGroupItem key={p.value} value={p.value}>{p.label}</RadioGroupItem>)}
+          </RadioGroup>
+          {form.policy === 'pinned' ? (
+            <FormField id={fieldId(ids, 'pinned')} label="Pinned version" error={problems.pinned}>
+              <Input name="pinned_version" autoComplete="off" spellCheck={false} placeholder="0.4.1" value={form.pinned} onChange={e => onChange({ pinned: e.currentTarget.value })} />
+            </FormField>
+          ) : null}
+        </Column>
         <FormField
           id={fieldId(ids, 'dir')}
           label="Custom instructions folder"
@@ -295,19 +325,19 @@ function adaptTarget(plugin: Plugin, snapshot: Snapshot): string {
   return ADAPT_HARNESSES.some(o => o.value === wanted) ? wanted : FALLBACK_ADAPT;
 }
 
-type View = 'form' | 'adapt' | 'remove' | 'discard';
+type View = 'form' | 'adapt' | 'remove' | 'discard' | 'export';
 type Working = 'save' | 'resolve' | 'reinstall' | 'folder' | 'reload' | 'remove' | 'adapt';
 /** A failure of the last request, said inside the drawer. `saving`: it was a save, which says "Not saved". */
 interface Fault { text: string; saving: boolean }
 /** What the drawer shows besides the form: the view, the last failure, the line under the instructions, the folds, and the fields of Adapt. */
-interface Ui { view: View; fault: Fault | null; status: string; more: boolean; notes: boolean; advanced: boolean; harness: string; budget: string; budgetProblem: string | null }
+interface Ui { view: View; exportArchive?: ResolvedProject; fault: Fault | null; status: string; more: boolean; notes: boolean; advanced: boolean; harness: string; budget: string; budgetProblem: string | null }
 /** A drawer's session: for which plugin and whether it is open (`known`: it was made from the plugin, not from nothing), the form it opened on (`base`), the form as typed, and whether a save was tried (the problems show from then on). */
 interface Session { id: string; open: boolean; known: boolean; base: PluginForm; form: PluginForm; tried: boolean; ui: Ui }
 const calm = (): Ui => ({ view: 'form', fault: null, status: '', more: false, notes: false, advanced: false, harness: FALLBACK_ADAPT, budget: '2', budgetProblem: null });
 const opened = (id: string, open: boolean, plugin: Plugin | null, targets: readonly Target[]): Session => { const form = formOf(plugin, targets); return { id, open, known: plugin !== null, base: form, form, tried: false, ui: calm() }; };
 const NO_TARGETS: readonly Target[] = [];
 /** Where the focus goes when a view goes back to the form: the control that opened it (the question before leaving has none: the first field). */
-const RETURNS = { adapt: 'adapt-open', remove: 'remove-open', discard: 'source' } as const;
+const RETURNS = { adapt: 'adapt-open', remove: 'remove-open', discard: 'source', export: 'export-open' } as const;
 
 export interface PluginDialogProps {
   /** The id of the plugin in the registry's list. A plugin that is not there (taken away while the drawer was closing) draws nothing. */
@@ -419,7 +449,7 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
   function checkUpdates(): void {
     if (!shown || unsaved()) return;
     const before = shown.upstream_revision;
-    void act('resolve', () => latest.current.request<Snapshot>('resolve', { id: shown.id }), resolved => {
+    void act('resolve', () => resolvePlugin(latest.current.request, shown.id, latest.current.adopt), resolved => {
       const now = resolved.registry.plugins.find(p => p.id === shown.id);
       const found = !!now?.upstream_revision && now.upstream_revision !== before;
       latest.current.adopt(resolved);
@@ -482,6 +512,16 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
   const folder = instructions?.path || shown.custom_instructions_dir;
   const stale = instructions?.stale_harnesses ?? [];
   const fault = ui.fault;
+  const savedSource = form.source.trim() === shown.source;
+  const sourceFailure = savedSource ? plugin?.project_source_error : undefined;
+  const archive = savedSource && !sourceFailure ? plugin?.resolved_project : undefined;
+  if (ui.view === 'export') {
+    const checked = ui.exportArchive;
+    const staleReason = archive?.digest === checked?.digest ? undefined : 'The source changed. Close this window and check for updates.';
+    return <ExtractDialog id={shown.id} name={label} action="extract_plugin" harnesses={checked?.harnesses ?? []} digest={checked?.digest}
+      unavailableReason={sourceFailure || staleReason} open={open}
+      onOpenChange={next => { if (!next) back(); }} onExported={() => onOpenChange(false)} />;
+  }
 
   let title: string, description: string, body: React.ReactNode, footer: React.ReactNode;
   if (ui.view === 'adapt') {
@@ -525,9 +565,18 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
     footer = <DiscardFooter key="discard" onKeep={back} onDiscard={() => onOpenChange(false)} />;
   } else {
     title = label;
-    description = plugin?.project ? 'The build of one of your projects.' : 'Installed as its author ships it.';
+    description = archive ? 'Sync installs the builds included in this Muro project file.' : plugin?.project ? 'The build of one of your projects.' : 'Installed as its author ships it.';
     body = gone ? <RefusalLine>This plugin is no longer in your list.</RefusalLine> : (
       <form key="form" id={formId} noValidate onSubmit={submit}><Column gap="lg">
+        {sourceFailure && fault?.text !== sourceFailure ? <RefusalLine>{sourceFailure}</RefusalLine> : null}
+        {archive ? (
+          <Column as="section" gap="xs" aria-label="Project file builds">
+            <Text variant="strong" truncate title={archive.path}>{archive.path.split(/[\\/]/).pop()}</Text>
+            <BuildAvailability harnesses={archive.harnesses} />
+            <Cell align="start"><Button type="button" id={fieldId(ids, 'export-open')} size="sm" variant="outline" disabled={working !== null || !archive.harnesses.length}
+              onClick={() => { if (!unsaved()) patchUi({ view: 'export', exportArchive: archive, fault: null }); }}>Export to folder…</Button></Cell>
+          </Column>
+        ) : null}
         <PluginFields ids={ids} form={form} onChange={change} problems={problems} targets={targets} saved advanced={ui.advanced} onAdvanced={advanced => patchUi({ advanced })} />
         <Column gap="sm" as="section" aria-label="Custom instructions">
           {instructions?.error ? <RefusalLine>{instructions.error}</RefusalLine> : null}

@@ -32,12 +32,22 @@ pub fn open_in_file_manager(path: &Path) -> Result<()> {
 }
 
 pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
+    request_with_progress(data, action, payload, None)
+}
+
+fn request_with_progress(
+    data: &Path,
+    action: &str,
+    payload: Value,
+    progress: Option<&dyn Fn(Value)>,
+) -> Result<Value> {
     match action {
         "projects" => projects::projects(data),
         "project" => projects::project(data, &payload),
         "open_project" => projects::open(data, &payload),
         "install_project" => projects::install(data, &payload),
         "extract_project" => projects::extract(data, &payload),
+        "extract_plugin" => projects::extract_plugin(data, &payload),
         "remove_project" => projects::remove(data, &payload),
         "open_folder" => projects::open_folder(data, &payload),
         "create_project" => project_jobs::create(data, &payload),
@@ -82,7 +92,9 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
             }
             Ok(snapshot)
         }
-        _ => muro_registry::service::request(data, action, payload),
+        _ => muro_registry::service::request_with_progress(data, action, payload, Some(&|settings, file| {
+            factory::Factory::from_settings(settings)?.verified_build(file, &projects::cache_dir(data))
+        }), progress),
     }
 }
 
@@ -161,7 +173,7 @@ fn summary(apply: bool, result: &Value) -> String {
 
 /// The result of one sync, and the names of the plugins whose source could not be resolved.
 fn check_and_apply(data: &Path, apply: bool) -> Result<(Value, Vec<String>)> {
-    let checked = muro_registry::service::request(data, "check", json!({}))?;
+    let checked = request(data, "check", json!({}))?;
     let unchecked = checked["errors"]
         .as_array()
         .into_iter()

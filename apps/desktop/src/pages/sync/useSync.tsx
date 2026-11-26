@@ -12,17 +12,19 @@
 //    again, and a sheet that showed the whole plan shows the new one, so the next Apply never sends a plan that was refused and the table says what is installed.
 // The pages ask for what they need here and send nothing about a plan themselves.
 import * as React from 'react';
-import type { ApplyProgress, CheckError, CheckResult, Plan, Review, Snapshot } from '../../types.ts';
-import { currentPlan, mustReview } from '../../model.ts';
+import type { ApplyProgress, CheckError, CheckProgress, CheckResult, Plan, Review, Snapshot } from '../../types.ts';
+import { currentPlan, mustReview, type CellStatus } from '../../model.ts';
 import { message } from '../../words.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
+import { registryWrite, resolvePlugin } from './registryWrite.ts';
 import { applyRequest, appliedMessage, type Choice } from './words.ts';
 
 export interface ApplyOptions {
   /** `confirm` (the default) runs the removals of the plan, `skip` leaves them out and runs the rest. Only a plan with removals has a difference. */
   choice?: Choice;
 }
+interface PluginTarget { plugin_id: string; target_id: string }
 export interface ReviewOptions {
   /** Plan for this harness alone: the sheet shows only its changes, and the plan is not the one the note and the table read. */
   targetId?: string;
@@ -55,6 +57,10 @@ export interface SyncApi {
   replan(): Promise<void>;
   /** Opens the review sheet on a fresh plan (the whole one, `targetId`'s alone) or on `plan` as it is. Review and "Sync N changes" ask for a fresh plan first: the sheet never shows an old one. */
   openReview(options?: ReviewOptions): Promise<void>;
+  selectTarget(pluginId: string, targetId: string): Promise<void>;
+  syncPlugin(pluginId: string, targetId: string, shown: CellStatus): Promise<void>;
+  resolvingSources: readonly string[];
+  resolveAdded(saved: Snapshot, pluginId: string): Promise<Snapshot>;
   /** Closes the sheet. Does nothing while it applies: an apply is not left half-way. */
   closeReview(): void;
   /** Applies the plan of the open sheet (`review`). On success the sheet closes, the plan is made again and a notice says what was applied and what was left out. On a failure the sheet stays, with `error`. Never rejects. */
@@ -66,6 +72,9 @@ export interface SyncApi {
 }
 
 const SyncContext = React.createContext<SyncApi | null>(null);
+const CheckProgressContext = React.createContext<CheckProgress | null>(null);
+
+export const useCheckProgress = () => React.useContext(CheckProgressContext);
 
 export function SyncProvider({ children }: { children?: React.ReactNode }) {
   const registry = useRegistry();
@@ -84,6 +93,8 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
   const [plan, setPlan] = React.useState<Plan | null>(null);
   const [review, setReview] = React.useState<Review | null>(null);
   const [checking, setChecking] = React.useState(false);
+  const [resolvingSources, setResolvingSources] = React.useState<string[]>([]);
+  const [checkProgress, setCheckProgress] = React.useState<CheckProgress | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [progress, setProgress] = React.useState<ApplyProgress | null>(null);
   const [errors, setErrors] = React.useState<CheckError[]>([]);
@@ -159,17 +170,39 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
     void make(false);
   }, [make]);
 
+  const resolveAdded = React.useCallback(async (saved: Snapshot, pluginId: string): Promise<Snapshot> => {
+    const showSnapshot = (snapshot: Snapshot) => adopt(snapshot, { replan: false });
+    setResolvingSources(ids => [...ids, pluginId]);
+    showSnapshot(saved);
+    try {
+      const resolved = await resolvePlugin(send.current, pluginId, showSnapshot);
+      showSnapshot(resolved);
+      // A verified archive lists its native builds. Its cell can plan just the chosen installation.
+      if (!resolved.registry.plugins.find(plugin => plugin.id === pluginId)?.resolved_project) void make(false);
+      return resolved;
+    } finally {
+      setResolvingSources(ids => ids.filter(id => id !== pluginId));
+    }
+  }, [adopt, make]);
+
   const check = React.useCallback(async (): Promise<void> => {
     await attempt(async () => {
       setChecking(true);
       setErrors([]);
+      let active = true;
       try {
-        const result = await send.current<CheckResult>('check');
+        const result = await send.current<CheckResult>('check', {}, event => {
+          if (active) setCheckProgress(event);
+        });
         // The plan first: the snapshot is then of the revision the plan is for, and `adopt` plans nothing more.
         hold(result.plan);
         setErrors(result.errors ?? []);
         adopt(result.snapshot);
-      } finally { setChecking(false); }
+      } finally {
+        active = false;
+        setCheckProgress(null);
+        setChecking(false);
+      }
     });
   }, [attempt, hold, adopt]);
 
@@ -189,6 +222,23 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
     show({ plan: fresh, target_id: target?.id ?? null });
   }, [attempt, hold, show]);
 
+  const selectTarget = React.useCallback(async (pluginId: string, targetId: string): Promise<void> => {
+    const snapshot = snapshotRef.current;
+    if (!snapshot) return;
+    await attempt(async () => {
+      const next = await registryWrite(send.current, snapshot.registry.revision, 'select_plugin_target', { id: pluginId, target_id: targetId });
+      adopt(next, { replan: false });
+    });
+  }, [attempt, adopt]);
+
+  const pluginPlan = React.useCallback(async (pluginId: string, targetId: string): Promise<Plan> => {
+    const plan = await send.current<Plan>('plan', { plugin_id: pluginId, target_id: targetId });
+    if (plan.operations.some(o => o.plugin_id !== pluginId || o.target_id !== targetId || !['install', 'activate', 'update', 'reinstall'].includes(o.kind))) {
+      throw new Error('This plan includes other changes. Open Review to see the full plan.');
+    }
+    return plan;
+  }, []);
+
   const closeReview = React.useCallback((): void => {
     if (progressRef.current) return;
     show(null);
@@ -198,15 +248,27 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
   /** After an apply that failed: the registry and the plan are read again, quietly (the failure stays what the sheet says). Part of the plan may have been applied before the harness refused,
    * and a plan refused because the registry moved is no longer the plan: either way the table must say what is installed. A sheet that showed the whole plan held (`replaced`: its id) shows
    * the new one, so the next Apply sends a plan the service can take; the sheet of one harness or of a reinstall cannot be made again from what the window holds, and stays as it was. */
-  const settle = React.useCallback(async (replaced: string | null): Promise<void> => {
+  const settle = React.useCallback(async (replaced: string | null, scope?: PluginTarget): Promise<void> => {
+    const open = reviewRef.current;
+    if (scope) {
+      hold(null);
+      // A native apply can fail after changing files. Refresh this target's inventory before adopting the snapshot.
+      try {
+        const plan = await pluginPlan(scope.plugin_id, scope.target_id);
+        if (open) show({ ...scope, plan });
+      } catch {
+        if (open) show(null);
+      }
+    }
     try { adopt(await send.current<Snapshot>('snapshot'), { replan: false }); }
     catch { /* the next focus or tick of the window reads it again */ }
+    if (scope) return;
     await make(true);
-    const fresh = planRef.current, open = reviewRef.current;
+    const fresh = planRef.current;
     if (replaced && fresh && fresh.id !== replaced && open && open.target_id === null && open.plan.id === replaced) show({ plan: fresh, target_id: null });
-  }, [adopt, make, show]);
+  }, [adopt, hold, make, show, pluginPlan]);
 
-  const applyPlan = React.useCallback(async (planned: Plan, choice: Choice): Promise<void> => {
+  const applyPlan = React.useCallback(async (planned: Plan, choice: Choice, scope?: PluginTarget): Promise<void> => {
     const sent = applyRequest(planned, choice);
     if (!sent) return;
     // Whether the sheet shows the plan the window holds: only then can it be replaced by the new one after a refusal.
@@ -217,12 +279,12 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
         let answer: Snapshot;
         // The request that failed is reported by `attempt` once the window has read the registry again; nothing is applied from the sheet before that.
         try { answer = await send.current<Snapshot>('apply', sent.payload); }
-        catch (e) { await settle(whole); throw e; }
+        catch (e) { await settle(whole, scope); throw e; }
         // The plan is made again from what is installed now; the note says "Applying…" until it is.
         adopt(answer, { replan: false });
         hold(null);
         show(null);
-        await make(false);
+        if (!scope) await make(false);
         say.current(appliedMessage(planned, answer));
       } finally { running(null); }
     });
@@ -230,8 +292,26 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
 
   const apply = React.useCallback(async (options: ApplyOptions = {}): Promise<void> => {
     const open = reviewRef.current;
-    if (open) await applyPlan(open.plan, options.choice ?? 'confirm');
+    if (!open) return;
+    const scope = open.plugin_id && open.target_id ? { plugin_id: open.plugin_id, target_id: open.target_id } : undefined;
+    await applyPlan(open.plan, options.choice ?? 'confirm', scope);
   }, [applyPlan]);
+
+  const syncPlugin = React.useCallback(async (pluginId: string, targetId: string, shown: CellStatus): Promise<void> => {
+    const fresh = await attempt(async () => {
+      const plan = await pluginPlan(pluginId, targetId);
+      if (shown.kind === 'unscanned') adopt(await send.current<Snapshot>('snapshot'), { replan: false });
+      return plan;
+    });
+    if (!fresh) return;
+    const [operation] = fresh.operations;
+    if (!fresh.blockers.length && fresh.operations.length === 1 && operation?.kind === shown.kind
+      && (operation.from_version || '') === (shown.from || '') && (operation.to_version || '') === (shown.to || '')) {
+      await applyPlan(fresh, 'confirm', { plugin_id: pluginId, target_id: targetId });
+    } else {
+      show({ plan: fresh, target_id: targetId, plugin_id: pluginId });
+    }
+  }, [attempt, pluginPlan, adopt, applyPlan, show]);
 
   const applyAll = React.useCallback(async (): Promise<void> => {
     if (working.current) return;
@@ -249,9 +329,9 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
 
   const api = React.useMemo<SyncApi>(() => ({
     plan, planFor: plan?.revision ?? null, review, checking, busy, applying: progress?.plan_id ?? null, progress, errors, error,
-    check, replan, openReview, closeReview, apply, applyAll, adopt,
-  }), [plan, review, checking, busy, progress, errors, error, check, replan, openReview, closeReview, apply, applyAll, adopt]);
-  return <SyncContext.Provider value={api}>{children}</SyncContext.Provider>;
+    check, replan, openReview, selectTarget, syncPlugin, resolvingSources, resolveAdded, closeReview, apply, applyAll, adopt,
+  }), [plan, review, checking, busy, progress, errors, error, check, replan, openReview, selectTarget, syncPlugin, resolvingSources, resolveAdded, closeReview, apply, applyAll, adopt]);
+  return <SyncContext.Provider value={api}><CheckProgressContext.Provider value={checkProgress}>{children}</CheckProgressContext.Provider></SyncContext.Provider>;
 }
 
 /** The sync state of the window. The provider is mounted once, above every page (App.tsx). */

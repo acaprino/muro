@@ -161,12 +161,21 @@ function scenarioData(scenario) {
   const base = { targets: [harnessTarget('t1', 'codex', 'Codex isolated test')], plugins: [], installed: { t1: [] }, found: [foundHarness('codex', 'Codex')], byHarness: {}, jobs: [], activity: [], sync: idle, auto_sync: false };
   const package1 = () => plugin('p1', 'Package', ['t1'], [build('codex', '2')]);
   switch (scenario) {
+    case 'fieldnotes-project': return { ...base, targets: [harnessTarget('codex', 'codex', 'Codex CLI')], projects: [{ id: 'fieldnotes', path: 'D:/Projects/fieldnotes/fieldnotes.mp' }] };
+    case 'cold-codex': return { ...base, plugins: [package1()] };
     case 'changes': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '1')] }, found: [foundHarness('claude-code', 'Claude Code', { version: '2.1.4' })] };
     case 'recorded': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '1')] }, sync: recorded(1) };
     case 'recorded-ok': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0) };
     case 'recorded-errors': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2')] }, sync: recorded(0, { errors: 1 }) };
     case 'recorded-unseen': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] }, sync: recorded(1) };
     case 'projects': return { ...base, targets: [harnessTarget('t1', 'claude-code', 'Claude Code'), harnessTarget('t2', 'codex', 'Codex')], plugins: [plugin('commit-helper', 'commit-helper', ['t1', 't2'], [build('claude-code', '2.1.0')], { upstream_version: 'v2.1.0' })], installed: { t1: [installedPlugin('commit-helper', 'commit-helper', '2.1.0')], t2: [] }, found: [], projects: [{ id: 'sample', path: 'D:/Muro/data/projects/sample.mp', adapters: ['claude-code', 'codex', 'opencode'], info: projectInfo('Sample', 'sample', { builtin: true }) }], settings: { ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
+    case 'legacy-project': {
+      const data = scenarioData('projects');
+      data.plugins.push(plugin('sample', 'Sample', ['t2'], [build('codex', '0.5.0', 'muro')], {
+        project: 'sample', source: 'D:/isolated/data/project-cache/old/release/sample',
+      }));
+      return data;
+    }
     case 'stored-settings': return { ...base, settings: { auto_sync: true, interval_minutes: 45 } };   // automatic sync on, an interval that is none of the listed ones
     case 'unlisted': return { ...base, plugins: [package1()], installed: { t1: [installedPlugin('p1', 'Package', '2'), installedPlugin('old-snippets', 'old-snippets', '0.2.0', false)] } };
     case 'removals': return { ...base, targets: [harnessTarget('t1', 'codex', 'Codex isolated test', { exclusive: true })], plugins: [package1()], installed: { t1: [installedPlugin('old-snippets', 'old-snippets', '0.2.0', false), { ...installedPlugin('ghost', 'ghost', '1.0.0', false), present: false }] } };
@@ -202,23 +211,42 @@ export function createTransport(scenario = 'default') {
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
   Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '', staleDeletes: 0 });   // the knobs of the project writes
   Object.assign(flags, { releaseError: '', releaseHeld: false, releaseCaller: false, releaseDelay: 0 });   // the knobs of a release
+  // Resolved .mp sources, keyed by the source entered in Sync. A repository and a local file both supply the same result shape.
+  flags.projectSources = {};
+  flags.holdInspection = false;
+  let finishInspection, finishResolution;
+  const unscanned = new Set(scenario === 'cold-codex' ? ['t1'] : []);
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
   const STALE = 'Registry revision changed; refresh before saving';   // the service's own words
   const log = (action, status, message) => activity.push({ id: 'a' + ++activityNumber + 'x', time: ago(0), action, status, message });
   const inventory = t => {
+    if (unscanned.has(t.id)) return { target_id: t.id, complete: false, unscanned: true, supported: true, error: 'Run inventory scan', plugins: [] };
     if (flags.unreadable && t.id === reg.targets[0]?.id) return { target_id: t.id, complete: false, error: 'Configuration folder not found', supported: true, plugins: [] };
     const warnings = flags.brokenMarketplace && t.id === reg.targets[0]?.id ? ['The marketplace old-notes points to a folder that is gone: D:/Projects/gone/old-notes'] : [];
     return { target_id: t.id, complete: true, error: null, warnings, supported: true, plugins: installed[t.id] || [] };
   };
   const instructions = () => reg.plugins.map(p => ({ plugin_id: p.id, path: p.custom_instructions_dir || 'D:/isolated/data/custom-instructions/' + p.id, files: flags.instructionFiles, digest: 'fixture-digest', stale_harnesses: flags.instructionStale ? [reg.targets.find(t => p.targets.includes(t.id))?.harness].filter(Boolean) : [] }));
-  const snapshot = () => structuredClone({ registry: reg, inventory: reg.targets.map(inventory), activity, sync, jobs, data_dir: 'D:/isolated/data', custom_instructions: instructions() });
+  const snapshot = () => structuredClone({ registry: { ...reg, ...(projects.length ? { projects: projects.map(({ id, path }) => ({ id, path })) } : {}) }, inventory: reg.targets.map(inventory), activity, sync, jobs, data_dir: 'D:/isolated/data', custom_instructions: instructions() });
   const mutate = payload => {
     if (payload.revision !== undefined && payload.revision !== reg.revision) throw new Error(STALE);
     if (flags.rejectSave) throw new Error('Version conflict: reload registry');
   };
   const bump = () => { reg.revision++; return snapshot(); };
+  function resolveArchive(plugin) {
+    const linked = projects.find(project => project.id === plugin.project);
+    const archive = flags.projectSources[linked?.path ?? plugin.source];
+    if (!archive) return;
+    if (archive.error) {
+      plugin.project_source_error = archive.error;
+      throw new Error(archive.error);
+    }
+    delete plugin.project_source_error;
+    plugin.resolved_project = { path: archive.file, digest: archive.digest, harnesses: archive.harnesses };
+    plugin.upstream_version = archive.version;
+    plugin.distributions = archive.harnesses.map(h => build(h, archive.version));
+  }
   // The service binds a new plugin to the installation it is added from (adopt), refusing what it cannot bind.
   const adopt = ({ plugin, adopt: { target_id, native_id } }) => {
     if (reg.plugins.some(p => p.id === plugin.id)) throw new Error(`An installation is adopted by a plugin that is being added; ${plugin.id} is in the list already`);
@@ -229,15 +257,18 @@ export function createTransport(scenario = 'default') {
     if (entry.managed) throw new Error(`${native_id} already belongs to ${entry.registry_id} on ${target.name}`);
     Object.assign(entry, { managed: true, registry_id: plugin.id });
   };
-  function makePlan(only, reinstall) {
+  function makePlan(only, reinstall, pluginId) {
+    if (pluginId && flags.rejectPluginPlan) throw new Error('The plugin plan cannot be refreshed');
     const operations = [], blockers = [];
     for (const t of reg.targets.filter(t => t.enabled && (!only || t.id === only))) {
+      unscanned.delete(t.id);
       const inv = inventory(t);
       if (!inv.complete) { blockers.push(`${t.name}: ${inv.error}`); continue; }
       const before = blockers.length, wanted = new Set();
       for (const p of reg.plugins.filter(p => p.targets.includes(t.id))) {
         const want = p.distributions.find(d => d.harness === t.harness && d.path), have = inv.plugins.find(i => i.registry_id === p.id);
         if (have) wanted.add(have.id);
+        if (p.project_source_error) { blockers.push(`${t.name} / ${p.name}: ${p.project_source_error}`); continue; }
         if (flags.projectChanged && p.project) { blockers.push(`${t.name} / ${p.name}: Project file changed: open the project again`); continue; }   // the registry's words for a build older than its project file
         if (!want) { blockers.push(`${t.name} / ${p.name}: no build for this harness: point the source at the plugin's folder, or adapt the plugin with AI`); continue; }
         const kind = !have ? 'install' : reinstall === p.id ? 'reinstall' : have.version !== want.version ? 'update' : null;
@@ -249,8 +280,9 @@ export function createTransport(scenario = 'default') {
     if (broken) operations.push({ target_id: broken.id, plugin_id: '', name: 'old-notes', kind: 'remove-marketplace', from_version: '', to_version: '', reason: inventory(broken).warnings[0], plugins: ['notes@old-notes'] });
     if (flags.blockPlan) blockers.push('Codex isolated test: Inventory incomplete');
     operations.sort((a, b) => (a.kind === 'remove') - (b.kind === 'remove'));
-    const plan = { id: 'plan-' + ++planNumber, revision: reg.revision, operations, blockers };
+    const plan = { id: 'plan-' + ++planNumber, revision: reg.revision, operations: pluginId ? operations.filter(op => op.plugin_id === pluginId && ['install', 'update', 'reinstall', 'activate'].includes(op.kind)) : operations, blockers, ...(pluginId ? { plugin_id: pluginId } : {}) };
     plans.set(plan.id, plan);
+    if (pluginId) return structuredClone(plan);
     const checked = reg.targets.filter(t => t.enabled && (!only || t.id === only)).map(t => t.id), time = ago(0);
     for (const id of checked) sync.targets[id] = { ...sync.targets[id], checked: time, synced: sync.targets[id]?.synced ?? null };
     if (!only) Object.assign(sync, { last_check: time, revision: reg.revision, pending: operations.length, blockers: blockers.length });
@@ -609,12 +641,11 @@ export function createTransport(scenario = 'default') {
   // extract_project {id, harness, folder}: the factory writes the plugin the file carries for one harness into folder/<harness>/ and answers what was written. The refusals come in the runtime's order
   // (the list, a harness Muro builds, a full path) and then the command's own (a harness the build lacks: `adapters` of the entry; a folder already there: what was extracted before). No file is written here.
   const extracted = new Set();
-  function extractProject(p) {
-    const entry = listedFile(p.id);
+  function extractBuild(p, adapters) {
     const harness = String(p.harness ?? ''), folder = String(p.folder ?? '').trim();
     if (!['claude-code', 'codex', 'opencode', 'pi', 'hermes'].includes(harness)) throw new Error(`No Muro adapter for the harness ${harness}`);
     if (!isAbsolute(folder)) throw new Error('Name the folder to extract into by its full path');
-    if (!entry.adapters.includes(harness)) throw new Error(`This project's build has no adapter for ${harness}: it has ${[...entry.adapters].sort().join(', ')}`);
+    if (!adapters.includes(harness)) throw new Error(`This project's build has no adapter for ${harness}: it has ${[...adapters].sort().join(', ')}`);
     const target = `${folder.replace(/[\\/]+$/, '')}/${harness}`;
     if (extracted.has(target)) throw new Error(`${target} already exists: choose another folder`);
     extracted.add(target);
@@ -655,9 +686,12 @@ export function createTransport(scenario = 'default') {
   }
   async function apply(payload) {
     if (flags.applyDelay) await new Promise(done => setTimeout(done, flags.applyDelay));
-    if (flags.rejectApply) throw new Error('The harness refused the change');
     const plan = plans.get(payload.plan_id);
     if (!plan) throw new Error('Unknown plan');
+    if (flags.rejectApply) {
+      if (plan.plugin_id) for (const op of plan.operations) unscanned.add(op.target_id);
+      throw new Error('The harness refused the change');
+    }
     if (plan.revision !== reg.revision) throw new Error('Registry revision changed; calculate a new plan');
     if (plan.blockers.length && !payload.allow_blocked) throw new Error('Plan has blockers; resolve them before applying');
     // The service's Contract 1: a removal is executed only when the request carries the plan's number of removals; skip_removals leaves them out.
@@ -672,8 +706,13 @@ export function createTransport(scenario = 'default') {
       else list.push(installedPlugin(op.plugin_id, op.name, op.to_version));
     }
     const time = ago(0), touched = [...new Set(executed.map(o => o.target_id))];
-    for (const id of touched) sync.targets[id] = { ...sync.targets[id], synced: time };
-    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('sync', 'complete', `${executed.length} operations applied`); }
+    if (plan.plugin_id) Object.assign(sync, { revision: null, pending: null, blockers: null });
+    else if (touched.length) {
+      for (const id of touched) sync.targets[id] = { ...sync.targets[id], synced: time };
+      sync.last_sync = time;
+      sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length);
+    }
+    if (touched.length) log('sync', 'complete', `${executed.length} operations applied`);
     const result = snapshot();
     if (payload.allow_blocked) result.left_out = plan.blockers;
     result.skipped_removals = skip ? removals : 0;
@@ -685,16 +724,21 @@ export function createTransport(scenario = 'default') {
     jobs.push(job);
     return structuredClone(job);
   }
-  const request = async (action, payload = {}) => {
+  const request = async (action, payload = {}, onProgress) => {
     calls.push({ action, payload: structuredClone(payload) });
     switch (action) {
       case 'snapshot': case 'scan': return snapshot();
       case 'discover': return structuredClone(data.found);
       case 'jobs': return structuredClone(newestFirst());
-      case 'plan': if (flags.planDelay) await new Promise(done => setTimeout(done, flags.planDelay)); return makePlan(payload.target_id, payload.reinstall);
+      case 'plan': if (flags.planDelay) await new Promise(done => setTimeout(done, flags.planDelay)); return makePlan(payload.target_id, payload.reinstall, payload.plugin_id);
       case 'check': {
-        if (flags.checkDelay) await new Promise(done => setTimeout(done, flags.checkDelay));
         const errors = flags.checkErrors && reg.plugins[0] ? [{ plugin_id: reg.plugins[0].id, message: 'Source unreachable: could not resolve the release' }] : [];
+        for (const [i, plugin] of reg.plugins.entries()) {
+          onProgress?.({ phase: 'source', index: i + 1, total: reg.plugins.length, name: plugin.name });
+          if (i === 0 && flags.checkDelay) await new Promise(done => setTimeout(done, flags.checkDelay));
+          try { resolveArchive(plugin); } catch (error) { errors.push({ plugin_id: plugin.id, message: error.message }); }
+        }
+        onProgress?.({ phase: 'plan' });
         const plan = makePlan(payload.target_id);
         if (!payload.target_id) sync.errors = errors.length;
         log('check', errors.length ? 'failed' : 'complete', errors.length ? 'Plan calculated; sources not resolved' : 'Sources resolved and plan calculated');
@@ -703,8 +747,9 @@ export function createTransport(scenario = 'default') {
       case 'apply': return apply(payload);
       case 'projects': return projects.map(p => summaryOf(p.id, p.path, p.info));
       case 'project': {
-        const held = projectOf(payload.id);
-        let info = structuredClone(held.info);
+        const held = projects.find(p => p.id === payload.id);
+        if (!held) throw new Error('That project is not in your list');
+        let info = { ...structuredClone(held.info), file: held.path, export_harnesses: [...(held.adapters || [])] };
         if (flags.bigGraph) info = withBigGraph(info);
         if (flags.emptyGraph) info = { ...info, graph: { entries: [], capabilities: [], examples: [] } };
         if (flags.noEntries) info = { ...info, graph: { ...info.graph, entries: [] } };
@@ -727,7 +772,14 @@ export function createTransport(scenario = 'default') {
       case 'edit_project': return editProject(payload);
       case 'delete_project': return deleteProject(payload);
       case 'release_project': return releaseProject(payload);
-      case 'extract_project': return extractProject(payload);
+      case 'extract_project': return extractBuild(payload, listedFile(payload.id).adapters);
+      case 'extract_plugin': {
+        const plugin = reg.plugins.find(p => p.id === payload.id);
+        if (plugin?.project_source_error) throw new Error('Check the plugin source again before exporting. ' + plugin.project_source_error);
+        if (!plugin?.resolved_project) throw new Error('Check a .mp source before exporting the plugin');
+        if (payload.digest !== undefined && payload.digest !== plugin.resolved_project.digest) throw new Error('The checked plugin changed. Reopen Export to choose its current version.');
+        return extractBuild(payload, plugin.resolved_project.harnesses);
+      }
       case 'project_updates': return projectUpdates(payload);
       case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);
@@ -740,6 +792,12 @@ export function createTransport(scenario = 'default') {
       case 'pick_file': { unknownShellAction(action); return { path: flags.pickPath }; }
       case 'open_folder': { unknownShellAction(action); return { opened: true }; }
       case 'pick_folder': { unknownShellAction(action); return { path: flags.pickFolder }; }
+      case 'inspect_plugin_source': {
+        const source = flags.projectSources[payload.plugin.source];
+        if (flags.holdInspection) await new Promise(done => { finishInspection = done; });
+        if (source?.error) throw new Error(source.error);
+        return { harnesses: source?.harnesses ?? [], project_version: source?.version ?? null };
+      }
       case 'save_plugin': {
         mutate(payload);
         if (payload.adopt) adopt(payload);
@@ -747,6 +805,14 @@ export function createTransport(scenario = 'default') {
         if (!seeded) { Object.assign(p, { upstream_version: 'v-native', upstream_revision: 'abc123' }); if (p.distributions[0]) Object.assign(p.distributions[0], { origin: 'muro', custom_instructions_digest: 'old-instructions' }); seeded = true; }
         const at = reg.plugins.findIndex(x => x.id === p.id);
         if (at >= 0) reg.plugins[at] = p; else reg.plugins.push(p);
+        return bump();
+      }
+      case 'select_plugin_target': {
+        mutate(payload);
+        const plugin = reg.plugins.find(p => p.id === payload.id);
+        if (!plugin || !reg.targets.some(t => t.id === payload.target_id && t.enabled)) throw new Error('Plugin or harness is unavailable');
+        if (plugin.targets.includes(payload.target_id)) return snapshot();
+        plugin.targets.push(payload.target_id);
         return bump();
       }
       case 'remove_plugin': { mutate(payload); reg.plugins = reg.plugins.filter(p => p.id !== payload.id); return bump(); }
@@ -770,7 +836,15 @@ export function createTransport(scenario = 'default') {
         if (reg.settings.ai) reg.settings.agent = reg.settings.ai.harness;   // as the registry does: the old `agent` is always ai.harness
         return bump();
       }
-      case 'resolve': { const p = reg.plugins.find(p => p.id === payload.id); if (p) p.last_checked = ago(0); return bump(); }
+      case 'resolve': {
+        if (flags.holdResolution) await new Promise(done => { finishResolution = done; });
+        const p = reg.plugins.find(p => p.id === payload.id);
+        if (p) {
+          p.last_checked = ago(0);
+          resolveArchive(p);
+        }
+        return bump();
+      }
       case 'adapt': return startAdaptation(payload);
       case 'cancel_job': return cancelJob(payload);
       case 'open_custom_instructions': case 'custom_instructions': return structuredClone(instructions().find(i => i.plugin_id === payload.id));
@@ -791,6 +865,8 @@ export function createTransport(scenario = 'default') {
     }
   };
   const behind = {
+    finishInspection() { finishInspection?.(); finishInspection = null; },
+    finishResolution() { finishResolution?.(); finishResolution = null; },
     settings(patch) { Object.assign(reg.settings, patch); reg.revision++; },
     check(message = 'Everything is in sync') { makePlan(); log('Background check', 'complete', message); },
     bump() { reg.revision++; },

@@ -7,17 +7,27 @@ import { useRegistry } from '../../../state/registry.tsx';
 import { harnessNames } from '../../../model.ts';
 import { message, unknownTo } from '../../../words.ts';
 import { EXTRACT_ABOUT, EXTRACT_HARNESSES, checkFolder, extractPayload, extractedLine } from './jobs.ts';
-import { RefusalLine, projectName } from './HarmonizeDialog.tsx';
-import type { ChangeDialogProps } from './HarmonizeDialog.tsx';
+import { RefusalLine } from './HarmonizeDialog.tsx';
 
-const OPTIONS = EXTRACT_HARNESSES.map(value => ({ value, label: harnessNames[value] ?? value }));
+interface ExtractDialogProps {
+  id: string;
+  name: string;
+  action: 'extract_project' | 'extract_plugin';
+  harnesses?: readonly string[];
+  digest?: string;
+  unavailableReason?: string;
+  open: boolean;
+  onOpenChange(open: boolean): void;
+  onExported?(): void;
+}
 
-/** Extract: the plugin the project's file carries for one harness is written into a folder (`extract_project`, ADR-0035). No AI runs and the file is only read, so nothing waits for it. The page checks
- * only that the folder is a full path; what the build has and what is already in the folder the command says, and its sentence is shown as it came, with the window open. */
-export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProps) {
+/** Projects and Sync export one installable harness folder with the same controls. A resolved Sync plugin knows exactly which harnesses its file carries. */
+export function ExtractDialog({ id, name, action, harnesses = EXTRACT_HARNESSES, digest, unavailableReason, open, onOpenChange, onExported }: ExtractDialogProps) {
   const { request } = useRegistry();
   const notify = useNotify();
-  const [harness, setHarness] = React.useState<string>(EXTRACT_HARNESSES[0]);
+  const options = harnesses.map(value => ({ value, label: harnessNames[value] ?? value }));
+  const [chosen, setHarness] = React.useState<string>('');
+  const harness = harnesses.includes(chosen) ? chosen : harnesses[0];
   const [folder, setFolder] = React.useState('');
   const [problem, setProblem] = React.useState<string | null>(null);
   const [failure, setFailure] = React.useState<string | null>(null);
@@ -32,8 +42,6 @@ export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProp
     setWas(open);
     if (open) { setProblem(null); setFailure(null); }
   }
-  const name = projectName(info, id);
-
   async function chooseFolder(): Promise<void> {
     try {
       const picked = await request<{ path: string | null } | null>('pick_folder');
@@ -45,7 +53,7 @@ export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProp
   }
 
   async function extract(): Promise<void> {
-    if (pending.current) return;
+    if (pending.current || !harness || unavailableReason) return;
     const bad = checkFolder(folder);
     setProblem(bad);
     if (bad) return;
@@ -53,8 +61,10 @@ export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProp
     setExtracting(true);
     setFailure(null);
     try {
-      const done = await request<ProjectExtract>('extract_project', extractPayload(id, harness, folder));
-      onOpenChange(false);
+      const payload = extractPayload(id, harness, folder);
+      const done = await request<ProjectExtract>(action, digest ? { ...payload, digest } : payload);
+      if (onExported) onExported();
+      else onOpenChange(false);
       notify(extractedLine(done));
     } catch (e) { setFailure(message(e)); }
     finally {
@@ -67,18 +77,18 @@ export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProp
     <Dialog
       open={open}
       onOpenChange={next => { if (!next && pending.current) return; onOpenChange(next); }}
-      title={`Extract ${name}`}
+      title={`Export ${name}`}
       description={EXTRACT_ABOUT}
       footer={(
         <>
           <Button variant="outline" disabled={extracting} onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button loading={extracting} loadingText="Extracting…" onClick={() => void extract()}>Extract</Button>
+          <Button disabled={!harness || !!unavailableReason} loading={extracting} loadingText="Exporting…" onClick={() => void extract()}>Export</Button>
         </>
       )}
     >
       <Column gap="lg">
         <FormField label="Harness">
-          <Select options={OPTIONS} value={harness} onValueChange={value => { setHarness(value); setFailure(null); }} />
+          <Select options={options} value={harness ?? ''} onValueChange={value => { setHarness(value); setFailure(null); }} />
         </FormField>
         <Column>
           <FormField label="Folder" error={problem ?? undefined}>
@@ -88,7 +98,7 @@ export function ExtractDialog({ id, info, open, onOpenChange }: ChangeDialogProp
             ? <Text as="p" variant="note">This version of Muro cannot open a folder dialog yet: type the path.</Text>
             : <Cell align="start"><Button variant="outline" size="sm" onClick={() => void chooseFolder()}>Choose folder…</Button></Cell>}
         </Column>
-        {failure ? <RefusalLine>{failure}</RefusalLine> : null}
+        {unavailableReason || failure ? <RefusalLine>{unavailableReason || failure}</RefusalLine> : null}
       </Column>
     </Dialog>
   );

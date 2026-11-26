@@ -67,6 +67,16 @@ test('cellState gives needs-build when the plugin has no distribution for the ha
  assert.equal(cellState({...plugin,distributions:[]},t,s,null).kind,'needs-build');
  assert.equal(cellState({...plugin,distributions:[{harness:'codex',path:'',version:'2'}]},t,s,null).kind,'needs-build');
 });
+test('a Hermes server component cannot stand in for its main plugin in the Sync table', () => {
+  const s = snapshot(), target = { ...s.registry.targets[0], harness: 'hermes' };
+  const packagePlugin = { ...plugin, distributions: [{ harness: 'hermes', path: '/hermes', version: '2' }] };
+  const main = s.inventory[0].plugins[0];
+  const server = { ...main, id: 'server', registry_id: plugin.id, component: 'hermes-mcp', version: '2' };
+  s.inventory[0].plugins = [server, main];
+  assert.equal(cellState(packagePlugin, target, s, null).kind, 'update');
+  s.inventory[0].plugins = [server];
+  assert.equal(cellState(packagePlugin, target, s, null).kind, 'install');
+});
 test('cellState: an unreadable inventory or unreadable instructions are unknown, never ok',()=>{
  const t=snapshot().registry.targets[0],ok=snapshot();ok.inventory[0].plugins[0].version='2';
  const incomplete=snapshot();incomplete.inventory[0].plugins[0].version='2';incomplete.inventory[0].complete=false;
@@ -102,6 +112,26 @@ test('harnessState without a plan, or with a stale one, reads the snapshot',()=>
  assert.deepEqual(harnessState(t,s,null),{kind:'changes',count:1});
  s.inventory[0].plugins[0].version='2';
  assert.deepEqual(harnessState(t,s,plan([op('update','1','2')],3)),{kind:'ok',count:0});
+});
+test('a refused archive check explains its selected cells even with an old installed build', () => {
+  const s = snapshot(), target = s.registry.targets[0];
+  const broken = { ...plugin, project_source_error: 'The plugin build differs from its project.' };
+  s.registry.plugins = [broken];
+  s.inventory[0].plugins[0].version = '2';
+  assert.deepEqual(cellState(broken, target, s, null), {kind:'source-error',reason:broken.project_source_error});
+  assert.equal(harnessState(target, s, null).kind, 'source-error');
+  assert.equal(pluginState(broken, s).kind, 'unknown');
+  assert.equal(syncHeadline(s, plan([])).kind, 'sources');
+  s.inventory[0].plugins = [];
+  assert.equal(cellState(broken, target, s, plan([])).kind, 'source-error');
+  assert.equal(cellState({...broken,targets:[]}, target, s, null).kind, 'none');
+});
+test('a main plugin and its server count as two changes in the same row and target', () => {
+  const s = snapshot(), target = s.registry.targets[0];
+  const pair = plan([op('install','','2'), {...op('install','','2'), name:'Package MCP'}]);
+  assert.deepEqual(cellState(plugin, target, s, pair), {kind:'changes',count:2});
+  assert.deepEqual(harnessState(target, s, pair), {kind:'changes',count:2});
+  assert.equal(syncSummary(s, pair).operations, 2);
 });
 test('harnessState reports the plugins that have no build for the harness, after the changes',()=>{
  const s=snapshot(),t=s.registry.targets[0],bare={...plugin,id:'bare',name:'Bare',distributions:[]};s.registry.plugins=[plugin,bare];s.inventory[0].plugins[0].version='2';
