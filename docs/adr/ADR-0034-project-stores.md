@@ -231,8 +231,9 @@ run that waits is replaced by a newer one that waits: the newest file wins.
   run, with Muro at `muro-v0.10.0` (`docs/verification/2026-11-26-project-store-real-repositories.md`). That
   record proves, of the items below, the push to GitHub by `muro project release`, the push that adds the
   caller and starts it, the fetch of a store of tens of megabytes and the step of the repository's own tests.
-  It also records a defect: a project file written on Windows carries no executable permission. The items
-  below are kept as they were written on 2026-11-25.
+  It also records a defect: a project file written on Windows carries no executable permission (fixed the same
+  day: `docs/verification/2026-11-26-project-files-on-windows.md`). The items below are kept as they were
+  written on 2026-11-25.
 - The workflow ran once on GitHub, on a private probe repository, and released at the
   first run (`docs/verification/2026-11-25-project-store.md`). No real project's
   repository calls it yet.
