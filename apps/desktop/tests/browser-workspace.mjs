@@ -528,7 +528,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   assert.equal(await panelOf(page).count(), 0, 'under 850px the left panel is out of the layout');
   await frames(page);
   assert.ok(await sideways(page) <= 0, '500px, the graph');
-  for (const name of ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Release…', 'Add input…', 'All projects', 'Project panel']) {
+  for (const name of ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Extract…', 'Release…', 'Add input…', 'All projects', 'Project panel']) {
     const box = await page.getByRole('button', { name, exact: true }).boundingBox();
     assert.ok(box && box.x >= 0 && box.x + box.width <= 500 + 0.5, `${name} is inside the window`);
   }
@@ -556,8 +556,8 @@ await test('every control has a name, and the actions that are not there yet are
     await segment(page, name).click();
     assert.deepEqual(await unnamed(page), [], name);
   }
-  const actions = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Release…', 'Add input…'];
-  // Add input… and Harmonize again… work (plan W, browser-write-ai.mjs), and so does Release… for a project that names a repository (browser-write-edit.mjs); the two that wait
+  const actions = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Extract…', 'Release…', 'Add input…'];
+  // Add input… and Harmonize again… work (plan W, browser-write-ai.mjs), and so do Extract… and, for a project that names a repository, Release… (browser-write-edit.mjs); the two that wait
   // for another plan say which.
   const waiting = { 'Review decisions…': 'Coming with the review', 'Install on harnesses…': 'Coming with the Sync page' };
   for (const name of actions) {
@@ -568,7 +568,7 @@ await test('every control has a name, and the actions that are not there yet are
     } else assert.equal(await button.isDisabled(), false, `${name} is live`);
   }
   assert.deepEqual(await texts(actionBar(page).locator('button')), actions, 'Add input… is last');
-  assert.deepEqual(await actionBar(page).locator('button').evaluateAll(buttons => buttons.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
+  assert.deepEqual(await actionBar(page).locator('button').evaluateAll(buttons => buttons.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
 });
 
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }
