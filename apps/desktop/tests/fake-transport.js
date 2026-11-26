@@ -606,6 +606,20 @@ export function createTransport(scenario = 'default') {
     }
     return answer;
   }
+  // extract_project {id, harness, folder}: the factory writes the plugin the file carries for one harness into folder/<harness>/ and answers what was written. The refusals come in the runtime's order
+  // (the list, a harness Muro builds, a full path) and then the command's own (a harness the build lacks: `adapters` of the entry; a folder already there: what was extracted before). No file is written here.
+  const extracted = new Set();
+  function extractProject(p) {
+    const entry = listedFile(p.id);
+    const harness = String(p.harness ?? ''), folder = String(p.folder ?? '').trim();
+    if (!['claude-code', 'codex', 'opencode', 'pi', 'hermes'].includes(harness)) throw new Error(`No Muro adapter for the harness ${harness}`);
+    if (!isAbsolute(folder)) throw new Error('Name the folder to extract into by its full path');
+    if (!entry.adapters.includes(harness)) throw new Error(`This project's build has no adapter for ${harness}: it has ${[...entry.adapters].sort().join(', ')}`);
+    const target = `${folder.replace(/[\\/]+$/, '')}/${harness}`;
+    if (extracted.has(target)) throw new Error(`${target} already exists: choose another folder`);
+    extracted.add(target);
+    return { harness, folders: [target] };
+  }
   // project_updates {id}: how each input's pin stands against its upstream (the first input is behind, at v9.9.9, the others are current).
   function projectUpdates({ id }) {
     const entry = listedFile(id);
@@ -713,6 +727,7 @@ export function createTransport(scenario = 'default') {
       case 'edit_project': return editProject(payload);
       case 'delete_project': return deleteProject(payload);
       case 'release_project': return releaseProject(payload);
+      case 'extract_project': return extractProject(payload);
       case 'project_updates': return projectUpdates(payload);
       case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);

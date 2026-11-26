@@ -32,6 +32,7 @@ import { PinDialog } from './write/PinDialog.tsx';
 import { InstructionsDialog } from './write/InstructionsDialog.tsx';
 import { DetailsDialog } from './write/DetailsDialog.tsx';
 import { ReleaseDialog } from './write/ReleaseDialog.tsx';
+import { ExtractDialog } from './write/ExtractDialog.tsx';
 
 /** The workspace of an open project, in the frame of the window: the panel at the left (inputs, examples, records, runs), the decision graph at the centre, the details
  * of what is selected in the window's inspector (`ProjectInspector`), and the actions of the project in the window's action bar (`ProjectActions`). The frame decides the widths (Sigrid's `AppShell`): under 1000px the inspector
@@ -46,7 +47,8 @@ import { ReleaseDialog } from './write/ReleaseDialog.tsx';
  * run goes no other is offered, and the buttons and the foot say why; an edit by hand (the details) waits only for a run that changes this project. The run of this
  * project is the card at the top (JobCard). Review decisions has no operation in the runtime yet, and installing comes with the Sync page: both stay off, saying so.
  * Release, at the foot too, changes nothing of the project: it puts the file into the repository the file names (ReleaseDialog). It is off, saying why, for a project
- * that names none, and while a run changes this project. */
+ * that names none, and while a run changes this project.
+ * Extract, beside it, writes the plugin the file carries for one harness into a folder (ExtractDialog): it only reads the file, so it is always offered. */
 
 const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examples', records: 'Records', runs: 'Runs' };
 /** Why the two actions the runtime has no operation for here are off. */
@@ -219,6 +221,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
       <InstructionsDialog id={view.id} info={info} open={dialog === 'instructions'} onOpenChange={closed} />
       <DetailsDialog id={view.id} info={info} open={dialog === 'details'} onOpenChange={closed} />
       <ReleaseDialog id={view.id} info={info} open={dialog === 'release'} onOpenChange={closed} />
+      <ExtractDialog id={view.id} info={info} open={dialog === 'extract'} onOpenChange={closed} />
     </Column>
   );
 }
@@ -255,6 +258,7 @@ export function ProjectActions() {
         <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
         <GatedButton off={busy} variant="outline" onClick={() => setDialog('harmonize')}>Harmonize again…</GatedButton>
         <GatedButton off={NO_INSTALL} variant="outline">Install on harnesses…</GatedButton>
+        <GatedButton off={null} variant="outline" onClick={() => setDialog('extract')}>Extract…</GatedButton>
         <GatedButton off={noRelease} variant="outline" onClick={() => setDialog('release')}>Release…</GatedButton>
         <GatedButton off={busy} onClick={() => setDialog('add')}>Add input…</GatedButton>
       </Cluster>

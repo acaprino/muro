@@ -214,6 +214,43 @@ fn built(home: &Home, name: &str, kinds: &[&str]) -> (PathBuf, String) {
 }
 
 #[test]
+fn a_project_is_extracted_for_one_harness_into_the_folder_named() {
+    let home = Home::new();
+    let (file, _) = built(&home, "demo", &["codex"]);
+    let folder = home.files.join("out");
+    let before = fs::read(&file).unwrap();
+    let done = home.call("extract_project", json!({"id":"demo","harness":"codex","folder":folder.clone()})).unwrap();
+    assert_eq!((done["harness"].as_str(), done["folders"].as_array().map(Vec::len)), (Some("codex"), Some(1)));
+    assert!(folder.join("codex").join("INSTALL.md").is_file());
+    assert_eq!(fs::read(&file).unwrap(), before, "the project file is only read");
+    let asked: Vec<Vec<String>> = calls(&home.factory).into_iter().filter(|c| c[..2] == ["project", "extract"]).collect();
+    assert_eq!(asked.len(), 1);
+    assert_eq!(asked[0][2..], [file.to_string_lossy().into_owned(), "--harness".to_owned(), "codex".to_owned(),
+        "--out".to_owned(), folder.to_string_lossy().into_owned(),
+        "--cache".to_owned(), home.data.join("project-cache").to_string_lossy().into_owned()]);
+}
+
+#[test]
+fn extract_refuses_what_it_cannot_do() {
+    let home = Home::new();
+    built(&home, "demo", &["codex"]);
+    let folder = home.files.join("out");
+    let cases = [
+        ("an unlisted project", json!({"id":"other","harness":"codex","folder":folder.clone()}), "not in your list"),
+        ("a harness Muro does not build", json!({"id":"demo","harness":"vim","folder":folder.clone()}), "No Muro adapter for the harness vim"),
+        ("no folder", json!({"id":"demo","harness":"codex"}), "full path"),
+        ("a folder that is not a full path", json!({"id":"demo","harness":"codex","folder":"out"}), "full path"),
+        ("a harness the build lacks", json!({"id":"demo","harness":"pi","folder":folder.clone()}), "This project's build has no adapter for pi: it has codex"),
+    ];
+    for (why, payload, reason) in cases {
+        let error = error_of(home.call("extract_project", payload));
+        assert!(error.contains(reason), "{why}: {error}");
+        assert!(!error.contains("Project extract failed"), "{why}: the command's prefix is not repeated: {error}");
+    }
+    assert!(!folder.exists(), "nothing was written");
+}
+
+#[test]
 fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
     let home = Home::new();
     // Targets of kinds that read configuration files: those of Claude Code and Codex run the harness's

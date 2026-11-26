@@ -339,6 +339,20 @@ export function releasedLine(done: Partial<ProjectRelease> | null | undefined): 
   return said || (done?.pushed === true ? 'The project file was pushed to its repository.' : 'Nothing was pushed.');
 }
 
+// ---------- extracting a project for one harness ----------
+
+/** Extracting (ADR-0035): the runtime has the factory write the plugin the file carries for one harness into a folder (`extract_project`, `muro project extract`). Nothing is built. */
+export const EXTRACT_ABOUT = 'The plugin the project file carries for one harness is written into the folder you choose, in a new folder named after the harness. Nothing is built, the project file is only read and nothing already there is overwritten.';
+/** The harnesses Muro builds an adapter for (the runtime's `HARNESSES`). A file whose build lacks one is refused by the command, which says which it has. */
+export const EXTRACT_HARNESSES = ['claude-code', 'codex', 'opencode', 'pi', 'hermes'] as const;
+export type ExtractPayload = { id: string; harness: string; folder: string };
+export const extractPayload = (id: string, harness: string, folder: string): ExtractPayload => ({ id, harness, folder: folder.trim() });
+/** What the page says once it is done: the folders written, as the command named them. */
+export function extractedLine(done: { folders?: unknown } | null | undefined): string {
+  const folders = Array.isArray(done?.folders) ? done.folders : [];
+  return folders.length ? `Extracted to ${folders.join(' and ')}` : 'The plugin was extracted.';
+}
+
 // ---------- the runs the runtime holds ----------
 
 export const isRunning = (job: Job): boolean => job.status === 'running';

@@ -18,6 +18,9 @@
 //! the work folder holds `commit-fails`; waiting for a `go-commit` file beside the work folder when it holds
 //! `commit-waits`; else the file written as a descriptor with what the commit was asked under `committed`.
 //!
+//! `project extract` answers from the descriptor's `build`: refused for a harness it does not name; else it writes
+//! `<out>/<harness>/INSTALL.md` and prints `{"harness", "folders"}`.
+//!
 //! `project release` answers from the descriptor too, and reaches no repository: refused when `--expect-digest` is
 //! not the file's, when the descriptor has no `repository` (`{"url","branch","tag_prefix"}`) or when its `release`
 //! says `{"refused": "<sentence>"}`; nothing to push when `release` says `{"held": true}`; else the document the
@@ -178,6 +181,16 @@ elif args[:2] == ["project", "commit"]:
                          "summary": Path(summary).read_text(encoding="utf-8") if summary else None}
     out.write_text(json.dumps(held), encoding="utf-8")
     print(json.dumps({"path": str(out), "digest": hashlib.sha256(out.read_bytes()).hexdigest()}))
+elif args[:2] == ["project", "extract"]:
+    held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
+    harness, offered = option("--harness"), sorted(held.get("build", {}))
+    if harness not in offered:
+        print(f"Project extract failed: This project's build has no adapter for {harness}: it has {', '.join(offered)}", file=sys.stderr)
+        sys.exit(1)
+    target = Path(option("--out")) / harness
+    target.mkdir(parents=True)
+    (target / "INSTALL.md").write_text("Install\n", encoding="utf-8")
+    print(json.dumps({"harness": harness, "folders": [str(target)]}))
 elif args[:2] == ["project", "release"]:
     # what a repository would answer is in the descriptor: nothing is fetched or pushed
     data = Path(args[2]).read_bytes()
