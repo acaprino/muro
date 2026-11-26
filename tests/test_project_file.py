@@ -445,6 +445,74 @@ def test_an_executable_helper_stays_executable(tmp_path, package, cache):
     assert (folder / "capabilities" / "run.sh").stat().st_mode & 0o111
 
 
+# --- executable files, on a disk that keeps no such bit (Windows) ------------------------------------
+
+def make_scripts_upstream(root):
+    """A source with scripts: `bin/run` is executable in Git, `bin/plain.sh` only starts like a script."""
+    make_upstream(root)
+    (root / "bin").mkdir()
+    for name in ("run", "plain.sh"):
+        (root / "bin" / name).write_bytes(b"#!/bin/sh\necho " + name.encode("ascii") + b"\n")
+    git(root, "add", ".")
+    git(root, "update-index", "--chmod=+x", "bin/run")      # the mode is Git's: a Windows disk has none to give
+    git(root, "commit", "-qm", "scripts")
+    return root, git(root, "rev-parse", "HEAD")
+
+
+def scripts_package(pkg, root, commit):
+    make_package(pkg, root, commit)
+    manifest = json.loads((pkg / "sources.json").read_text(encoding="utf-8"))
+    manifest["sources"][0]["selected_paths"].append("bin")
+    (pkg / "sources.json").write_text(json.dumps(manifest), encoding="utf-8")
+    return pkg
+
+
+def scripted_release(out):
+    """A build with the source's scripts as helpers, at the root and in an adapter: the build makes a helper that
+    starts as a script executable, whatever its mode in Git. The launcher starts like one and is no helper."""
+    built = build_release(out) / SLUG
+    skill = built / "adapters" / "claude-code" / "skills" / SLUG
+    for folder in (built / "scripts" / "demo" / "bin", skill / "scripts" / "demo" / "bin"):
+        folder.mkdir(parents=True)
+        for name in ("run", "plain.sh"):
+            (folder / name).write_bytes(b"#!/bin/sh\n")
+            (folder / name).chmod(0o755)
+    (skill / "muro.py").write_bytes(b"#!/usr/bin/env python3\n")
+    return out
+
+
+def executable(mp):
+    with zipfile.ZipFile(mp) as zf:
+        return sorted(info.filename for info in zf.infolist() if (info.external_attr >> 16) & 0o111)
+
+
+def test_a_disk_that_keeps_no_executable_bit_packs_the_same_file(tmp_path, monkeypatch):
+    """An input is executable when Git says so, a built helper when the build's rule says so: neither is asked of
+    the disk alone, so a pack on Windows writes the bytes a pack on Linux writes."""
+    pkg = scripts_package(tmp_path / "pkg", *make_scripts_upstream(tmp_path / "upstream"))
+    staged, cache = scripted_release(tmp_path / "staged"), tmp_path / "cache"
+    first = project.pack(pkg, tmp_path / "a.mp", sources_cache=cache, release_dir=staged)      # fetched from Git
+    monkeypatch.setattr(project, "_executable", lambda path: False)                              # a disk with no bit
+    second = project.pack(pkg, tmp_path / "b.mp", sources_cache=cache, release_dir=staged)     # read from the cache
+    helpers = [f"release/{SLUG}/{where}scripts/demo/bin/{name}"
+               for where in ("", f"adapters/claude-code/skills/{SLUG}/") for name in ("plain.sh", "run")]
+    assert executable(second) == sorted(["inputs/demo/bin/run", *helpers])
+    assert first.read_bytes() == second.read_bytes()
+    assert project.executable_members(second) == frozenset(executable(second))
+
+
+def test_a_cache_entry_that_names_no_executable_files_is_fetched_again(tmp_path, package):
+    """An entry made before the cache kept those names cannot say which files were executable."""
+    cache = tmp_path / "cache"
+    project.pack(package, tmp_path / "a.mp", sources_cache=cache)
+    src = json.loads((package / "sources.json").read_text(encoding="utf-8"))["sources"][0]
+    assert project._current(cache, src)
+    (cache / "demo" / f"{src['commit']}.modes").unlink()
+    assert not project._current(cache, src)
+    project._seal(cache, src)                    # an entry filled by hand: sealed, it names none
+    assert project._current(cache, src)
+
+
 # --- sources and their cache -----------------------------------------------------------------------
 
 def test_pack_fills_the_sources_cache_and_reads_it_without_the_network(tmp_path, package, monkeypatch):
