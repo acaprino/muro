@@ -420,5 +420,36 @@ await test('Release: a project that names no repository has it off, saying why; 
   assert.deepEqual(await releasesOf(app), [], 'looking sends nothing');
 });
 
+// ---------- extract ----------
+await test('Extract: the window sends the project, the harness and the folder chosen; a folder that is not a full path sends nothing; a refusal is said as it came with the window open; the notice says where the plugin went', 'projects', {}, async app => {
+  const { page } = app;
+  await openSample(page);
+  const read = await digest(page);
+  await app.flags({ pickFolder: 'D:/Out' });
+  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
+  const dialog = windowOf(page, 'Extract Sample');
+  await dialog.waitFor();
+  assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
+  const confirm = dialog.getByRole('button', { name: 'Extract', exact: true });
+  await dialog.locator('input').last().fill('Out');
+  await confirm.click();
+  await dialog.getByText('Choose the folder with its full path', { exact: true }).waitFor();
+  assert.deepEqual(await callsOf(app, 'extract_project'), [], 'nothing is sent for a folder that is not a full path');
+  await dialog.getByRole('button', { name: 'Choose folder…', exact: true }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="dialog-content"] input')].some(e => e.value === 'D:/Out'));
+  await page.screenshot({ path: shots + '/write-extract.png' });
+  await confirm.click();
+  await dialog.waitFor({ state: 'detached' });
+  await notice(page, 'Extracted to D:/Out/claude-code').waitFor();
+  assert.deepEqual((await callsOf(app, 'extract_project')).map(c => c.payload), [{ id: 'sample', harness: 'claude-code', folder: 'D:/Out' }]);
+  assert.equal(await digest(page), read, 'the project file is only read');
+  // The same folder again: the command's refusal is said, and the window stays.
+  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
+  await dialog.waitFor();
+  await confirm.click();
+  await dialog.getByRole('alert').getByText('D:/Out/claude-code already exists: choose another folder', { exact: true }).waitFor();
+  assert.equal(await dialog.isVisible(), true);
+});
+
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }
 console.log('PASS: ' + done.join('; '));

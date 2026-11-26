@@ -313,3 +313,10 @@ of the file is a release. Muro owns the repository-side build as one reusable
 workflow, `.github/workflows/project-store.yml`, which a store calls pinned to a
 Muro ref. Proposed: the model is the owner's; the workflow, its rules and the text
 are not separately approved. The workflow has not run on GitHub.
+
+## Extracting one harness
+
+Manual note outside the generated index: [ADR-0035: The plugin of one harness is
+extracted from the project file](ADR-0035-project-extract.md) records the command
+and the button the owner asked for on 2026-11-26. Proposed: the request is the
+owner's; the choices and the text are not separately approved.

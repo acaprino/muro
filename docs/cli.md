@@ -398,6 +398,21 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
+### `muro project extract FILE.mp --harness H --out DIR [--cache DIR]`
+
+Writes the plugin the file carries for one harness into `DIR/<H>/`, ready to install as its `INSTALL.md` says
+([ADR-0035](adr/ADR-0035-project-extract.md)). `H` is a harness the file's build has: `claude-code`, `codex`,
+`opencode`, `pi` or `hermes`. Nothing is built and the file is only read: what comes out is `release/<slug>/adapters/<H>/`
+of the file, byte for byte. For `hermes`, a plugin with its own servers also gets `DIR/hermes-mcp/`, which its
+`INSTALL.md` reaches as `../hermes-mcp`.
+
+`DIR` may hold other things, but a folder the command would write must not be there yet: nothing is overwritten. The
+file is checked first as `verify` does. Prints `{"harness", "folders"}`. Refused, with exit 1 and
+`Project extract failed: <sentence>`: a plugin that was not built from its project, a file with no built plugin, a
+harness the build does not have (the sentence names the ones it has), a folder already there.
+
+To write a whole plugin store into a repository instead, push the file: [the project store](project-store.md).
+
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
 (Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below. Releasing it:

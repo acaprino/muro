@@ -2,7 +2,7 @@
 //! bundled factory (`muro project info`), opened from anywhere and put on the harnesses as a registry
 //! plugin. The factory owns the format; the registry owns the list and the plugins; this module
 //! connects them and decides nothing about what a project means.
-use crate::factory::Factory;
+use crate::factory::{Factory, READ_LIMIT};
 use anyhow::{Context, Result, bail, ensure};
 use muro_registry::projects::{self as list, same_file};
 use serde_json::{Value, json};
@@ -207,6 +207,27 @@ fn named_targets(registry: &Value, payload: &Value) -> Result<(Vec<String>, Vec<
 
 fn plugin_of<'a>(registry: &'a Value, id: &str) -> Option<&'a Value> {
     registry["plugins"].as_array()?.iter().find(|p| p["id"] == id)
+}
+
+/// `extract_project {id, harness, folder}`: the plugin the project's file carries for one harness, written by the
+/// factory into `folder/<harness>/` (`muro project extract`, ADR-0035). The file is read and never written, and
+/// nothing already in `folder` is overwritten. Answers what the command printed, `{harness, folders}`; what it
+/// refused is its sentence, without the command's own prefix.
+pub fn extract(data: &Path, payload: &Value) -> Result<Value> {
+    let current = registry(data)?;
+    let file = listed_file(&current, payload["id"].as_str().unwrap_or(""))?;
+    let harness = payload["harness"].as_str().unwrap_or("");
+    ensure!(HARNESSES.contains(&harness), "No Muro adapter for the harness {harness}");
+    let folder = payload["folder"].as_str().unwrap_or("").trim();
+    ensure!(Path::new(folder).is_absolute(), "Name the folder to extract into by its full path");
+    let args = vec!["project".to_owned(), "extract".into(), file.to_string_lossy().into_owned(), "--harness".into(), harness.to_owned(),
+        "--out".into(), folder.to_owned(), "--cache".into(), cache_dir(data).to_string_lossy().into_owned()];
+    let done = Factory::from_settings(&current["settings"])?.json(&args, "Extracting the plugin", &|| false, READ_LIMIT);
+    sweep_cache(data);
+    done.map_err(|error| {
+        let reason = format!("{error:#}");
+        anyhow::anyhow!("{}", reason.strip_prefix("Project extract failed: ").unwrap_or(&reason).to_owned())
+    })
 }
 
 /// `install_project {id, targets}`: puts the project's built plugin on the targets named (ids of the

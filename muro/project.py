@@ -528,6 +528,42 @@ def verify(mp: Path, cache_root: Path) -> None:
         check_release(folder, built)
 
 
+def extract(mp: Path, harness: str, out: Path, cache_root: Path) -> list[Path]:
+    """The built plugin of one harness, as the project file carries it, into `out/<harness>/` (ADR-0035).
+
+    Nothing is built. Hermes also gets `out/hermes-mcp/` when the build has it: its INSTALL.md reaches it as
+    `../hermes-mcp`. `out` may hold other things; a folder this writes must not be there yet.
+    """
+    verify(mp, cache_root)
+    folder = cached(mp, cache_root)
+    slug = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))["plugin"]["slug"]
+    adapters = folder / "release" / slug / "adapters"
+    offered = sorted(path.name for path in adapters.iterdir() if (path / "INSTALL.md").is_file())         if adapters.is_dir() else []
+    if not offered:
+        raise ValueError("This project has no built plugin yet: it is built when the project is harmonized")
+    if harness not in offered:
+        raise ValueError(f"This project's build has no adapter for {harness}: it has {', '.join(offered)}")
+    names = [harness]
+    if harness == "hermes" and (adapters / "hermes-mcp").is_dir():
+        names.append("hermes-mcp")
+    targets = [Path(out) / name for name in names]
+    for target in targets:
+        if target.exists():
+            raise ValueError(f"{target} already exists: choose another folder")
+    made: list[Path] = []
+    try:
+        for name, target in zip(names, targets):
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.mkdir()              # claims the name: only what was made here is ever removed
+            made.append(target)
+            shutil.copytree(adapters / name, target, dirs_exist_ok=True)
+    except OSError:
+        for target in made:             # a half-written plugin is not left to be installed
+            shutil.rmtree(target, ignore_errors=True)
+        raise
+    return targets
+
+
 # --- writing ----------------------------------------------------------------------------------------
 
 def _walk(root: Path) -> Iterator[tuple[str, Path]]:
