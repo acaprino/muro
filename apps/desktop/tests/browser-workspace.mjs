@@ -643,15 +643,17 @@ await test('every control has a name, and the actions that are not there yet are
   }
   const actions = ['Review decisions…', 'Harmonize again…', 'Install via Sync…', 'Export to folder…', 'Release…', 'Add input…'];
   const waiting = { 'Review decisions…': 'Coming with the review' };
-  for (const name of actions) {
+  const buttons = actionBar(page).getByRole('button');
+  assert.equal(await buttons.count(), actions.length);
+  for (const [index, name] of actions.entries()) {
     const button = page.getByRole('button', { name, exact: true });
+    assert.equal(await buttons.nth(index).and(button).count(), 1, `${name} is action ${index + 1}`);
     if (name in waiting) {
       assert.equal(await button.isDisabled(), true, `${name} waits for another plan`);
       assert.equal(await button.getAttribute('title'), waiting[name]);
     } else assert.equal(await button.isDisabled(), false, `${name} is live`);
   }
-  assert.deepEqual(await texts(actionBar(page).locator('button')), actions, 'Add input… is last');
-  assert.deepEqual(await actionBar(page).locator('button').evaluateAll(buttons => buttons.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
+  assert.deepEqual(await buttons.evaluateAll(elements => elements.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
 });
 
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }
