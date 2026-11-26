@@ -438,13 +438,22 @@ functions `check-sources` and `build` use (license gate, coverage gate, the pin'
 keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
 holds them) and, beside it, `<DIR>/<id>/<commit>.stamp`: the digest of what the snapshot was fetched for
 (the commit and the source's `selected_paths`, `media_paths`, `notice_paths`, `license_path`, `excluded_paths`
-and `license`). `pack` reads a snapshot whose stamp matches without fetching, and fetches again, replacing it,
-when the stamp differs or is missing (a snapshot made before stamps existed, or by hand); it stores the one it
-fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
+and `license`), and `<DIR>/<id>/<commit>.modes`: the names of the snapshot's executable files, as a JSON list
+(a Windows disk keeps no such bit, so the folder alone cannot say). `pack` reads a snapshot whose stamp matches
+without fetching, and fetches again, replacing it, when the stamp differs or is missing (a snapshot made before
+stamps existed, or by hand) or the list of names is missing (a snapshot made before it was kept); it stores the
+one it fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
 build (`<DIR>/<slug>/…`); `pack` refuses one that is not the build of this package (the `sources.json` plugin
 slug and version, and the capability ids, must be the package's: `muro project verify`'s check); without it the
 file carries no release. The file is written whole or not at all, and the same project packs
 to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
+
+Which members are executable does not depend on the disk the file is written on. An input is executable when
+its mode in Git at the pin says so: `pack` reads it from the commit, the cache keeps the names, and `edit` and
+`commit` take them from the file they change. A helper of the built plugin (a file under a `scripts/` folder, at
+the root of the build or in an adapter) is executable by the build's own rule: it starts with `#!`. So a file
+written on Windows marks the same inputs and helpers as one written on Linux. A package's own file
+(`capabilities/`, `prompts/`, `custom-instructions/`) is executable only where the disk says so.
 
 `verify` checks that the plugin a `.mp` carries (`release/<slug>/`) was built from the package it carries: the
 release's `sources.json` plugin slug and version and its capability ids must equal the package's. It prints

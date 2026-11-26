@@ -24,7 +24,7 @@ repository has 126 executable files (scripts of the absorbed sources, some with 
 name); the second carried 5,550 members, none executable. The store publishes what the file holds, so a store
 written from such a file gives macOS and Linux users scripts they cannot start by name.
 
-It is not fixed. It touches every command that writes a project file on Windows from files on the disk: `pack`,
+It is not fixed (fixed later the same day: `2026-11-26-project-files-on-windows.md`). It touches every command that writes a project file on Windows from files on the disk: `pack`,
 `commit`, `edit`, and the app's actions over them. `inputs/` taken from Git keep the bit (it is read from the
 tree), until an unpack and a pack on Windows drop it.
 
