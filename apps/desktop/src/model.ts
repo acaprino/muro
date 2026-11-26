@@ -68,13 +68,13 @@ export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):Har
   const unseen=checked?0:recorded(snapshot)?.pending??0;
   return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:build?{kind:'needs-build',count:build}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:{kind:'ok',count:0};
 }
-export interface SyncSummary { kind:'no-harness'|'not-checked'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; byKind:Record<string,number> }
-/** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked. `errors` is the sources the last check could not resolve. */
+export interface SyncSummary { kind:'no-harness'|'not-checked'|'changed'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; byKind:Record<string,number> }
+/** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked (`not-checked`), or the last check was of an earlier revision: the list changed since (`changed`). `errors` is the sources the last check could not resolve. */
 export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {
   const empty=(kind:SyncSummary['kind']):SyncSummary=>({kind,operations:0,blockers:0,errors:0,byKind:{}});
   if(!snapshot.registry.targets.some(t=>t.enabled)) return empty('no-harness');
   const checked=currentPlan(snapshot,plan),record=checked?null:recorded(snapshot);
-  if(!checked&&!record) return empty('not-checked');
+  if(!checked&&!record) return empty(snapshot.sync.last_check&&snapshot.sync.revision!==snapshot.registry.revision?'changed':'not-checked');
   const byKind:Record<string,number>={};
   for(const o of checked?.operations??[]) byKind[o.kind]=(byKind[o.kind]||0)+1;
   const archivedErrors=snapshot.registry.plugins.filter(p=>p.project_source_error && snapshot.registry.targets.some(t=>t.enabled&&p.targets.includes(t.id))).length;

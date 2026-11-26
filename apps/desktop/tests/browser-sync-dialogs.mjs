@@ -26,9 +26,9 @@ async function test(name, scenario, options, body) {
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
 const actions = async app => (await app.calls()).map(c => c.action);
 const escaped = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** The window has read the registry once: the footer says what it holds. */
-const foot = page => page.locator('[data-slot="app-shell-footer"]');
-const ready = page => foot(page).getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const status = page => page.locator('[data-slot="app-shell-status"]');
+const ready = page => status(page).getByText(/Last check/).waitFor();
 const notice = (page, text) => page.locator('[data-toasts]').getByText(text, { exact: true });
 /** The drawer of a plugin or of Add plugin (Sigrid's side panel), and its title. */
 const sheet = page => page.locator('[data-slot="sheet-content"]');
@@ -483,7 +483,7 @@ await test('the registry moves while the drawer is open: what was typed stays, a
   await field(s, 'name').fill('Renamed');
   await page.evaluate(() => window.behind.settings({ auto_sync: true }));
   await page.evaluate(() => window.shown());
-  await foot(page).getByText('Automatic sync on').waitFor();
+  await status(page).getByText(/Next check/).waitFor();
   assert.equal(await field(s, 'name').inputValue(), 'Renamed', 'the window read the registry again and the form kept what was typed');
   const before = (await callsOf(app, 'snapshot')).length;
   await save(s).click();
@@ -656,7 +656,7 @@ await test('Adapt with AI with Codex as the coding agent says what is needed bef
   await ready(page);
   await page.evaluate(ai => window.behind.settings({ auto_sync: true, agent: ai.harness, ai }), CODEX);
   await page.evaluate(() => window.shown());
-  await foot(page).getByText('Automatic sync on').waitFor();
+  await status(page).getByText(/Next check/).waitFor();
   let s = await openPlugin(page, 'Package');
   await fold(s, 'More').click();
   await fold(s, 'Adapt with AI').click();
@@ -672,7 +672,7 @@ await test('Adapt with AI with Codex as the coding agent says what is needed bef
   // The API answers the simulator; the agent of Settings still runs the adaptation, and the dialog says so.
   await page.evaluate(ai => window.behind.settings({ auto_sync: false, agent: ai.harness, ai }), { ...CODEX, engine: 'api', harness: 'claude-code' });
   await page.evaluate(() => window.shown());
-  await foot(page).getByText('Automatic sync off').waitFor();
+  await status(page).getByText(/Automatic sync off/).waitFor();
   s = await openPlugin(page, 'Package');
   await fold(s, 'More').click();
   await fold(s, 'Adapt with AI').click();

@@ -91,6 +91,21 @@ test('while a simulation is pending, another request of the window is answered, 
   assert.deepEqual(order, ['snapshot', 'cancel_simulation', 'simulate']);
 });
 
+// Reading the projects starts a Python process for each file, and the runtime reads the registry for it without the lock: opening Projects
+// while a check runs (minutes, with its lock) shows the list at once, instead of waiting behind the check.
+test('the list of projects and a project are read while a check is still running', async () => {
+  const m = manual(), request = serial(m.send, ALONE);
+  const check = request('check'), list = request('projects'), one = request('project');
+  await later();
+  assert.deepEqual([...m.sent].sort(), ['check', 'project', 'projects'], 'neither waits for the check');
+  m.answer('projects');
+  m.answer('project');
+  assert.equal(await list, 'projects');
+  assert.equal(await one, 'project');
+  m.answer('check');
+  assert.equal(await check, 'check');
+});
+
 test('a request that takes the registry lock still waits for the one before it, simulation or not', async () => {
   const m = manual(), request = serial(m.send, ALONE);
   const simulation = request('simulate'), plan = request('plan'), scan = request('scan');

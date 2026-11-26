@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Button, Cell, Cluster, Column, Heading, Icon, ScrollArea, Separator, Sheet, SheetContent, SheetHeader, SheetTitle, Spacer, Text, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
+import { Button, Cell, Cluster, Column, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Heading, Icon, ScrollArea, Separator, Sheet, SheetContent, SheetHeader, SheetTitle, Spacer, Text, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
 import { Empty } from '@acaprino/sigrid/components';
 import { ContentSplit, Inspector, useAppShell } from '@acaprino/sigrid/layout';
 import { GraphCanvas, type GraphCanvasHandle } from '@acaprino/sigrid/graph';
@@ -45,14 +45,12 @@ import { ExtractDialog } from './write/ExtractDialog.tsx';
  * The changes of the project (write/): Add input and Harmonize again at the foot, Edit details in the header, Move pin, Remove and the instructions in the Inputs panel.
  * Each opens a dialog the workspace holds, so it outlives the drawer the panel may be in. A change of the package is an AI run of the runtime, one at a time: while any
  * run goes no other is offered, and the buttons and the foot say why; an edit by hand (the details) waits only for a run that changes this project. The run of this
- * project is the card at the top (JobCard). Review decisions waits for the runtime. Install via Sync opens the source and target choices in Sync.
+ * project is the card at the top (JobCard). Install via Sync, the one solid button, opens the source and target choices in Sync; Export and Release are in More.
  * Release, at the foot too, changes nothing of the project: it puts the file into the repository the file names (ReleaseDialog). It is off, saying why, for a project
  * that names none, and while a run changes this project.
  * Export to folder writes a copy of one harness build (ExtractDialog). */
 
 const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examples', records: 'Records', runs: 'Runs' };
-/** Why reviewing decisions is unavailable. */
-const NO_REVIEW = 'Coming with the review';
 /** Whether the shell said it cannot open a folder ("Unknown ... open_folder"): then "Open folder" is gone, for every project, until the window is loaded again. */
 let noFolderShell = false;
 
@@ -250,17 +248,25 @@ export function ProjectActions({ onInstall, checkingProject }: { onInstall(): vo
   const busy = busyReason(jobs.running);
   const noRelease = info && releaseOf(info) ? (view ? busyReason(runningOn(jobs.jobs, view.id)) : null) : NO_RELEASE_REPOSITORY;
   const noExport = info?.export_harnesses?.length === 0 ? 'Harmonize this project to build its harness variants.' : null;
+  // One solid button, the one that ends the work: the project on the harnesses. What changes it stays in sight; what takes it elsewhere (a folder, a release) is in More,
+  // each item off with its reason in place.
   return (
     <Cell grow>
       <Cluster justify="end">
         <Text variant="note" role="status">{busy ?? ''}</Text>
         <Spacer />
-        <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
+        <GatedButton off={busy} variant="outline" onClick={() => setDialog('add')}>Add input…</GatedButton>
         <GatedButton off={busy} variant="outline" onClick={() => setDialog('harmonize')}>Harmonize again…</GatedButton>
-        <GatedButton off={info?.file ? null : 'Waiting for the project file path'} loading={checkingProject} loadingText="Checking the project…" variant="outline" onClick={onInstall}>Install via Sync…</GatedButton>
-        <GatedButton off={noExport} variant="outline" onClick={() => setDialog('extract')}>Export to folder…</GatedButton>
-        <GatedButton off={noRelease} variant="outline" onClick={() => setDialog('release')}>Release…</GatedButton>
-        <GatedButton off={busy} onClick={() => setDialog('add')}>Add input…</GatedButton>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline"><Icon name="more" />More</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem disabled={noExport !== null} title={noExport ?? undefined} onSelect={() => setDialog('extract')}><Icon name="folderOpen" />Export to folder…</DropdownMenuItem>
+            <DropdownMenuItem disabled={noRelease !== null} title={noRelease ?? undefined} onSelect={() => setDialog('release')}><Icon name="tag" />Release…</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <GatedButton off={info?.file ? null : 'Waiting for the project file path'} loading={checkingProject} loadingText="Checking the project…" onClick={onInstall}>Install via Sync…</GatedButton>
       </Cluster>
     </Cell>
   );

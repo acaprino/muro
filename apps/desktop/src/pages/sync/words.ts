@@ -32,6 +32,20 @@ export function appliedMessage(plan: Plan, answer: Pick<Snapshot, 'skipped_remov
   return `${appliedNotice(plan.operations.length - skipped, skipped)}${left ? ` ${left} left out.` : ''}`;
 }
 
+/** Why the service planned an operation, in the words of the review sheet. Its three generic reasons are its own terms (desired distribution, artifact,
+ * registry): they are said as the change they stand for. Any other reason (files missing, a marketplace that cannot be loaded) is already plain and stays. */
+export function reasonOf(o: Operation): string {
+  switch (o.reason) {
+    case 'Missing desired distribution': return 'Not installed yet';
+    case 'Not in desired registry for this target': return 'Not in your list for this harness';
+    case 'Reconcile desired artifact':
+      return o.kind === 'activate' ? 'Installed but switched off'
+        : o.kind === 'reinstall' ? 'Installed again on request'
+          : o.from_version && o.from_version !== o.to_version ? 'New version' : 'The build changed';
+    default: return o.reason;
+  }
+}
+
 /** What each operation kind is called in the list of what a check found. */
 const CHANGE_WORDS: [string, string][] = [['install', 'install'], ['update', 'update'], ['reinstall', 'reinstall'], ['activate', 'activation'], ['remove', 'removal'], ['remove-marketplace', 'broken marketplace']];
 /** One or two names as they are; more, the first and how many are left. */
@@ -55,6 +69,8 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
       return note(h.kind, 'warn', 'No harness is managed', 'Muro needs at least one harness to install plugins into.');
     case 'not-checked':
       return note(h.kind, null, 'Not checked yet', 'Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.', true);
+    case 'changed':
+      return note(h.kind, null, 'Your list changed since the last check', 'Check now to see what the change means for your harnesses. Nothing changes until you apply.', true);
     case 'changes': {
       const parts = CHANGE_WORDS.filter(([kind]) => h.byKind[kind]).map(([kind, word]) => plural(h.byKind[kind]!, word));
       const bits = [parts.join(', '), h.blockers ? `${plural(h.blockers, 'item')} not ready yet` : '', unreadable, h.errors ? `${plural(h.errors, 'source')} could not be checked` : ''].filter(Boolean);
@@ -86,6 +102,7 @@ export function chipOf(h: SyncHeadline): Chip {
   const text = {
     'no-harness': 'No harness',
     'not-checked': 'Not checked yet',
+    changed: 'List changed',
     changes: `${plural(h.operations, 'change')} waiting`,
     blocked: 'Needs attention',
     unreadable: 'A harness cannot be read',

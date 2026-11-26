@@ -6,7 +6,7 @@ import { open } from './browser-helper.mjs';
 
 const out = 'apps/desktop/tests/shots';
 await mkdir(out, { recursive: true });
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const button = (scope, name) => scope.getByRole('button', { name, exact: true });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });
@@ -43,8 +43,8 @@ const SCREENS = [
   ['project-details', 'projects', async page => { await project(page); await button(page, 'Edit details…').click(); await page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]').waitFor(); }],
   ['project-add-input', 'projects', addInput],
   ['project-harmonize', 'projects', async page => { await project(page); await button(page, 'Harmonize again…').click(); await page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]').waitFor(); }],
-  ['project-release', 'projects', async page => { await project(page); await button(page, 'Release…').click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
-  ['project-extract', 'projects', async page => { await project(page); await button(page, 'Export to folder…').click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
+  ['project-release', 'projects', async page => { await project(page); await button(page, 'More').click(); await page.getByRole('menuitem', { name: 'Release…', exact: true }).click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
+  ['project-extract', 'projects', async page => { await project(page); await button(page, 'More').click(); await page.getByRole('menuitem', { name: 'Export to folder…', exact: true }).click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
   ['project-running', 'projects', async page => {
     await addInput(page);
     const form = page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]');

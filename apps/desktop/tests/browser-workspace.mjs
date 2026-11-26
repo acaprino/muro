@@ -24,8 +24,8 @@ async function test(name, scenario, options, body) {
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
 const texts = loc => loc.evaluateAll(elements => elements.map(e => e.textContent.trim()));
 const kept = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('muro.project') ?? 'null'));
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 /** The tabs are Sigrid's `ToolbarTab`s, in the title bar or in the row under it on a narrow window: buttons marked `aria-current="page"`, not `role=tab`. */
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); };
@@ -91,10 +91,13 @@ await test('the list says what each project is, what is installed as published, 
   await line.waitFor();
   const text = await line.textContent();
   for (const fact of ['0.5.0', 'D:/Muro/data/projects/sample.mp', '3 inputs · 4 capabilities']) assert.ok(text.includes(fact), `the row says ${fact}: ${text}`);
-  assert.equal(await line.getByRole('button', { name: 'Remove Sample from the list', exact: true }).count(), 1, 'every project can leave the list');
-  assert.equal(await line.getByRole('button', { name: 'Delete Sample…', exact: true }).count(), 1, 'and every project can be deleted');
-  await page.getByRole('heading', { name: /Installed as published/, level: 2 }).waitFor();
-  assert.match(await page.getByRole('list', { name: 'Installed as published' }).textContent(), /commit-helper.*Needs a build for Codex/);
+  await line.getByRole('button', { name: 'More for Sample', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).waitFor();
+  assert.equal(await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).count(), 1, 'every project can leave the list');
+  assert.equal(await page.getByRole('menuitem', { name: 'Delete…', exact: true }).count(), 1, 'and every project can be deleted, from its More menu');
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'detached' });
+  assert.equal(await page.getByRole('heading', { name: /Installed as published/ }).count(), 0, 'the plugins of Sync are not listed again here');
   await page.screenshot({ path: shots + '/workspace-list.png' });
   await page.getByRole('button', { name: 'Sample', exact: true }).click();
   await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
@@ -111,6 +114,22 @@ await test('the list says what each project is, what is installed as published, 
   await page.screenshot({ path: shots + '/workspace-1512.png' });
 });
 
+await test('leaving the tab and coming back reads neither the list nor the open project again (each is a Python process)', 'projects', {}, async app => {
+  const { page } = app;
+  await goProjects(page);
+  await page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Sample' }).waitFor();
+  await tab(page, 'Sync').click();
+  await tab(page, 'Projects').click();
+  await page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Sample' }).waitFor();
+  assert.equal((await callsOf(app, 'projects')).length, 1, 'the list the window holds is shown again');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  await tab(page, 'Activity').click();
+  await tab(page, 'Projects').click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  assert.equal((await callsOf(app, 'project')).length, 1, 'the open project is shown again as it was read');
+});
+
 await test('Remove from list asks first and removes only the entry; a project named with <, & and quotes is shown as text', 'projects', {}, async app => {
   const { page } = app;
   const odd = '<b>Odd & "quoted"';
@@ -123,7 +142,10 @@ await test('Remove from list asks first and removes only the entry; a project na
   assert.deepEqual((await app.calls()).filter(c => ['pick_file', 'open_project'].includes(c.action)).map(c => [c.action, c.payload]), [['pick_file', { filter: 'Muro project (*.mp)' }], ['open_project', { path: `D:/Notes/${odd}.mp` }]]);
   await page.getByRole('button', { name: odd, exact: true }).waitFor();
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('main b')].filter(b => b.textContent.includes('Odd')).length), 0, 'the name is text, not markup');
-  const remove = page.getByRole('button', { name: `Remove ${odd} from the list`, exact: true });
+  const remove = { click: async () => {
+    await page.getByRole('button', { name: `More for ${odd}`, exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).click();
+  } };
   const dialog = page.locator('[data-slot="dialog-content"]');
   await remove.click();
   await dialog.getByText(`Remove ${odd} from your list?`, { exact: true }).waitFor();
@@ -531,7 +553,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   assert.equal(await panelOf(page).count(), 0, 'under 850px the left panel is out of the layout');
   await frames(page);
   assert.ok(await sideways(page) <= 0, '500px, the graph');
-  for (const name of ['Review decisions…', 'Harmonize again…', 'Install via Sync…', 'Export to folder…', 'Release…', 'Add input…', 'All projects', 'Project panel']) {
+  for (const name of ['Add input…', 'Harmonize again…', 'More', 'Install via Sync…', 'All projects', 'Project panel']) {
     const box = await page.getByRole('button', { name, exact: true }).boundingBox();
     assert.ok(box && box.x >= 0 && box.x + box.width <= 500 + 0.5, `${name} is inside the window`);
   }
@@ -631,7 +653,7 @@ await test('Install via Sync checks a linked legacy plugin, then opens that same
   for (const action of ['save_plugin', 'install_project', 'apply']) assert.equal((await callsOf(app, action)).length, 0, action);
 });
 
-await test('every control has a name, and the actions that are not there yet are disabled and say why', 'projects', {}, async app => {
+await test('every control has a name; the bar has one solid action, Install via Sync, and keeps Export and Release in More', 'projects', {}, async app => {
   const { page } = app;
   await openSample(page);
   await row(page, 'A landing page').click();
@@ -641,19 +663,20 @@ await test('every control has a name, and the actions that are not there yet are
     await segment(page, name).click();
     assert.deepEqual(await unnamed(page), [], name);
   }
-  const actions = ['Review decisions…', 'Harmonize again…', 'Install via Sync…', 'Export to folder…', 'Release…', 'Add input…'];
-  const waiting = { 'Review decisions…': 'Coming with the review' };
+  const actions = ['Add input…', 'Harmonize again…', 'More', 'Install via Sync…'];
   const buttons = actionBar(page).getByRole('button');
   assert.equal(await buttons.count(), actions.length);
   for (const [index, name] of actions.entries()) {
     const button = page.getByRole('button', { name, exact: true });
     assert.equal(await buttons.nth(index).and(button).count(), 1, `${name} is action ${index + 1}`);
-    if (name in waiting) {
-      assert.equal(await button.isDisabled(), true, `${name} waits for another plan`);
-      assert.equal(await button.getAttribute('title'), waiting[name]);
-    } else assert.equal(await button.isDisabled(), false, `${name} is live`);
+    assert.equal(await button.isDisabled(), false, `${name} is live`);
   }
-  assert.deepEqual(await buttons.evaluateAll(elements => elements.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'outline', 'outline', 'default'], 'Add input… is the one solid action');
+  assert.deepEqual(await buttons.evaluateAll(elements => elements.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'default'], 'Install via Sync… is the one solid action');
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Release…', exact: true }).waitFor();
+  for (const name of ['Export to folder…', 'Release…']) assert.equal(await page.getByRole('menuitem', { name, exact: true }).isDisabled(), false, `${name} is live, in More`);
+  assert.deepEqual(await unnamed(page), [], 'the menu');
+  await page.keyboard.press('Escape');
 });
 
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }

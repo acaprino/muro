@@ -17,7 +17,7 @@ import { plural } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
 import { useSync } from './useSync.tsx';
-import type { Choice } from './words.ts';
+import { reasonOf, type Choice } from './words.ts';
 
 const KINDS: Record<string, string> = { install: 'Install', update: 'Update', reinstall: 'Reinstall', activate: 'Activate', remove: 'Remove', 'remove-marketplace': 'Remove' };
 /** What an operation changes: a plugin by its name; a marketplace the harness cannot load, said as such. */
@@ -26,7 +26,7 @@ const subjectOf = (o: Operation): string => (o.kind === 'remove-marketplace' ? `
 const detailOf = (o: Operation): string => {
   if (o.kind === 'remove-marketplace') return [o.reason, o.plugins?.length ? `With it: ${o.plugins.join(', ')}` : ''].filter(Boolean).join(' · ');
   const versions = o.kind === 'remove' ? o.from_version : o.kind === 'update' ? `${o.from_version} → ${o.to_version}` : o.to_version;
-  return [versions, o.present === false ? 'files missing' : '', o.reason].filter(Boolean).join(' · ');
+  return [versions, o.present === false ? 'files missing' : '', reasonOf(o)].filter(Boolean).join(' · ');
 };
 /** What the removals of a plan do, beside its buttons. */
 const removalNote = ({ uninstall, missing }: { uninstall: number; missing: number }): string =>

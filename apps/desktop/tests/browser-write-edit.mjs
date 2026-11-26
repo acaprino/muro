@@ -26,8 +26,8 @@ const callsOf = async (app, action) => (await app.calls()).filter(c => c.action 
 /** The payloads of every `edit_project` the page sent, oldest first. */
 const editsOf = async app => (await callsOf(app, 'edit_project')).map(c => c.payload);
 const texts = loc => loc.evaluateAll(elements => elements.map(e => e.textContent.trim()));
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); };
 const openSample = async page => {
@@ -306,11 +306,16 @@ await test('Records: at 500px the panel is a drawer, and a record added from it 
 const RELEASE_ABOUT = 'The project file is pushed to its repository with your own Git, and the workflow of that repository then makes the release. A push cannot be taken back from here.';
 const RELEASE_INIT = 'Add the release workflow when the repository has none';
 const NO_RELEASE_REPOSITORY = 'This project names no repository: give it one in Edit details…';
-const releaseButton = page => page.getByRole('button', { name: 'Release…', exact: true });
+/** Release… of the project's More menu, with the menu open (`closeMenu` shuts it). */
+const releaseButton = async page => {
+  if (!(await page.getByRole('menu').count())) await page.getByRole('button', { name: 'More', exact: true }).click();
+  return page.getByRole('menuitem', { name: 'Release…', exact: true });
+};
+const closeMenu = async page => { await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' }); };
 /** The payloads of every `release_project` the page sent, oldest first. */
 const releasesOf = async app => (await callsOf(app, 'release_project')).map(c => c.payload);
 const openRelease = async (page, name = 'Sample') => {
-  await releaseButton(page).click();
+  await (await releaseButton(page)).click();
   const dialog = windowOf(page, `Release ${name}?`);
   await dialog.waitFor();
   return dialog;
@@ -321,8 +326,8 @@ await test('Release: it asks first with the focus on Cancel and says what the fi
   const { page } = app;
   await openSample(page);
   const read = await digest(page);
-  assert.equal(await releaseButton(page).isDisabled(), false, 'the project names a repository');
-  assert.equal(await releaseButton(page).getAttribute('data-variant'), 'outline', 'not the solid action of the window');
+  assert.equal(await (await releaseButton(page)).isDisabled(), false, 'the project names a repository');
+  await closeMenu(page);
   let dialog = await openRelease(page);
   await page.waitForFunction(() => document.activeElement?.textContent === 'Cancel');
   await dialog.getByText(RELEASE_ABOUT, { exact: true }).waitFor();
@@ -403,15 +408,19 @@ await test('Release: a project that names no repository has it off, saying why; 
   await notice(page, 'Notes added to your list.').waitFor();
   await page.getByRole('button', { name: 'Notes', exact: true }).click();
   await page.getByRole('heading', { name: 'Notes', level: 1 }).waitFor();
-  assert.equal(await releaseButton(page).isDisabled(), true, 'there is nowhere to release it to');
-  assert.equal(await releaseButton(page).getAttribute('title'), NO_RELEASE_REPOSITORY);
+  const nowhere = await releaseButton(page);
+  assert.equal(await nowhere.isDisabled(), true, 'there is nowhere to release it to');
+  assert.equal(await nowhere.getAttribute('title'), NO_RELEASE_REPOSITORY);
+  await closeMenu(page);
   const details = await openDetails(page);
   await details.locator('input[name="repository-url"]').fill('https://github.com/owner/notes');
   await details.locator('input[name="repository-tag_prefix"]').fill('notes-v');
   await save(details).click();
   await details.waitFor({ state: 'detached' });
-  await page.locator('button:enabled').filter({ hasText: /^Release…$/ }).waitFor();
-  assert.equal(await releaseButton(page).getAttribute('title'), null, 'nothing to say once it can be released');
+  await releaseButton(page);
+  await page.getByRole('menuitem', { name: 'Release…', exact: true, disabled: false }).waitFor();
+  assert.equal(await page.getByRole('menuitem', { name: 'Release…', exact: true }).getAttribute('title'), null, 'nothing to say once it can be released');
+  await closeMenu(page);
   const dialog = await openRelease(page, 'Notes');
   const said = await dialog.textContent();
   for (const fact of ['https://github.com/owner/notes', 'main', 'notes.mp', '0.5.0', 'notes-v0.5.0']) assert.ok(said.includes(fact), `the window says ${fact}: ${said}`);
@@ -426,7 +435,8 @@ await test('Extract: the window sends the project, the harness and the folder ch
   await openSample(page);
   const read = await digest(page);
   await app.flags({ pickFolder: 'D:/Out' });
-  await page.getByRole('button', { name: 'Export to folder…', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Export to folder…', exact: true }).click();
   const dialog = windowOf(page, 'Export Sample');
   await dialog.waitFor();
   assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
@@ -448,7 +458,8 @@ await test('Extract: the window sends the project, the harness and the folder ch
   assert.deepEqual((await callsOf(app, 'extract_project')).map(c => c.payload), [{ id: 'sample', harness: 'claude-code', folder: 'D:/Out' }]);
   assert.equal(await digest(page), read, 'the project file is only read');
   // The same folder again: the command's refusal is said, and the window stays.
-  await page.getByRole('button', { name: 'Export to folder…', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Export to folder…', exact: true }).click();
   await dialog.waitFor();
   await confirm.click();
   await dialog.getByRole('alert').getByText('D:/Out/claude-code already exists: choose another folder', { exact: true }).waitFor();

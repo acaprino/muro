@@ -3,17 +3,16 @@
 // Every tab is a page of the window now; it opens on Sync.
 import { useCallback, useRef, useState } from 'react';
 import { AppWindow, ScreenBoundary, focusContent, useNotify, type AppView } from '@acaprino/imago';
-import { useMedia } from '@acaprino/sigrid';
-import { Badge, Button, Icon, Spacer, Text } from '@acaprino/sigrid/primitives';
+import { Badge, Button, Icon, Text } from '@acaprino/sigrid/primitives';
 import { Empty } from '@acaprino/sigrid/components';
 import { useCommand } from '@acaprino/sigrid/assemblies';
 import type { Page, Snapshot } from './types.ts';
-import { stamp, syncHeadline } from './model.ts';
+import { syncHeadline } from './model.ts';
 import { message, plural } from './words.ts';
 import { useRegistry } from './state/registry.tsx';
 import { ProjectJobsProvider } from './pages/project/write/useJobs.tsx';
 import { SyncProvider, useSync } from './pages/sync/useSync.tsx';
-import { checkedLine, chipOf } from './pages/sync/words.ts';
+import { checkedLine, chipOf, timesLine } from './pages/sync/words.ts';
 import { Sync, SyncActions, type SyncEntry } from './pages/sync/Sync.tsx';
 import { resolvePlugin } from './pages/sync/registryWrite.ts';
 import { indexProjectPlugins } from './pages/project/write/jobs.ts';
@@ -32,28 +31,22 @@ const PAGES: readonly AppView<Page>[] = [
   { id: 'settings', label: 'Settings', command: 'Go to Settings', icon: 'settings' },
 ];
 
-/** The status row: the state of the sync in a few words, when it was checked and when it is next (the record the service keeps; a narrow window has no room for it), and how many harnesses are managed.
- * The state is the sync state of the window (useSync): a check or an apply under way says so; else the plan this window made, which counts only for the registry revision it was made for, and with
- * none what the service recorded. */
-function StatusLine({ snapshot, error }: { snapshot: Snapshot | null; error: string | null }) {
+/** The status row: the state of the sync in a few words and when it was checked and is next (the record the service keeps). The state is the sync state of the window (useSync): a check
+ * or an apply under way says so; else the plan this window made, which counts only for the registry revision it was made for, and with none what the service recorded. Said once: the page
+ * shows its own words while the registry is read, and on Sync the note under the row says the state, so the row there says only the times, the last sync and the automatic sync with them. */
+function StatusLine({ snapshot, onSync }: { snapshot: Snapshot | null; onSync: boolean }) {
   const sync = useSync();
-  const narrow = useMedia('(width < 620px)');
-  if (!snapshot) return <Text>{error ? 'Registry not available' : 'Reading your registry…'}</Text>;
+  if (!snapshot) return null;
+  if (onSync) return <Text truncate>{timesLine(snapshot)}</Text>;
   const chip = chipOf(syncHeadline(snapshot, sync.plan));
   const doing = sync.progress ? `Applying ${plural(sync.progress.total, 'change')}…` : sync.checking ? 'Checking…' : null;
   return (
     <>
       <Badge tone={doing ? 'info' : chip.tone === 'ok' ? 'success' : 'warning'}>{doing ?? chip.text}</Badge>
-      {narrow ? null : <Text truncate>{checkedLine(snapshot)}</Text>}
-      <Spacer />
-      <Text>{plural(snapshot.registry.targets.length, 'harness', 'harnesses')}</Text>
+      <Text truncate>{checkedLine(snapshot)}</Text>
     </>
   );
 }
-
-/** The foot: the automatic sync, the last sync and the size of the list. */
-const footLine = (snapshot: Snapshot): string =>
-  `Automatic sync ${snapshot.registry.settings.auto_sync ? 'on' : 'off'} · last sync ${stamp(snapshot.sync.last_sync)} · ${plural(snapshot.registry.plugins.length, 'plugin')} in your list`;
 
 /** The window with the page of the view. */
 function Muro() {
@@ -124,8 +117,7 @@ function Muro() {
       views={PAGES}
       view={page}
       onView={go}
-      status={<StatusLine snapshot={snapshot} error={error} />}
-      footer={snapshot ? <Text>{footLine(snapshot)}</Text> : undefined}
+      status={<StatusLine snapshot={snapshot} onSync={onSync} />}
       // The actions and the details of a page are regions of the frame: the bar under the content, the inspector beside it (docked from 1000px, a drawer under).
       actions={onSync ? snapshot && <SyncActions /> : page === 'projects' && project.view && project.info ? <ProjectActions onInstall={() => void installProject()} checkingProject={checkingProject} /> : undefined}
       inspector={onSync && harness ? (

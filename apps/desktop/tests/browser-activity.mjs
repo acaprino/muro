@@ -18,9 +18,9 @@ async function test(name, scenario, options, body) {
 }
 
 const content = page => page.locator('main[data-slot="app-shell-content"]');
-const foot = page => page.locator('[data-slot="app-shell-footer"]');
+const status = page => page.locator('[data-slot="app-shell-status"]');
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
-const ready = page => foot(page).getByText(/in your list/).waitFor();
+const ready = page => status(page).getByText(/Last check/).waitFor();
 const history = page => content(page).getByRole('list', { name: 'Activity' });
 const rows = page => history(page).getByRole('listitem');
 const titles = page => rows(page).evaluateAll(items => items.map(item => item.innerText.split('\n')[0].trim()));

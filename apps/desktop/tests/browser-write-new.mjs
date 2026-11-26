@@ -21,8 +21,13 @@ async function test(name, scenario, options, body) {
 }
 
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
+/** Delete… or Remove from list… of a project's More menu, as one press. */
+const fromMore = (page, name, item) => ({ click: async () => {
+  await page.getByRole('button', { name: `More for ${name}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: item, exact: true }).click();
+} });
 /** The tabs are Sigrid's `ToolbarTab`s: buttons marked `aria-current="page"`, not `role=tab`. */
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); await page.getByRole('heading', { name: 'Projects', level: 1 }).waitFor(); };
@@ -319,10 +324,13 @@ await test('Delete project: asks first, names the file and says it goes too; eve
   await goProjects(page);
   await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
   await notice(page, `${odd} added to your list.`).waitFor();
-  assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 2, 'a Delete on every project of the list');
-  assert.equal(await page.getByRole('button', { name: 'Delete Sample…', exact: true }).count(), 1);
-  assert.equal(await page.getByRole('button', { name: `Remove ${odd} from the list`, exact: true }).count(), 1, 'Remove from list is still there beside it');
-  const del = page.getByRole('button', { name: `Delete ${odd}…`, exact: true });
+  assert.equal(await page.getByRole('button', { name: /^More for / }).count(), 2, 'a More menu, with Delete, on every project of the list');
+  await page.getByRole('button', { name: `More for ${odd}`, exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).waitFor();
+  assert.equal(await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).count(), 1, 'Remove from list is still there beside it');
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'detached' });
+  const del = fromMore(page, odd, 'Delete…');
   const dialog = dialogOf(page);
   await del.click();
   await dialog.getByText(`Delete ${odd}?`, { exact: true }).waitFor();
@@ -346,7 +354,7 @@ await test('Delete project: asks first, names the file and says it goes too; eve
   assert.deepEqual(Object.keys(asked[0].payload).sort(), ['id', 'revision']);
   assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Sample', exact: true }).count(), 1, 'the other project is what is left');
   // No project is kept from deletion: the one that was first in the list goes the same way.
-  await page.getByRole('button', { name: 'Delete Sample…', exact: true }).click();
+  await fromMore(page, 'Sample', 'Delete…').click();
   await dialog.getByText('Delete Sample?', { exact: true }).waitFor();
   await dialog.getByText('D:/Muro/data/projects/sample.mp', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: 'Delete Sample', exact: true }).click();
@@ -363,7 +371,7 @@ await test('Delete project: a registry that moved since the page read it is read
   await notice(page, 'Notes added to your list.').waitFor();
   // The registry moves on as the first request reaches it: it refuses the revision the page read.
   await app.flags({ staleDeletes: 1 });
-  await page.getByRole('button', { name: 'Delete Notes…', exact: true }).click();
+  await fromMore(page, 'Notes', 'Delete…').click();
   await dialogOf(page).getByRole('button', { name: 'Delete Notes', exact: true }).click();
   await notice(page, 'Notes deleted.').waitFor();
   const asked = await callsOf(app, 'delete_project');

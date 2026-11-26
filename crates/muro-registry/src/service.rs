@@ -34,6 +34,15 @@ fn locked_registry(data_dir: &Path) -> Result<(fs::File, Value)> {
     Ok((lock, load_registry(data_dir)?))
 }
 
+/// The registry as it is now, read without the writer lock: `registry.json` is only ever replaced
+/// whole (`storage::write`), so a reader sees one revision or the next, never half of one. For a
+/// caller that only reads it (the projects of the desktop window, each of which then waits for a
+/// Python process): a check or a save that holds the lock for minutes does not hold it back.
+pub fn read_registry(data_dir: &Path) -> Result<Value> {
+    ensure_registry_folder(data_dir)?;
+    load_registry(data_dir)
+}
+
 /// Run a cache operation while the registry and the set of builds it refers to are stable.
 pub fn with_registry<T>(data_dir: &Path, read: impl FnOnce(&Value) -> Result<T>) -> Result<T> {
     let (_lock, registry) = locked_registry(data_dir)?;

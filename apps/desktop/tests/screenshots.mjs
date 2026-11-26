@@ -20,8 +20,8 @@ async function demo(scenario, scheme, body) {
   const app = await open(scenario, { viewport: SIZE, theme: scheme, reducedMotion: 'reduce' });
   try { await body(app.page); } finally { await app.close(); }
 }
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });
 
