@@ -4,7 +4,7 @@
 
 <p align="center"><strong>One plugin list for all your coding agents</strong></p>
 
-<p align="center">Harness manager · Plugin sync · Plugin updater · Skill harmonizer</p>
+<p align="center">Harness manager · Plugin sync · One plugin, every harness · Plugin updater · Skill harmonizer</p>
 
 <p align="center">
   <a href="#what-muro-does">Features</a> ·
@@ -17,7 +17,9 @@
 
 ---
 
-Muro is a Windows desktop app that looks after the coding agents on your computer: Claude Code, Codex, OpenCode, Pi and Hermes Agent. You keep one list of the plugins you want and the harnesses each one goes on. Muro installs them, removes what you no longer want and keeps everything up to date. When a plugin has no build for one of your harnesses, Muro can rebuild it for that harness with AI.
+Muro is a Windows desktop app that looks after the coding agents on your computer: Claude Code, Codex, OpenCode, Pi and Hermes Agent. You keep one list of the plugins you want and the harnesses each one goes on. Muro installs them, removes what you no longer want and keeps everything up to date.
+
+The same plugin goes on every harness. When a plugin has no build for one of your harnesses, Muro adapts it to that harness with AI and validates the result, and every package its factory builds comes out in the native form of each harness at once. [One plugin on every harness](#one-plugin-on-every-harness) shows how.
 
 The same engine is a harmonizer. Muro's factory absorbs pinned skills and plugins from several sources into one package with its own catalog, coordinator and release for every harness. [Muro as a harmonizer](#muro-as-a-harmonizer) shows what such a package is.
 
