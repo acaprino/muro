@@ -111,6 +111,22 @@ await test('the list says what each project is, what is installed as published, 
   await page.screenshot({ path: shots + '/workspace-1512.png' });
 });
 
+await test('leaving the tab and coming back reads neither the list nor the open project again (each is a Python process)', 'projects', {}, async app => {
+  const { page } = app;
+  await goProjects(page);
+  await page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Sample' }).waitFor();
+  await tab(page, 'Sync').click();
+  await tab(page, 'Projects').click();
+  await page.getByRole('table', { name: 'Projects' }).getByRole('row').filter({ hasText: 'Sample' }).waitFor();
+  assert.equal((await callsOf(app, 'projects')).length, 1, 'the list the window holds is shown again');
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  await tab(page, 'Activity').click();
+  await tab(page, 'Projects').click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  assert.equal((await callsOf(app, 'project')).length, 1, 'the open project is shown again as it was read');
+});
+
 await test('Remove from list asks first and removes only the entry; a project named with <, & and quotes is shown as text', 'projects', {}, async app => {
   const { page } = app;
   const odd = '<b>Odd & "quoted"';

@@ -16,42 +16,60 @@ import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
 
 const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
+/** The ids of a list of projects, in one order, as one string to compare. */
+const idsOf = (projects: readonly { id: string }[]): string => projects.map(p => p.id).sort().join('\n');
 
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
  * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). A new project is made by an AI run
  * (`NewProjectDialog`, followed by the job card above the list) and a project is deleted, file and all, after asking (`DeleteDialog`). The open project is the
  * session's (`state/project.ts`): leaving the tab, or a reload, brings it back. */
 export function Projects() {
-  const { request } = useRegistry();
+  const { request, snapshot } = useRegistry();
   const project = useProject();
   const leave = React.useRef(project.leave);
   leave.current = project.leave;
   React.useEffect(() => () => leave.current(), []);
   const openId = project.view?.id ?? null;
   const { settled } = useJobs();
-  const lastListRead = React.useRef<number | null>(null);
-  const [list, setList] = React.useState<ProjectSummary[] | null>(null);
+  const { cache } = project;
+  // The projects the registry lists: another window or the tray that adds or takes away a file moves them.
+  const ids = idsOf(snapshot?.registry.projects ?? []);
+  // The list the window last read, while nothing moved since: coming back to the tab reads nothing (each summary is a Python process).
+  const kept = cache.list;
+  const lastListRead = React.useRef<{ settled: number; ids: string } | null>(kept ? { settled: kept.settled, ids: kept.ids } : null);
+  const [list, setList] = React.useState<ProjectSummary[] | null>(kept ? kept.rows : null);
   const [error, setError] = React.useState<string | null>(null);
+  const keep = React.useCallback((rows: ProjectSummary[]) => {
+    const at = lastListRead.current;
+    cache.list = at ? { ...at, rows } : null;
+  }, [cache]);
   const loadList = React.useCallback(async (): Promise<void> => {
-    lastListRead.current = settled;
+    lastListRead.current = { settled, ids };
     setError(null);
     try {
       const rows = await request<ProjectSummary[]>('projects');
-      setList(Array.isArray(rows) ? rows : []);
+      const shown = Array.isArray(rows) ? rows : [];
+      keep(shown);
+      setList(shown);
     } catch (e) { setError(message(e)); }
-  }, [request, settled]);
+  }, [request, settled, ids, keep]);
   // Keep the last list ready for Back. A job or edit invalidates its summaries, but those reads
   // can wait until the list is visible instead of delaying the open project's own refresh.
+  // The registry's projects moved since the last reading and the list does not show them as they are now: read again, once for each such move.
+  const shown = list ? idsOf(list) : null;
   React.useEffect(() => {
-    if (openId === null && lastListRead.current !== settled) void loadList();
-  }, [openId, loadList, settled]);
+    const at = lastListRead.current;
+    if (openId === null && (at?.settled !== settled || (at.ids !== ids && shown !== ids))) void loadList();
+  }, [openId, loadList, settled, ids, shown]);
   async function showOpened(added: ProjectSummary): Promise<void> {
     if (!list) return loadList();
     setList(rows => {
       const current = rows ?? [];
-      return current.some(p => p.id === added.id)
+      const next = current.some(p => p.id === added.id)
         ? current.map(p => p.id === added.id ? added : p)
         : [...current, added];
+      keep(next);
+      return next;
     });
   }
   // Opening a project takes its button away, and closing one takes "All projects".
@@ -259,17 +277,26 @@ function OpenProject({ id, onUnlisted }: { id: string; onUnlisted(): void }) {
   const { request } = useRegistry();
   const project = useProject();
   const { settled } = useJobs();
+  const { cache } = project;
   const sendRef = React.useRef(request);
   sendRef.current = request;
   const [attempt, setAttempt] = React.useState(0);
-  const [read, setRead] = React.useState<{ info: (ProjectInfo & { file: string }) | null; error: string | null }>({ info: null, error: null });
+  // The project as the window last read it, while no run or edit has ended since: opening it again, or coming back to the tab, reads nothing (a Python process).
+  const kept = (): (ProjectInfo & { file: string }) | null => cache.info?.id === id && cache.info.settled === settled ? cache.info.info : null;
+  const [read, setRead] = React.useState<{ info: (ProjectInfo & { file: string }) | null; error: string | null }>(() => ({ info: kept(), error: null }));
   const closeUnlisted = React.useRef(onUnlisted);
   closeUnlisted.current = onUnlisted;
   React.useEffect(() => {
+    const held = attempt === 0 ? kept() : null;
+    if (held) { setRead({ info: held, error: null }); return undefined; }
     let live = true;
+    const at = settled;
     setRead(r => ({ info: r.info, error: null }));
     sendRef.current<ProjectInfo & { file: string }>('project', { id }).then(
-      info => { if (live) setRead({ info, error: null }); },
+      info => {
+        cache.info = { id, settled: at, info };
+        if (live) setRead({ info, error: null });
+      },
       e => {
         if (!live) return;
         const reason = message(e);
