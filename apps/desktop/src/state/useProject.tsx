@@ -75,8 +75,9 @@ export function ProjectProvider({ children }: { children?: React.ReactNode }) {
       dialog,
       setDialog,
       current: () => latest.current,
-      open: id => { stopRun(); setDialog(null); setView(() => (latest.current = fresh(id))); },
-      close: () => { stopRun(); setView(() => (latest.current = null)); },
+      // A project opened from the list, or closed, is read again the next time: the file may have changed behind the window. Only leaving the tab keeps it.
+      open: id => { stopRun(); setDialog(null); cache.info = null; setView(() => (latest.current = fresh(id))); },
+      close: () => { stopRun(); cache.info = null; setView(() => (latest.current = null)); },
       leave: () => { stopRun(); setDialog(null); remember(latest.current); setView(() => (latest.current = recall())); },
       setPanel: panel => change(v => v.panel === panel ? v : { ...v, panel }),
       select: next => change(v => {

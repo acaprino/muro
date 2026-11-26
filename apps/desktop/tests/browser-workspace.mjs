@@ -92,6 +92,7 @@ await test('the list says what each project is, what is installed as published, 
   const text = await line.textContent();
   for (const fact of ['0.5.0', 'D:/Muro/data/projects/sample.mp', '3 inputs · 4 capabilities']) assert.ok(text.includes(fact), `the row says ${fact}: ${text}`);
   await line.getByRole('button', { name: 'More for Sample', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).waitFor();
   assert.equal(await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).count(), 1, 'every project can leave the list');
   assert.equal(await page.getByRole('menuitem', { name: 'Delete…', exact: true }).count(), 1, 'and every project can be deleted, from its More menu');
   await page.keyboard.press('Escape');
@@ -672,6 +673,7 @@ await test('every control has a name; the bar has one solid action, Install via 
   }
   assert.deepEqual(await buttons.evaluateAll(elements => elements.map(b => b.getAttribute('data-variant'))), ['outline', 'outline', 'outline', 'default'], 'Install via Sync… is the one solid action');
   await page.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Release…', exact: true }).waitFor();
   for (const name of ['Export to folder…', 'Release…']) assert.equal(await page.getByRole('menuitem', { name, exact: true }).isDisabled(), false, `${name} is live, in More`);
   assert.deepEqual(await unnamed(page), [], 'the menu');
   await page.keyboard.press('Escape');
