@@ -7,7 +7,7 @@
 import * as React from 'react';
 import { Badge, Button, Cluster, Column, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
-import { cellState, harnessState, stamp, versionOf, type CellStatus } from '../../model.ts';
+import { cellState, harnessState, versionOf, type CellStatus } from '../../model.ts';
 import { plural } from '../../words.ts';
 import { useSync } from './useSync.tsx';
 
@@ -54,7 +54,7 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
       <TableHeader>
         <TableRow>
           <TableHead><TwoLines first="Plugin" second={`${plural(plugins.length, 'plugin')} in your list`} /></TableHead>
-          <TableHead><TwoLines first="Latest version" second={`Checked ${stamp(snapshot.sync.last_check)}`} /></TableHead>
+          <TableHead><Text>Latest version</Text></TableHead>
           {targets.map(t => (
             <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} asking={asking === t.id} onOpen={onOpenHarness} onReview={id => void reviewHarness(id)} />
           ))}
@@ -81,12 +81,11 @@ interface HarnessHeadProps {
   onReview(targetId: string): void;
 }
 
-/** The head of a harness column: its name (which opens it), its state, how many plugins need a build there, and when it was checked and synced. */
+/** The head of a harness column: its name (which opens it), its state and how many plugins need a build there. When it was checked and synced is in its inspector. */
 function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: HarnessHeadProps) {
   const state = harnessState(target, snapshot, plan);
   // The plugins without a build here, counted even where changes come first: Apply all leaves them out.
   const builds = state.kind === 'needs-build' ? 0 : snapshot.registry.plugins.filter(p => cellState(p, target, snapshot, plan).kind === 'needs-build').length;
-  const times = snapshot.sync.targets[target.id];
   let line: React.ReactNode;
   switch (state.kind) {
     case 'paused':
@@ -119,7 +118,6 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
         <Button variant="ghost" size="sm" onClick={event => onOpen(target.id, event.currentTarget)}><Text truncate>{target.name}</Text></Button>
         {line}
         {builds ? <Badge tone="warning">{needBuild(builds)}</Badge> : null}
-        <Text variant="caption" title={`Last sync ${stamp(times?.synced ?? null)}`}>Checked {stamp(times?.checked ?? null)}</Text>
       </Column>
     </TableHead>
   );

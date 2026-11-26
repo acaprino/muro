@@ -55,6 +55,8 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
       return note(h.kind, 'warn', 'No harness is managed', 'Muro needs at least one harness to install plugins into.');
     case 'not-checked':
       return note(h.kind, null, 'Not checked yet', 'Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.', true);
+    case 'changed':
+      return note(h.kind, null, 'Your list changed since the last check', 'Check now to see what the change means for your harnesses. Nothing changes until you apply.', true);
     case 'changes': {
       const parts = CHANGE_WORDS.filter(([kind]) => h.byKind[kind]).map(([kind, word]) => plural(h.byKind[kind]!, word));
       const bits = [parts.join(', '), h.blockers ? `${plural(h.blockers, 'item')} not ready yet` : '', unreadable, h.errors ? `${plural(h.errors, 'source')} could not be checked` : ''].filter(Boolean);
@@ -86,6 +88,7 @@ export function chipOf(h: SyncHeadline): Chip {
   const text = {
     'no-harness': 'No harness',
     'not-checked': 'Not checked yet',
+    changed: 'List changed',
     changes: `${plural(h.operations, 'change')} waiting`,
     blocked: 'Needs attention',
     unreadable: 'A harness cannot be read',

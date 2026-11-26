@@ -24,7 +24,6 @@ async function test(name, scenario, options, body) {
 // ---------- where things are ----------
 const content = page => page.locator('main[data-slot="app-shell-content"]');
 const status = page => page.locator('[data-slot="app-shell-status"]');
-const foot = page => page.locator('[data-slot="app-shell-footer"]');
 /** The note on top of the page, its title and its sentence; `data-kind` is the state it says (words.ts `NoteKind`). */
 const note = page => page.locator('#sync-state');
 const noteTitle = page => page.locator('#sync-state-title');
@@ -57,8 +56,8 @@ const focusedText = page => page.evaluate(() => document.activeElement?.innerTex
 const focusOn = (page, text) => page.waitForFunction(t => document.activeElement?.innerText?.trim() === t, text);
 /** The bar holds these buttons, once the requests that changed it are over. */
 const barIs = (page, labels) => page.waitForFunction(l => [...document.querySelectorAll('[data-slot="app-shell-actions"] button')].map(b => b.innerText.trim()).join('|') === l.join('|'), labels);
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => foot(page).getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => status(page).getByText(/Last check/).waitFor();
 /** Nothing about the sync runs: no busy button in the bar, and the note says neither checking nor applying. */
 const settled = page => page.waitForFunction(() => {
   const n = document.querySelector('#sync-state');
@@ -85,7 +84,8 @@ await test('the note before and after a check: opening the page checks nothing, 
   await titled(page, 'Not checked yet');
   assert.equal(await kind(page), 'not-checked');
   assert.equal(await noteText(page).textContent(), 'Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.');
-  assert.match(await note(page).textContent(), /Last check never · Last sync never · Automatic sync off/);
+  assert.match(await status(page).textContent(), /Last check never · Last sync never · Automatic sync off/, 'the times are in the status row, said once');
+  assert.doesNotMatch(await note(page).textContent(), /Last check/, 'the note does not repeat them');
   assert.deepEqual(await barLabels(page), ['Check now'], 'only Check now before a check');
   assert.deepEqual(await solid(page).allTextContents(), ['Check now'], 'and it is what to do next');
   assert.deepEqual((await actions(app)).filter(a => a === 'plan' || a === 'check'), [], 'opening the page checks nothing');
@@ -93,10 +93,8 @@ await test('the note before and after a check: opening the page checks nothing, 
   await check(app);
   assert.equal(await noteTitle(page).textContent(), '1 change ready to apply');
   assert.equal(await noteText(page).textContent(), '1 update. Nothing changes until you apply.');
-  assert.match(await note(page).textContent(), /Last check today/);
-  assert.match(await status(page).textContent(), /1 change waiting/, 'the status row repeats it');
-  assert.match(await status(page).textContent(), /Last check\s*today/);
-  assert.match(await foot(page).textContent(), /Automatic sync off/);
+  assert.doesNotMatch(await status(page).textContent(), /waiting/, 'on Sync the status row does not repeat the note');
+  assert.match(await status(page).textContent(), /Last check\s*today.*Automatic sync off/);
   assert.deepEqual(await barLabels(page), ['Check now', 'Review', 'Apply all 1 change']);
   assert.deepEqual(await solid(page).allTextContents(), ['Apply all 1 change'], 'one solid button');
   const c = cells(page, 'Package');
@@ -144,8 +142,7 @@ await test('Apply all asks for a fresh plan, applies it at once when it is what 
   assert.equal(await cells(page, 'Package').nth(2).textContent(), '2', 'the cell shows the installed version');
   await head(page, 'Codex isolated test').getByText('In sync', { exact: true }).waitFor();
   await notice(page, '1 change applied.').waitFor();
-  assert.match(await foot(page).textContent(), /last sync\s*today/);
-  assert.match(await status(page).textContent(), /In sync/);
+  assert.match(await status(page).textContent(), /Last sync\s*today/);
   await barIs(page, ['Check now']);
   assert.equal(await solid(page).count(), 0, 'in sync, nothing leads');
 });
@@ -265,9 +262,8 @@ await test('a source the check could not resolve is listed with the service\'s w
   await ready(page);
   await app.flags({ checkErrors: true });
   await check(app);
-  const errors = page.locator('#check-errors');
-  await errors.getByText('1 source could not be checked', { exact: true }).waitFor();
-  assert.match(await errors.textContent(), /Package: Source unreachable: could not resolve the release/);
+  await note(page).getByText(/Package: Source unreachable: could not resolve the release/).waitFor();
+  assert.equal(await content(page).getByText('1 source could not be checked', { exact: true }).count(), 0, 'counted once, in the sentence of the note');
   assert.equal(await noteTitle(page).textContent(), '1 change ready to apply', 'the plan stays');
   assert.match(await noteText(page).textContent(), /1 source could not be checked/);
 });
@@ -282,11 +278,11 @@ await test('with nothing to apply, a source that could not be resolved replaces 
   assert.equal(await noteText(page).textContent(), 'Muro could not resolve it, so it cannot say it is up to date. Check again when it answers.');
   assert.equal(await content(page).getByText('Everything is in sync').count(), 0);
   assert.deepEqual(await solid(page).allTextContents(), ['Check now']);
-  assert.match(await status(page).textContent(), /Sources not checked/);
+  assert.match(await note(page).textContent(), /Package: Source unreachable/, 'the note lists the source');
   await app.flags({ checkErrors: false });
   await check(app);
   await titled(page, 'Everything is in sync');
-  assert.equal(await page.locator('#check-errors').count(), 0, 'the list is of the last check');
+  assert.doesNotMatch(await note(page).textContent(), /Source unreachable/, 'the list is of the last check');
 });
 
 await test('a check this window did not make: the note says what the service recorded, a column that cannot show where says to check, and Apply all with a removal opens the sheet', 'recorded-unseen', {}, async app => {
@@ -357,7 +353,7 @@ await test('a check and an apply say that they run; a sheet that applies cannot 
   await titled(page, 'Checking sources and harnesses…');
   await page.locator('#sync-state-text').filter({ hasText: /^Checking source 1 of \d+ · .+/ }).waitFor();
   assert.equal(await checkNow(page).getAttribute('aria-busy'), 'true');
-  await status(page).getByText('Checking…', { exact: true }).waitFor();
+  assert.doesNotMatch(await status(page).textContent(), /Checking/, 'the note says it, the status row does not repeat it');
   assert.equal(await focusedText(page), 'Check now', 'the button keeps the focus while it waits');
   await settled(page);
   assert.equal(await noteTitle(page).textContent(), '1 change ready to apply');
@@ -369,7 +365,6 @@ await test('a check and an apply say that they run; a sheet that applies cannot 
   await busy.waitFor();
   assert.equal(await busy.getAttribute('aria-busy'), 'true');
   await titled(page, 'Applying 1 change…');
-  await status(page).getByText('Applying 1 change…', { exact: true }).waitFor();
   await page.keyboard.press('Escape');
   assert.equal(await sheet(page).count(), 1, 'Escape does not close a sheet that is applying');
   await sheet(page).waitFor({ state: 'detached' });
@@ -490,7 +485,6 @@ await test('no harness is managed: the page says so where the note would be, wit
   assert.equal(await page.locator('#sync-table').count(), 0);
   assert.equal(await note(page).count(), 0);
   assert.deepEqual(await barLabels(page), ['Check now']);
-  assert.match(await status(page).textContent(), /No harness/);
   await content(page).getByRole('button', { name: 'Add harness', exact: true }).click();
   await page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"]').first().waitFor();
 });

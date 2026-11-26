@@ -6,7 +6,7 @@ import { open } from './browser-helper.mjs';
 
 const out = 'apps/desktop/tests/shots';
 await mkdir(out, { recursive: true });
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const button = (scope, name) => scope.getByRole('button', { name, exact: true });
 const row = (page, title) => page.locator('[data-slot="item-row"]').filter({ has: page.locator('[data-slot="item-row-title"]', { hasText: new RegExp(`^${title}$`) }) });

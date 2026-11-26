@@ -172,8 +172,10 @@ test('with no plan of this revision the summary is the recorded check: its count
  s.sync=recordedSync({pending:2,blockers:1});assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:2,blockers:1,errors:0,byKind:{}});
 });
 test('a record of another revision, or of none, is not a check of this one',()=>{
- const empty={kind:'not-checked',operations:0,blockers:0,errors:0,byKind:{}},s=snapshot();
- for(const over of [{revision:3},{revision:null},{pending:null,blockers:null},{revision:5}]){s.sync=recordedSync(over);assert.deepEqual(syncSummary(s,null),empty,JSON.stringify(over));}
+ const empty=(kind:string)=>({kind,operations:0,blockers:0,errors:0,byKind:{}}),s=snapshot();
+ for(const over of [{revision:3},{revision:null},{revision:5}]){s.sync=recordedSync(over);assert.deepEqual(syncSummary(s,null),empty('changed'),`checked at ${JSON.stringify(over)}: the list changed since`);}
+ s.sync=recordedSync({revision:3,last_check:null});assert.deepEqual(syncSummary(s,null),empty('not-checked'),'no check at all');
+ s.sync=recordedSync({pending:null,blockers:null});assert.deepEqual(syncSummary(s,null),empty('not-checked'),'a record of this revision without counts');
  s.sync=recordedSync({errors:2,revision:3});assert.equal(syncSummary(s,null).errors,0,'errors recorded for another revision say nothing about this one');
 });
 test('a plan of this revision wins over the record',()=>{

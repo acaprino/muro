@@ -88,6 +88,12 @@ test('the note before any check says so, and Check now is what to do', () => {
   assert.equal(noteOf(snapshot(), plan([op('update')], [], 3), nothing).kind, 'not-checked', 'a plan made for another revision is as good as none');
 });
 
+test('a check of an earlier revision: the note says the list changed since, never "Not checked yet" beside the time of the check', () => {
+  const n = noteOf(snapshot(recorded({ revision: 3, pending: 2 })), null, nothing);
+  assert.deepEqual(n, { kind: 'changed', tone: null, title: 'Your list changed since the last check', text: 'Check now to see what the change means for your harnesses. Nothing changes until you apply.', lead: true });
+  assert.equal(noteOf(snapshot(recorded({ revision: 3, last_check: null })), null, nothing).kind, 'not-checked', 'with no check at all it is not checked');
+});
+
 test('the note with no harness managed', () => {
   const n = noteOf(snapshot(record(), [target('t1', 'Codex', false)]), null, nothing);
   assert.deepEqual([n.kind, n.tone, n.title, n.text], ['no-harness', 'warn', 'No harness is managed', 'Muro needs at least one harness to install plugins into.']);
@@ -172,6 +178,7 @@ const headline = (kind: SyncHeadline['kind'], over: Partial<SyncHeadline> = {}):
 test('the chip of the status row says each state in a few words, and is ok only when in sync', () => {
   assert.deepEqual(chipOf(headline('no-harness')), { text: 'No harness', tone: 'warn' });
   assert.deepEqual(chipOf(headline('not-checked')), { text: 'Not checked yet', tone: 'warn' });
+  assert.deepEqual(chipOf(headline('changed')), { text: 'List changed', tone: 'warn' });
   assert.deepEqual(chipOf(headline('changes', { operations: 1 })), { text: '1 change waiting', tone: 'warn' });
   assert.deepEqual(chipOf(headline('changes', { operations: 5 })), { text: '5 changes waiting', tone: 'warn' });
   assert.deepEqual(chipOf(headline('blocked')), { text: 'Needs attention', tone: 'warn' });

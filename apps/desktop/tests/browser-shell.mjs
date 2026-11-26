@@ -27,15 +27,14 @@ const tab = (page, name) => tabs(page).filter({ hasText: new RegExp(`^${name}$`)
 const currentTab = page => page.locator('[data-slot="toolbar-tab"][aria-current="page"]');
 const content = page => page.locator('main[data-slot="app-shell-content"]');
 const status = page => page.locator('[data-slot="app-shell-status"]');
-const foot = page => page.locator('[data-slot="app-shell-footer"]');
 const controls = page => titleBar(page).locator('[data-slot="window-controls"] button');
 const palette = page => page.locator('[data-slot="command-palette"]');
 const options = page => palette(page).getByRole('option');
 const texts = loc => loc.evaluateAll(elements => elements.map(e => e.textContent.trim()));
 const count = async (app, action) => (await app.calls()).filter(c => c.action === action).length;
 const behind = (page, change) => page.evaluate(change);
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => foot(page).getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => status(page).getByText(/Last check/).waitFor();
 
 /** What sticks out: how far the page scrolls sideways, which items of the title bar's toolbar run under the window's buttons, and whether those buttons and every tab are inside the window. */
 const measure = page => page.evaluate(() => {
@@ -221,18 +220,17 @@ await test('Settings chooses the theme with the shell\'s own commands: dark at f
 await test('the window reads the registry again when the crate says it is shown (window-shown) and when it gets the focus, and asks for no plan', 'changes', {}, async app => {
   const { page } = app;
   await ready(page);
-  await foot(page).getByText('Automatic sync off').waitFor();
-  await status(page).getByText('Not checked yet').waitFor();
-  await status(page).getByText('1 harness').waitFor();
+  await status(page).getByText(/Automatic sync off/).waitFor();
+  await page.locator('#sync-state-title').getByText('Not checked yet').waitFor();
   const before = await count(app, 'snapshot');
   await behind(page, () => window.behind.settings({ auto_sync: true }));
   await page.evaluate(() => window.shown());
-  await foot(page).getByText('Automatic sync on').waitFor();
-  await status(page).getByText('next check soon').waitFor();
+  await status(page).getByText(/Next check/).waitFor();
+  await status(page).getByText(/Next check soon/).waitFor();
   assert.equal(await count(app, 'snapshot'), before + 1);
   await behind(page, () => window.behind.check());
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-  await status(page).getByText('1 change waiting').waitFor();
+  await page.locator('#sync-state-title').getByText('1 change ready to apply').waitFor();
   assert.match(await status(page).textContent(), /Last check\s*today/);
   assert.equal(await count(app, 'snapshot'), before + 2);
   assert.equal(await count(app, 'plan'), 0, 'a refresh asks for no plan');
@@ -241,7 +239,7 @@ await test('the window reads the registry again when the crate says it is shown 
 await test('every 30 s while it has the focus the window shows what the worker recorded', 'changes', { clock: true }, async app => {
   const { page } = app;
   await ready(page);
-  await status(page).getByText('Not checked yet').waitFor();
+  await page.locator('#sync-state-title').getByText('Not checked yet').waitFor();
   assert.equal(await page.evaluate(() => document.hasFocus()), true, 'the premise: this page has the focus');
   const before = await count(app, 'snapshot');
   // Time stands still from here: what passes is what the test lets pass.
@@ -250,7 +248,7 @@ await test('every 30 s while it has the focus the window shows what the worker r
   await page.clock.fastForward(10_000);
   assert.equal(await count(app, 'snapshot'), before, 'not yet');
   await page.clock.fastForward(25_000);
-  await status(page).getByText('1 change waiting').waitFor();
+  await page.locator('#sync-state-title').getByText('1 change ready to apply').waitFor();
   assert.match(await status(page).textContent(), /Last check\s*today/);
   assert.equal(await count(app, 'snapshot'), before + 1);
   assert.equal(await count(app, 'plan'), 0);

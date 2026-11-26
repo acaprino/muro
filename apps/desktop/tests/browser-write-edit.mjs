@@ -26,8 +26,8 @@ const callsOf = async (app, action) => (await app.calls()).filter(c => c.action 
 /** The payloads of every `edit_project` the page sent, oldest first. */
 const editsOf = async app => (await callsOf(app, 'edit_project')).map(c => c.payload);
 const texts = loc => loc.evaluateAll(elements => elements.map(e => e.textContent.trim()));
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 const tab = (page, name) => page.locator('[data-slot="toolbar-tab"]').filter({ hasText: new RegExp(`^${name}$`) });
 const goProjects = async page => { await ready(page); await tab(page, 'Projects').click(); };
 const openSample = async page => {

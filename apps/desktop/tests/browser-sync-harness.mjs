@@ -31,8 +31,8 @@ const rowOf = (page, name) => page.getByRole('row').filter({ hasText: name });
 /** The requests of the page about the sync and the registry; the AI runs' reading (`jobs`) is the window's own and comes when it likes. */
 const actions = async app => (await app.calls()).map(c => c.action).filter(action => action !== 'jobs');
 const callsOf = async (app, action) => (await app.calls()).filter(c => c.action === action);
-/** The window has read the registry once: the footer says what it holds. */
-const ready = page => page.locator('[data-slot="app-shell-footer"]').getByText(/in your list/).waitFor();
+/** The window has read the registry once: the status row says when it was last checked. */
+const ready = page => page.locator('[data-slot="app-shell-status"]').getByText(/Last check/).waitFor();
 /** The inspector while it shows something: docked (an `aside`, `hidden` when closed) or, under 1000px, a panel over the end of the content. */
 const inspector = page => page.locator('[data-inspector-form]:not([hidden])');
 /** Add harness is a drawer from the right (Sigrid's `Dialog` with `drawer`); what it asks first is a centred dialog. */

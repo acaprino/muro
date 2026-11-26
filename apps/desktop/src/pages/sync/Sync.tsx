@@ -14,7 +14,7 @@ import { plural } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
 import { indexProjectPlugins } from '../project/write/jobs.ts';
 import { useCheckProgress, useSync } from './useSync.tsx';
-import { nameList, noteOf, timesLine, type NoteTone } from './words.ts';
+import { nameList, noteOf, type NoteTone } from './words.ts';
 import { SyncTable } from './SyncTable.tsx';
 import { ReviewSheet } from './ReviewSheet.tsx';
 import { PluginDialog } from './PluginDialog.tsx';
@@ -72,7 +72,6 @@ export function Sync({ openHarness, entry }: SyncProps) {
           />
         </Card>
       ) : <SyncNote snapshot={snapshot} />}
-      <CheckErrors snapshot={snapshot} />
       <HarnessWarnings snapshot={snapshot} />
       {availableProjects.length > 0 ? (
         <Section title="Install from a project">
@@ -110,7 +109,8 @@ export function Sync({ openHarness, entry }: SyncProps) {
 
 const TONE: Record<NoteTone, 'success' | 'info' | 'warning'> = { ok: 'success', info: 'info', warn: 'warning' };
 
-/** The sync note: what the last check found, in a title and a sentence, and when it was checked, synced and is checked next. The status row repeats it as a chip, and is what is announced. */
+/** The sync note: what the last check found, in a title and a sentence, and under it the sources the last check could not resolve, each with the service's words (they stay until the
+ * next check; the sentence already counts them). When it was checked, synced and is checked next is the status row's, over it. */
 function SyncNote({ snapshot }: { snapshot: Snapshot }) {
   const sync = useSync();
   const progress = useCheckProgress();
@@ -118,29 +118,13 @@ function SyncNote({ snapshot }: { snapshot: Snapshot }) {
   const detail = progress?.phase === 'source'
     ? `Checking source ${progress.index} of ${progress.total} · ${progress.name}`
     : progress?.phase === 'plan' ? 'Reading installed plugins and preparing changes.' : note.text;
-  return (
-    <Note id="sync-state" data-kind={note.kind} tone={note.tone ? TONE[note.tone] : 'info'} announce={false} title={<Text id="sync-state-title">{note.title}</Text>}>
-      <Column gap="xs">
-        <Text id="sync-state-text" aria-live={sync.checking ? 'polite' : 'off'}>{detail}</Text>
-        <Text variant="note">{timesLine(snapshot)}</Text>
-      </Column>
-    </Note>
-  );
-}
-
-/** The sources the last check could not resolve, each with the service's words. They stay until the next check. */
-function CheckErrors({ snapshot }: { snapshot: Snapshot }) {
-  const { errors } = useSync();
-  if (!errors.length) return null;
   const nameOf = (id: string): string => snapshot.registry.plugins.find(p => p.id === id)?.name ?? id;
+  const errors = sync.checking ? [] : sync.errors;
   return (
-    <Note
-      id="check-errors"
-      tone="warning"
-      announce={false}
-      title={<Text>{plural(errors.length, 'source')} could not be checked</Text>}
-      items={errors.map(e => <><Text variant="strong">{nameOf(e.plugin_id)}</Text>: {e.message}</>)}
-    />
+    <Note id="sync-state" data-kind={note.kind} tone={note.tone ? TONE[note.tone] : 'info'} announce={false} title={<Text id="sync-state-title">{note.title}</Text>}
+      items={errors.length ? errors.map(e => <><Text variant="strong">{nameOf(e.plugin_id)}</Text>: {e.message}</>) : undefined}>
+      <Text id="sync-state-text" aria-live={sync.checking ? 'polite' : 'off'}>{detail}</Text>
+    </Note>
   );
 }
 
