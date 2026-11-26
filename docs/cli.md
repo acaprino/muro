@@ -398,6 +398,21 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
+### `muro project extract FILE.mp --harness H --out DIR [--cache DIR]`
+
+Writes the plugin the file carries for one harness into `DIR/<H>/`, ready to install as its `INSTALL.md` says
+([ADR-0035](adr/ADR-0035-project-extract.md)). `H` is a harness the file's build has: `claude-code`, `codex`,
+`opencode`, `pi` or `hermes`. Nothing is built and the file is only read: what comes out is `release/<slug>/adapters/<H>/`
+of the file, byte for byte. For `hermes`, a plugin with its own servers also gets `DIR/hermes-mcp/`, which its
+`INSTALL.md` reaches as `../hermes-mcp`.
+
+`DIR` may hold other things, but a folder the command would write must not be there yet: nothing is overwritten. The
+file is checked first as `verify` does. Prints `{"harness", "folders"}`. Refused, with exit 1 and
+`Project extract failed: <sentence>`: a plugin that was not built from its project, a file with no built plugin, a
+harness the build does not have (the sentence names the ones it has), a folder already there.
+
+To write a whole plugin store into a repository instead, push the file: [the project store](project-store.md).
+
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
 (Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below. Releasing it:
@@ -423,13 +438,22 @@ functions `check-sources` and `build` use (license gate, coverage gate, the pin'
 keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
 holds them) and, beside it, `<DIR>/<id>/<commit>.stamp`: the digest of what the snapshot was fetched for
 (the commit and the source's `selected_paths`, `media_paths`, `notice_paths`, `license_path`, `excluded_paths`
-and `license`). `pack` reads a snapshot whose stamp matches without fetching, and fetches again, replacing it,
-when the stamp differs or is missing (a snapshot made before stamps existed, or by hand); it stores the one it
-fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
+and `license`), and `<DIR>/<id>/<commit>.modes`: the names of the snapshot's executable files, as a JSON list
+(a Windows disk keeps no such bit, so the folder alone cannot say). `pack` reads a snapshot whose stamp matches
+without fetching, and fetches again, replacing it, when the stamp differs or is missing (a snapshot made before
+stamps existed, or by hand) or the list of names is missing (a snapshot made before it was kept); it stores the
+one it fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
 build (`<DIR>/<slug>/…`); `pack` refuses one that is not the build of this package (the `sources.json` plugin
 slug and version, and the capability ids, must be the package's: `muro project verify`'s check); without it the
 file carries no release. The file is written whole or not at all, and the same project packs
 to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
+
+Which members are executable does not depend on the disk the file is written on. An input is executable when
+its mode in Git at the pin says so: `pack` reads it from the commit, the cache keeps the names, and `edit` and
+`commit` take them from the file they change. A helper of the built plugin (a file under a `scripts/` folder, at
+the root of the build or in an adapter) is executable by the build's own rule: it starts with `#!`. So a file
+written on Windows marks the same inputs and helpers as one written on Linux. A package's own file
+(`capabilities/`, `prompts/`, `custom-instructions/`) is executable only where the disk says so.
 
 `verify` checks that the plugin a `.mp` carries (`release/<slug>/`) was built from the package it carries: the
 release's `sources.json` plugin slug and version and its capability ids must equal the package's. It prints

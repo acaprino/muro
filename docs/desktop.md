@@ -63,8 +63,8 @@ project's AI run, while there is one to say, and then three regions side by side
 - the details of what is selected (an example, an input or a capability) in the inspector at the right: docked from 1000 px,
   and a panel over the end of the graph under it. Under 620 px the left panel becomes a drawer, opened by a button.
 
-At the foot are **Review decisions…**, **Harmonize again…**, **Install on harnesses…**, **Release…** and **Add input…**, the
-last one the solid button. **Harmonize again…** and **Add input…** start an AI run, and are off, with the reason, while
+At the foot are **Review decisions…**, **Harmonize again…**, **Install on harnesses…**, **Extract…**, **Release…** and
+**Add input…**, the last one the solid button. **Harmonize again…** and **Add input…** start an AI run, and are off, with the reason, while
 another run goes. **Review decisions…** (*Coming with the review*) and **Install on harnesses…** (*Coming with the Sync page*)
 are disabled: the runtime has no operation that reviews a project's decisions yet, and the window installs nothing on a
 harness until the Sync page is back. **Release…** puts the project's file into its repository; it is off, with the reason,
@@ -198,6 +198,14 @@ record…**, **Edit** and **Delete** on a record. The page sends only what chang
 reads the project again once the runtime answers, so the next edit is made on the file as the last one left it. A record
 you add is yours, and a record Muro wrote becomes yours when you change its words. While an AI run is changing the project
 no edit is offered (the runtime refuses one); a run of another project does not stop it.
+
+**Extract…** (the foot of the workspace) writes the plugin the project's file carries for one harness into a folder
+([ADR-0035](adr/ADR-0035-project-extract.md)). You choose the harness (Claude Code, Codex, OpenCode, Pi or Hermes) and
+the folder, typed or picked with **Choose folder…**; the page sends `extract_project` and the runtime runs
+[`muro project extract`](cli.md#muro-project-extract-filemp---harness-h---out-dir---cache-dir). The plugin goes into a
+new folder named after the harness (Hermes can add `hermes-mcp`). No AI runs, nothing is built, the file is only read,
+and nothing already in the folder is overwritten, so the button is always offered. What is refused is shown in the
+dialog as it came: a folder already there, a harness the build does not have. The notice says where the plugin went.
 
 **Release…** (the foot of the workspace) puts the project's file into the repository its `project.json` names, where a
 push of the file is a release ([ADR-0034](adr/ADR-0034-project-stores.md), [the project store](project-store.md)). No AI

@@ -154,11 +154,10 @@ Only `pytest` is installed for them.
 - Taking a newer file from the repository: neither a command nor an action of the app does it.
 - No release has been made from the app. Its action (**Release…**, `release_project`) is written and tested against
   stand-ins only: see "Not run" in the ADR.
-- `muro project release` has not pushed to a repository on GitHub. See "Not run" in the ADR.
-- Moving an existing repository to this model.
-- `AGENTS.md` still describes a package as an unpacked directory in its own repository.
+- A second release of a store that this workflow wrote: no real repository has made one.
 - Git LFS. The file is committed as it is. GitHub refuses a file over 100 MB, and the run reads the file of a
   tagged commit through an interface with the same limit.
 - A protected branch. The workflow pushes with its own token, which a rule that asks for a pull request refuses.
-- The workflow has run once, on a probe repository (`docs/verification/2026-11-25-project-store.md`). See "Not run" in
-  the ADR for what that run does not show.
+- The workflow has run on a probe repository (`docs/verification/2026-11-25-project-store.md`) and released two real
+  projects at their first run (`docs/verification/2026-11-26-project-store-real-repositories.md`). See "Not run" in
+  the ADR and in the second record for what those runs do not show.

@@ -97,7 +97,7 @@ def scaffold_package(directory: Path, remote: str, *, slug: str | None, license_
         errors += check_sources(manifest, directory, coverage=False)
         if errors:
             raise ValueError("source verification failed:\n" + "\n".join(errors))
-        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
         return manifest_path
     except ValueError:
         # A failed init leaves no phantom package behind.

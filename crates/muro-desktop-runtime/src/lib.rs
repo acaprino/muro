@@ -37,6 +37,7 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
         "project" => projects::project(data, &payload),
         "open_project" => projects::open(data, &payload),
         "install_project" => projects::install(data, &payload),
+        "extract_project" => projects::extract(data, &payload),
         "remove_project" => projects::remove(data, &payload),
         "open_folder" => projects::open_folder(data, &payload),
         "create_project" => project_jobs::create(data, &payload),

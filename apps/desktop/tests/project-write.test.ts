@@ -10,6 +10,7 @@ import {
   agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
   defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
   operationWords, outcomeOf, parseBudget, releasePayload, releasedLine, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
+  EXTRACT_HARNESSES, extractPayload, extractedLine,
 } from '../src/pages/project/write/jobs.ts';
 import { createTransport } from './fake-transport.js';
 
@@ -659,6 +660,23 @@ test('the update check says which input is behind, and fails as the upstream doe
   assert.deepEqual(await fake.request('pick_folder'), { path: null }, 'a dialog closed without a folder');
   fake.flags.noShellActions = true;
   await assert.rejects(fake.request('pick_folder'), { message: 'Unknown registry action: pick_folder' });
+});
+
+test("an extract names the project, the harness and the folder, says where the plugin went, writes no project file and is refused in the runtime's words and then in the command's", async () => {
+  assert.deepEqual([...EXTRACT_HARNESSES], ['claude-code', 'codex', 'opencode', 'pi', 'hermes']);
+  assert.deepEqual(extractPayload('sample', 'codex', '  D:/Out  '), { id: 'sample', harness: 'codex', folder: 'D:/Out' });
+  assert.equal(extractedLine({ folders: ['D:/Out/hermes', 'D:/Out/hermes-mcp'] }), 'Extracted to D:/Out/hermes and D:/Out/hermes-mcp');
+  assert.equal(extractedLine(null), 'The plugin was extracted.');
+  const fake = createTransport('projects');
+  const digest = fake.behind.digest('sample');
+  assert.deepEqual(await fake.request('extract_project', extractPayload('sample', 'codex', 'D:/Out/')), { harness: 'codex', folders: ['D:/Out/codex'] });
+  assert.equal(fake.behind.digest('sample'), digest, 'the project file is only read');
+  const refused = (harness: string, folder: string, said: string) => assert.rejects(fake.request('extract_project', { id: 'sample', harness, folder }), { message: said }, `${harness} ${folder}`);
+  await refused('vim', 'D:/Out', 'No Muro adapter for the harness vim');
+  await refused('codex', 'Out', 'Name the folder to extract into by its full path');
+  await refused('pi', 'D:/Out', "This project's build has no adapter for pi: it has claude-code, codex, opencode");
+  await refused('codex', 'D:/Out', 'D:/Out/codex already exists: choose another folder');
+  await assert.rejects(fake.request('extract_project', { id: 'nope', harness: 'codex', folder: 'D:/Out' }), { message: 'That project is not in your list' });
 });
 
 test("a release answers the command's document, passes the switches on, writes no file, and is refused in the runtime's words and then in the command's", async () => {

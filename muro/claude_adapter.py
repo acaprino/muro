@@ -36,5 +36,5 @@ export function register(on) {{
 '''
     hooks = root / "hooks"
     hooks.mkdir(parents=True, exist_ok=True)
-    (hooks / "policy.mjs").write_text(module, encoding="utf-8")
+    (hooks / "policy.mjs").write_text(module, encoding="utf-8", newline="\n")
     return "./policy.mjs"

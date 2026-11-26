@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import shutil
 
-from .adapters import write_adapters
+from .adapters import copy_as_lf, write_adapters
 from .core import parse_router, validate_capabilities_and_router, validate_plugin_identity
 from .delivery import (DELIVERY_FILE, PACKAGE_SERVER_FILE, allows_empty_catalog, load_delivery, package_server,
                        package_server_gate_errors, packaged_path_errors, server_sections, unregistered_active_hooks,
@@ -77,8 +77,8 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             shutil.copytree(project_root / "capabilities", dist / "capabilities")
         else:
             (dist / "capabilities").mkdir()
-        shutil.copytree(prompts_dir(project_root), dist / "prompts")
-        (dist / "sources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        shutil.copytree(prompts_dir(project_root), dist / "prompts", copy_function=copy_as_lf)
+        (dist / "sources.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8", newline="\n")
         shutil.copy2(project_root / "guide-examples.json", dist / "guide-examples.json")
         if entries_doc is not None:
             shutil.copy2(project_root / ENTRIES_FILE, dist / ENTRIES_FILE)
@@ -86,7 +86,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
             shutil.copy2(project_root / DELIVERY_FILE, dist / DELIVERY_FILE)
         if package_server(delivery_doc):
             (dist / PACKAGE_SERVER_FILE).write_text(json.dumps(server_sections(delivery_doc), indent=2),
-                                                    encoding="utf-8")
+                                                    encoding="utf-8", newline="\n")
         copy_runtime(project_root, dist, delivery_doc)
         for src in sources:
             # A file the intake AI declared as evidence only is not shipped, and no step may point at it.
@@ -123,12 +123,12 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
                 if end is None:
                     raise ValueError(f"Malformed capability: {cap_file}")
                 lines_.insert(end + 1, "<!-- Modified by Muro; see LICENSES and NOTICE.md. -->")
-                cap_file.write_text("\n".join(lines_) + "\n", encoding="utf-8")
+                cap_file.write_text("\n".join(lines_) + "\n", encoding="utf-8", newline="\n")
         runtime_deps = [f"  - {rd['name']} ({rd.get('version', '')}): {rd['license']}"
                         for src in sources for rd in src.get("runtime_deps", []) if not rd.get("bundled", False)]
         if runtime_deps:
             lines += ["Runtime Dependencies (Not Bundled):", *runtime_deps, ""]
-        (dist / "NOTICE.md").write_text("\n".join(lines), encoding="utf-8")
+        (dist / "NOTICE.md").write_text("\n".join(lines), encoding="utf-8", newline="\n")
         write_release_guide(dist, plugin, sources)
         write_adapters(dist, plugin, runtime_source(project_root), capabilities=capabilities,
                        entries=entries_doc["entries"] if entries_doc else None, delivery=delivery_doc)

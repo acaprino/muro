@@ -74,5 +74,7 @@ export interface ProjectUpdate { id:string; pin:string; pinned:string; upstream:
  * whether a commit was `pushed` (false when the repository already holds this file) and which, whether it carries the release workflow (`initialized`), and `reason`: what happened, in a sentence
  * or two, then the command's warnings. */
 export interface ProjectRelease { repository:string; branch:string; file:string; version:string; tag:string; pushed:boolean; commit:string|null; initialized:boolean; reason:string }
+/** What `extract_project` answers, the document `muro project extract` prints: the harness and the folders written (Hermes can have its server package beside it). */
+export interface ProjectExtract { harness:string; folders:string[] }
 /** The last update check of a project's inputs, for the file it was made on (`digest`). */
 export interface ProjectUpdates { id:string; digest:string; inputs:ProjectUpdate[] }

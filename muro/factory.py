@@ -159,6 +159,14 @@ def _helper_name(source_id: str, name: str) -> str:
     return name
 
 
+def starts_as_script(start: bytes) -> bool:
+    """Whether a file is an interpreter script, from its content or its first two bytes (`#!`).
+
+    The build makes such a helper executable, whatever its mode in Git, and a project file marks it so where
+    the disk keeps no such bit (`muro/project.py`, `_add_release`): the rule lives here, once."""
+    return start.startswith(b"#!")
+
+
 def unpackaged_reference_errors(capabilities: list, source_id: str, unpackaged: list[str]) -> list[str]:
     """A capability must not send the host to a file the release does not carry. A path check, not a judgment."""
     return [f"Capability {cap.id}: scripts/{source_id}/{relative} is read at intake only and is not packaged"
@@ -198,7 +206,7 @@ def copy_source_helpers(src: dict[str, Any], project_root: Path, dist: Path) -> 
             raise ValueError(f"Duplicate helper path in {src['id']}: {relative}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
-        if content.startswith(b"#!"):
+        if starts_as_script(content):
             # Git blobs carry no mode: an interpreter-script helper must stay runnable by its own
             # path, or a live host gets 'Permission denied' (superpowers task-start, 2026-11-14).
             target.chmod(target.stat().st_mode | 0o755)
