@@ -16,7 +16,7 @@ import { SyncProvider, useSync } from './pages/sync/useSync.tsx';
 import { checkedLine, chipOf } from './pages/sync/words.ts';
 import { Sync, SyncActions, type SyncEntry } from './pages/sync/Sync.tsx';
 import { resolvePlugin } from './pages/sync/registryWrite.ts';
-import { projectFileKey } from './pages/project/write/jobs.ts';
+import { indexProjectPlugins } from './pages/project/write/jobs.ts';
 import { HarnessInspector } from './pages/sync/HarnessInspector.tsx';
 import { Activity } from './pages/activity/Activity.tsx';
 import { Projects } from './pages/Projects.tsx';
@@ -96,11 +96,8 @@ function Muro() {
   async function installProject(): Promise<void> {
     const { view, info } = project;
     if (!view || !info?.file || !snapshot || projectCheck.current) return;
-    const file = projectFileKey(info.file);
-    const plugins = snapshot.registry.plugins;
-    const existing = plugins.find(p => projectFileKey(p.source) === file)
-      ?? plugins.find(p => p.project === view.id)
-      ?? plugins.find(p => p.resolved_project && projectFileKey(p.resolved_project.path) === file);
+    const findPlugin = indexProjectPlugins(snapshot.registry.plugins);
+    const existing = findPlugin({ id: view.id, path: info.file });
     if (existing?.project === view.id && !existing.resolved_project) {
       const token = Symbol();
       projectCheck.current = token;

@@ -1,5 +1,5 @@
 import type {
-  ChangeOperation, InstructionEdit, InstructionFile, Job, ProjectOperation, ProjectRecord, ProjectRelease, ProjectRepository, Transport, VersionStep,
+  ChangeOperation, InstructionEdit, InstructionFile, Job, Plugin, ProjectFile, ProjectOperation, ProjectRecord, ProjectRelease, ProjectRepository, Transport, VersionStep,
 } from '../../../types.ts';
 
 /** The write side of a project, as plain data (ADR-0032): the shapes of the requests the runtime reads (`crates/muro-desktop-runtime/src/project_jobs.rs`), the checks of what a person typed
@@ -351,6 +351,23 @@ export async function pickProjectFile(request: Transport): Promise<string | null
 export function projectFileKey(path: string): string {
   const flat = path.replace(/\\/g, '/').replace(/^\/\/\?\/UNC\//i, '//').replace(/^\/\/\?\//, '').replace(/\/+$/, '');
   return /^(?:[a-z]:\/|\/\/)/i.test(flat) ? flat.toLowerCase() : flat;
+}
+/** Workspace and Sync both identify the registered file before offering to add it again. */
+export function indexProjectPlugins(plugins: readonly Plugin[]): (project: ProjectFile) => Plugin | undefined {
+  const sources = new Map<string, Plugin>(), linked = new Map<string, Plugin>(), verified = new Map<string, Plugin>();
+  for (const plugin of plugins) {
+    const source = projectFileKey(plugin.source);
+    if (!sources.has(source)) sources.set(source, plugin);
+    if (plugin.project && !linked.has(plugin.project)) linked.set(plugin.project, plugin);
+    if (plugin.resolved_project) {
+      const path = projectFileKey(plugin.resolved_project.path);
+      if (!verified.has(path)) verified.set(path, plugin);
+    }
+  }
+  return project => {
+    const path = projectFileKey(project.path);
+    return sources.get(path) ?? linked.get(project.id) ?? verified.get(path);
+  };
 }
 /** The harnesses Muro builds an adapter for (the runtime's `HARNESSES`). A file whose build lacks one is refused by the command, which says which it has. */
 export const EXTRACT_HARNESSES = ['claude-code', 'codex', 'opencode', 'pi', 'hermes'] as const;

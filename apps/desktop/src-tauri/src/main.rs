@@ -68,6 +68,12 @@ impl Backend {
     /// gate; any other request waits for the sync in progress, and tries again for a moment when
     /// the registry is held by another writer, so no page has to.
     fn request(&self, action: &str, payload: Value) -> anyhow::Result<Value> {
+        self.request_with_progress(action, payload, None)
+    }
+
+    fn request_with_progress(
+        &self, action: &str, payload: Value, progress: Option<&dyn Fn(Value)>,
+    ) -> anyhow::Result<Value> {
         match action {
             "autostart" => autostart::state(&self.autostart, &self.executable),
             "set_autostart" => {
@@ -82,13 +88,13 @@ impl Backend {
                 .context("Muro is closing")?,
             "apply" => self
                 .gate
-                .run(|| self.send(action, payload))
+                .run(|| self.send(action, payload, progress))
                 .context("Muro is closing")?,
             _ => {
                 if !WITHOUT_THE_LOCK.contains(&action) {
                     self.gate.wait_idle(SYNC_WAIT);
                 }
-                let result = self.send(action, payload)?;
+                let result = self.send(action, payload, progress)?;
                 if action == "settings" {
                     self.remember(&result["registry"]["settings"]);
                 }
@@ -98,9 +104,9 @@ impl Backend {
     }
 
     /// A request to the backend, tried again while another writer holds the registry.
-    fn send(&self, action: &str, payload: Value) -> anyhow::Result<Value> {
+    fn send(&self, action: &str, payload: Value, progress: Option<&dyn Fn(Value)>) -> anyhow::Result<Value> {
         cli::retry_while_busy(BUSY_WAIT, BUSY_STEP, || {
-            self.client.request(action, payload.clone())
+            self.client.request_with_progress(action, payload.clone(), progress)
         })
     }
 
@@ -169,15 +175,21 @@ fn pick_folder(app: &tauri::AppHandle) -> anyhow::Result<Value> {
 #[tauri::command]
 async fn request(
     app: tauri::AppHandle,
+    webview: tauri::Webview,
     state: tauri::State<'_, Backend>,
     action: String,
     payload: Value,
+    on_progress: Option<tauri::ipc::JavaScriptChannelId>,
 ) -> Result<Value, String> {
     let backend = state.inner().clone();
+    let channel = on_progress.map(|id| id.channel_on(webview));
     tauri::async_runtime::spawn_blocking(move || {
-        let answer = match action.as_str() {
-            "pick_file" => pick_file(&app, &payload),
-            "pick_folder" => pick_folder(&app),
+        let answer = match (action.as_str(), channel) {
+            ("pick_file", _) => pick_file(&app, &payload),
+            ("pick_folder", _) => pick_folder(&app),
+            (_, Some(channel)) => backend.request_with_progress(&action, payload, Some(&|update| {
+                let _ = channel.send(update);
+            })),
             _ => backend.request(&action, payload),
         };
         answer.map_err(|e| format!("{e:#}"))

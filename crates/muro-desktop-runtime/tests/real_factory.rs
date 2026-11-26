@@ -211,9 +211,7 @@ fn sync_checks_exports_and_installs_a_local_project_without_registering_it_in_pr
     let plugin = &resolved["registry"]["plugins"][0];
     let archive = &plugin["resolved_project"];
     assert_eq!(archive["digest"], registry_projects::file_digest(&file).unwrap());
-    let harnesses = archive["harnesses"].as_array().unwrap();
-    assert_eq!(harnesses.len(), 2, "{archive}");
-    assert!(harnesses.contains(&json!("claude-code")) && harnesses.contains(&json!("opencode")));
+    assert_eq!(archive["harnesses"], json!(["claude-code", "codex", "opencode"]));
     assert_eq!(call("projects", json!({})).unwrap(), json!([]));
     let export = |harness: &str| call("extract_plugin", json!({"id":"sync-example","harness":harness,"folder":exports}));
     assert!(export("pi").is_err());

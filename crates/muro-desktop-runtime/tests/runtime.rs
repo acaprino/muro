@@ -458,6 +458,50 @@ fn plugins_in(profile: &Path) -> usize {
 }
 
 #[test]
+fn check_streams_source_then_plan_and_returns_its_own_result() {
+    use muro_desktop_runtime::cli::Client;
+    use std::cell::RefCell;
+
+    let registry = Registry::new();
+    registry.plugin(&[]);
+    let client = Client::spawn(Path::new(env!("CARGO_BIN_EXE_muroctl")), &registry.data()).unwrap();
+    let updates = RefCell::new(Vec::new());
+    let result = client.request_with_progress("check", json!({}), Some(&|update| {
+        // A second reply while the first request is receiving updates must go to its own caller.
+        assert!(client.request("status", json!({})).unwrap()["revision"].is_number());
+        updates.borrow_mut().push(update);
+    })).unwrap();
+    assert_eq!(updates.into_inner(), [
+        json!({"phase":"source","index":1,"total":1,"name":"Example"}),
+        json!({"phase":"plan"}),
+    ]);
+    assert!(result["plan"]["id"].is_string());
+    assert!(client.request_with_progress("check", json!({"target_id":"missing"}), Some(&|_| {
+        panic!("validation precedes any progress");
+    })).is_err());
+}
+
+#[test]
+fn serve_sends_only_a_terminal_reply_without_an_opt_in() {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let registry = Registry::new();
+    registry.plugin(&[]);
+    let mut server = Command::new(env!("CARGO_BIN_EXE_muroctl"))
+        .arg("--data").arg(registry.data()).arg("serve")
+        .stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
+    writeln!(server.stdin.take().unwrap(), "{}", json!({"id":17,"action":"check"})).unwrap();
+    let output = server.wait_with_output().unwrap();
+    assert!(output.status.success());
+    // Parsing one JSON document also rejects additional frames before or after the result.
+    let frame: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(frame["id"], 17);
+    assert_eq!(frame["ok"], true);
+    assert!(frame["result"]["plan"]["id"].is_string());
+}
+
+#[test]
 fn sync_now_applies_a_clean_plan_and_reports_blockers_without_failing() {
     // A clean plan is applied, and the next sync finds nothing to do.
     let clean = Registry::new();

@@ -3,14 +3,14 @@
 // plan is tested on. Pure data under Node: nothing here renders.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Job } from '../src/types.ts';
+import type { Job, Plugin } from '../src/types.ts';
 import {
   ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, NO_RELEASE_REPOSITORY, PROJECT_RUN_MINUTES, RELEASE_ABOUT,
   RELEASE_INIT, RELEASE_INIT_HINT, RELEASE_NOTE, REPOSITORY_FIELDS, SAVING_PHASE, VERSION_STEPS,
   agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
   defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
   operationWords, outcomeOf, parseBudget, releasePayload, releasedLine, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
-  EXTRACT_HARNESSES, extractPayload, extractedLine,
+  EXTRACT_HARNESSES, extractPayload, extractedLine, indexProjectPlugins,
 } from '../src/pages/project/write/jobs.ts';
 import { createTransport } from './fake-transport.js';
 
@@ -21,6 +21,18 @@ const keys = (value: object): string[] => Object.keys(value).sort();
 /** The changes of an existing project, in the order a menu lists them. */
 const CHANGE_OPERATIONS = ['harmonize', 'add_input', 'remove_input', 'move_pin', 'instructions'] as const;
 const DIGEST = 'a'.repeat(64);
+
+test('Sync and Projects match an existing project plugin by source, legacy link or verified archive', () => {
+  const plugin: Plugin = { id: 'registered', name: 'Registered', policy: 'stable', source: 'https://github.com/example/store', targets: [], distributions: [], pinned_version: '' };
+  const project = { id: 'local', path: 'D:/Projects/Fieldnotes/Fieldnotes.mp' };
+  const source = { ...plugin, source: String.raw`\\?\D:\projects\fieldnotes\fieldnotes.mp` };
+  const linked = { ...plugin, project: 'local' };
+  const verified = { ...plugin, resolved_project: { path: project.path.toUpperCase(), digest: DIGEST, harnesses: ['codex'] } };
+  assert.equal(indexProjectPlugins([verified, linked, source])(project), source);
+  assert.equal(indexProjectPlugins([verified, linked])(project), linked);
+  assert.equal(indexProjectPlugins([verified])(project), verified);
+  assert.equal(indexProjectPlugins([source])({ id: 'other', path: 'D:/Other/Fieldnotes.mp' }), undefined);
+});
 
 // ---------- what a person types ----------
 test('the constants are the runtime\'s: the default and the largest budget, and the agent it needs', () => {

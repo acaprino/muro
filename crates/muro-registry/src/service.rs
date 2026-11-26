@@ -2,6 +2,7 @@ use crate::{ai, instructions, native, projects, sources, storage::*, sync_status
 use anyhow::{Context, Result, bail, ensure};
 use fs2::FileExt;
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 use std::{fs, path::Path};
 
 /// How a request that met another writer starts its error: the text a client looks for to try
@@ -11,7 +12,7 @@ pub const BUSY: &str = "Registry is busy";
 const ACTIVITY_LIMIT: usize = 500;
 
 pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
-    dispatch(data_dir, action, payload, None)
+    request_with_progress(data_dir, action, payload, None, None)
 }
 
 fn ensure_registry_folder(data_dir: &Path) -> Result<()> {
@@ -47,11 +48,13 @@ pub fn request_with_projects(
     payload: Value,
     read_project: &projects::ProjectReader<'_>,
 ) -> Result<Value> {
-    dispatch(data_dir, action, payload, Some(read_project))
+    request_with_progress(data_dir, action, payload, Some(read_project), None)
 }
 
-fn dispatch(
+/// An observer receives check milestones on the request worker, before it starts each phase.
+pub fn request_with_progress(
     data_dir: &Path, action: &str, payload: Value, reader: Option<&projects::ProjectReader<'_>>,
+    progress: Option<&dyn Fn(Value)>,
 ) -> Result<Value> {
     // A read of two small files that are only ever replaced whole: it waits for no writer, so a
     // check that lasts minutes does not blind the tray and the background worker.
@@ -97,10 +100,9 @@ fn dispatch(
                 return Err(error);
             }
             log(data_dir, action, "complete", "Installed copy taken over")?;
-            // Codex and Hermes are read from the last scan unless asked: it still names the old owner.
-            snapshot(data_dir, &registry, &receipts, true)
+            snapshot(data_dir, &registry, &receipts, false)
         }
-        "save_plugin" | "remove_plugin" | "save_target" | "remove_target" | "settings"
+        "save_plugin" | "select_plugin_target" | "remove_plugin" | "save_target" | "remove_target" | "settings"
         | "save_projects" | "remove_project" => {
             revision(&registry, &payload)?;
             // The receipt written for an adopted installation, until the registry is saved.
@@ -162,6 +164,20 @@ fn dispatch(
                         )?);
                     }
                     upsert(&mut registry["plugins"], p)?;
+                }
+                "select_plugin_target" => {
+                    let pid = str_field(&payload, "id")?;
+                    let tid = str_field(&payload, "target_id")?;
+                    let harness = str_field(enabled_target(&registry, tid)?, "harness")?;
+                    let index = registry["plugins"].as_array().context("plugins")?.iter()
+                        .position(|p| p["id"] == pid).context("Plugin not found")?;
+                    let plugin = &registry["plugins"][index];
+                    if plugin["targets"].as_array().context("plugin targets")?.iter().any(|id| id == tid) {
+                        return snapshot(data_dir, &registry, &receipts, false);
+                    }
+                    ensure!(plugin["distributions"].as_array().context("distributions")?.iter()
+                        .any(|d| d["harness"] == harness), "{}", sources::missing(plugin, harness));
+                    registry["plugins"][index]["targets"].as_array_mut().context("plugin targets")?.push(json!(tid));
                 }
                 "save_target" => {
                     let t = payload["target"].clone();
@@ -246,6 +262,7 @@ fn dispatch(
             }
             if let Some(key) = removed_target {
                 sync_status::forget_target(data_dir, key)?;
+                forget_inventories(data_dir, [key])?;
             }
             if action == "settings" {
                 // Settings do not change what a sync would do: the last plan stays current, so a
@@ -254,9 +271,7 @@ fn dispatch(
                 sync_status::carry_revision(data_dir, from, to)?;
             }
             log(data_dir, action, "complete", "Registry configuration saved")?;
-            // Codex and Hermes are read from the last scan unless asked: that scan still shows
-            // the copies of a removed plugin as managed.
-            snapshot(data_dir, &registry, &receipts, cleared_receipts)
+            snapshot(data_dir, &registry, &receipts, false)
         }
         "plan" => check_plan(
             data_dir,
@@ -264,6 +279,8 @@ fn dispatch(
             &receipts,
             payload["reinstall"].as_str(),
             only_target(&payload)?,
+            payload.get("plugin_id").filter(|id| !id.is_null())
+                .map(|id| id.as_str().context("plugin_id must be a string")).transpose()?,
             None,
         ),
         "check" => {
@@ -272,8 +289,12 @@ fn dispatch(
             planned_targets(&registry, only)?;
             let before = registry["plugins"].clone();
             let mut errors = vec![];
-            for index in 0..registry["plugins"].as_array().context("plugins")?.len() {
+            let total = registry["plugins"].as_array().context("plugins")?.len();
+            for index in 0..total {
                 let plugin = registry["plugins"][index].clone();
+                if let Some(report) = progress {
+                    report(json!({"phase":"source","index":index + 1,"total":total,"name":plugin["name"]}));
+                }
                 match resolve_plugin(data_dir, &registry, &plugin, reader) {
                     Ok(resolved) => registry["plugins"][index] = resolved,
                     Err(e) => {
@@ -289,7 +310,10 @@ fn dispatch(
             } else {
                 save_registry(data_dir, &mut registry)?;
             }
-            let plan = check_plan(data_dir, &registry, &receipts, None, only, Some(errors.len()))?;
+            if let Some(report) = progress {
+                report(json!({"phase":"plan"}));
+            }
+            let plan = check_plan(data_dir, &registry, &receipts, None, only, None, Some(errors.len()))?;
             if errors.is_empty() {
                 log(
                     data_dir,
@@ -408,13 +432,10 @@ fn dispatch(
 fn resolve_plugin(
     data: &Path, registry: &Value, plugin: &Value, reader: Option<&projects::ProjectReader<'_>>,
 ) -> Result<Value> {
-    // A completed install_project from before archive sources points at a cache folder and knows
-    // only the selected targets' variants. Resolve its listed file under the same writer lock.
-    // Its initial resolve (empty builds) belongs to install_project's own setup.
-    let bound = plugin["resolved_project"].is_object() || plugin["distributions"].as_array().into_iter()
-        .flatten().any(|build| build["project_digest"].is_string());
+    // Older project rows pointed at an unpack folder, sometimes without any recorded build.
+    // Their listed archive is authoritative, regardless of which targets were selected.
     let mut rebound;
-    let input = if let Some(id) = plugin["project"].as_str().filter(|_| bound && reader.is_some()) {
+    let input = if let Some(id) = plugin["project"].as_str().filter(|_| reader.is_some()) {
         let path = projects::listed_path(registry, id).context("The project is no longer in your list")
             .context(sources::ProjectSource)?;
         projects::validate_path(path).context(sources::ProjectSource)?;
@@ -428,6 +449,47 @@ fn resolve_plugin(
         plugin
     };
     sources::resolve_with_projects(data, input, &registry["settings"], reader.unwrap_or(&projects::no_factory))
+}
+
+/// Publish the verified archive and the user's target selection in one registry revision.
+/// Every embedded variant is discoverable, including those without a selected target.
+pub fn save_project_install(
+    data: &Path, id: &str, name: &str, file: &Path, build: &projects::VerifiedBuild,
+    selected: &[(&str, &str)],
+) -> Result<Value> {
+    let (_lock, mut registry) = locked_registry(data)?;
+    ensure!(projects::listed_path(&registry, id).map(Path::new) == Some(file),
+        "The listed project changed. Open the project again.");
+    ensure!(projects::file_digest(file)? == build.digest,
+        "The project file changed. Open the project again.");
+    let old = registry["plugins"].as_array().context("plugins")?.iter().find(|p| p["id"] == id);
+    ensure!(old.is_none_or(|plugin| plugin["project"] == id),
+        "A plugin named {id} is already in your list and is not this project's; remove it first");
+    let draft = old.cloned().unwrap_or_else(|| json!({
+        "id":id,"project":id,"name":name,"source":file,"policy":"head","pinned_version":"",
+        "targets":[],"distributions":[]
+    }));
+    let mut plugin = resolve_plugin(data, &registry, &draft, Some(&|_, _| Ok(build.clone())))?;
+    let offered = plugin["resolved_project"]["harnesses"].as_array().context("Missing archive variants")?;
+    let managed = registry["targets"].as_array().context("targets")?;
+    let mut targets = vec![];
+    for &(target, harness) in selected {
+        ensure!(managed.iter().any(|t| t["id"] == target && t["harness"] == harness && t["enabled"] == true),
+            "The selected harness {target} changed. Open the project again.");
+        ensure!(offered.iter().any(|h| h == harness), "This project's build has no adapter for {harness}");
+        targets.push(json!(target));
+    }
+    for held in draft["targets"].as_array().into_iter().flatten() {
+        if managed.iter().any(|t| t["id"] == *held && t["enabled"] != true) {
+            targets.push(held.clone());
+        }
+    }
+    plugin["targets"] = json!(targets);
+    validate_plugin(&plugin, &registry)?;
+    upsert(&mut registry["plugins"], plugin.clone())?;
+    save_registry(data, &mut registry)?;
+    log(data, "save_plugin", "complete", "Project variants and installation targets saved")?;
+    Ok(plugin)
 }
 
 /// Keep previously installed copies while preventing an unverified archive update from applying
@@ -545,7 +607,8 @@ fn adopt_installation(
             .contains(&json!(target_id)),
         "The plugin must list {name} to adopt an installation there"
     );
-    let inventory = native::inventory(target, receipts);
+    let scanned = scan_inventories(root, &[target], receipts)?;
+    let inventory = &scanned[0];
     ensure!(
         inventory["complete"] == true,
         "{name} could not be read: {}",
@@ -604,7 +667,8 @@ fn take_over(root: &Path, registry: &mut Value, receipts: &mut Value, payload: &
         .find(|t| t["id"] == target_id)
         .cloned()
         .context("Target not found")?;
-    let inventory = native::inventory(&target, receipts);
+    let scanned = scan_inventories(root, &[&target], receipts)?;
+    let inventory = &scanned[0];
     // A harness that cannot be read has its blocker in the next plan; once it reads, installing the
     // project there again takes the copy over.
     if inventory["complete"] != true {
@@ -821,28 +885,85 @@ fn validate_target(t: &Value, reg: &Value) -> Result<()> {
     }
     Ok(())
 }
+/// Native commands read different profiles. Keep the number of child processes bounded
+/// and the result in registry order, since the plan fingerprints this array.
+fn scan_inventories(root: &Path, targets: &[&Value], receipts: &Value) -> Result<Value> {
+    const PARALLEL_TARGETS: usize = 4;
+    let mut inventories = Vec::with_capacity(targets.len());
+    for batch in targets.chunks(PARALLEL_TARGETS) {
+        if let [target] = batch {
+            inventories.push(native::inventory(target, receipts));
+            continue;
+        }
+        std::thread::scope(|scope| -> Result<()> {
+            let workers: Vec<_> = batch
+                .iter()
+                .map(|&target| scope.spawn(move || native::inventory(target, receipts)))
+                .collect();
+            for worker in workers {
+                let observed = worker.join().map_err(|_| anyhow::anyhow!("Inventory worker stopped"))?;
+                inventories.push(observed);
+            }
+            Ok(())
+        })?;
+    }
+    let path = root.join("inventory.json");
+    let mut cache = optional(&path)?;
+    let entries = cache.as_object_mut().context("inventory cache")?;
+    for (&target, inventory) in targets.iter().zip(&inventories) {
+        let mut entry = inventory.clone();
+        entry["target_hash"] = json!(hash(target));
+        entries.insert(str_field(target, "id")?.to_owned(), entry);
+    }
+    if !targets.is_empty() {
+        write(&path, &cache)?;
+    }
+    Ok(Value::Array(inventories))
+}
+
+/// Until an apply is verified, a snapshot must not claim that the pre-apply state
+/// still exists. The registry writer lock serializes every inventory cache update.
+fn forget_inventories<'a>(root: &Path, ids: impl IntoIterator<Item = &'a str>) -> Result<()> {
+    let path = root.join("inventory.json");
+    let mut cache = optional(&path)?;
+    let entries = cache.as_object_mut().context("inventory cache")?;
+    let before = entries.len();
+    for id in ids {
+        entries.remove(id);
+    }
+    if entries.len() < before {
+        write(&path, &cache)?;
+    }
+    Ok(())
+}
+
 fn inventories(root: &Path, reg: &Value, receipts: &Value, fresh: bool) -> Result<Value> {
+    let targets = reg["targets"].as_array().context("targets")?;
+    if fresh {
+        return scan_inventories(root, &targets.iter().collect::<Vec<_>>(), receipts);
+    }
     let cache = optional(&root.join("inventory.json"))?;
-    let mut results = vec![];
-    for target in reg["targets"].as_array().context("targets")? {
+    let mut results = Vec::with_capacity(targets.len());
+    for target in targets {
         let tid = str_field(target, "id")?;
-        let inv = if matches!(target["harness"].as_str(), Some("codex" | "hermes")) && !fresh {
-            cache.get(tid).filter(|v|v["target_hash"]==hash(target)).cloned().unwrap_or(json!({"target_id":tid,"complete":false,"supported":true,"error":"Run inventory scan to inspect Codex plugins","plugins":[],"fingerprint":""}))
+        let inventory = if matches!(target["harness"].as_str(), Some("claude-code" | "codex" | "hermes")) {
+            match cache.get(tid).filter(|v| v["target_hash"] == hash(target)) {
+                Some(cached) => {
+                    let mut inventory = cached.clone();
+                    native::bind_receipts(&mut inventory, tid, receipts);
+                    inventory
+                }
+                None => json!({"target_id":tid,"complete":false,"supported":true,"unscanned":true,
+                    "error":format!("Check now to inspect plugins on {}", text(&target["name"])),
+                    "plugins":[],"fingerprint":""}),
+            }
         } else {
+            // OpenCode and Pi read the local configuration, including external edits, without a subprocess.
             native::inventory(target, receipts)
         };
-        results.push(inv);
+        results.push(inventory);
     }
-    if fresh {
-        let mut next = json!({});
-        for (inv, t) in results.iter().zip(reg["targets"].as_array().unwrap()) {
-            let mut v = inv.clone();
-            v["target_hash"] = json!(hash(t));
-            next[str_field(t, "id")?] = v;
-        }
-        write(&root.join("inventory.json"), &next)?;
-    }
-    Ok(json!(results))
+    Ok(Value::Array(results))
 }
 fn snapshot(root: &Path, reg: &Value, receipts: &Value, fresh: bool) -> Result<Value> {
     let path = root.join("activity.json");
@@ -1021,16 +1142,15 @@ fn only_target(payload: &Value) -> Result<Option<&str>> {
 }
 /// The targets a plan compares: every enabled target, or only the one named.
 fn planned_targets<'a>(reg: &'a Value, only: Option<&str>) -> Result<Vec<&'a Value>> {
-    let targets = reg["targets"].as_array().context("targets")?;
-    let Some(tid) = only else {
-        return Ok(targets.iter().filter(|t| t["enabled"] == true).collect());
-    };
-    let target = targets
-        .iter()
+    if let Some(tid) = only { return Ok(vec![enabled_target(reg, tid)?]); }
+    Ok(reg["targets"].as_array().context("targets")?.iter().filter(|t| t["enabled"] == true).collect())
+}
+fn enabled_target<'a>(reg: &'a Value, tid: &str) -> Result<&'a Value> {
+    let target = reg["targets"].as_array().context("targets")?.iter()
         .find(|t| t["id"] == tid)
         .context("Target not found")?;
     ensure!(target["enabled"] == true, "Target is disabled");
-    Ok(vec![target])
+    Ok(target)
 }
 /// Calculates a plan, stores it for `apply` and records the check. `errors` is the number of
 /// sources the `check` behind it could not resolve; a plan alone has none to report.
@@ -1040,15 +1160,32 @@ fn check_plan(
     receipts: &Value,
     reinstall: Option<&str>,
     only: Option<&str>,
+    plugin_id: Option<&str>,
     errors: Option<usize>,
 ) -> Result<Value> {
-    let plan = plan(root, reg, receipts, reinstall, only)?;
+    if let Some(pid) = plugin_id {
+        let tid = only.context("A plugin install needs a target_id")?;
+        let plugin = reg["plugins"].as_array().context("plugins")?.iter()
+            .find(|p| p["id"] == pid).context("Plugin not found")?;
+        ensure!(plugin["targets"].as_array().context("plugin targets")?.iter().any(|id| id == tid),
+                "Select this harness for the plugin before installing it");
+        ensure!(reinstall.is_none_or(|requested| requested == pid), "Reinstall must name the selected plugin");
+    }
+    // Compare all desired native identities on this harness before narrowing the saved operations.
+    // Otherwise two plugins that claim the same installation could both pass the scoped check.
+    let mut plan = plan(root, reg, receipts, reinstall, only, plugin_id)?;
+    if let Some(pid) = plugin_id {
+        plan["operations"].as_array_mut().context("operations")?.retain(|op|
+            op["plugin_id"] == pid && matches!(op["kind"].as_str(), Some("install" | "activate" | "update" | "reinstall")));
+        plan["plugin_id"] = json!(pid);
+    }
     write(
         &root
             .join("plans")
             .join(format!("{}.json", str_field(&plan, "id")?)),
         &plan,
     )?;
+    if plugin_id.is_some() { return Ok(plan); }
     let checked = planned_targets(reg, only)?
         .into_iter()
         .map(|t| str_field(t, "id"))
@@ -1066,10 +1203,11 @@ fn plan(
     receipts: &Value,
     reinstall: Option<&str>,
     only_target: Option<&str>,
+    selected_plugin: Option<&str>,
 ) -> Result<Value> {
     let targets = planned_targets(reg, only_target)?;
     let instruction_bindings = instructions::bindings(root, reg)?;
-    let invs = inventories(root, reg, receipts, true)?;
+    let invs = scan_inventories(root, &targets, receipts)?;
     let currency = projects::Currency::new(reg);
     let mut ops: Vec<Value> = vec![];
     let mut blockers = vec![];
@@ -1089,6 +1227,8 @@ fn plan(
         let installed = inv["plugins"].as_array().context("inventory plugins")?;
         let blocked_before = blockers.len();
         let mut desired_native = vec![];
+        let mut owners: BTreeMap<String, BTreeSet<&str>> = BTreeMap::new();
+        let mut protected_installs = BTreeSet::new();
         for plugin in reg["plugins"]
             .as_array()
             .context("plugins")?
@@ -1100,6 +1240,16 @@ fn plan(
             })
         {
             let pid = str_field(plugin, "id")?;
+            for old in installed.iter().filter(|i| i["registry_id"] == pid) {
+                owners.entry(str_field(old, "id")?.to_owned()).or_default().insert(pid);
+            }
+            // Without a build this plugin has no additional native identity to claim here.
+            // Its installed identities above still protect it from another plugin's install.
+            if selected_plugin.is_some_and(|selected| selected != pid)
+                && plugin["distributions"].as_array().is_some_and(|builds| builds.iter().all(|d| d["harness"] != h))
+            {
+                continue;
+            }
             let repairing = reinstall == Some(pid);
             let prepared = currency.check(plugin, h)
                 .and_then(|()| install_artifacts(root, plugin, h, receipts, tid, repairing));
@@ -1111,24 +1261,16 @@ fn plan(
                     continue;
                 }
             };
-            // The native name of a Hermes package identifies the installation. Do not
-            // replace an independently installed copy or half-install a colliding pair.
             let hermes_pair = h == "hermes" && artifacts.iter().any(|a| a["component"] == native::HERMES_MCP);
-            if let Some(conflict) = artifacts.iter().find(|a| {
-                desired_native.contains(&a["native_id"]) || (h == "hermes" && installed.iter().any(|i| {
-                    (hermes_pair || i["component"] == native::HERMES_MCP) &&
-                    i["id"] == a["native_id"] && (i["registry_id"] != pid || i["component"] != a["component"])
-                }))
-            }) {
-                blockers.push(format!("{}: native installation {} already belongs to another plugin",
-                    text(&target["name"]), text(&conflict["native_id"])));
-                // If two desired plugins claim the same uninstalled name, neither wins by list order.
-                let competing = ops.iter().find(|op| op["target_id"] == tid && op["artifact"]["native_id"] == conflict["native_id"])
-                    .map(|op| op["plugin_id"].clone());
-                if let Some(other) = competing { ops.retain(|op| op["target_id"] != tid || op["plugin_id"] != other); }
-                continue;
-            }
             for artifact in artifacts {
+                let native_id = str_field(&artifact, "native_id")?;
+                owners.entry(native_id.to_owned()).or_default().insert(pid);
+                if installed.iter().any(|i| {
+                    (selected_plugin == Some(pid) || (h == "hermes" && (hermes_pair || i["component"] == native::HERMES_MCP))) &&
+                    i["id"] == native_id && (i["registry_id"] != pid || i["component"] != artifact["component"])
+                }) {
+                    protected_installs.insert(native_id.to_owned());
+                }
                 let previous = installed.iter().find(|i| i["registry_id"] == pid && i["component"] == artifact["component"]);
                 let receipt = receipt_for(receipts, tid, pid, artifact["component"].as_str()).unwrap_or(&Value::Null);
                 desired_native.push(artifact["native_id"].clone());
@@ -1138,6 +1280,19 @@ fn plan(
                 }
             }
         }
+        // A pair can collide with two separate plugins. Collect every claim first, even from
+        // already installed or blocked plugins, then drop every operation of each competing owner.
+        let mut blocked_plugins: BTreeSet<&str> = BTreeSet::new();
+        for (native_id, plugins) in owners {
+            if plugins.len() > 1 || protected_installs.contains(&native_id) {
+                if selected_plugin.is_none_or(|pid| plugins.contains(pid)) {
+                    blockers.push(format!("{}: native installation {native_id} already belongs to another plugin", text(&target["name"])));
+                }
+                blocked_plugins.extend(plugins);
+            }
+        }
+        ops.retain(|op| op["target_id"] != tid || !op["plugin_id"].as_str().is_some_and(|id| blocked_plugins.contains(id)));
+        if selected_plugin.is_some() { continue; } // Installing one plugin never cleans up the harness.
         // The list is the truth (the owner, 2026-11-25): a marketplace the harness cannot load keeps
         // the harness from listing anything, so one that holds no plugin of the list goes, with the
         // plugins configured from it, whatever `exclusive` says. One that holds a plugin of the list
@@ -1190,7 +1345,7 @@ fn plan(
     ensure!(instructions::bindings(root, reg)? == instruction_bindings,
             "custom-instructions changed while preparing the plan; calculate a new plan");
     Ok(
-        json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
+        json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_scope":only_target,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
     )
 }
 /// One native package is one operation, including the optional Hermes MCP package.
@@ -1365,7 +1520,13 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
     }
     ensure!(plan["custom_instructions_hash"] == hash(&instructions::bindings(root, reg)?),
             "custom-instructions changed since plan; calculate a new plan");
-    let invs = inventories(root, reg, receipts, true)?;
+    // Older persisted plans fingerprinted every configured target, including disabled ones.
+    let invs = if let Some(scope) = plan.get("inventory_scope") {
+        let targets = planned_targets(reg, scope.as_str())?;
+        scan_inventories(root, &targets, receipts)?
+    } else {
+        inventories(root, reg, receipts, true)?
+    };
     ensure!(
         hash(&invs) == str_field(&plan, "inventory_hash")?,
         "Installed inventory changed; calculate a new plan"
@@ -1414,6 +1575,16 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         }
     }
     let journal = root.join("journal.json");
+    let changed_ids = changed.iter()
+        .map(|target| str_field(target, "id"))
+        .collect::<Result<Vec<_>>>()?;
+    let plugin_install = plan["plugin_id"].is_string();
+    if plugin_install {
+        // A native command can write and then fail. Invalidate the old full-plan counts
+        // before touching the harness, including when only one of a Hermes pair succeeds.
+        sync_status::invalidate_counts(root)?;
+    }
+    forget_inventories(root, changed_ids)?;
     write(
         &journal,
         &json!({"plan_id":pid,"status":"running","completed":[]}),
@@ -1522,7 +1693,7 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
             &json!({"plan_id":pid,"status":"running","completed":done}),
         )?;
     }
-    let post = inventories(root, reg, receipts, true)?;
+    let post = scan_inventories(root, &changed, receipts)?;
     for &op in &executed {
         let inv = post
             .as_array()
@@ -1581,14 +1752,12 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         "complete",
         &format!("{} operations verified", executed.len()),
     )?;
-    let mut synced = executed
-        .iter()
-        .copied()
-        .map(|op| str_field(op, "target_id"))
-        .collect::<Result<Vec<_>>>()?;
-    synced.sort_unstable();
-    synced.dedup();
-    sync_status::record_sync(root, &synced, executed.len())?;
+    if !plugin_install {
+        let mut synced = executed.iter().map(|op| str_field(op, "target_id")).collect::<Result<Vec<_>>>()?;
+        synced.sort_unstable();
+        synced.dedup();
+        sync_status::record_sync(root, &synced, executed.len())?;
+    }
     applied_snapshot(
         root,
         reg,
@@ -1670,6 +1839,26 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
 mod tests {
     use super::*;
     #[test]
+    fn snapshots_read_cli_observations_without_running_the_host_and_use_current_ownership() {
+        let data = tempfile::tempdir().unwrap();
+        let target = json!({"id":"claude","name":"Claude Code","harness":"claude-code",
+            "root":data.path(),"executable":"no-such-executable"});
+        let registry = json!({"targets":[target]});
+        let empty = inventories(data.path(), &registry, &json!({}), false).unwrap();
+        assert_eq!(empty[0]["unscanned"], true);
+        assert!(empty[0]["error"].as_str().unwrap().contains("Check now"));
+        let observed = json!({"target_id":"claude","target_hash":hash(&target),"complete":true,
+            "plugins":[{"id":"demo@m","managed":true,"registry_id":"previous","receipt_id":"old","component":"old"}]});
+        write(&data.path().join("inventory.json"), &json!({"claude":observed})).unwrap();
+        let receipts = json!({"new":{"target_id":"claude","native_id":"demo@m","plugin_id":"new-owner"}});
+        let current = inventories(data.path(), &registry, &receipts, false).unwrap();
+        assert_eq!(current[0]["complete"], true);
+        assert_eq!(current[0]["plugins"][0], json!({"id":"demo@m","managed":true,"registry_id":"new-owner","receipt_id":"new"}));
+        let unowned = inventories(data.path(), &registry, &json!({}), false).unwrap();
+        assert_eq!(unowned[0]["plugins"][0], json!({"id":"demo@m","managed":false}));
+    }
+
+    #[test]
     fn a_linked_row_resolves_the_listed_archive_without_selecting_new_targets_or_another_plugin() {
         let data = tempfile::tempdir().unwrap();
         let archive = data.path().join("project.mp");
@@ -1691,6 +1880,11 @@ mod tests {
         let build = |release: &Path| projects::VerifiedBuild {
             release:release.to_path_buf(), version:"1".into(), digest:digest.clone(),
         };
+        let mut empty = legacy.clone();
+        empty["distributions"] = json!([]);
+        let recovered = resolve_plugin(data.path(), &registry, &empty, Some(&|_, _| Ok(build(&release)))).unwrap();
+        assert_eq!(recovered["resolved_project"]["harnesses"], json!(["opencode", "pi"]));
+        assert_eq!(recovered["targets"], legacy["targets"]);
         let resolved = resolve_plugin(data.path(), &registry, &legacy, Some(&|_, _| Ok(build(&release)))).unwrap();
         for field in ["id", "project", "name", "targets"] {
             assert_eq!(resolved[field], legacy[field]);

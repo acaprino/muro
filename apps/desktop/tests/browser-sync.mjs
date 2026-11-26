@@ -102,7 +102,7 @@ await test('the note before and after a check: opening the page checks nothing, 
   const c = cells(page, 'Package');
   assert.match(await c.nth(0).textContent(), /github\.com\/example\/p1/, 'the source under the name');
   assert.equal(await c.nth(1).textContent(), 'v2Latest release', 'the latest version with the update policy');
-  assert.equal(await c.nth(2).textContent(), 'Update 1 → 2', 'the cell says what a sync changes there');
+  await c.nth(2).getByRole('button', { name: 'Update 1 → 2 · Package on Codex isolated test', exact: true }).waitFor();
   await head(page, 'Codex isolated test').getByRole('button', { name: 'Sync 1 change', exact: true }).waitFor();
   await page.screenshot({ path: shots + '/sync-dark.png' });
 });
@@ -355,6 +355,7 @@ await test('a check and an apply say that they run; a sheet that applies cannot 
   await app.flags({ checkDelay: 600 });
   await checkNow(page).click();
   await titled(page, 'Checking sources and harnesses…');
+  await page.locator('#sync-state-text').filter({ hasText: /^Checking source 1 of \d+ · .+/ }).waitFor();
   assert.equal(await checkNow(page).getAttribute('aria-busy'), 'true');
   await status(page).getByText('Checking…', { exact: true }).waitFor();
   assert.equal(await focusedText(page), 'Check now', 'the button keeps the focus while it waits');
@@ -433,15 +434,15 @@ await test('the table: a row per plugin with its source, version and policy, a c
   assert.match(await m.nth(0).textContent(), /github\.com\/owner\/sample/);
   assert.equal(await m.nth(0).locator('[title="Sample"]').count(), 1, 'the whole name in its title');
   assert.equal(await m.nth(1).textContent(), 'v0.4.0Latest release');
-  assert.equal(await m.nth(2).textContent(), 'Update 0.3.0 → 0.4.0');
+  await m.nth(2).getByRole('button', { name: 'Update 0.3.0 → 0.4.0 · Sample on Claude Code', exact: true }).waitFor();
   assert.equal(await m.nth(3).textContent(), '0.4.0');
   const t = cells(page, 'test-runner');
   assert.match(await t.nth(1).textContent(), /Pinned version/);
-  assert.equal(await t.nth(4).textContent(), 'Install 1.0.4');
+  await t.nth(4).getByRole('button', { name: 'Install 1.0.4 · test-runner on OpenCode', exact: true }).waitFor();
   assert.equal(await cells(page, 'docs-writer').nth(4).textContent(), 'Needs a build');
   const s = cells(page, 'sql-companion');
   assert.equal(await s.nth(1).textContent(), 'Not checkedLatest commit', 'no version yet, on the latest commit');
-  assert.equal(await s.nth(2).textContent(), '—Not installed here');
+  assert.equal(await s.nth(2).textContent(), 'Not selected');
   await head(page, 'Claude Code').getByRole('button', { name: 'Sync 2 changes', exact: true }).waitFor();
   await head(page, 'Codex').getByText('In sync', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByRole('button', { name: 'Sync 1 change', exact: true }).waitFor();

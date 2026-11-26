@@ -32,6 +32,15 @@ pub fn open_in_file_manager(path: &Path) -> Result<()> {
 }
 
 pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
+    request_with_progress(data, action, payload, None)
+}
+
+fn request_with_progress(
+    data: &Path,
+    action: &str,
+    payload: Value,
+    progress: Option<&dyn Fn(Value)>,
+) -> Result<Value> {
     match action {
         "projects" => projects::projects(data),
         "project" => projects::project(data, &payload),
@@ -83,9 +92,9 @@ pub fn request(data: &Path, action: &str, payload: Value) -> Result<Value> {
             }
             Ok(snapshot)
         }
-        _ => muro_registry::service::request_with_projects(data, action, payload, &|settings, file| {
+        _ => muro_registry::service::request_with_progress(data, action, payload, Some(&|settings, file| {
             factory::Factory::from_settings(settings)?.verified_build(file, &projects::cache_dir(data))
-        }),
+        }), progress),
     }
 }
 

@@ -84,6 +84,15 @@ pub fn forget_target(root: &Path, id: &str) -> Result<()> {
     write(&root.join(FILE), &state)
 }
 
+/// A single-plugin install changes the inventory without calculating the remaining full plan.
+/// Preserve the timestamps of actual harness checks and syncs until the next one runs.
+pub fn invalidate_counts(root: &Path) -> Result<()> {
+    let mut state = load(root)?;
+    if state["revision"].is_null() { return Ok(()); }
+    for field in ["revision", "pending", "blockers"] { state[field] = Value::Null; }
+    write(&root.join(FILE), &state)
+}
+
 /// Records an applied plan: the targets it changed are synced, and the operations it applied
 /// are no longer pending. `blockers` stays as the check counted it: an apply that left
 /// blockers out did not resolve them.

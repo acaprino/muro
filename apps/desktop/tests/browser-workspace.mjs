@@ -116,8 +116,10 @@ await test('Remove from list asks first and removes only the entry; a project na
   const odd = '<b>Odd & "quoted"';
   await app.flags({ pickPath: `D:/Notes/${odd}.mp` });
   await goProjects(page);
+  await page.getByRole('table', { name: 'Projects' }).waitFor();
   await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
   await notice(page, `${odd} added to your list.`).waitFor();
+  assert.equal((await callsOf(app, 'projects')).length, 1, 'opening a file uses its returned summary without inspecting the other archives again');
   assert.deepEqual((await app.calls()).filter(c => ['pick_file', 'open_project'].includes(c.action)).map(c => [c.action, c.payload]), [['pick_file', { filter: 'Muro project (*.mp)' }], ['open_project', { path: `D:/Notes/${odd}.mp` }]]);
   await page.getByRole('button', { name: odd, exact: true }).waitFor();
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('main b')].filter(b => b.textContent.includes('Odd')).length), 0, 'the name is text, not markup');
@@ -481,6 +483,7 @@ await test('a reload brings back the open project, its panel and its selection; 
   await goProjects(page);
   await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
   assert.equal(await segment(page, 'Inputs').getAttribute('aria-pressed'), 'true', 'the panel that was open');
+  assert.equal((await callsOf(app, 'projects')).length, 0, 'restoring a workspace only inspects its own archive');
   assert.equal(await row(page, 'genoffice').getAttribute('aria-current'), 'true', 'the input that was selected');
   await inspector(page).getByRole('heading', { name: 'genoffice', level: 3 }).waitFor();
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', OFFICE);

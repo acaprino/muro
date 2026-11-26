@@ -126,6 +126,7 @@ fn the_project_page_reads_the_full_info_and_only_for_a_listed_project() {
     let file = home.file("demo.mp", json!({"plugin":plugin("Demo","demo")}));
     home.list(&[("demo", &file)]);
     let info = home.call("project", json!({"id":"demo"})).unwrap();
+    assert_eq!(info["file"], json!(file));
     assert_eq!(info["plugin"]["slug"], "demo");
     assert!(info["graph"].is_object() && info.get("inputs").unwrap().is_array(), "the full info, not the summary");
     assert!(!calls(&home.factory)[0].contains(&"--summary".to_owned()));
@@ -268,9 +269,9 @@ fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
     // exactly the targets named: another of a kind named (here a disabled one) is not made one
     assert_eq!(installed["targets"], json!(["pi-main", "oc"]));
     let builds = installed["distributions"].as_array().unwrap();
-    assert_eq!(builds.iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["pi", "opencode"]);
+    assert_eq!(builds.iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["claude-code", "opencode", "pi"]);
     for build in builds {
-        assert_eq!((build["origin"].as_str(), build["version"].as_str()), (Some("muro"), Some("1.0.0")));
+        assert_eq!((build["origin"].as_str(), build["version"].as_str()), (Some("native"), Some("1.0.0")));
         assert_eq!(build["project_digest"], json!(digest));
         assert_eq!(build["source_revision"], installed["upstream_revision"]);
         assert!(build["path"].as_str().unwrap().contains(&digest), "the build is the cached unpack of this file");
@@ -282,28 +283,25 @@ fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
     // a second call is the same plugin, not a second one
     home.call("install_project", json!({"id":"demo","targets":["pi-main","oc"]})).unwrap();
     assert_eq!(home.plugin("demo")["targets"], json!(["pi-main", "oc"]));
-    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 2);
+    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 3);
     assert!(file.is_file());
 }
 
 #[test]
-fn checking_an_installed_project_offers_all_variants_and_later_target_edits_keep_them() {
+fn installing_on_pi_immediately_offers_the_projects_codex_variant_and_later_edits_keep_it() {
     let home = Home::new();
     home.target("pi-main", "pi", true);
     home.target("oc", "opencode", true);
-    let (file, _) = built(&home, "demo", &["opencode", "pi"]);
+    let (file, _) = built(&home, "demo", &["codex", "opencode", "pi"]);
     home.call("install_project", json!({"id":"demo","targets":["pi-main"]})).unwrap();
-    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 1);
-
-    let checked = home.call("check", json!({})).unwrap();
-    assert_eq!(checked["errors"], json!([]));
     let plugin = home.plugin("demo");
     assert_eq!(plugin["source"], json!(file));
     assert_eq!(plugin["targets"], json!(["pi-main"]));
-    assert_eq!(plugin["resolved_project"]["harnesses"], json!(["opencode","pi"]));
+    assert_eq!(plugin["resolved_project"]["harnesses"], json!(["codex","opencode","pi"]));
+    assert!(plugin["distributions"].as_array().unwrap().iter().any(|d| d["harness"] == "codex"));
     let out = home.files.join("export");
-    home.call("extract_plugin", json!({"id":"demo","harness":"opencode","folder":out})).unwrap();
-    assert!(out.join("opencode/INSTALL.md").is_file());
+    home.call("extract_plugin", json!({"id":"demo","harness":"codex","folder":out})).unwrap();
+    assert!(out.join("codex/INSTALL.md").is_file());
 
     home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
     let edited = home.plugin("demo");
@@ -326,23 +324,23 @@ fn only_the_targets_named_are_the_plugins_and_a_target_not_named_is_not_touched_
     let done = home.call("install_project", json!({"id":"demo","targets":["pi-a"]})).unwrap();
     assert_eq!(home.plugin("demo")["targets"], json!(["pi-a"]));
     assert_eq!(done["harnesses"], json!(["pi"]));
-    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 1);
+    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 2);
     // switching another kind on, the page names the ones that are on: the target of the first kind that was
     // switched off stays off
     home.call("install_project", json!({"id":"demo","targets":["pi-a","oc"]})).unwrap();
     let plugin = home.plugin("demo");
     assert_eq!(plugin["targets"], json!(["pi-a", "oc"]), "pi-b was switched off and stays off");
-    assert_eq!(plugin["distributions"].as_array().unwrap().iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["pi", "opencode"]);
-    // a distribution is made for each distinct kind of the targets, once
+    assert_eq!(plugin["resolved_project"]["harnesses"], json!(["opencode", "pi"]));
+    // Two targets of the same kind share their build.
     home.call("install_project", json!({"id":"demo","targets":["pi-b","pi-a","pi-b"]})).unwrap();
     let plugin = home.plugin("demo");
     assert_eq!(plugin["targets"], json!(["pi-b", "pi-a"]), "exactly those named, each once, in the order named");
-    assert_eq!(plugin["distributions"].as_array().unwrap().len(), 1, "one build for the one kind");
-    // naming only the other kind leaves the first kind's targets and build out
+    assert_eq!(plugin["distributions"].as_array().unwrap().len(), 2);
+    // Naming only the other kind drops the old destinations and keeps both builds.
     home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
     let kept = home.plugin("demo");
     assert_eq!(kept["targets"], json!(["oc"]));
-    assert_eq!(kept["distributions"].as_array().unwrap().iter().map(|d| d["harness"].as_str().unwrap()).collect::<Vec<_>>(), ["opencode"]);
+    assert_eq!(kept["distributions"], plugin["distributions"]);
 }
 
 #[test]

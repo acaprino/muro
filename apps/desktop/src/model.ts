@@ -25,7 +25,7 @@ export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   if(installations.some(i=>i.installed?.version!==distributionFor(plugin,i.target)?.version)) return status('update','Update available','warn');
   return status('ok','Up to date','ok');
 }
-export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'source-error'|'changes'|'unknown'|'paused'|'none';
+export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'source-error'|'changes'|'unscanned'|'unknown'|'paused'|'none';
 export interface CellStatus { kind:CellKind; from?:string; to?:string; reason?:string; count?:number }
 const cell=(kind:CellKind,from?:string,to?:string):CellStatus=>({kind,...(from?{from}:{}),...(to?{to}:{})});
 /** The operation kinds the service plans: each one is a change waiting to be applied. */
@@ -43,18 +43,22 @@ export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Pla
   const instructions=instructionsOf(plugin,snapshot);
   if(instructions?.error) return cell('unknown');
   if(instructions?.stale_harnesses.includes(target.harness)) return cell('needs-build');
-  if(!readable(target,snapshot)) return cell('unknown');
+  const inventory = snapshot.inventory.find(i => i.target_id === target.id);
+  if(inventory?.unscanned) return cell(distributionFor(plugin,target) ? 'unscanned' : 'needs-build');
+  if(!inventory?.complete || !inventory.supported) return cell('unknown');
   const wanted=distributionFor(plugin,target);
   if(!wanted) return cell('needs-build');
   const installed=installedOn(plugin,target,snapshot);
   if(!installed) return cell('install',undefined,wanted.version);
   return cell(installed.version===wanted.version?'ok':'update',installed.version,wanted.version);
 }
-export interface HarnessStatus { kind:'paused'|'unknown'|'changes'|'needs-build'|'source-error'|'unseen'|'ok'; count:number }
+export interface HarnessStatus { kind:'paused'|'unscanned'|'unknown'|'changes'|'needs-build'|'source-error'|'unseen'|'ok'; count:number }
 /** The state line of a harness column. A harness that cannot be read is never in sync; the count is of what the kind names. `unseen`: the record says changes are waiting and this column has none of its own to show (the record does not say where they are), so it cannot say it is in sync: `count` is the recorded total. */
 export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):HarnessStatus {
   if(!target.enabled) return {kind:'paused',count:0};
-  if(!readable(target,snapshot)) return {kind:'unknown',count:0};
+  const inventory = snapshot.inventory.find(i => i.target_id === target.id);
+  if(inventory?.unscanned) return {kind:'unscanned',count:0};
+  if(!inventory?.complete || !inventory.supported) return {kind:'unknown',count:0};
   const kinds=snapshot.registry.plugins.map(p=>cellState(p,target,snapshot,plan).kind);
   const count=(wanted:(k:CellKind)=>boolean)=>kinds.filter(wanted).length;
   const checked=currentPlan(snapshot,plan);
@@ -83,7 +87,8 @@ export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
   const summary=syncSummary(snapshot,plan);
   const unreadable=snapshot.registry.targets.filter(t=>t.enabled).map(target=>({target,state:harnessState(target,snapshot,plan)})).filter(x=>x.state.kind==='unknown').map(x=>({target:x.target,count:x.state.count}));
   const quiet=summary.kind==='ok'||summary.kind==='blocked';
-  return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':summary.kind,unreadable};
+  const unchecked = snapshot.inventory.some(i => i.unscanned && snapshot.registry.targets.some(t => t.enabled && t.id === i.target_id));
+  return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':summary.kind==='ok'&&unchecked?'not-checked':summary.kind,unreadable};
 }
 /** What an enabled harness holds that it cannot load itself (the `warnings` of its inventory), each with its harness. The service read around it: the harness is listed and managed all the same, so this is told beside the sync state and never takes its place. */
 export function harnessWarnings(snapshot:Snapshot):{target:Target;message:string}[] {

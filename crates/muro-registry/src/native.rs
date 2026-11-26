@@ -125,23 +125,37 @@ pub fn inventory(target: &Value, receipts: &Value) -> Value {
         for p in &mut entries {
             let name = plugin_name(h, p);
             p["plugin_name"] = name;
-            for (rid,r) in receipts.as_object().into_iter().flatten() {
-                if r["target_id"] == tid && r["native_id"] == p["id"] {
-                    p["managed"]=json!(true);
-                    p["registry_id"]=r["plugin_id"].clone();
-                    p["receipt_id"]=json!(rid);
-                    if let Some(component) = r.get("component") {
-                        p["component"] = component.clone();
-                    }
-                }
-            }
         }
-        json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"broken":broken,"plugins":entries,"fingerprint":fingerprint})
+        let mut inventory = json!({"target_id":tid,"complete":true,"supported":supported(h),"error":null,"warnings":warnings,"broken":broken,"plugins":entries,"fingerprint":fingerprint});
+        bind_receipts(&mut inventory, tid, receipts);
+        inventory
     });
     match result {
         Ok(v) => v,
         Err(e) => {
             json!({"target_id":tid,"complete":false,"supported":supported(h),"error":format!("{e:#}"),"warnings":[],"broken":[],"plugins":[],"fingerprint":""})
+        }
+    }
+}
+/// Ownership belongs to the registry. A cached observation of the host's files must show
+/// the same owners as a fresh scan after an adoption, takeover or removal from the list.
+pub(crate) fn bind_receipts(inventory: &mut Value, target_id: &str, receipts: &Value) {
+    let Some(plugins) = inventory["plugins"].as_array_mut() else { return };
+    for plugin in plugins {
+        let Some(fields) = plugin.as_object_mut() else { continue };
+        fields.remove("registry_id");
+        fields.remove("receipt_id");
+        fields.remove("component");
+        plugin["managed"] = json!(false);
+        if let Some((key, receipt)) = receipts.as_object().into_iter().flatten().find(|(_, r)| {
+            r["target_id"] == target_id && r["native_id"] == plugin["id"]
+        }) {
+            plugin["managed"] = json!(true);
+            plugin["registry_id"] = receipt["plugin_id"].clone();
+            plugin["receipt_id"] = json!(key);
+            if let Some(component) = receipt.get("component") {
+                plugin["component"] = component.clone();
+            }
         }
     }
 }

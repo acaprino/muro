@@ -10,7 +10,7 @@ import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
 import { DeleteDialog, atRevision, nameOf } from './project/write/DeleteDialog.tsx';
 import { JobCard } from './project/write/JobCard.tsx';
-import { busyReason, pickProjectFile, projectFileKey, runningOn } from './project/write/jobs.ts';
+import { busyReason, pickProjectFile, runningOn } from './project/write/jobs.ts';
 import { NewProjectDialog } from './project/write/NewProjectDialog.tsx';
 import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
@@ -27,36 +27,50 @@ export function Projects() {
   const leave = React.useRef(project.leave);
   leave.current = project.leave;
   React.useEffect(() => () => leave.current(), []);
-  // `settled` counts the jobs that ended: the list is read again when one does (a new project, a deleted one, a version moved).
+  const openId = project.view?.id ?? null;
   const { settled } = useJobs();
-  const sendRef = React.useRef(request);
-  sendRef.current = request;
+  const lastListRead = React.useRef<number | null>(null);
   const [list, setList] = React.useState<ProjectSummary[] | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  /** The list of project files. A failure is the page's own: it shows where the list would be. */
-  const loadList = React.useCallback(async (): Promise<ProjectSummary[] | null> => {
+  const loadList = React.useCallback(async (): Promise<void> => {
+    lastListRead.current = settled;
     setError(null);
     try {
-      const read = await sendRef.current<ProjectSummary[]>('projects');
-      const rows = Array.isArray(read) ? read : [];
-      setList(rows);
-      return rows;
-    } catch (e) { setError(message(e)); return null; }
-  }, []);
-  React.useEffect(() => { void loadList(); }, [loadList, settled]);
-  const openId = project.view?.id ?? null;
+      const rows = await request<ProjectSummary[]>('projects');
+      setList(Array.isArray(rows) ? rows : []);
+    } catch (e) { setError(message(e)); }
+  }, [request, settled]);
+  // Keep the last list ready for Back. A job or edit invalidates its summaries, but those reads
+  // can wait until the list is visible instead of delaying the open project's own refresh.
+  React.useEffect(() => {
+    if (openId === null && lastListRead.current !== settled) void loadList();
+  }, [openId, loadList, settled]);
+  async function showOpened(added: ProjectSummary): Promise<void> {
+    if (!list) return loadList();
+    setList(rows => {
+      const current = rows ?? [];
+      return current.some(p => p.id === added.id)
+        ? current.map(p => p.id === added.id ? added : p)
+        : [...current, added];
+    });
+  }
   // Opening a project takes its button away, and closing one takes "All projects".
   useFocusKept(openId);
-  // A project the list no longer holds (removed by another window, its file gone from the list) is closed.
-  React.useEffect(() => { if (list && openId !== null && !list.some(p => p.id === openId)) project.close(); }, [list, openId]);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (openId !== null) return <OpenProject key={openId} id={openId} summary={list?.find(p => p.id === openId) ?? null} />;
-  return <ProjectList list={list} error={error} loadList={loadList} />;
+  if (openId !== null) return <OpenProject key={openId} id={openId} onUnlisted={() => {
+    lastListRead.current = null;
+    project.close();
+  }} />;
+  return <ProjectList list={list} error={error} loadList={loadList} showOpened={showOpened} />;
 }
 
 // ---------- the list ----------
-function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null; error: string | null; loadList: () => Promise<ProjectSummary[] | null> }) {
-  const { request, snapshot, adopt } = useRegistry();
+function ProjectList({ list, error, loadList, showOpened }: {
+  list: ProjectSummary[] | null;
+  error: string | null;
+  loadList(): Promise<void>;
+  showOpened(project: ProjectSummary): Promise<void>;
+}) {
+  const { request, snapshot, adopt, reload } = useRegistry();
   const project = useProject();
   const notify = useNotify();
   const { jobs, running } = useJobs();
@@ -75,20 +89,21 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const busy = busyReason(running);
 
   async function openFile(): Promise<void> {
-    let path: string | null;
-    try { path = await pickProjectFile(request); }
-    catch (e) {
-      if (unknownTo(e, 'pick_file')) { setNoPicker(true); notify('This version of Muro cannot open a file dialog yet.', { kind: 'error' }); }
-      else notify(message(e), { kind: 'error' });
-      return;
-    }
-    if (!path) return;
     setOpening(true);
     try {
-      await request('open_project', { path });
-      const read = await loadList();
-      const added = read?.find(p => projectFileKey(p.path) === projectFileKey(path));
-      notify(`${added ? nameOf(added) : 'The project'} added to your list.`);
+      let path: string | null;
+      try { path = await pickProjectFile(request); }
+      catch (e) {
+        if (!unknownTo(e, 'pick_file')) throw e;
+        setNoPicker(true);
+        notify('This version of Muro cannot open a file dialog yet.', { kind: 'error' });
+        return;
+      }
+      if (!path) return;
+      const added = await request<ProjectSummary>('open_project', { path });
+      if (!latest.current?.registry.projects?.some(project => project.id === added.id)) void reload();
+      await showOpened(added);
+      notify(`${nameOf(added)} added to your list.`);
     } catch (e) { notify(message(e), { kind: 'error' }); }
     finally { setOpening(false); }
   }
@@ -240,28 +255,35 @@ function Published({ snapshot }: { snapshot: Snapshot }) {
 
 // ---------- the open project ----------
 /** The open project, read from the service. An answer for a project that is no longer the open one is dropped; a failure says why, with Try again. */
-function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | null }) {
+function OpenProject({ id, onUnlisted }: { id: string; onUnlisted(): void }) {
   const { request } = useRegistry();
   const project = useProject();
   const { settled } = useJobs();
   const sendRef = React.useRef(request);
   sendRef.current = request;
   const [attempt, setAttempt] = React.useState(0);
-  const [read, setRead] = React.useState<{ info: ProjectInfo | null; error: string | null }>({ info: null, error: null });
+  const [read, setRead] = React.useState<{ info: (ProjectInfo & { file: string }) | null; error: string | null }>({ info: null, error: null });
+  const closeUnlisted = React.useRef(onUnlisted);
+  closeUnlisted.current = onUnlisted;
   React.useEffect(() => {
     let live = true;
     setRead(r => ({ info: r.info, error: null }));
-    sendRef.current<ProjectInfo>('project', { id }).then(
+    sendRef.current<ProjectInfo & { file: string }>('project', { id }).then(
       info => { if (live) setRead({ info, error: null }); },
-      e => { if (live) setRead({ info: null, error: message(e) }); },
+      e => {
+        if (!live) return;
+        const reason = message(e);
+        if (reason === 'That project is not in your list') closeUnlisted.current();
+        else setRead({ info: null, error: reason });
+      },
     );
     return () => { live = false; };
   }, [id, attempt, settled]);
   const { setInfo } = project;
   React.useEffect(() => {
-    setInfo(read.info && { ...read.info, file: summary?.path ?? null });
+    setInfo(read.info);
     return () => setInfo(null);
-  }, [setInfo, read.info, summary?.path]);
+  }, [setInfo, read.info]);
   const back = <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>;
   if (read.error) return (
     <Column gap="lg" pad="xl">
@@ -275,5 +297,5 @@ function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | nu
       <Text as="p" variant="muted" role="status">Reading the project…</Text>
     </Column>
   );
-  return <Workspace info={read.info} file={summary?.path ?? null} />;
+  return <Workspace info={read.info} file={read.info.file} />;
 }

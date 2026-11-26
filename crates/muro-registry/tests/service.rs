@@ -343,6 +343,90 @@ fn second_artifact(temp: &Path) -> std::path::PathBuf {
     dir
 }
 
+#[test]
+fn a_single_plugin_install_leaves_other_plugins_and_target_sync_times_alone() {
+    let (temp, root, profile, artifact) = fixture();
+    target(&root, &profile);
+    plugin_as(&root, &artifact, "example", &[]);
+    plugin_as(&root, &second_artifact(temp.path()), "second", &["oc"]);
+    let config = profile.join("opencode.json");
+    fs::write(&config, r#"{"plugins":["independent-plugin"]}"#).unwrap();
+    let scope = json!({"target_id":"oc","plugin_id":"example"});
+    assert!(request(&root, "plan", scope.clone()).is_err());
+    assert!(request(&root, "plan", json!({"plugin_id":"example"})).is_err());
+    assert!(request(&root, "plan", json!({"target_id":"oc","plugin_id":"unknown"})).is_err());
+
+    let before = snapshot(&root);
+    let select = |revision: &Value| request(&root, "select_plugin_target",
+        json!({"id":"example","target_id":"oc","revision":revision}));
+    let saved = select(&before["registry"]["revision"]).unwrap();
+    let mut expected = before["registry"]["plugins"].as_array().unwrap().clone();
+    expected.iter_mut().find(|p| p["id"] == "example").unwrap()["targets"] = json!(["oc"]);
+    assert_eq!(saved["registry"]["plugins"], json!(expected));
+    let repeated = select(&saved["registry"]["revision"]).unwrap();
+    assert_eq!(saved["registry"], repeated["registry"]);
+    let full = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(full["operations"].as_array().unwrap().len(), 3, "{full}");
+    let old = age_checks(&root);
+    let plan = request(&root, "plan", scope).unwrap();
+    let ops = plan["operations"].as_array().unwrap();
+    assert_eq!(ops.len(), 1, "{plan}");
+    assert_eq!(ops[0]["plugin_id"], "example");
+    assert_eq!(ops[0]["kind"], "install");
+    let after = request(&root, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let installed = after["inventory"][0]["plugins"].as_array().unwrap();
+    assert_eq!(installed.len(), 2, "{installed:?}");
+    assert!(installed.iter().any(|i| i["registry_id"] == "example"));
+    assert!(installed.iter().any(|i| i["id"] == "independent-plugin" && i["managed"] == false));
+    assert_eq!(after["sync"]["targets"]["oc"]["checked"], old);
+    assert!(after["sync"]["targets"]["oc"]["synced"].is_null());
+    assert!(after["sync"]["pending"].is_null());
+}
+
+#[test]
+fn one_plugin_can_be_installed_when_another_selected_plugin_has_no_build_for_the_harness() {
+    let (_temp, root, profile, artifact) = fixture();
+    target(&root, &profile);
+    plugin(&root, &artifact);
+    let state = snapshot(&root);
+    let mut missing = state["registry"]["plugins"][0].clone();
+    missing["id"] = json!("other");
+    missing["name"] = json!("No build here");
+    missing["distributions"] = json!([]);
+    request(&root, "save_plugin", json!({"revision":state["registry"]["revision"],"plugin":missing})).unwrap();
+    for payload in [json!({}), json!({"target_id":"oc","plugin_id":"other"})] {
+        let blocked = request(&root, "plan", payload).unwrap();
+        assert!(blocked["blockers"].to_string().contains("No build here"), "{blocked}");
+    }
+    let chosen = request(&root, "plan", json!({"target_id":"oc","plugin_id":"example"})).unwrap();
+    assert_eq!(chosen["blockers"], json!([]));
+    assert_eq!(chosen["operations"].as_array().unwrap().len(), 1);
+    assert_eq!(chosen["operations"][0]["plugin_id"], "example");
+    request(&root, "apply", json!({"plan_id":chosen["id"]})).unwrap();
+}
+
+#[test]
+fn a_scoped_install_cannot_win_a_native_identity_by_list_order_or_adopt_it() {
+    let (_t, root, profile, artifact) = fixture();
+    target(&root, &profile);
+    plugin(&root, &artifact);
+    let scope = json!({"target_id":"oc","plugin_id":"example"});
+    let ready = request(&root, "plan", scope.clone()).unwrap();
+    let native = ready["operations"][0]["artifact"]["native_id"].clone();
+    plugin_as(&root, &artifact, "duplicate", &["oc"]);
+    for pid in ["example", "duplicate"] {
+        let plan = request(&root, "plan", json!({"target_id":"oc","plugin_id":pid})).unwrap();
+        assert_eq!(plan["operations"], json!([]), "{plan}");
+        assert!(!plan["blockers"].as_array().unwrap().is_empty());
+    }
+    let revision = snapshot(&root)["registry"]["revision"].clone();
+    request(&root, "remove_plugin", json!({"revision":revision,"id":"duplicate"})).unwrap();
+    fs::write(profile.join("opencode.json"), json!({"plugins":[native]}).to_string()).unwrap();
+    let blocked = request(&root, "plan", scope).unwrap();
+    assert_eq!(blocked["operations"], json!([]), "{blocked}");
+    assert!(!blocked["blockers"].as_array().unwrap().is_empty());
+}
+
 /// Targets `oc` and `other` with the example plugin to install on both, a disabled target
 /// `off`, and a full plan already calculated (2 operations).
 fn two_targets(temp: &Path, root: &Path, profile: &Path, artifact: &Path) {
@@ -467,6 +551,26 @@ fn plan_for_one_target_leaves_the_others_out() {
             "{action}"
         );
     }
+}
+
+#[test]
+fn checking_and_applying_one_target_preserves_the_other_targets_observations() {
+    let (temp, root, profile, artifact) = fixture();
+    two_targets(temp.path(), &root, &profile, &artifact);
+    let cached = || serde_json::from_slice::<Value>(&fs::read(root.join("inventory.json")).unwrap()).unwrap();
+    let before = cached();
+    assert_eq!(before["oc"]["complete"], true);
+    assert!(before.get("off").is_none(), "ordinary plans do not inspect disabled profiles");
+    fs::write(profile.join("opencode.json"), "{invalid").unwrap();
+    let plan = request(&root, "plan", json!({"target_id":"other"})).unwrap();
+    assert_eq!(cached()["oc"], before["oc"]);
+    fs::write(profile.join("opencode.json"), r#"{"plugins":["changed-outside-the-plan"]}"#).unwrap();
+    let applied = request(&root, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    assert_eq!(applied["sync"]["targets"]["other"]["synced"], applied["sync"]["last_sync"]);
+    assert_eq!(cached()["oc"], before["oc"]);
+    let fresh = request(&root, "scan", json!({})).unwrap();
+    assert_eq!(fresh["inventory"][0]["plugins"][0]["id"], "changed-outside-the-plan");
+    assert_eq!(cached()["off"]["complete"], true, "an explicit scan still covers every profile");
 }
 
 #[test]
@@ -1872,9 +1976,7 @@ mod registered_adaptation {
     }
 }
 
-#[test]
-fn hermes_project_sync_tracks_both_packages_and_recovers_after_a_partial_install() {
-    let (_t, root, profile, adapters) = fixture();
+fn hermes_pair_fixture(root: &Path, profile: &Path, adapters: &Path) -> Value {
     let main = adapters.join("hermes");
     let server = adapters.join("hermes-mcp");
     fs::create_dir(&main).unwrap();
@@ -1882,11 +1984,51 @@ fn hermes_project_sync_tracks_both_packages_and_recovers_after_a_partial_install
     fs::write(main.join("plugin.yaml"), r#"{"name":"demo","version":"1.0"}"#).unwrap();
     fs::write(server.join("plugin.json"), r#"{"name":"demo-mcp","version":"1.0"}"#).unwrap();
     fs::write(server.join("mcp.json"), "{}").unwrap();
-    request(&root, "save_target", json!({"revision":0,"target":{"id":"h","harness":"hermes","name":"Hermes","root":profile,
+    request(root, "save_target", json!({"revision":0,"target":{"id":"h","harness":"hermes","name":"Hermes","root":profile,
         "executable":env!("CARGO_BIN_EXE_fake-hermes"),"exclusive":false,"enabled":true}})).unwrap();
-    let saved = snapshot(&root);
-    request(&root, "save_plugin", json!({"revision":saved["registry"]["revision"],"plugin":{"id":"demo","name":"Demo","source":adapters,
-        "policy":"head","pinned_version":"","targets":["h"],"distributions":[{"harness":"hermes","path":main,"version":"1.0","project_digest":"snapshot"}]}})).unwrap();
+    json!({"id":"demo","name":"Demo","source":adapters,"policy":"head","pinned_version":"","targets":["h"],
+           "distributions":[{"harness":"hermes","path":main,"version":"1.0","project_digest":"snapshot"}]})
+}
+
+fn save_hermes(root: &Path, plugin: &Value) {
+    let revision = request(root, "registry", json!({})).unwrap()["revision"].clone();
+    request(root, "save_plugin", json!({"revision":revision, "plugin":plugin})).unwrap();
+}
+
+#[test]
+fn all_plugins_contesting_either_member_of_a_hermes_pair_are_blocked_in_every_order() {
+    for pair_position in 0..3 {
+        let (_temp, root, profile, adapters) = fixture();
+        let pair = hermes_pair_fixture(&root, &profile, &adapters);
+        let mut plugins = vec![];
+        for (id, name) in [("solo-main", "demo"), ("solo-server", "demo-mcp"), ("unrelated", "other")] {
+            let path = adapters.join(id);
+            fs::create_dir(&path).unwrap();
+            fs::write(path.join("plugin.yaml"), json!({"name":name,"version":"1.0"}).to_string()).unwrap();
+            let mut single = pair.clone();
+            single["id"] = json!(id);
+            single["distributions"] = json!([{"harness":"hermes","path":path,"version":"1.0"}]);
+            plugins.push(single);
+        }
+        plugins.insert(pair_position, pair);
+        for plugin in &plugins { save_hermes(&root, plugin); }
+        let plan = request(&root, "plan", json!({})).unwrap();
+        assert_eq!(plan["blockers"].as_array().unwrap().len(), 2, "{plan}");
+        assert_eq!(plan["operations"].as_array().unwrap().len(), 1, "{plan}");
+        assert_eq!(plan["operations"][0]["plugin_id"], "unrelated");
+        for pid in ["demo", "solo-main", "solo-server", "unrelated"] {
+            let scoped = request(&root, "plan", json!({"target_id":"h","plugin_id":pid})).unwrap();
+            assert_eq!(scoped["operations"].as_array().unwrap().len(), usize::from(pid == "unrelated"), "{scoped}");
+            assert_eq!(scoped["blockers"].as_array().unwrap().is_empty(), pid == "unrelated", "{scoped}");
+        }
+    }
+}
+
+#[test]
+fn hermes_project_sync_tracks_both_packages_and_recovers_after_a_partial_install() {
+    let (_t, root, profile, adapters) = fixture();
+    let server = adapters.join("hermes-mcp");
+    save_hermes(&root, &hermes_pair_fixture(&root, &profile, &adapters));
 
     // An independently installed package with the server's name is never overwritten.
     let state = profile.join("installed.json");
@@ -1899,7 +2041,12 @@ fn hermes_project_sync_tracks_both_packages_and_recovers_after_a_partial_install
     let initial = request(&root, "plan", json!({})).unwrap();
     assert_eq!(initial["operations"].as_array().unwrap().len(), 2, "{initial}");
     fs::write(profile.join("refuse-server"), "").unwrap();
-    assert!(request(&root, "apply", json!({"plan_id":initial["id"]})).is_err());
+    let scoped = request(&root, "plan", json!({"target_id":"h","plugin_id":"demo"})).unwrap();
+    assert_eq!(snapshot(&root)["sync"]["pending"], 2);
+    assert!(request(&root, "apply", json!({"plan_id":scoped["id"]})).is_err());
+    let failed = snapshot(&root);
+    assert!(failed["sync"]["revision"].is_null());
+    assert!(failed["sync"]["pending"].is_null());
     fs::remove_file(profile.join("refuse-server")).unwrap();
     let retry = request(&root, "plan", json!({})).unwrap();
     assert_eq!(retry["operations"].as_array().unwrap().len(), 1, "{retry}");
@@ -2002,6 +2149,50 @@ fn claude_native_round_trip() {
 #[ignore = "requires installed native Codex, uses isolated home"]
 fn codex_native_round_trip() {
     marketplace_round_trip("codex", &std::env::var("MURO_CODEX_TEST_EXE").unwrap());
+}
+
+#[test]
+fn a_codex_adapter_inside_a_project_file_installs_through_sync() {
+    use std::process::Command;
+    use muro_registry::{projects::VerifiedBuild, service::request_with_projects};
+    let (temp, data, profile, _) = fixture();
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap();
+    let python = if cfg!(windows) { "python" } else { "python3" };
+    let packed = Command::new(python)
+        .arg(repo.join("crates/muro-desktop-runtime/tests/common/make_project.py"))
+        .arg(repo).arg(temp.path()).arg("codex-check").output().unwrap();
+    assert!(packed.status.success(), "{}", String::from_utf8_lossy(&packed.stderr));
+    let archive = temp.path().join("codex-check.mp");
+    let cache = data.join("project-cache");
+    let target = request(&data, "save_target", json!({"revision":0, "target":{
+        "id":"cx","harness":"codex","name":"Codex","root":profile,
+        "executable":env!("CARGO_BIN_EXE_fake-codex"),"exclusive":false,"enabled":true
+    }})).unwrap();
+    request(&data, "save_plugin", json!({"revision":target["registry"]["revision"], "plugin":{
+        "id":"from-mp","name":"From archive","source":archive,"policy":"head","pinned_version":"",
+        "targets":["cx"],"distributions":[]
+    }})).unwrap();
+    let checked = request_with_projects(&data, "check", json!({}), &|_, file| {
+        let result = Command::new(python).arg(repo.join("muro_build.py")).args(["project","verify"])
+            .arg(file).arg("--cache").arg(&cache).arg("--build-info").output()?;
+        anyhow::ensure!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        let info: Value = serde_json::from_slice(&result.stdout)?;
+        let digest = info["digest"].as_str().unwrap();
+        Ok(VerifiedBuild {
+            release:cache.join(digest).join("release").join(info["slug"].as_str().unwrap()),
+            digest:digest.to_owned(), version:info["version"].as_str().unwrap().to_owned()
+        })
+    }).unwrap();
+    assert_eq!(checked["errors"], json!([]));
+    let plan = &checked["plan"];
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    assert_eq!(plan["operations"][0]["target_id"], "cx");
+    assert_eq!(plan["operations"][0]["kind"], "install");
+    request(&data, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    let installed = profile.join("plugins/cache/muro-from-mp/tester/0.1.0");
+    assert!(installed.join(".codex-plugin/plugin.json").is_file());
+    assert!(fs::read_to_string(installed.join("INSTALL.md")).unwrap().contains("codex-check"));
+    assert_eq!(request(&data, "plan", json!({})).unwrap()["operations"], json!([]));
 }
 
 // Owner, 2026-11-25, "Muro deve funzionare": on the owner's computer one configured marketplace whose

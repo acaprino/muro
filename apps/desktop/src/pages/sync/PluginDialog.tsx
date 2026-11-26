@@ -242,24 +242,24 @@ export function PluginFields({ ids, form, onChange, problems, targets, saved, so
       </FormField>
       <Column gap="sm" role="group" aria-labelledby={fieldId(ids, 'targets')}>
         <Text variant="strong" id={fieldId(ids, 'targets')}>Install on</Text>
-        <Text as="p" variant="note">Sync installs the available builds on the selected harnesses when changes are applied.</Text>
+        <Text as="p" variant="note">Select where you want this plugin. After saving, install it from its row in Sync.</Text>
         {sourcePreview}
         {targets.length ? targets.map(t => (
           <Checkbox key={t.id} id={fieldId(ids, `target-${t.id}`)} label={t.name} checked={form.targets.includes(t.id)} onCheckedChange={on => toggle(t.id, on === true)} />
         )) : <Text as="p" variant="muted">No harness yet. Add one in Sync.</Text>}
       </Column>
-      <Column gap="sm">
-        <Text variant="strong" id={fieldId(ids, 'policy')}>Updates</Text>
-        <RadioGroup aria-labelledby={fieldId(ids, 'policy')} value={form.policy} onValueChange={value => { if (isPolicy(value)) onChange({ policy: value }); }}>
-          {POLICIES.map(p => <RadioGroupItem key={p.value} value={p.value}>{p.label}</RadioGroupItem>)}
-        </RadioGroup>
-        {form.policy === 'pinned' ? (
-          <FormField id={fieldId(ids, 'pinned')} label="Pinned version" error={problems.pinned}>
-            <Input name="pinned_version" autoComplete="off" spellCheck={false} placeholder="0.4.1" value={form.pinned} onChange={e => onChange({ pinned: e.currentTarget.value })} />
-          </FormField>
-        ) : null}
-      </Column>
-      <Fold label="Advanced" open={advanced || problems.builds !== undefined} onToggle={() => onAdvanced(!advanced)}>
+      <Fold label="Advanced" open={advanced || !!problems.pinned || !!problems.builds} onToggle={() => onAdvanced(!advanced)}>
+        <Column gap="sm">
+          <Text variant="strong" id={fieldId(ids, 'policy')}>Updates</Text>
+          <RadioGroup aria-labelledby={fieldId(ids, 'policy')} value={form.policy} onValueChange={value => { if (isPolicy(value)) onChange({ policy: value }); }}>
+            {POLICIES.map(p => <RadioGroupItem key={p.value} value={p.value}>{p.label}</RadioGroupItem>)}
+          </RadioGroup>
+          {form.policy === 'pinned' ? (
+            <FormField id={fieldId(ids, 'pinned')} label="Pinned version" error={problems.pinned}>
+              <Input name="pinned_version" autoComplete="off" spellCheck={false} placeholder="0.4.1" value={form.pinned} onChange={e => onChange({ pinned: e.currentTarget.value })} />
+            </FormField>
+          ) : null}
+        </Column>
         <FormField
           id={fieldId(ids, 'dir')}
           label="Custom instructions folder"

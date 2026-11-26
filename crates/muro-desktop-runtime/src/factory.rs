@@ -76,15 +76,15 @@ impl Factory {
         serde_json::from_str(done.stdout.trim()).with_context(|| format!("{what} did not print JSON"))
     }
 
-    /// `muro project verify FILE`: the plugin the file carries was built from the package it carries.
-    /// The factory's reason is the error, without the command's own prefix.
-    pub fn project_verify(&self, file: &Path, cache: &Path) -> Result<()> {
-        self.verify(file, cache, false).map(|_| ())
-    }
-
     /// The pinned release in the cache and its version come from the very snapshot the factory checked.
     pub fn verified_build(&self, file: &Path, cache: &Path) -> Result<VerifiedBuild> {
-        let info = self.verify(file, cache, true)?;
+        let args = vec!["project".to_owned(), "verify".into(), file.to_string_lossy().into_owned(),
+            "--cache".into(), cache.to_string_lossy().into_owned(), "--build-info".into()];
+        let info = self.json(&args, "Checking the project's plugin", &|| false, READ_LIMIT)
+            .map_err(|error| {
+                let reason = format!("{error:#}");
+                anyhow::anyhow!("{}", reason.strip_prefix("Project verify failed: ").unwrap_or(&reason))
+            })?;
         let digest = info["digest"].as_str().context("The factory gave no archive digest")?;
         let slug = info["slug"].as_str().context("The archive names no plugin")?;
         let version = info["version"].as_str().context("The archive names no plugin version")?;
@@ -93,20 +93,6 @@ impl Factory {
         let release = cache.join(digest).join("release").join(slug);
         ensure!(release.is_dir(), "The project's build is missing");
         Ok(VerifiedBuild { release, digest: digest.to_owned(), version: version.to_owned() })
-    }
-
-    fn verify(&self, file: &Path, cache: &Path, build_info: bool) -> Result<Value> {
-        let mut args = vec!["project".to_owned(), "verify".into(), file.to_string_lossy().into_owned(), "--cache".into(), cache.to_string_lossy().into_owned()];
-        if build_info {
-            args.push("--build-info".into());
-        }
-        match self.json(&args, "Checking the project's plugin", &|| false, READ_LIMIT) {
-            Ok(result) => Ok(result),
-            Err(error) => {
-                let reason = format!("{error:#}");
-                bail!("{}", reason.strip_prefix("Project verify failed: ").unwrap_or(&reason))
-            }
-        }
     }
 
     /// `muro project info FILE --summary` (or the full info) through the cache folder.

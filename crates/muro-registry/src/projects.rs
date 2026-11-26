@@ -13,6 +13,7 @@ use std::{
 };
 
 /// A release verified by the factory in its digest-addressed cache.
+#[derive(Clone)]
 pub struct VerifiedBuild {
     pub release: PathBuf,
     pub digest: String,

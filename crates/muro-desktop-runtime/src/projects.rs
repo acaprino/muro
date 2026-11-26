@@ -97,13 +97,23 @@ pub fn projects(data: &Path) -> Result<Value> {
         return Ok(json!([]));
     }
     let factory = Factory::from_settings(&current["settings"])?;
-    let mut shown = vec![];
-    for item in items {
-        let (id, path) = (item["id"].as_str().unwrap_or(""), item["path"].as_str().unwrap_or(""));
-        // A file the factory cannot read at all (it crashed, it ran out of time) is that project's own
-        // error: it must not hide the others from the list.
-        shown.push(summary(&factory, data, id, path).unwrap_or_else(|error| failed(id, path, &format!("{error:#}"))));
-    }
+    // Archive inspection starts a Python process. Keep at most three reading at once, even for a
+    // large list. Each worker owns its output slots, so completion order never moves a row.
+    let chunk_size = items.len().div_ceil(3);
+    let mut shown = vec![Value::Null; items.len()];
+    std::thread::scope(|scope| {
+        for (entries, rows) in items.chunks(chunk_size).zip(shown.chunks_mut(chunk_size)) {
+            let factory = &factory;
+            scope.spawn(move || {
+                for (item, row) in entries.iter().zip(rows) {
+                    let id = item["id"].as_str().unwrap_or("");
+                    let path = item["path"].as_str().unwrap_or("");
+                    *row = summary(factory, data, id, path)
+                        .unwrap_or_else(|error| failed(id, path, &format!("{error:#}")));
+                }
+            });
+        }
+    });
     Ok(json!(shown))
 }
 
@@ -113,9 +123,12 @@ pub fn project(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
     let current = registry(data)?;
     let file = listed_file(&current, id)?;
-    Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false).inspect_err(|_| {
+    let mut info = Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false).inspect_err(|_| {
         discard_unpack(data, &current, &file);
-    })
+    })?;
+    info.as_object_mut().context("The factory returned invalid project information")?
+        .insert("file".to_owned(), json!(file));
+    Ok(info)
 }
 
 /// The unpack of a file the factory refused is deleted: a hostile file is no reason for the cache to hold
@@ -175,13 +188,10 @@ pub fn open(data: &Path, payload: &Value) -> Result<Value> {
     Ok(shown)
 }
 
-/// The harness kinds a request names: a nonempty list of known kinds, each once.
-/// The targets a request names, each a managed one (a target of the registry that is switched on), each
-/// once and in the order named, with the harness kinds they are of, each once in the order they first
-/// appear: the distributions to make, one for each kind.
-fn named_targets(registry: &Value, payload: &Value) -> Result<(Vec<String>, Vec<String>)> {
+/// The requested enabled targets, in selection order, paired with their harness kind.
+fn named_targets<'a>(registry: &'a Value, payload: &'a Value) -> Result<Vec<(&'a str, &'a str)>> {
     let named = payload["targets"].as_array().context("Name the targets to install on")?;
-    let (mut ids, mut kinds): (Vec<String>, Vec<String>) = (vec![], vec![]);
+    let mut selected = vec![];
     for item in named {
         let id = item.as_str().context("A target is its id")?;
         let target = registry["targets"]
@@ -194,15 +204,12 @@ fn named_targets(registry: &Value, payload: &Value) -> Result<(Vec<String>, Vec<
         ensure!(target["enabled"] == true, "{name} is paused: switch it on in Sync first");
         let kind = target["harness"].as_str().unwrap_or("");
         ensure!(HARNESSES.contains(&kind), "No Muro adapter for the harness {kind}");
-        if !ids.iter().any(|known| known == id) {
-            ids.push(id.to_owned());
-        }
-        if !kinds.iter().any(|known| known == kind) {
-            kinds.push(kind.to_owned());
+        if !selected.contains(&(id, kind)) {
+            selected.push((id, kind));
         }
     }
-    ensure!(!ids.is_empty(), "Name at least one target to install on");
-    Ok((ids, kinds))
+    ensure!(!selected.is_empty(), "Name at least one target to install on");
+    Ok(selected)
 }
 
 fn plugin_of<'a>(registry: &'a Value, id: &str) -> Option<&'a Value> {
@@ -259,8 +266,8 @@ fn extract_file(data: &Path, settings: &Value, file: &Path, payload: &Value, dig
 
 /// `install_project {id, targets}`: puts the project's built plugin on the targets named (ids of the
 /// registry's managed harnesses), from the release inside the file as it is now. In one place it saves the
-/// registry plugin `<slug>` (its field `project` is the project's id) with one distribution for each
-/// harness kind of those targets, taken from the cached unpack of the file and recording the file's digest,
+/// registry plugin `<slug>` (its field `project` is the project's id) with all variants of the
+/// verified archive, taken from its cached unpack and recording the file's digest,
 /// and sets the plugin's targets to exactly those ids. A target not named is not made a target, and
 /// stays what it was: switching one harness on never turns on another of its kind. (A target that is
 /// paused and already the plugin's stays: the page shows no switch for it, so a request cannot speak for it.)
@@ -273,7 +280,7 @@ fn extract_file(data: &Path, settings: &Value, file: &Path, payload: &Value, dig
 pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
     let current = registry(data)?;
-    let (target_ids, kinds) = named_targets(&current, payload)?;
+    let selected = named_targets(&current, payload)?;
     let file = listed_file(&current, id)?;
     let factory = Factory::from_settings(&current["settings"])?;
     let read = factory.project_info(&file, &cache_dir(data), true)?;
@@ -286,105 +293,28 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
         read["plugin"]["name"].as_str().unwrap_or(slug),
         read["digest"].as_str().context("The factory gave no digest")?,
     );
-    let root = cache_dir(data).join(digest);
-    let release = root.join("release").join(slug);
-    ensure!(release.is_dir(), "This project has no built plugin yet: it is built when the project is harmonized");
-    factory.project_verify(&file, &cache_dir(data))?;
-    let mut builds = vec![];
-    for kind in &kinds {
-        let adapter = release.join("adapters").join(kind);
+    let build = factory.verified_build(&file, &cache_dir(data))?;
+    ensure!(build.digest == digest, "The project file changed. Open the project again.");
+    let mut kinds = vec![];
+    let mut copies = vec![];
+    for &(target, kind) in &selected {
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+        let adapter = build.release.join("adapters").join(kind);
         ensure!(adapter.is_dir(), "This project's build has no adapter for {kind}");
-        let adapter = adapter.canonicalize()?;
-        let (native_name, version) = list::build_identity(kind, &adapter)
+        let (native_name, _) = list::build_identity(kind, &adapter)
             .with_context(|| format!("The {kind} build of this project cannot be read"))?;
-        builds.push((kind.clone(), adapter, version, native_name));
+        copies.push((target, native_name));
     }
-    // The folder `release/` of the unpack, not the plugin inside it: a registry source that holds
-    // `adapters/<harness>` is resolved into native distributions of its own, which carry no record of
-    // the project file; this one holds none, so what is recorded below is what a resolve keeps.
-    let source = root.join("release").to_string_lossy().into_owned();
-    if let Some(old) = plugin_of(&current, id) {
-        ensure!(
-            old["project"] == id,
-            "A plugin named {id} is already in your list and is not this project's; remove it first"
-        );
-    }
-    // A plugin whose source is another unpack of the file (or that was never resolved) starts over:
-    // the registry takes a new source only with its old builds and resolved metadata cleared, and it
-    // resolves the folder itself, so the revision the builds record is the registry's own.
-    let resolved = plugin_of(&current, id)
-        .is_some_and(|old| old["source"] == source.as_str() && old["upstream_revision"].is_string());
-    let follows_archive = plugin_of(&current, id).is_some_and(|old| old["resolved_project"].is_object());
-    if follows_archive {
-        crate::request(data, "resolve", json!({"id":id}))?;
-    } else if !resolved {
-        update(data, |reg| {
-            if let Some(old) = plugin_of(reg, id) {
-                ensure!(old["project"] == id && old["resolved_project"].is_null(), "The plugin changed. Open the project again.");
-            }
-            let mut plugin = plugin_of(reg, id).cloned().unwrap_or_else(|| {
-                json!({"id":id,"name":name,"policy":"head","pinned_version":"","targets":[]})
-            });
-            plugin["source"] = json!(source);
-            plugin["project"] = json!(id);
-            plugin["distributions"] = json!([]);
-            if let Some(object) = plugin.as_object_mut() {
-                for key in ["resolved_source", "upstream_revision", "upstream_version", "last_checked"] {
-                    object.remove(key);
-                }
-            }
-            Ok(Some(("save_plugin", json!({"plugin":plugin}))))
-        })?;
-        crate::request(data, "resolve", json!({"id":id}))?;
-    }
-    let saved = update(data, |reg| {
-        let mut plugin = plugin_of(reg, id).cloned().context("The plugin disappeared")?;
-        ensure!(plugin["project"] == id, "The plugin changed. Open the project again.");
-        let revision = plugin["upstream_revision"].as_str().context("The project's folder was not resolved")?.to_owned();
-        let mut targets: Vec<Value> = target_ids.iter().map(|target| json!(target)).collect();
-        for held in plugin["targets"].as_array().into_iter().flatten() {
-            let paused = reg["targets"].as_array().into_iter().flatten().any(|t| t["id"] == *held && t["enabled"] != true);
-            if paused && !targets.contains(held) {
-                targets.push(held.clone());
-            }
-        }
-        if plugin["resolved_project"].is_object() {
-            ensure!(plugin["resolved_project"]["digest"] == digest, "The project file changed. Open the project again.");
-        } else {
-            ensure!(!follows_archive && plugin["source"] == source.as_str(), "The plugin source changed. Open the project again.");
-            let distributions: Vec<Value> = builds.iter().map(|(kind, adapter, version, _)| {
-                json!({"harness":kind,"path":adapter.to_string_lossy(),"version":version,"origin":"muro",
-                       "source_revision":revision,"project_digest":digest})
-            }).collect();
-            plugin["distributions"] = json!(distributions);
-        }
-        plugin["targets"] = json!(targets);
-        Ok(Some(("save_plugin", json!({"plugin":plugin}))))
-    })?;
-    let plugin = saved
-        .as_ref()
-        .and_then(|snapshot| plugin_of(&snapshot["registry"], id))
-        .cloned()
-        .context("The plugin was not saved")?;
-    // A copy of the same plugin already on a named target (the person installed it, or another plugin
-    // of the list holds it) becomes this project's, so the next plan replaces it with the build instead
-    // of installing a second copy beside it (`take_over` of the registry).
-    for target in &target_ids {
-        let kind = current["targets"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .find(|t| t["id"] == target.as_str())
-            .and_then(|t| t["harness"].as_str())
-            .unwrap_or("");
-        let Some((_, _, _, native_name)) = builds.iter().find(|build| build.0 == kind) else {
-            continue;
-        };
+    let plugin = muro_registry::service::save_project_install(data, id, name, &file, &build, &selected)?;
+    for (target, native_name) in copies {
         update(data, |_| {
             Ok(Some(("take_over", json!({"plugin_id":id,"target_id":target,"name":native_name}))))
         })?;
     }
     sweep_cache(data);
+    let target_ids: Vec<_> = selected.iter().map(|(target, _)| *target).collect();
     Ok(json!({"id":id,"plugin":plugin,"digest":digest,"harnesses":kinds,"targets":target_ids}))
 }
 
@@ -415,18 +345,6 @@ fn distribution_digests(registry: &Value) -> HashSet<String> {
         .collect()
 }
 
-/// The digests of the unpacks the cache keeps: that of each listed project's file as it is now, and
-/// those of the builds installed.
-fn kept_digests(registry: &Value) -> HashSet<String> {
-    let mut kept = distribution_digests(registry);
-    for project in listed(registry) {
-        if let Some(digest) = project["path"].as_str().and_then(|path| list::file_digest(Path::new(path)).ok()) {
-            kept.insert(digest);
-        }
-    }
-    kept
-}
-
 /// The name of a cache folder the factory made for a file: the SHA-256 of its bytes. Any other name is
 /// not this module's to remove.
 fn is_digest(name: &str) -> bool {
@@ -438,12 +356,27 @@ fn is_digest(name: &str) -> bool {
 /// registry that cannot be read leaves the cache as it is.
 pub fn sweep_cache(data: &Path) {
     let _ = muro_registry::service::with_registry(data, |current| {
-        let kept = kept_digests(current);
-        for entry in std::fs::read_dir(cache_dir(data))?.flatten() {
+        let cache = cache_dir(data);
+        let installed = distribution_digests(current);
+        let mut candidates = HashSet::new();
+        for entry in std::fs::read_dir(&cache)?.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if is_digest(&name) && !kept.contains(&name) && entry.path().is_dir() {
-                let _ = std::fs::remove_dir_all(entry.path());
+            if is_digest(&name) && !installed.contains(&name) && entry.path().is_dir() {
+                candidates.insert(name);
             }
+        }
+        // Startup and file-open call this under the registry lock. Only read archive bytes while
+        // there is a cached unpack that could actually be removed.
+        for project in listed(current) {
+            if candidates.is_empty() {
+                break;
+            }
+            if let Some(digest) = project["path"].as_str().and_then(|path| list::file_digest(Path::new(path)).ok()) {
+                candidates.remove(&digest);
+            }
+        }
+        for digest in candidates {
+            let _ = std::fs::remove_dir_all(cache.join(digest));
         }
         Ok(())
     });
