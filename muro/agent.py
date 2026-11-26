@@ -162,7 +162,7 @@ def _write_files(files: dict[str, str], root: Path, allowed: Callable[[str], boo
         if root.resolve() not in target.parents and target != root.resolve():
             raise ValueError(f"rejected path escaping the package: {path}")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(body, encoding="utf-8")
+        target.write_text(body, encoding="utf-8", newline="\n")
         written.append(path)
     return sorted(written)
 

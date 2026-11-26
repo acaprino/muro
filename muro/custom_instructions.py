@@ -165,4 +165,4 @@ def copy_runtime(package_root: Path, dist: Path, document: dict | None) -> None:
         targets.add(str(target).casefold())
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(content)
-    (dist / RECEIPT).write_text(json.dumps({"digest": metadata["digest"]}), encoding="utf-8")
+    (dist / RECEIPT).write_text(json.dumps({"digest": metadata["digest"]}), encoding="utf-8", newline="\n")

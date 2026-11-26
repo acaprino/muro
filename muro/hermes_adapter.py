@@ -70,8 +70,8 @@ def write_hermes_servers(root: Path, plugin: dict, mcp: dict, release: Path, sou
     manifest = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
                 "name": plugin["slug"] + "-mcp", "version": plugin["version"],
                 "description": f"{plugin['name']}: MCP servers of the unified plugin"}
-    (root / "plugin.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (root / "mcp.json").write_text(json.dumps(mcp, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "plugin.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (root / "mcp.json").write_text(json.dumps(mcp, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     (root / "LICENSES").mkdir()
     shutil.copy2(release / "NOTICE.md", root / "NOTICE.md")
     for source in sorted(source_ids):
@@ -89,7 +89,7 @@ def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:
         "author": "Muro contributors",
     }
     # JSON is a YAML subset; generation needs no YAML library or host dependencies.
-    (root / "plugin.yaml").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (root / "plugin.yaml").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     registration = _REGISTER_SKILLS
     if has_policy:
         section_id = plugin["slug"] + ".always-on"
@@ -112,4 +112,4 @@ def write_hermes_adapter(root: Path, plugin: dict, has_policy: bool) -> None:
         register_section({section_id!r}, policy, position="after_memory", max_chars={_SECTION_LIMIT})
         return
 ''' + _TURN_HOOK
-    (root / "__init__.py").write_text(registration, encoding="utf-8")
+    (root / "__init__.py").write_text(registration, encoding="utf-8", newline="\n")
