@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { Badge, Button, Cluster, Column, Count, Heading, Icon, Page, Section, Split, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
-import { Dialog, Empty, SettingRow } from '@acaprino/sigrid/components';
+import { Badge, Button, Cluster, Column, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Heading, Icon, Page, Split, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
+import { Dialog, Empty } from '@acaprino/sigrid/components';
 import type { ProjectInfo, ProjectSummary, Snapshot } from '../types.ts';
-import { cellState, versionOf } from '../model.ts';
 import { useRegistry } from '../state/registry.tsx';
 import { useProject } from '../state/useProject.tsx';
 import { useFocusKept, useNotify } from '@acaprino/imago';
@@ -187,7 +186,6 @@ function ProjectList({ list, error, loadList, showOpened }: {
       </Split>
       <JobCard projectId={null} />
       {body}
-      {snapshot ? <Published snapshot={snapshot} /> : null}
       <NewProjectDialog open={making} onOpenChange={setMaking} listed={list ?? []} restoreFocusTo={newButton} focusAfterStart={heading} />
       <Dialog
         open={removal.open}
@@ -214,8 +212,9 @@ function ProjectList({ list, error, loadList, showOpened }: {
   );
 }
 
-/** One project file of the list: its name (which opens it), its version, its file and what it holds; or, for a file that cannot be read, why.
- * "Remove from list" and "Delete…" are on every project. "Delete…" is off while an AI run is changing the project (`deleteReason` says why). */
+/** One project file of the list: its name (which opens it), its version, its file and what it holds; or, for a file that cannot be read, why. What takes it away
+ * ("Remove from list…", "Delete…") is in its More menu, not beside its name as the row's only buttons. "Delete…" is off while an AI run is changing the project
+ * (`deleteReason` says why). */
 function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: ProjectSummary; deleteReason: string | null; onOpen: () => void; onRemove: () => void; onDelete: () => void }) {
   const name = nameOf(p), counts = countsOf(p);
   return (
@@ -234,40 +233,19 @@ function ProjectRow({ p, deleteReason, onOpen, onRemove, onDelete }: { p: Projec
         </Column>
       </TableCell>
       <TableCell align="end">
-        <Cluster justify="end">
-          <Button variant="outline" size="sm" aria-label={`Remove ${name} from the list`} onClick={onRemove}>Remove from list</Button>
-          <span title={deleteReason ?? undefined}>
-            <Button variant="outline" size="sm" aria-label={`Delete ${name}…`} disabled={deleteReason !== null} onClick={onDelete}>Delete…</Button>
-          </span>
+        <Cluster justify="end" wrap={false}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" aria-label={`More for ${name}`}><Icon name="more" /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onRemove}><Icon name="minus" />Remove from list…</DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" disabled={deleteReason !== null} title={deleteReason ?? undefined} onSelect={onDelete}><Icon name="delete" />Delete…</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </Cluster>
       </TableCell>
     </TableRow>
-  );
-}
-
-/** The plugins of the list that are no project's: installed as their author ships them, with the harnesses that have no build of them. */
-function Published({ snapshot }: { snapshot: Snapshot }) {
-  const own = snapshot.registry.plugins.filter(p => !p.project);
-  if (!own.length) return null;
-  return (
-    <Section title="Installed as published" icon={<Icon name="archive" />} end={<Count value={own.length} label={own.length === 1 ? 'plugin' : 'plugins'} />}>
-      <Text as="p" variant="note">Plugins Muro installs as their author ships them.</Text>
-      <Column as="ul" gap="xs" aria-label="Installed as published">
-        {own.map(p => {
-          const missing = snapshot.registry.targets.filter(t => t.enabled && p.targets.includes(t.id) && cellState(p, t, snapshot, null).kind === 'needs-build');
-          const version = versionOf(p).version;
-          return (
-            <li key={p.id}>
-              <SettingRow
-                label={<Text truncate title={p.name}><Text variant="strong">{p.name}</Text>{version ? <Text variant="muted"> {version}</Text> : null}</Text>}
-                description={<Text truncate>{p.source}</Text>}
-                control={missing.length ? <Badge tone="warning">Needs a build for {missing.map(t => t.name).join(', ')}</Badge> : undefined}
-              />
-            </li>
-          );
-        })}
-      </Column>
-    </Section>
   );
 }
 

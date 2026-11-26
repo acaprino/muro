@@ -3,7 +3,7 @@ import { Button, Cell, Checkbox, Cluster, Column, Heading, Icon, Input, Select, 
 import { Dialog, FormField, Note, SettingRow } from '@acaprino/sigrid/components';
 import { Inspector } from '@acaprino/sigrid/layout';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
-import { filesMissing, harnessNames, inList, stamp } from '../../model.ts';
+import { filesMissing, harnessNames, harnessState, inList, stamp } from '../../model.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
@@ -143,7 +143,10 @@ function InstalledHere({ snapshot, target, adding, error, note, noteRef, onAdd }
 
 export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspectorProps) {
   const { snapshot, request } = useRegistry();
-  const { adopt } = useSync();
+  const sync = useSync();
+  const { adopt } = sync;
+  // The plan of this harness alone, asked for from here ("Sync N changes"): the button says it waits.
+  const [asking, setAsking] = React.useState(false);
   const notify = useNotify();
   const { add, adding } = useAddToList();
   const formId = React.useId();
@@ -274,6 +277,14 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
   }
 
   const times = target ? snapshot?.sync.targets[target.id] : undefined;
+  // The changes waiting on this harness alone: they are synced from here, the table's columns only say how many.
+  const state = target && snapshot ? harnessState(target, snapshot, sync.plan) : null;
+  const changes = state?.kind === 'changes' ? state.count : 0;
+  async function reviewHere(): Promise<void> {
+    if (!target) return;
+    setAsking(true);
+    try { await sync.openReview({ targetId: target.id }); } finally { setAsking(false); }
+  }
   return (
     <>
       <Inspector
@@ -295,6 +306,11 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
         {target && form && snapshot ? (
           <form ref={region} id={formId} noValidate onSubmit={event => { event.preventDefault(); void save(); }}><Column gap="lg">
             <Text as="p" variant="note">{`Checked ${stamp(times?.checked ?? null)} · last sync ${stamp(times?.synced ?? null)}`}</Text>
+            {changes ? (
+              <Cluster>
+                <Button type="button" variant="outline" loading={asking} disabled={sync.busy && !asking} onClick={() => void reviewHere()}><Icon name="refresh" />Sync {plural(changes, 'change')}</Button>
+              </Cluster>
+            ) : null}
             <HarnessFields values={form} problems={shown} refs={refs} onChange={values => edit(values)} />
             <CheckRow id={`${formId}-enabled`} label="Keep this harness in sync" help="Switch off to pause: Muro leaves it alone." checked={form.enabled} onChange={enabled => edit({ enabled })} />
             <CheckRow id={`${formId}-exclusive`} label="Uninstall plugins that are not in my list" help="Muro asks before it uninstalls. Only on this harness." checked={form.exclusive} onChange={exclusive => edit({ exclusive })} />

@@ -101,18 +101,20 @@ await test('the note before and after a check: opening the page checks nothing, 
   assert.match(await c.nth(0).textContent(), /github\.com\/example\/p1/, 'the source under the name');
   assert.equal(await c.nth(1).textContent(), 'v2Latest release', 'the latest version with the update policy');
   await c.nth(2).getByRole('button', { name: 'Update 1 → 2 · Package on Codex isolated test', exact: true }).waitFor();
-  await head(page, 'Codex isolated test').getByRole('button', { name: 'Sync 1 change', exact: true }).waitFor();
+  await head(page, 'Codex isolated test').getByText('1 change waiting', { exact: true }).waitFor();
   await page.screenshot({ path: shots + '/sync-dark.png' });
 });
 
-await test('a harness column offers its own changes, and its plan is not the note\'s', 'two-harnesses', {}, async app => {
+await test('a harness column says how many changes wait there; its inspector syncs that harness alone, and its plan is not the note\'s', 'two-harnesses', {}, async app => {
   const { page } = app;
   await ready(page);
   await check(app);
   assert.equal(await noteTitle(page).textContent(), '2 changes ready to apply');
-  const own = page.locator('#sync-table thead').getByRole('button', { name: 'Sync 1 change', exact: true });
-  assert.equal(await own.count(), 2, 'one for each harness');
-  await own.first().click();
+  assert.equal(await page.locator('#sync-table thead').getByText('1 change waiting', { exact: true }).count(), 2, 'each column says it');
+  assert.equal(await page.locator('#sync-table thead').getByRole('button', { name: /^Sync / }).count(), 0, 'and offers no sync of its own');
+  await head(page, 'Codex isolated test').getByRole('button', { name: 'Codex isolated test', exact: true }).click();
+  const own = page.locator('[data-inspector-form]:not([hidden])').getByRole('button', { name: 'Sync 1 change', exact: true });
+  await own.click();
   await sheet(page).waitFor();
   assert.equal(await sheetTitle(page), 'Sync Codex isolated test');
   assert.deepEqual((await app.calls()).at(-1), { action: 'plan', payload: { target_id: 't1' } });
@@ -123,7 +125,7 @@ await test('a harness column offers its own changes, and its plan is not the not
   assert.equal(await noteTitle(page).textContent(), '2 changes ready to apply', 'a one-harness plan is not the plan of the note');
   await barButton(page, 'Apply all 2 changes').waitFor();
   await focusOn(page, 'Sync 1 change');
-  assert.equal(await page.evaluate(() => !!document.activeElement?.closest('th')), true, 'focus goes back to where the sheet was opened');
+  assert.equal(await page.evaluate(() => !!document.activeElement?.closest('[data-inspector-form]')), true, 'focus goes back to where the sheet was opened');
 });
 
 await test('Apply all asks for a fresh plan, applies it at once when it is what the note showed, and plans again', 'changes', {}, async app => {
@@ -438,9 +440,9 @@ await test('the table: a row per plugin with its source, version and policy, a c
   const s = cells(page, 'sql-companion');
   assert.equal(await s.nth(1).textContent(), 'Not checkedLatest commit', 'no version yet, on the latest commit');
   assert.equal(await s.nth(2).textContent(), 'Not selected');
-  await head(page, 'Claude Code').getByRole('button', { name: 'Sync 2 changes', exact: true }).waitFor();
+  await head(page, 'Claude Code').getByText('2 changes waiting', { exact: true }).waitFor();
   await head(page, 'Codex').getByText('In sync', { exact: true }).waitFor();
-  await head(page, 'OpenCode').getByRole('button', { name: 'Sync 1 change', exact: true }).waitFor();
+  await head(page, 'OpenCode').getByText('1 change waiting', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByText('1 plugin needs a build', { exact: true }).waitFor();
   assert.equal(await noteText(page).textContent(), '1 install, 1 update, 1 removal · 1 item not ready yet. Nothing changes until you apply.');
   // The rows are one tab stop, and the arrows move between them.

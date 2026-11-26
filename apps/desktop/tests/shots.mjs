@@ -43,8 +43,8 @@ const SCREENS = [
   ['project-details', 'projects', async page => { await project(page); await button(page, 'Edit details…').click(); await page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]').waitFor(); }],
   ['project-add-input', 'projects', addInput],
   ['project-harmonize', 'projects', async page => { await project(page); await button(page, 'Harmonize again…').click(); await page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]').waitFor(); }],
-  ['project-release', 'projects', async page => { await project(page); await button(page, 'Release…').click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
-  ['project-extract', 'projects', async page => { await project(page); await button(page, 'Export to folder…').click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
+  ['project-release', 'projects', async page => { await project(page); await button(page, 'More').click(); await page.getByRole('menuitem', { name: 'Release…', exact: true }).click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
+  ['project-extract', 'projects', async page => { await project(page); await button(page, 'More').click(); await page.getByRole('menuitem', { name: 'Export to folder…', exact: true }).click(); await page.locator('[data-slot="dialog-content"]').waitFor(); }],
   ['project-running', 'projects', async page => {
     await addInput(page);
     const form = page.locator('[data-slot="dialog-content"], [data-slot="sheet-content"][data-side="right"]');

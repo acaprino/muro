@@ -319,10 +319,17 @@ await test('Delete project: asks first, names the file and says it goes too; eve
   await goProjects(page);
   await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
   await notice(page, `${odd} added to your list.`).waitFor();
-  assert.equal(await page.getByRole('button', { name: /^Delete .*…$/ }).count(), 2, 'a Delete on every project of the list');
-  assert.equal(await page.getByRole('button', { name: 'Delete Sample…', exact: true }).count(), 1);
-  assert.equal(await page.getByRole('button', { name: `Remove ${odd} from the list`, exact: true }).count(), 1, 'Remove from list is still there beside it');
-  const del = page.getByRole('button', { name: `Delete ${odd}…`, exact: true });
+  assert.equal(await page.getByRole('button', { name: /^More for / }).count(), 2, 'a More menu, with Delete, on every project of the list');
+  /** Delete… or Remove from list… of a project's More menu. */
+  const fromMore = (name, item) => ({ click: async () => {
+    await page.getByRole('button', { name: `More for ${name}`, exact: true }).click();
+    await page.getByRole('menuitem', { name: item, exact: true }).click();
+  } });
+  await page.getByRole('button', { name: `More for ${odd}`, exact: true }).click();
+  assert.equal(await page.getByRole('menuitem', { name: 'Remove from list…', exact: true }).count(), 1, 'Remove from list is still there beside it');
+  await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'detached' });
+  const del = fromMore(odd, 'Delete…');
   const dialog = dialogOf(page);
   await del.click();
   await dialog.getByText(`Delete ${odd}?`, { exact: true }).waitFor();
@@ -346,7 +353,7 @@ await test('Delete project: asks first, names the file and says it goes too; eve
   assert.deepEqual(Object.keys(asked[0].payload).sort(), ['id', 'revision']);
   assert.equal(await page.getByRole('table', { name: 'Projects' }).getByRole('button', { name: 'Sample', exact: true }).count(), 1, 'the other project is what is left');
   // No project is kept from deletion: the one that was first in the list goes the same way.
-  await page.getByRole('button', { name: 'Delete Sample…', exact: true }).click();
+  await fromMore('Sample', 'Delete…').click();
   await dialog.getByText('Delete Sample?', { exact: true }).waitFor();
   await dialog.getByText('D:/Muro/data/projects/sample.mp', { exact: true }).waitFor();
   await dialog.getByRole('button', { name: 'Delete Sample', exact: true }).click();

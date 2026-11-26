@@ -56,7 +56,7 @@ export function Sync({ openHarness, entry }: SyncProps) {
       <Split>
         <Column gap="xs">
           <Heading level={1}>Sync</Heading>
-          <Text as="p" variant="muted">Choose Install or Update under the harness you want to change. Add plugin accepts a .mp file, a folder or a repository.</Text>
+          <Text as="p" variant="muted">Your plugins on each harness you use.</Text>
         </Column>
         <Cluster>
           {noHarness ? null : addHarness}

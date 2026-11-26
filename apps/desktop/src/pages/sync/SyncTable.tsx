@@ -2,8 +2,8 @@
 // (pages/sync.ts of commit 5e33a82) on Sigrid's table parts. What a cell or a column says is model.ts's (`cellState`, `harnessState`), read with the plan of this
 // window (useSync), which counts only for the registry revision it was made for: with none the cells say what the snapshot shows, and a column that the recorded
 // check says has changes, with nothing of its own to show, says to check. A cell never reads as in sync for a harness that cannot be read or a plugin without a build.
-// The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); "Sync N changes" under a harness opens the review
-// sheet on the plan of that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
+// The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); a column only says how many changes wait there,
+// and its inspector syncs that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
 import * as React from 'react';
 import { Badge, Button, Cluster, Column, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
@@ -30,14 +30,6 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
   // The row that holds the tab stop: the last one focused, or the first.
   const [active, setActive] = React.useState<string | null>(null);
   const current = plugins.some(p => p.id === active) ? active : plugins[0]?.id ?? null;
-  // The harness whose own plan is being asked for ("Sync N changes"), so its button says it waits.
-  const [asking, setAsking] = React.useState<string | null>(null);
-
-  async function reviewHarness(targetId: string): Promise<void> {
-    setAsking(targetId);
-    try { await sync.openReview({ targetId }); } finally { setAsking(null); }
-  }
-
   /** Up and Down move to the row above or below, Home and End to the first and the last; the focus stays on the names. */
   function move(event: React.KeyboardEvent<HTMLTableSectionElement>): void {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -56,7 +48,7 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
           <TableHead><TwoLines first="Plugin" second={`${plural(plugins.length, 'plugin')} in your list`} /></TableHead>
           <TableHead><Text>Latest version</Text></TableHead>
           {targets.map(t => (
-            <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} asking={asking === t.id} onOpen={onOpenHarness} onReview={id => void reviewHarness(id)} />
+            <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} onOpen={onOpenHarness} />
           ))}
         </TableRow>
       </TableHeader>
@@ -76,13 +68,11 @@ interface HarnessHeadProps {
   target: Target;
   snapshot: Snapshot;
   plan: Plan | null;
-  asking: boolean;
   onOpen(targetId: string, opener: HTMLElement | null): void;
-  onReview(targetId: string): void;
 }
 
 /** The head of a harness column: its name (which opens it), its state and how many plugins need a build there. When it was checked and synced is in its inspector. */
-function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: HarnessHeadProps) {
+function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
   const state = harnessState(target, snapshot, plan);
   // The plugins without a build here, counted even where changes come first: Apply all leaves them out.
   const builds = state.kind === 'needs-build' ? 0 : snapshot.registry.plugins.filter(p => cellState(p, target, snapshot, plan).kind === 'needs-build').length;
@@ -92,7 +82,7 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
       line = <Badge variant="outline"><Icon name="pause" />Paused</Badge>;
       break;
     case 'changes':
-      line = <Button variant="outline" size="sm" loading={asking} onClick={() => onReview(target.id)}><Icon name="refresh" />Sync {plural(state.count, 'change')}</Button>;
+      line = <Badge tone="info">{plural(state.count, 'change')} waiting</Badge>;
       break;
     case 'needs-build':
       line = <Badge tone="warning">{needBuild(state.count)}</Badge>;
@@ -184,7 +174,8 @@ function Cell({ state, plugin, target }: { state: CellStatus; plugin: Plugin; ta
     case 'unknown': return <Text variant="muted">Unknown</Text>;
     case 'paused': return <Text variant="muted">Paused</Text>;
     default:
-      if (plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path)) return <Text variant="muted">Not selected</Text>;
+      // Not chosen here: an empty cell, said to a screen reader.
+      if (plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path)) return <Text srOnly>Not selected</Text>;
       action = 'Select for sync';
   }
   return <CellAction label={action} state={state} plugin={plugin} target={target} />;

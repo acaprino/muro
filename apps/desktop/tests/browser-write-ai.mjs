@@ -45,6 +45,12 @@ const dialog = page => page.locator('[data-slot="dialog-content"], [data-slot="s
 /** The card of the open project's run, at the top of the workspace. */
 const card = page => page.getByRole('region', { name: 'AI run', exact: true });
 const button = (scope, name) => scope.getByRole('button', { name, exact: true });
+/** Release… of the project's More menu, with the menu open (`closeMenu` shuts it). */
+const releaseItem = async page => {
+  if (!(await page.getByRole('menu').count())) await page.getByRole('button', { name: 'More', exact: true }).click();
+  return page.getByRole('menuitem', { name: 'Release…', exact: true });
+};
+const closeMenu = async page => { await page.keyboard.press('Escape'); await page.getByRole('menu').waitFor({ state: 'detached' }); };
 const header = page => page.locator('main header').first();
 const notice = (page, text) => page.locator('[data-toasts]').getByText(text, { exact: true });
 const fieldError = (scope, text) => scope.locator('[data-slot="field-error"]').getByText(text, { exact: true });
@@ -127,8 +133,6 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   const { page } = app;
   await openSample(page);
   const read = await digest(page);
-  assert.equal(await button(page, 'Review decisions…').isDisabled(), true);
-  assert.equal(await button(page, 'Review decisions…').getAttribute('title'), 'Coming with the review', 'the runtime has no operation that runs the review');
   await button(page, 'Harmonize again…').click();
   const dlg = dialog(page);
   await dlg.getByRole('heading', { name: 'Harmonize again' }).waitFor();
@@ -143,10 +147,13 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   const reason = busyWith('Harmonize again');
   assert.equal(await button(page, 'Install via Sync…').isEnabled(), true, 'opening Sync can read the current project while a new version is being prepared');
   // Release… is no AI run, and still waits for a run that changes this project, as Edit details… does.
-  for (const name of ['Harmonize again…', 'Add input…', 'Edit details…', 'Release…']) {
+  for (const name of ['Harmonize again…', 'Add input…', 'Edit details…']) {
     assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);
     assert.equal(await button(page, name).getAttribute('title'), reason, `${name} says why`);
   }
+  assert.equal(await (await releaseItem(page)).isDisabled(), true, 'Release… waits for the run');
+  assert.equal(await (await releaseItem(page)).getAttribute('title'), reason, 'Release… says why');
+  await closeMenu(page);
   await page.getByRole('status').filter({ hasText: reason }).first().waitFor();
   await segment(page, 'Inputs').click();
   for (const name of ['Move pin of taste-skill', 'Remove genoffice', 'Instructions…']) {
@@ -165,7 +172,8 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   await versionShown(page, '0.6.0');
   await until(() => button(page, 'Harmonize again…').isEnabled(), 'Harmonize again… comes back');
   assert.equal(await button(page, 'Edit details…').isDisabled(), false);
-  assert.equal(await button(page, 'Release…').isDisabled(), false);
+  assert.equal(await (await releaseItem(page)).isDisabled(), false);
+  await closeMenu(page);
   assert.equal(await page.getByRole('status').filter({ hasText: reason }).count(), 0, 'the foot no longer says a run goes');
 });
 
@@ -260,7 +268,8 @@ await test('A run another client started: the refusal is shown, and the page rea
   await card(page).getByRole('heading', { name: 'The adaptation of docs-writer' }).waitFor();
   assert.equal(await button(page, 'Add input…').isDisabled(), true, 'no change is offered while it goes');
   assert.equal(await button(page, 'Add input…').getAttribute('title'), busyWith('The adaptation of docs-writer'));
-  assert.equal(await button(page, 'Release…').isDisabled(), false, 'a release is no AI run: a run that does not change this project does not hold it back');
+  assert.equal(await (await releaseItem(page)).isDisabled(), false, 'a release is no AI run: a run that does not change this project does not hold it back');
+  await closeMenu(page);
 });
 
 // ---------- the records wait for a run ----------
