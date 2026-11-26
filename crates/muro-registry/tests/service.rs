@@ -1115,6 +1115,28 @@ fn status_is_the_revision_the_settings_and_the_sync_state_and_needs_no_lock() {
 }
 
 #[test]
+fn the_registry_is_read_without_the_lock_a_writer_holds() {
+    let (_t, r, p, a) = fixture();
+    target(&r, &p);
+    plugin(&r, &a);
+    let full = snapshot(&r);
+    let held = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(r.join("writer.lock"))
+        .unwrap();
+    fs2::FileExt::try_lock_exclusive(&held).unwrap();
+    assert_eq!(muro_registry::service::read_registry(&r).unwrap(), full["registry"]);
+    assert!(
+        request(&r, "registry", json!({}))
+            .unwrap_err()
+            .to_string()
+            .contains("Registry is busy"),
+        "the locked read still waits for the writer"
+    );
+}
+
+#[test]
 fn status_of_a_registry_never_written_is_the_default_one() {
     let (_t, r, _p, _a) = fixture();
     let status = request(&r, "status", json!({})).unwrap();

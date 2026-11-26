@@ -91,7 +91,9 @@ fn summary(factory: &Factory, data: &Path, id: &str, path: &str) -> Result<Value
 /// `projects`: a summary for each listed project, in list order. One bad file is an `error` in its own
 /// entry; a factory that cannot run at all is an error of the action.
 pub fn projects(data: &Path) -> Result<Value> {
-    let current = registry(data)?;
+    // Read without the writer lock: a check or a save that holds it does not hold back the list,
+    // and the window sends this outside its queue.
+    let current = muro_registry::service::read_registry(data)?;
     let items = listed(&current);
     if items.is_empty() {
         return Ok(json!([]));
@@ -121,7 +123,8 @@ pub fn projects(data: &Path) -> Result<Value> {
 /// no unpack of it in the cache.
 pub fn project(data: &Path, payload: &Value) -> Result<Value> {
     let id = payload["id"].as_str().unwrap_or("");
-    let current = registry(data)?;
+    // As `projects`: the registry is only read, so the writer lock is not taken.
+    let current = muro_registry::service::read_registry(data)?;
     let file = listed_file(&current, id)?;
     let mut info = Factory::from_settings(&current["settings"])?.project_info(&file, &cache_dir(data), false).inspect_err(|_| {
         discard_unpack(data, &current, &file);

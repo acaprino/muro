@@ -43,7 +43,7 @@ const BUSY_STEP: Duration = Duration::from_millis(250);
 /// held back behind a sync. Cancelling a simulation and asking whether a variable is set touch no
 /// registry; the jobs of the project write side live in files of their own, so reading them and
 /// cancelling one (`jobs`, `cancel_job`) do not either, and a Cancel must not wait for a sync.
-const WITHOUT_THE_LOCK: [&str; 6] = ["discover", "status", "cancel_simulation", "env_present", "jobs", "cancel_job"];
+const WITHOUT_THE_LOCK: [&str; 8] = ["discover", "status", "cancel_simulation", "env_present", "jobs", "cancel_job", "projects", "project"];
 
 /// The backend the window talks to, and what the shell itself answers.
 #[derive(Clone)]
