@@ -14,8 +14,8 @@ export type ProjectDialog = 'add' | 'harmonize' | 'pin' | 'instructions' | 'deta
 export interface ProjectApi {
   view: ProjectView | null;
   /** What the service said of the open project, while its workspace is on screen. */
-  info: ProjectInfo | null;
-  setInfo(info: ProjectInfo | null): void;
+  info: (ProjectInfo & { file: string | null }) | null;
+  setInfo(info: ProjectApi['info']): void;
   /** The dialog open over the workspace, if any: the window's actions open three of them. */
   dialog: ProjectDialog | null;
   setDialog(dialog: ProjectDialog | null): void;
@@ -39,7 +39,7 @@ export function ProjectProvider({ children }: { children?: React.ReactNode }) {
   const send = React.useRef(request);
   send.current = request;
   const [view, setView] = React.useState<ProjectView | null>(() => recall());
-  const [info, setInfo] = React.useState<ProjectInfo | null>(null);
+  const [info, setInfo] = React.useState<ProjectApi['info']>(null);
   const [dialog, setDialog] = React.useState<ProjectDialog | null>(null);
   const latest = React.useRef(view);
   latest.current = view;

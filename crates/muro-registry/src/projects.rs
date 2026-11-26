@@ -9,8 +9,21 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     io::Read,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
 };
+
+/// A release verified by the factory in its digest-addressed cache.
+pub struct VerifiedBuild {
+    pub release: PathBuf,
+    pub digest: String,
+    pub version: String,
+}
+
+pub type ProjectReader<'a> = dyn Fn(&Value, &Path) -> Result<VerifiedBuild> + 'a;
+
+pub(crate) fn no_factory(_: &Value, _: &Path) -> Result<VerifiedBuild> {
+    bail!("Reading a .mp plugin source requires the Muro factory")
+}
 
 /// What a plan says of a plugin whose project file is not the one its builds were made from.
 pub const CHANGED: &str = "Project file changed: open the project again";
@@ -89,6 +102,11 @@ pub fn validate_path(path: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn listed_path<'a>(registry: &'a Value, id: &str) -> Option<&'a str> {
+    registry["projects"].as_array()?.iter()
+        .find(|project| project["id"] == id)?["path"].as_str()
+}
+
 /// The SHA-256 of the file as lowercase hex: the digest `muro project info` reports, which names the
 /// project's identity (the same bytes, the same project).
 pub fn file_digest(path: &Path) -> Result<String> {
@@ -125,21 +143,31 @@ impl<'a> Currency<'a> {
     /// build for the harness (the plan says that itself): nothing to check. A build that records no
     /// digest, a project no longer in the list and a file that cannot be read are all changed.
     pub fn check(&self, plugin: &Value, harness: &str) -> Result<()> {
-        let Some(project) = plugin["project"].as_str() else {
-            return Ok(());
-        };
+        if let Some(error) = plugin["project_source_error"].as_str() {
+            bail!("{error}");
+        }
         let Some(build) = plugin["distributions"]
             .as_array()
             .and_then(|all| all.iter().find(|d| d["harness"] == harness))
         else {
             return Ok(());
         };
-        let listed = self.registry["projects"]
-            .as_array()
-            .and_then(|all| all.iter().find(|p| p["id"] == project));
-        let Some(path) = listed.and_then(|p| p["path"].as_str()) else {
-            bail!("{CHANGED} (it is no longer in your list)");
-        };
+        if let Some(project) = plugin["project"].as_str() {
+            let Some(path) = listed_path(self.registry, project) else {
+                bail!("{CHANGED} (it is no longer in your list)");
+            };
+            let digest = plugin["resolved_project"]["digest"].as_str().or_else(|| build["project_digest"].as_str());
+            return self.compare(path, digest, CHANGED);
+        }
+        if let Some(source) = plugin["resolved_project"].as_object() {
+            let path = source.get("path").and_then(Value::as_str).context("Project source path is missing")?;
+            let expected = source.get("digest").and_then(Value::as_str);
+            return self.compare(path, expected, "The .mp source changed: check for updates before applying");
+        }
+        Ok(())
+    }
+
+    fn compare(&self, path: &str, expected: Option<&str>, changed: &str) -> Result<()> {
         let current = self
             .digests
             .borrow_mut()
@@ -147,9 +175,9 @@ impl<'a> Currency<'a> {
             .or_insert_with(|| file_digest(Path::new(path)).map_err(|e| format!("{e:#}")))
             .clone();
         match current {
-            Ok(digest) if build["project_digest"].as_str() == Some(digest.as_str()) => Ok(()),
-            Ok(_) => bail!(CHANGED),
-            Err(reason) => bail!("{CHANGED} ({reason})"),
+            Ok(digest) if expected == Some(digest.as_str()) => Ok(()),
+            Ok(_) => bail!("{changed}"),
+            Err(reason) => bail!("{changed} ({reason})"),
         }
     }
 }

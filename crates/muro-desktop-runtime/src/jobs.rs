@@ -291,7 +291,7 @@ pub fn start(data: &Path, payload: &Value) -> Result<Value> {
         .as_str()
         .is_none();
     if unresolved {
-        muro_registry::service::request(data, "resolve", json!({"id":plugin_id}))?;
+        crate::request(data, "resolve", json!({"id":plugin_id}))?;
     }
     let registry = muro_registry::service::request(data, "registry", json!({}))?;
     let plugin = registry["plugins"]

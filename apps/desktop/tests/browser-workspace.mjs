@@ -528,7 +528,7 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   assert.equal(await panelOf(page).count(), 0, 'under 850px the left panel is out of the layout');
   await frames(page);
   assert.ok(await sideways(page) <= 0, '500px, the graph');
-  for (const name of ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Extract…', 'Release…', 'Add input…', 'All projects', 'Project panel']) {
+  for (const name of ['Review decisions…', 'Harmonize again…', 'Install via Sync…', 'Export to folder…', 'Release…', 'Add input…', 'All projects', 'Project panel']) {
     const box = await page.getByRole('button', { name, exact: true }).boundingBox();
     assert.ok(box && box.x >= 0 && box.x + box.width <= 500 + 0.5, `${name} is inside the window`);
   }
@@ -546,6 +546,88 @@ await test('at 900px the inspector is a panel over the graph and a press on anot
   await page.screenshot({ path: shots + '/workspace-500.png' });
 });
 
+await test('Install via Sync prefills the project, cancellation clears the next Add, and a registered file reopens the same plugin', 'projects', {}, async app => {
+  const { page } = app;
+  const file = 'D:/Muro/data/projects/sample.mp';
+  await app.flags({ projectSources: { [file]: { file, digest: '4'.repeat(64), harnesses: ['claude-code', 'codex'], version: '0.5.0' } } });
+  const install = page.getByRole('button', { name: 'Install via Sync…', exact: true });
+  const drawer = page.locator('[data-slot="sheet-content"]');
+  const source = drawer.locator('input[name="source"]'), name = drawer.locator('input[name="name"]');
+  const cancel = drawer.getByRole('button', { name: 'Cancel', exact: true });
+  await openSample(page);
+  await install.click();
+  await drawer.getByRole('heading', { name: 'Add a plugin', exact: true }).waitFor();
+  assert.equal(await tab(page, 'Sync').getAttribute('aria-current'), 'page');
+  assert.equal(await source.inputValue(), file);
+  assert.equal(await name.inputValue(), 'Sample');
+  await cancel.click();
+  await drawer.waitFor({ state: 'detached' });
+  await page.getByRole('button', { name: 'Add plugin', exact: true }).click();
+  assert.equal(await source.inputValue(), '');
+  assert.equal(await name.inputValue(), '');
+  await cancel.click();
+  await drawer.waitFor({ state: 'detached' });
+  assert.equal((await callsOf(app, 'save_plugin')).length, 0);
+  await goProjects(page);
+  await install.click();
+  await drawer.getByRole('checkbox', { name: 'Claude Code', exact: true }).uncheck();
+  await drawer.getByRole('button', { name: 'Add plugin', exact: true }).click();
+  await drawer.waitFor({ state: 'detached' });
+  const plugin = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin;
+  assert.equal(plugin.source, file);
+  assert.deepEqual(plugin.targets, ['t2']);
+  await goProjects(page);
+  await install.click();
+  await drawer.getByRole('heading', { name: 'Sample', exact: true }).waitFor();
+  assert.equal(await drawer.getByRole('button', { name: 'Save', exact: true }).isDisabled(), true);
+  assert.equal((await callsOf(app, 'save_plugin')).length, 1);
+  for (const action of ['apply', 'install_project', 'extract_project', 'extract_plugin']) assert.equal((await callsOf(app, action)).length, 0, action);
+});
+
+await test('a local project and a repository with equal file bytes can follow their own sources in Sync', 'projects', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  const source = 'https://github.com/owner/published-store';
+  const digest = await page.evaluate(() => window.behind.digest('sample'));
+  await app.flags({ projectSources: { [source]: {
+    file: 'D:/isolated/data/sources/revision/sample.mp', digest, harnesses: ['claude-code', 'codex'], version: '0.5.0',
+  } } });
+  await page.getByRole('button', { name: 'Add plugin', exact: true }).click();
+  const drawer = page.locator('[data-slot="sheet-content"]');
+  await drawer.locator('input[name="source"]').fill(source);
+  await drawer.getByRole('button', { name: 'Add plugin', exact: true }).click();
+  await drawer.waitFor({ state: 'detached' });
+  await openSample(page);
+  await page.getByRole('button', { name: 'Install via Sync…', exact: true }).click();
+  await drawer.getByRole('heading', { name: 'Add a plugin', exact: true }).waitFor();
+  assert.equal(await drawer.locator('input[name="source"]').inputValue(), 'D:/Muro/data/projects/sample.mp');
+  assert.equal(await drawer.locator('input[name="name"]').inputValue(), 'Sample');
+  assert.equal((await callsOf(app, 'save_plugin')).length, 1);
+});
+
+await test('Install via Sync checks a linked legacy plugin, then opens that same plugin with its selected targets', 'legacy-project', {}, async app => {
+  const { page } = app;
+  const file = 'D:/Muro/data/projects/sample.mp';
+  const install = page.getByRole('button', { name: 'Install via Sync…', exact: true });
+  await app.flags({ projectSources: { [file]: { error: 'The project file could not be verified' } } });
+  await openSample(page);
+  await install.click();
+  await page.locator('[data-toasts]').getByText(/The project file could not be verified/).waitFor();
+  assert.equal(await tab(page, 'Projects').getAttribute('aria-current'), 'page');
+  assert.equal((await callsOf(app, 'save_plugin')).length, 0);
+  await app.flags({ projectSources: { [file]: {
+    file, digest: 'a'.repeat(64), version: '0.5.0', harnesses: ['claude-code', 'codex'],
+  } } });
+  await install.click();
+  const drawer = page.locator('[data-slot="sheet-content"]');
+  await drawer.getByRole('heading', { name: 'Sample', exact: true }).waitFor();
+  await drawer.getByRole('region', { name: 'Project file builds' }).getByText(/Included.*Claude Code.*Codex/).waitFor();
+  assert.equal(await drawer.getByRole('checkbox', { name: 'Claude Code', exact: true }).isChecked(), false);
+  assert.equal(await drawer.getByRole('checkbox', { name: 'Codex', exact: true }).isChecked(), true);
+  assert.deepEqual((await callsOf(app, 'resolve')).map(c => c.payload.id), ['sample', 'sample']);
+  for (const action of ['save_plugin', 'install_project', 'apply']) assert.equal((await callsOf(app, action)).length, 0, action);
+});
+
 await test('every control has a name, and the actions that are not there yet are disabled and say why', 'projects', {}, async app => {
   const { page } = app;
   await openSample(page);
@@ -556,10 +638,8 @@ await test('every control has a name, and the actions that are not there yet are
     await segment(page, name).click();
     assert.deepEqual(await unnamed(page), [], name);
   }
-  const actions = ['Review decisions…', 'Harmonize again…', 'Install on harnesses…', 'Extract…', 'Release…', 'Add input…'];
-  // Add input… and Harmonize again… work (plan W, browser-write-ai.mjs), and so do Extract… and, for a project that names a repository, Release… (browser-write-edit.mjs); the two that wait
-  // for another plan say which.
-  const waiting = { 'Review decisions…': 'Coming with the review', 'Install on harnesses…': 'Coming with the Sync page' };
+  const actions = ['Review decisions…', 'Harmonize again…', 'Install via Sync…', 'Export to folder…', 'Release…', 'Add input…'];
+  const waiting = { 'Review decisions…': 'Coming with the review' };
   for (const name of actions) {
     const button = page.getByRole('button', { name, exact: true });
     if (name in waiting) {

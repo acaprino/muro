@@ -49,7 +49,13 @@ def option(name, default=None):
     return default
 
 
-if args[:2] == ["project", "info"]:
+def check_build(held):
+    if held.get("mismatch"):
+        print("Project verify failed: The plugin inside this project does not match the project: it was not built from it (it is version 9.9.9, the project's is 1.0.0)", file=sys.stderr)
+        sys.exit(1)
+
+
+if args[:2] == ["project", "info"] or args[:2] == ["project", "verify"] and "--build-info" in args:
     mp = Path(args[2])
     cache = Path(option("--cache"))
     try:
@@ -81,15 +87,22 @@ if args[:2] == ["project", "info"]:
     for harness, version in held.get("build", {}).items():
         adapter = folder / "release" / held["plugin"]["slug"] / "adapters" / harness
         adapter.mkdir(parents=True, exist_ok=True)
+        (adapter / "INSTALL.md").write_text(f"Install on {harness}")
         if harness == "claude-code":
             (adapter / ".claude-plugin").mkdir(exist_ok=True)
             (adapter / ".claude-plugin" / "plugin.json").write_text(json.dumps({"name": held["plugin"]["slug"], "version": version}))
         elif harness == "codex":
             (adapter / ".codex-plugin").mkdir(exist_ok=True)
             (adapter / ".codex-plugin" / "plugin.json").write_text(json.dumps({"name": held["plugin"]["slug"], "version": version}))
+        elif harness == "hermes":
+            (adapter / "plugin.yaml").write_text(json.dumps({"name": held["plugin"]["slug"], "version": version}))
         else:
             (adapter / "package.json").write_text(json.dumps({"name": held["plugin"]["slug"], "version": version}))
             (adapter / "index.js").write_text("export default async () => ({})")
+    if "--build-info" in args:
+        check_build(held)
+        print(json.dumps({"verified": True, "digest": digest, "slug": held["plugin"]["slug"], "version": held["plugin"]["version"]}))
+        sys.exit(0)
     shown = {"project": {"schema": 1, **({"builtin": True} if held.get("builtin") else {})}, "plugin": held["plugin"], "digest": digest}
     if "--summary" in args:
         shown.update(inputs=1, capabilities=2, entries=3, examples=4, records=5, runs=6)
@@ -98,9 +111,7 @@ if args[:2] == ["project", "info"]:
     print(json.dumps(shown, ensure_ascii=False))
 elif args[:2] == ["project", "verify"]:
     held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
-    if held.get("mismatch"):
-        print("Project verify failed: The plugin inside this project does not match the project: it was not built from it (it is version 9.9.9, the project's is 1.0.0)", file=sys.stderr)
-        sys.exit(1)
+    check_build(held)
     print(json.dumps({"verified": True}))
 elif args[:2] == ["project", "simulate-prepare"]:
     # what the real factory prepares: the request's context (stack tokens sorted) and the prompt that carries it

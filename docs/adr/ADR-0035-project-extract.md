@@ -65,3 +65,26 @@ unpack the whole project (`muro project unpack`) and find the folder.
 - Rust and the window are not compiled or run on the owner's computer: GitHub Actions
   builds and tests them.
 - No extracted folder was installed in a live harness for this change.
+
+## Amendment of 2026-11-26 — project files as Sync plugin sources
+
+The owner asked to add a standalone `.mp` or a repository containing one to the plugin list, choose
+the harnesses in Sync, and make the difference between installation and export clear in the window.
+
+An earlier project installation keeps its registry ID, selected targets and receipts when Sync next
+checks its listed file. The archive then supplies every available variant for that row. On Hermes a release
+can contain a second native installation for MCP. The plan tracks both components separately so a retry can
+finish the remaining installation and a later release can retire the companion with a reviewed removal.
+
+- **Add plugin** accepts a local file, a folder or a repository. Sync reads the single archive in
+  the chosen root, including when generated plugin folders are also present. A repository with several
+  archives needs an explicit file fragment such as `#review.mp` or `#tools/review.mp`. The Git update
+  policy selects the revision before archive discovery.
+- The factory verifies the embedded release and identifies the archive by its SHA-256. Sync records
+  the variants with an installation guide and a readable harness manifest. It prepares the available
+  builds for the selected targets. Installation takes place when the Sync plan is applied.
+- **Export to folder…** in Projects or in a checked archive's Sync details copies one harness
+  variant and its guide, independently of installation. Sync binds this export to the digest it last
+  checked. A change of file requires another check before applying or exporting.
+- Opening an archive as a plugin source does not register it as an editable project. For a file
+  already open in Projects, **Install via Sync…** opens its Sync entry or pre-fills **Add plugin**.

@@ -1,4 +1,4 @@
-use crate::{native, storage::*};
+use crate::{native, projects, storage::*};
 use anyhow::{Context, Result, bail, ensure};
 use serde_json::{Value, json};
 use std::{
@@ -38,7 +38,10 @@ fn source_url(input: &str) -> Result<(url::Url, Option<String>)> {
         url.username().is_empty() && url.password().is_none(),
         "Do not put credentials in source URLs; configure Git authentication"
     );
-    let sub = url.fragment().map(str::to_owned);
+    let sub = url.fragment()
+        .map(|fragment| percent_encoding::percent_decode_str(fragment).decode_utf8().map(|s| s.into_owned()))
+        .transpose()
+        .context("The repository path must be UTF-8")?;
     url.set_fragment(None);
     if let Some(ref s) = sub {
         ensure!(
@@ -144,6 +147,60 @@ fn expand_home(source: &str, home: Option<&Path>) -> PathBuf {
 fn checkout(root: &Path, plugin: &Value) -> Result<(PathBuf, String, String)> {
     checkout_in(root, plugin, home_dir().as_deref())
 }
+
+/// Marks an archive refusal so Sync can keep a failed update out of a plan.
+#[derive(Debug)]
+pub(crate) struct ProjectSource;
+
+impl std::fmt::Display for ProjectSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Cannot use the .mp plugin source")
+    }
+}
+
+fn is_mp(path: &Path) -> bool {
+    path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("mp"))
+}
+
+/// Only the selected folder is inspected. In a store, its .mp owns the release even if a
+/// previous release has left adapter folders beside it. Several files require an explicit choice.
+fn plugin_source(path: &Path, source: &str) -> Result<PathBuf> {
+    if !path.is_dir() {
+        ensure!(is_mp(path), "Choose a plugin folder or a .mp project file");
+        ensure!(!path.is_symlink(), "A .mp source must be a regular file: {}", path.display());
+        return Ok(path.canonicalize()?);
+    }
+    let folder = path.canonicalize()?;
+    let mut files = vec![];
+    for entry in fs::read_dir(&folder)? {
+        let entry = entry?;
+        if is_mp(&entry.path()) && !entry.file_type()?.is_dir() {
+            files.push(entry.path());
+        }
+    }
+    files.sort();
+    match files.as_slice() {
+        [] => Ok(folder),
+        [file] => {
+            ensure!(
+                fs::symlink_metadata(file)?.is_file(),
+                "A .mp source must be a regular file: {}", file.display()
+            );
+            Ok(file.clone())
+        }
+        _ => {
+            let choices: Vec<_> = files.iter().map(|p| {
+                if path == Path::new(source) || is_local_path(source) {
+                    p.display().to_string()
+                } else {
+                    narrowed(source, &p.file_name().unwrap_or_default().to_string_lossy())
+                }
+            }).collect();
+            bail!("Choose one .mp file: {}", choices.join(" or "))
+        }
+    }
+}
+
 /// `checkout` for a given home folder, which a test sets and the user's own never changes.
 fn checkout_in(
     root: &Path,
@@ -152,9 +209,20 @@ fn checkout_in(
 ) -> Result<(PathBuf, String, String)> {
     let source = str_field(plugin, "source")?;
     let path = expand_home(source, home);
-    if path.is_dir() {
-        let path = path.canonicalize()?;
-        return Ok((path.clone(), tree_hash(&path)?, "local".into()));
+    if path.exists() {
+        let selected = if plugin["project"].is_string() {
+            path.canonicalize()?
+        } else {
+            plugin_source(&path, source).context(ProjectSource)?
+        };
+        // A file gets its revision from the verified bytes. A folder still uses its tree hash.
+        let revision = if selected.is_file() { String::new() } else { tree_hash(&selected)? };
+        return Ok((selected, revision, "local".into()));
+    }
+    let local_name = is_local_path(source) || !source.contains(['/', '\\'])
+        || source.starts_with("./") || source.starts_with(".\\");
+    if local_name && is_mp(&path) {
+        return Err(anyhow::anyhow!("Project file not found: {source}")).context(ProjectSource);
     }
     // A moved or deleted folder must not be looked up as an owner/repository on GitHub.
     ensure!(!is_local_path(source), "Source folder not found: {source}");
@@ -209,7 +277,8 @@ fn checkout_in(
         fs::rename(staged, &destination)?;
     }
     let source = if let Some(sub) = sub {
-        let candidate = destination.join(sub).canonicalize()?;
+        let candidate = destination.join(&sub).canonicalize()
+            .with_context(|| format!("The selected repository revision does not contain {sub}"))?;
         ensure!(
             candidate.starts_with(destination.canonicalize()?),
             "Source subdirectory escapes checkout"
@@ -218,7 +287,8 @@ fn checkout_in(
     } else {
         destination
     };
-    Ok((source, revision, reference))
+    let selected = plugin_source(&source, str_field(plugin, "source")?).context(ProjectSource)?;
+    Ok((selected, revision, reference))
 }
 const HARNESSES: [&str; 5] = ["claude-code", "codex", "opencode", "pi", "hermes"];
 /// What a source holds for one harness.
@@ -413,6 +483,9 @@ fn narrowed(source: &str, folder: &str) -> String {
 /// Why `plugin` has no build for harness `h`, in words a person can act on.
 pub fn missing(plugin: &Value, h: &str) -> String {
     let name = native::harness_name(h);
+    if plugin["resolved_project"].is_object() {
+        return format!("the .mp file contains no installable variant for {name}");
+    }
     let Some(resolved) = plugin["resolved_source"].as_str() else {
         return format!(
             "no {name} build yet: check for updates to look for one in the source, or adapt the plugin with AI"
@@ -454,9 +527,81 @@ pub fn missing(plugin: &Value, h: &str) -> String {
         looked.join(", ")
     )
 }
-pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
-    let (source, revision, version) = checkout(root, plugin)?;
+#[cfg(test)]
+fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
+    resolve_with_projects(root, plugin, &Value::Null, &projects::no_factory)
+}
+
+/// An archive has exactly the factory's layout. Loose sources also support each harness's
+/// native manifests and marketplaces.
+fn native_distribution(
+    harness: &str, source: &Path, revision: &str, project_digest: Option<&str>,
+) -> Result<Option<Value>> {
+    let found = if project_digest.is_some() {
+        let adapter = source.join("adapters").join(harness);
+        if !adapter.join("INSTALL.md").is_file() {
+            return Ok(None);
+        }
+        Found::One(adapter, None)
+    } else {
+        find(harness, source)?
+    };
+    let Found::One(dir, entry) = found else { return Ok(None) };
+    let (name, version) = identity_in(harness, &dir, entry.as_ref(), revision)?;
+    let mut build = json!({"harness":harness,"path":dir.canonicalize()?,"name":name,"version":version,
+                           "origin":"native","source_revision":revision});
+    if let Some(digest) = project_digest {
+        ensure!(!version.is_empty(), "The {harness} adapter declares no version");
+        build["project_digest"] = json!(digest);
+    }
+    Ok(Some(build))
+}
+
+pub fn resolve_with_projects(
+    root: &Path,
+    plugin: &Value,
+    settings: &Value,
+    read_project: &projects::ProjectReader<'_>,
+) -> Result<Value> {
+    let (selected, mut revision, mut version) = checkout(root, plugin)?;
     let mut next = plugin.clone();
+    let entry = next.as_object_mut().context("Expected a plugin")?;
+    entry.remove("project_source_error");
+    entry.remove("resolved_project");
+
+    let archive = if selected.is_file() {
+        let built = read_project(settings, &selected).context(ProjectSource)?;
+        if let Some(id) = plugin["project"].as_str() {
+            let slug = built.release.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if slug != id {
+                return Err(anyhow::anyhow!("The project file now holds {slug}, but this plugin belongs to {id}"))
+                    .context(ProjectSource);
+            }
+        }
+        if revision.is_empty() {
+            if plugin["policy"] == "pinned" && plugin["pinned_version"].as_str() != Some(built.version.as_str()) {
+                let expected = str_field(plugin, "pinned_version")?;
+                return Err(anyhow::anyhow!(
+                    "The local .mp has version {}, but this plugin is pinned to {expected}", built.version
+                )).context(ProjectSource);
+            }
+            revision.clone_from(&built.digest);
+            version.clone_from(&built.version);
+        }
+        Some(built)
+    } else {
+        None
+    };
+    let source = archive.as_ref().map_or(selected.as_path(), |built| built.release.as_path());
+    next["resolved_source"] = json!(source);
+    next["upstream_revision"] = json!(revision);
+    next["upstream_version"] = json!(version);
+    next["last_checked"] = event("resolve", "complete", "")["time"].clone();
+    // install_project owns the selected target builds and their archive digest. Its source is a
+    // cached release folder, not a new discovery of arbitrary native plugins.
+    if plugin["project"].is_string() && archive.is_none() {
+        return Ok(next);
+    }
     let mut distributions = vec![];
     // Explicit artifacts belong to the owner. Resolution only replaces its own discoveries.
     for old in plugin["distributions"].as_array().into_iter().flatten() {
@@ -475,22 +620,21 @@ pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
             }
         }
     }
+    let mut offered = vec![];
+    let project_digest = archive.as_ref().map(|built| built.digest.as_str());
     for h in HARNESSES {
-        if distributions.iter().any(|d| d["harness"] == h) {
-            continue;
+        // Each harness is independent: a missing or invalid variant leaves the others available.
+        let Ok(Some(build)) = native_distribution(h, source, &revision, project_digest) else { continue };
+        offered.push(h);
+        if !distributions.iter().any(|d| d["harness"] == h) {
+            distributions.push(build);
         }
-        // A harness whose files cannot be read has no native build here; the others are resolved.
-        let native_build = || -> Result<Option<Value>> {
-            let Found::One(dir, entry) = find(h, &source)? else {
-                return Ok(None);
-            };
-            let (name, version) = identity_in(h, &dir, entry.as_ref(), &revision)?;
-            let distribution = json!({"harness":h,"path":dir.canonicalize()?.to_string_lossy(),"name":name,"version":version,"origin":"native","source_revision":revision});
-            Ok(Some(distribution))
-        };
-        if let Ok(Some(distribution)) = native_build() {
-            distributions.push(distribution);
+    }
+    if let Some(built) = &archive {
+        if offered.is_empty() {
+            return Err(anyhow::anyhow!("The .mp contains no installable harness variants; build the project in Muro first")).context(ProjectSource);
         }
+        next["resolved_project"] = json!({"path":selected,"digest":built.digest,"version":built.version,"harnesses":offered});
     }
     for old in plugin["distributions"].as_array().into_iter().flatten() {
         if old["origin"] == "muro"
@@ -501,10 +645,6 @@ pub fn resolve(root: &Path, plugin: &Value) -> Result<Value> {
         }
     }
     next["distributions"] = json!(distributions);
-    next["resolved_source"] = json!(source);
-    next["upstream_revision"] = json!(revision);
-    next["upstream_version"] = json!(version);
-    next["last_checked"] = event("resolve", "complete", "")["time"].clone();
     Ok(next)
 }
 
@@ -531,10 +671,14 @@ mod tests {
     #[test]
     fn url_boundaries() {
         assert!(source_url("https://github.com/org/repo#../escape").is_err());
+        assert!(source_url("org/repo#%2e%2e/another.mp").is_err());
         assert!(source_url("https://secret@example.com/repo").is_err());
         let (u, s) = source_url("org/repo#plugins/demo").unwrap();
         assert_eq!(u.as_str(), "https://github.com/org/repo");
         assert_eq!(s.as_deref(), Some("plugins/demo"));
+        for location in ["org/repo#My Plugin.mp", "org/repo#My%20Plugin.mp"] {
+            assert_eq!(source_url(location).unwrap().1.as_deref(), Some("My Plugin.mp"));
+        }
     }
     #[test]
     fn missing_local_folder_fails_before_any_repository_lookup() {
@@ -669,6 +813,56 @@ mod tests {
     fn put(path: &Path, text: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(path, text).unwrap();
+    }
+
+    #[test]
+    fn a_store_and_its_project_file_offer_only_the_variants_in_the_verified_release() {
+        let data = tempfile::tempdir().unwrap();
+        let store = tempfile::tempdir().unwrap();
+        let released = data.path().join("release/demo");
+        let file = store.path().join("Demo.MP");
+        put(&file, "archive bytes");
+        let manifest = r#"{"name":"demo","version":"1.0.0"}"#;
+        put(&store.path().join("demo/adapters/pi/package.json"), manifest);
+        put(&released.join("adapters/codex/.codex-plugin/plugin.json"), manifest);
+        put(&released.join("adapters/codex/INSTALL.md"), "Install Codex");
+        put(&released.join("adapters/pi/package.json"), manifest); // no INSTALL.md for Pi
+        let digest = projects::file_digest(&file).unwrap();
+        for source in [store.path(), file.as_path()] {
+            let plugin = json!({"id":"demo","source":source,"policy":"head","distributions":[]});
+            let resolved = resolve_with_projects(data.path(), &plugin, &Value::Null, &|_, checked| {
+                assert_eq!(checked, file.canonicalize().unwrap());
+                Ok(projects::VerifiedBuild { release: released.clone(), digest: digest.clone(), version: "1.0.0".into() })
+            }).unwrap();
+            assert_eq!(resolved["resolved_project"]["harnesses"], json!(["codex"]));
+            assert_eq!(resolved["upstream_revision"], digest);
+            assert_eq!(resolved["upstream_version"], "1.0.0");
+            let builds = resolved["distributions"].as_array().unwrap();
+            assert_eq!(builds.len(), 1);
+            assert_eq!(builds[0]["project_digest"], digest);
+            assert_eq!(builds[0]["harness"], "codex");
+        }
+    }
+
+    #[test]
+    fn a_store_with_two_project_files_names_both_choices() {
+        let store = tempfile::tempdir().unwrap();
+        for name in ["a.mp", "B two.MP"] {
+            put(&store.path().join(name), "archive");
+        }
+        let reason = plugin_source(store.path(), "org/store").unwrap_err().to_string();
+        assert!(reason.contains("org/store#a.mp") && reason.contains("org/store#B two.MP"), "{reason}");
+        assert_eq!(plugin_source(&store.path().join("a.mp"), "org/store#a.mp").unwrap(),
+                   store.path().join("a.mp").canonicalize().unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_store_cannot_select_an_archive_through_a_link() {
+        let store = tempfile::tempdir().unwrap();
+        let outside = tempfile::NamedTempFile::new().unwrap();
+        std::os::unix::fs::symlink(outside.path(), store.path().join("linked.mp")).unwrap();
+        assert!(plugin_source(store.path(), "org/store").unwrap_err().to_string().contains("regular file"));
     }
     /// The local folder `source` resolved as a plugin on its latest commit.
     fn resolution(source: &Path) -> Value {

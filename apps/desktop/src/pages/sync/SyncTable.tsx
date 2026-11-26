@@ -101,6 +101,9 @@ function HarnessHead({ target, snapshot, plan, asking, onOpen, onReview }: Harne
     case 'unknown':
       line = <Badge tone="warning">{state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read'}</Badge>;
       break;
+    case 'source-error':
+      line = <Badge tone="warning">{plural(state.count, 'source')} to check</Badge>;
+      break;
     case 'unseen':
       line = <Text variant="strong">Check to see the changes</Text>;
       break;
@@ -170,6 +173,8 @@ function Cell({ state }: { state: CellStatus }) {
     case 'activate': return <Badge tone="info">Activate {state.to}</Badge>;
     case 'remove': return <Badge tone="danger">Remove {state.from}</Badge>;
     case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
+    case 'source-error': return <Column gap="xs" align="start"><Badge tone="warning">Check plugin source</Badge><Text variant="note" title={state.reason} truncate>{state.reason}</Text></Column>;
+    case 'changes': return <Badge tone="info">{plural(state.count ?? 0, 'change')}</Badge>;
     case 'unknown': return <Text variant="muted">Unknown</Text>;
     case 'paused': return <Text variant="muted">Paused</Text>;
     default: return <><Text variant="muted" aria-hidden="true">—</Text><Text srOnly>Not installed here</Text></>;

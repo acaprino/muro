@@ -11,16 +11,17 @@ pub const BUSY: &str = "Registry is busy";
 const ACTIVITY_LIMIT: usize = 500;
 
 pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
+    dispatch(data_dir, action, payload, None)
+}
+
+fn ensure_registry_folder(data_dir: &Path) -> Result<()> {
     fs::create_dir_all(data_dir)?;
-    ensure!(
-        !data_dir.is_symlink(),
-        "Registry directory must not be a symbolic link"
-    );
-    // A read of two small files that are only ever replaced whole: it waits for no writer, so a
-    // check that lasts minutes does not blind the tray and the background worker.
-    if action == "status" {
-        return status(data_dir);
-    }
+    ensure!(!data_dir.is_symlink(), "Registry directory must not be a symbolic link");
+    Ok(())
+}
+
+fn locked_registry(data_dir: &Path) -> Result<(fs::File, Value)> {
+    ensure_registry_folder(data_dir)?;
     let lock = fs::OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -29,12 +30,54 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
         .open(data_dir.join("writer.lock"))?;
     lock.try_lock_exclusive()
         .context(format!("{BUSY}; wait for the running operation"))?;
-    let mut registry = load_registry(data_dir)?;
+    Ok((lock, load_registry(data_dir)?))
+}
+
+/// Run a cache operation while the registry and the set of builds it refers to are stable.
+pub fn with_registry<T>(data_dir: &Path, read: impl FnOnce(&Value) -> Result<T>) -> Result<T> {
+    let (_lock, registry) = locked_registry(data_dir)?;
+    read(&registry)
+}
+
+/// The runtime supplies its bundled factory to read and verify archives; ordinary sources
+/// use only the registry. The same resolution runs for a single plugin and a full check.
+pub fn request_with_projects(
+    data_dir: &Path,
+    action: &str,
+    payload: Value,
+    read_project: &projects::ProjectReader<'_>,
+) -> Result<Value> {
+    dispatch(data_dir, action, payload, Some(read_project))
+}
+
+fn dispatch(
+    data_dir: &Path, action: &str, payload: Value, reader: Option<&projects::ProjectReader<'_>>,
+) -> Result<Value> {
+    // A read of two small files that are only ever replaced whole: it waits for no writer, so a
+    // check that lasts minutes does not blind the tray and the background worker.
+    if action == "status" {
+        ensure_registry_folder(data_dir)?;
+        return status(data_dir);
+    }
+    let (_lock, mut registry) = locked_registry(data_dir)?;
     let mut receipts = optional(&data_dir.join("receipts.json"))?;
     match action {
         "registry" => Ok(registry),
         "snapshot" => snapshot(data_dir, &registry, &receipts, false),
         "scan" => snapshot(data_dir, &registry, &receipts, true),
+        "inspect_plugin_source" => {
+            // Only the source and its revision policy determine what the source offers.
+            // A manual build or a target in the unfinished form is not a variant of the source.
+            let draft = &payload["plugin"];
+            let input = json!({"id":draft["id"], "name":"Source preview", "source":draft["source"],
+                "policy":draft["policy"], "pinned_version":draft["pinned_version"],
+                "targets":[], "distributions":[]});
+            validate_plugin(&input, &registry)?;
+            let found = resolve_plugin(data_dir, &registry, &input, reader)?;
+            let harnesses: Vec<_> = found["distributions"].as_array().into_iter().flatten()
+                .filter_map(|variant| variant["harness"].as_str()).collect();
+            Ok(json!({"harnesses":harnesses, "project_version":found["resolved_project"]["version"]}))
+        }
         "custom_instructions" => {
             let key = str_field(&payload, "id")?;
             let plugin = registry["plugins"].as_array().context("plugins")?.iter()
@@ -66,8 +109,12 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             let mut cleared_receipts = false;
             match action {
                 "save_plugin" => {
-                    let p = payload["plugin"].clone();
+                    let mut p = payload["plugin"].clone();
                     validate_plugin(&p, &registry)?;
+                    // Only a successful resolution establishes which archive a Sync row may export.
+                    for key in ["resolved_project", "project_source_error"] {
+                        p.as_object_mut().context("Expected a plugin")?.remove(key);
+                    }
                     instructions::directory(data_dir, &p)?;
                     if let Some(expected) = payload.get("expected_custom_instructions_digest") {
                         instructions_unchanged(data_dir, &p, expected)?;
@@ -92,6 +139,17 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                                 .all(|key| p.get(*key).is_none_or(Value::is_null)),
                                 "Changing source requires clearing resolved upstream metadata"
                             );
+                        } else {
+                            for key in ["resolved_project", "project_source_error"] {
+                                if let Some(value) = old.get(key) {
+                                    p[key] = value.clone();
+                                }
+                            }
+                            let selection_changed = old["policy"] != p["policy"]
+                                || (p["policy"] == "pinned" && old["pinned_version"] != p["pinned_version"]);
+                            if old["resolved_project"].is_object() && selection_changed {
+                                p["project_source_error"] = json!("Update policy changed. Check for updates to use the selected revision.");
+                            }
                         }
                     }
                     if let Some(adopt) = payload.get("adopt").filter(|a| !a.is_null()) {
@@ -216,9 +274,10 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
             let mut errors = vec![];
             for index in 0..registry["plugins"].as_array().context("plugins")?.len() {
                 let plugin = registry["plugins"][index].clone();
-                match sources::resolve(data_dir, &plugin) {
+                match resolve_plugin(data_dir, &registry, &plugin, reader) {
                     Ok(resolved) => registry["plugins"][index] = resolved,
                     Err(e) => {
+                        remember_archive_error(&mut registry["plugins"][index], &e);
                         errors.push(json!({"plugin_id":plugin["id"],"message":format!("{e:#}")}))
                     }
                 }
@@ -268,7 +327,15 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
                 .position(|p| p["id"] == key)
                 .context("Plugin not found")?;
             let plugin = registry["plugins"][index].clone();
-            let resolved = sources::resolve(data_dir, &plugin)?;
+            let resolved = match resolve_plugin(data_dir, &registry, &plugin, reader) {
+                Ok(resolved) => resolved,
+                Err(error) => {
+                    if remember_archive_error(&mut registry["plugins"][index], &error) {
+                        save_registry(data_dir, &mut registry)?;
+                    }
+                    return Err(error);
+                }
+            };
             registry["plugins"][index] = resolved;
             save_registry(data_dir, &mut registry)?;
             log(
@@ -337,6 +404,48 @@ pub fn request(data_dir: &Path, action: &str, payload: Value) -> Result<Value> {
         _ => bail!("Unknown registry action: {action}"),
     }
 }
+
+fn resolve_plugin(
+    data: &Path, registry: &Value, plugin: &Value, reader: Option<&projects::ProjectReader<'_>>,
+) -> Result<Value> {
+    // A completed install_project from before archive sources points at a cache folder and knows
+    // only the selected targets' variants. Resolve its listed file under the same writer lock.
+    // Its initial resolve (empty builds) belongs to install_project's own setup.
+    let bound = plugin["resolved_project"].is_object() || plugin["distributions"].as_array().into_iter()
+        .flatten().any(|build| build["project_digest"].is_string());
+    let mut rebound;
+    let input = if let Some(id) = plugin["project"].as_str().filter(|_| bound && reader.is_some()) {
+        let path = projects::listed_path(registry, id).context("The project is no longer in your list")
+            .context(sources::ProjectSource)?;
+        projects::validate_path(path).context(sources::ProjectSource)?;
+        if !Path::new(path).is_file() {
+            return Err(anyhow::anyhow!("The project file is missing: {path}")).context(sources::ProjectSource);
+        }
+        rebound = plugin.clone();
+        rebound["source"] = json!(path);
+        &rebound
+    } else {
+        plugin
+    };
+    sources::resolve_with_projects(data, input, &registry["settings"], reader.unwrap_or(&projects::no_factory))
+}
+
+/// Keep previously installed copies while preventing an unverified archive update from applying
+/// an old cached variant. A successful check (or a change of source) clears this refusal.
+fn remember_archive_error(plugin: &mut Value, error: &anyhow::Error) -> bool {
+    if error.downcast_ref::<sources::ProjectSource>().is_none()
+        && !plugin["resolved_project"].is_object() && !plugin["project_source_error"].is_string()
+    {
+        return false;
+    }
+    let reason = format!("{error:#}");
+    if plugin["project_source_error"].as_str() == Some(reason.as_str()) {
+        return false;
+    }
+    plugin["project_source_error"] = json!(reason);
+    true
+}
+
 fn load_registry(root: &Path) -> Result<Value> {
     let path = root.join("registry.json");
     let mut v = if path.exists() {
@@ -375,11 +484,11 @@ fn revision(reg: &Value, payload: &Value) -> Result<()> {
 fn receipt_key(target_id: &str, plugin_id: &str) -> String {
     serde_json::to_string(&[target_id, plugin_id]).expect("Two IDs serialize to JSON")
 }
-fn receipt_for<'a>(receipts: &'a Value, target_id: &str, plugin_id: &str) -> Option<&'a Value> {
+fn receipt_for<'a>(receipts: &'a Value, target_id: &str, plugin_id: &str, component: Option<&str>) -> Option<&'a Value> {
     receipts
         .as_object()?
         .values()
-        .find(|r| r["target_id"] == target_id && r["plugin_id"] == plugin_id)
+        .find(|r| r["target_id"] == target_id && r["plugin_id"] == plugin_id && r["component"].as_str() == component)
 }
 /// The digest of the copy a person already has: its folder, hashed as Muro hashes the build it
 /// installs. An entry with no folder (a Codex copy outside the cache Muro reads) gives none, and the
@@ -463,7 +572,7 @@ fn adopt_installation(
     let key = receipt_key(target_id, plugin_id);
     let all = receipts.as_object_mut().context("receipts")?;
     // A legacy delimiter key for this pair goes, as at an install.
-    all.retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id);
+    all.retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id || !r["component"].is_null());
     all.insert(key.clone(), receipt);
     write(&root.join("receipts.json"), receipts)?;
     Ok(key)
@@ -533,7 +642,7 @@ fn claim(
         "{} must list {label} to take over the copy there",
         text(&plugin["name"])
     );
-    if entries.iter().any(|e| e["registry_id"] == plugin_id) {
+    if entries.iter().any(|e| e["registry_id"] == plugin_id && e["component"].is_null()) {
         return Ok(false);
     }
     let Some(entry) = entries
@@ -555,7 +664,7 @@ fn claim(
     let all = receipts.as_object_mut().context("receipts")?;
     // The old owner's receipt for the copy goes, and so does any older one of the plugin there.
     all.retain(|_, r| {
-        r["target_id"] != target_id || (r["native_id"] != entry["id"] && r["plugin_id"] != plugin_id)
+        r["target_id"] != target_id || (r["native_id"] != entry["id"] && (r["plugin_id"] != plugin_id || !r["component"].is_null()))
     });
     all.insert(receipt_key(target_id, plugin_id), receipt);
     Ok(true)
@@ -813,6 +922,10 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
             "AI adaptation is stale; regenerate for the current source revision"
         );
     }
+    cache_artifact(root, source, h, str_field(plugin, "id")?, &name, &version, &custom_digest)
+}
+
+fn cache_artifact(root: &Path, source: &Path, h: &str, plugin_id: &str, name: &str, version: &str, custom_digest: &str) -> Result<Value> {
     let digest = tree_hash(source)?;
     let artifact = root.join("artifacts").join(&digest).join("plugin");
     if artifact.exists() {
@@ -832,11 +945,44 @@ fn prepare(root: &Path, plugin: &Value, h: &str) -> Result<Value> {
         );
         fs::rename(tmp.path(), &artifact)?;
     }
-    let native_id = native::native_id(h, str_field(plugin, "id")?, &name, &artifact)?;
+    let native_id = native::native_id(h, plugin_id, name, &artifact)?;
     Ok(
         json!({"source":source,"path":artifact,"digest":digest,"name":name,"version":version,"native_id":native_id,
                "custom_instructions_digest":custom_digest}),
     )
+}
+
+/// A verified Hermes project can install two native plugins. Prepare both before proposing
+/// either, and retain separate artifacts so a repair restores the exact packages installed.
+fn install_artifacts(root: &Path, plugin: &Value, h: &str, receipts: &Value, tid: &str, reinstall: bool) -> Result<Vec<Value>> {
+    let pid = str_field(plugin, "id")?;
+    if let Some(main) = receipt_for(receipts, tid, pid, None).filter(|r| reinstall && r["adopted"] != true) {
+        let server = receipt_for(receipts, tid, pid, Some(native::HERMES_MCP));
+        return std::iter::once(main).chain(server).map(|record| {
+            instructions::ensure_distribution(root, plugin, record)?;
+            let mut artifact = retained_artifact(root, record, h)?;
+            if let Some(component) = record.get("component") {
+                artifact["component"] = component.clone();
+            }
+            Ok(artifact)
+        }).collect();
+    }
+    let main = prepare(root, plugin, h)?;
+    let mut artifacts = vec![main];
+    if h == "hermes" && plugin["distributions"].as_array().into_iter().flatten().any(|d| d["harness"] == h && d["project_digest"].is_string()) {
+        let main = &artifacts[0];
+        let source = Path::new(str_field(main, "source")?).parent().context("Hermes adapter parent")?.join(native::HERMES_MCP);
+        if source.try_exists()? {
+            let version = str_field(main, "version")?;
+            let record = json!({"component":native::HERMES_MCP,"version":version});
+            let (name, _) = native::distribution_identity(h, &source, &record)?;
+            ensure!(name == format!("{}-mcp", str_field(main, "name")?), "The Hermes MCP package belongs to another plugin");
+            let mut server = cache_artifact(root, &source, h, pid, &name, version, str_field(main, "custom_instructions_digest")?)?;
+            server["component"] = json!(native::HERMES_MCP);
+            artifacts.push(server);
+        }
+    }
+    Ok(artifacts)
 }
 /// A repair must restore the files, not only the version. An entry with no folder cannot be
 /// compared, and Hermes installs a Git clone whose `.git` is not part of the artifact, so it is not.
@@ -925,7 +1071,7 @@ fn plan(
     let instruction_bindings = instructions::bindings(root, reg)?;
     let invs = inventories(root, reg, receipts, true)?;
     let currency = projects::Currency::new(reg);
-    let mut ops = vec![];
+    let mut ops: Vec<Value> = vec![];
     let mut blockers = vec![];
     for target in targets {
         let tid = str_field(target, "id")?;
@@ -954,89 +1100,42 @@ fn plan(
             })
         {
             let pid = str_field(plugin, "id")?;
-            let previous = installed.iter().find(|i| i["registry_id"] == pid);
-            let absent = Value::Null;
-            let receipt = receipt_for(receipts, tid, pid).unwrap_or(&absent);
-            // A build made from a project file that has changed since is stale, whatever else holds.
-            let artifact =
-                match currency.check(plugin, h).and_then(|()| if reinstall == Some(pid)
-                    && !receipt.is_null()
-                    && receipt["adopted"] != true
-                {
-                    instructions::ensure_distribution(root, plugin, receipt)
-                        .and_then(|_| retained_artifact(root, receipt, h))
-                } else {
-                    prepare(root, plugin, h)
-                }) {
-                    Ok(a) => a,
-                    Err(e) => {
-                        blockers.push(format!(
-                            "{} / {}: {e:#}",
-                            text(&target["name"]),
-                            text(&plugin["name"])
-                        ));
-                        // A listed plugin whose build fails is still wanted: its copy stays.
-                        if let Some(old) = previous {
-                            desired_native.push(old["id"].clone());
-                        }
-                        continue;
-                    }
-                };
-            if desired_native.contains(&artifact["native_id"]) {
-                blockers.push(format!(
-                    "{}: more than one registry plugin owns native installation {}",
-                    text(&target["name"]),
-                    text(&artifact["native_id"])
-                ));
+            let repairing = reinstall == Some(pid);
+            let prepared = currency.check(plugin, h)
+                .and_then(|()| install_artifacts(root, plugin, h, receipts, tid, repairing));
+            let artifacts = match prepared {
+                Ok(artifacts) => artifacts,
+                Err(e) => {
+                    blockers.push(format!("{} / {}: {e:#}", text(&target["name"]), text(&plugin["name"])));
+                    desired_native.extend(installed.iter().filter(|i| i["registry_id"] == pid).map(|i| i["id"].clone()));
+                    continue;
+                }
+            };
+            // The native name of a Hermes package identifies the installation. Do not
+            // replace an independently installed copy or half-install a colliding pair.
+            let hermes_pair = h == "hermes" && artifacts.iter().any(|a| a["component"] == native::HERMES_MCP);
+            if let Some(conflict) = artifacts.iter().find(|a| {
+                desired_native.contains(&a["native_id"]) || (h == "hermes" && installed.iter().any(|i| {
+                    (hermes_pair || i["component"] == native::HERMES_MCP) &&
+                    i["id"] == a["native_id"] && (i["registry_id"] != pid || i["component"] != a["component"])
+                }))
+            }) {
+                blockers.push(format!("{}: native installation {} already belongs to another plugin",
+                    text(&target["name"]), text(&conflict["native_id"])));
+                // If two desired plugins claim the same uninstalled name, neither wins by list order.
+                let competing = ops.iter().find(|op| op["target_id"] == tid && op["artifact"]["native_id"] == conflict["native_id"])
+                    .map(|op| op["plugin_id"].clone());
+                if let Some(other) = competing { ops.retain(|op| op["target_id"] != tid || op["plugin_id"] != other); }
                 continue;
             }
-            desired_native.push(artifact["native_id"].clone());
-            if let Some(old) = previous {
-                desired_native.push(old["id"].clone());
-            }
-            // An entry that reports no `present` has its files, as a harness that cannot tell does.
-            let files_missing = previous.is_some_and(|old| old["present"] == false);
-            // The copy comes from a marketplace the harness cannot load (`broken` of the inventory):
-            // installing it again from Muro's own source writes Muro's marketplace anew.
-            let market_broken = previous.is_some_and(|old| {
-                let market = old["id"]
-                    .as_str()
-                    .and_then(|id| id.split_once('@'))
-                    .map(|(_, market)| market);
-                market.is_some_and(|market| broken_markets(inv).any(|b| b["name"] == market))
-            });
-            let mut reason = if previous.is_none() {
-                "Missing desired distribution"
-            } else {
-                "Reconcile desired artifact"
-            };
-            // Only a copy Muro installed is switched on again: a person who adopted a copy and
-            // disabled it chose that.
-            let kind = if previous.is_none() {
-                Some("install")
-            } else if reinstall == Some(pid) {
-                Some("reinstall")
-            } else if receipt["digest"] != artifact["digest"]
-                || previous.unwrap()["version"] != artifact["version"]
-            {
-                Some("update")
-            } else if previous.unwrap()["enabled"] == false
-                && h == "claude-code"
-                && !receipt.is_null()
-                && receipt["adopted"] != true
-            {
-                Some("activate")
-            } else if files_missing {
-                reason = "Files missing";
-                Some("update")
-            } else if market_broken {
-                reason = "Its marketplace cannot be loaded";
-                Some("reinstall")
-            } else {
-                None
-            };
-            if let Some(kind) = kind {
-                ops.push(json!({"target_id":tid,"plugin_id":pid,"name":plugin["name"],"kind":kind,"from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],"reason":reason,"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())}));
+            for artifact in artifacts {
+                let previous = installed.iter().find(|i| i["registry_id"] == pid && i["component"] == artifact["component"]);
+                let receipt = receipt_for(receipts, tid, pid, artifact["component"].as_str()).unwrap_or(&Value::Null);
+                desired_native.push(artifact["native_id"].clone());
+                if let Some(old) = previous { desired_native.push(old["id"].clone()); }
+                if let Some(op) = install_operation(target, plugin, inv, &artifact, previous, receipt, repairing) {
+                    ops.push(op);
+                }
             }
         }
         // The list is the truth (the owner, 2026-11-25): a marketplace the harness cannot load keeps
@@ -1068,10 +1167,16 @@ fn plan(
         }
         // A plan with blockers can be applied in part, so a harness that has one gets no
         // removal until a plan finds it clear.
-        if target["exclusive"] == true && blockers.len() == blocked_before {
+        if blockers.len() == blocked_before {
             for old in installed {
-                if !desired_native.contains(&old["id"]) && !with_market.contains(&&old["id"]) {
+                // A project update can drop its MCP package. Only the copy installed for this
+                // still-selected plugin is ours to remove on a non-exclusive target.
+                let retired = old["component"] == native::HERMES_MCP && reg["plugins"].as_array().into_iter().flatten().any(|p| {
+                    p["id"] == old["registry_id"] && p["targets"].as_array().is_some_and(|ids| ids.contains(&target["id"]))
+                });
+                if (target["exclusive"] == true || retired) && !desired_native.contains(&old["id"]) && !with_market.contains(&&old["id"]) {
                     let mut removal = json!({"target_id":tid,"plugin_id":old["registry_id"].as_str().unwrap_or(""),"name":old["name"],"kind":"remove","from_version":old["version"],"to_version":"","reason":"Not in desired registry for this target","native_id":old["id"]});
+                    if retired { removal["reason"] = json!("The plugin no longer includes its Hermes MCP package"); }
                     // A record whose files are gone is cleared, not uninstalled: the sheet says so.
                     if old["present"] == false {
                         removal["present"] = json!(false);
@@ -1087,6 +1192,57 @@ fn plan(
     Ok(
         json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
     )
+}
+/// One native package is one operation, including the optional Hermes MCP package.
+fn install_operation(target: &Value, plugin: &Value, inv: &Value, artifact: &Value, previous: Option<&Value>, receipt: &Value, reinstall: bool) -> Option<Value> {
+    let h = target["harness"].as_str().unwrap_or("");
+    // An entry that reports no `present` has its files, as a harness that cannot tell does.
+    let files_missing = previous.is_some_and(|old| old["present"] == false);
+    // The copy comes from a marketplace the harness cannot load (`broken` of the inventory):
+    // installing it again from Muro's own source writes Muro's marketplace anew.
+    let market_broken = previous.is_some_and(|old| {
+        let market = old["id"]
+            .as_str()
+            .and_then(|id| id.split_once('@'))
+            .map(|(_, market)| market);
+        market.is_some_and(|market| broken_markets(inv).any(|b| b["name"] == market))
+    });
+    let mut reason = if previous.is_none() {
+        "Missing desired distribution"
+    } else {
+        "Reconcile desired artifact"
+    };
+    // Only a copy Muro installed is switched on again: a person who adopted a copy and
+    // disabled it chose that.
+    let kind = if previous.is_none() {
+        Some("install")
+    } else if reinstall {
+        Some("reinstall")
+    } else if receipt["digest"] != artifact["digest"]
+        || previous.unwrap()["version"] != artifact["version"]
+    {
+        Some("update")
+    } else if previous.unwrap()["enabled"] == false
+        && (h == "claude-code" || artifact["component"] == native::HERMES_MCP)
+        && !receipt.is_null()
+        && receipt["adopted"] != true
+    {
+        Some(if h == "hermes" { "update" } else { "activate" })
+    } else if files_missing {
+        reason = "Files missing";
+        Some("update")
+    } else if market_broken {
+        reason = "Its marketplace cannot be loaded";
+        Some("reinstall")
+    } else {
+        None
+    };
+    kind.map(|kind| {
+        let name = if artifact["component"].is_string() { &artifact["name"] } else { &plugin["name"] };
+        json!({"target_id":target["id"],"plugin_id":plugin["id"],"name":name,"kind":kind,
+               "from_version":previous.map(|i|i["version"].clone()).unwrap_or(json!("")),"to_version":artifact["version"],
+               "reason":reason,"artifact":artifact,"previous_id":previous.map(|i|i["id"].clone())})
+    })
 }
 /// The marketplaces of an inventory that its harness cannot load (`broken`, from `native::inventory`).
 fn broken_markets(inventory: &Value) -> impl Iterator<Item = &Value> {
@@ -1110,7 +1266,7 @@ fn installed_as_planned(observed: &Value, op: &Value) -> Result<()> {
             .as_array()
             .context("plugins")?
             .iter()
-            .any(|p| p["registry_id"] == op["plugin_id"]
+            .any(|p| p["registry_id"] == op["plugin_id"] && p["component"] == op["artifact"]["component"]
                 && p["version"] == op["to_version"]
                 && p["enabled"] != false),
         "Replacement version/activation did not match; removals stopped"
@@ -1214,6 +1370,18 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         hash(&invs) == str_field(&plan, "inventory_hash")?,
         "Installed inventory changed; calculate a new plan"
     );
+    let currency = projects::Currency::new(reg);
+    // An exclusive target got removals only because no wanted plugin was blocked when planned.
+    // Recheck that assumption for archives even when all their copies were already installed.
+    for target in &changed {
+        if executed.iter().any(|op| op["kind"] == "remove" && op["target_id"] == target["id"]) {
+            for plugin in reg["plugins"].as_array().context("plugins")?.iter().filter(|p| {
+                p["targets"].as_array().is_some_and(|ids| ids.contains(&target["id"]))
+            }) {
+                currency.check(plugin, str_field(target, "harness")?)?;
+            }
+        }
+    }
     for op in executed
         .iter()
         .copied()
@@ -1222,6 +1390,8 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         let a = &op["artifact"];
         let plugin = reg["plugins"].as_array().context("plugins")?.iter()
             .find(|plugin| plugin["id"] == op["plugin_id"]).context("Plugin disappeared")?;
+        let target = changed.iter().find(|target| target["id"] == op["target_id"]).context("Target disappeared")?;
+        currency.check(plugin, str_field(target, "harness")?)?;
         instructions::ensure_distribution(root, plugin, a)?;
         ensure!(
             tree_hash(Path::new(str_field(a, "source")?))? == a["digest"]
@@ -1309,14 +1479,19 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
                 )?;
                 let target_id = str_field(op, "target_id")?;
                 let plugin_id = str_field(op, "plugin_id")?;
-                let key = receipt_key(target_id, plugin_id);
-                first_install = receipt_for(receipts, target_id, plugin_id).is_none();
-                // Remove a legacy delimiter key for this pair while keeping other pairs intact.
+                let component = artifact["component"].as_str();
+                let key = match component {
+                    Some(part) => serde_json::to_string(&[target_id, plugin_id, part])?,
+                    None => receipt_key(target_id, plugin_id),
+                };
+                first_install = receipt_for(receipts, target_id, plugin_id, component).is_none();
+                // Each successful native install has a receipt, even when its sibling fails.
                 receipts
                     .as_object_mut()
                     .context("receipts")?
-                    .retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id);
+                    .retain(|_, r| r["target_id"] != target_id || r["plugin_id"] != plugin_id || r["component"].as_str() != component);
                 receipts[&key] = json!({"target_id":op["target_id"],"plugin_id":op["plugin_id"],"native_id":native_id,"name":name,"version":op["to_version"],"digest":artifact["digest"],"path":artifact["path"],"custom_instructions_digest":artifact["custom_instructions_digest"]});
+                if let Some(part) = component { receipts[&key]["component"] = json!(part); }
             }
             if op["kind"] != "remove" && op["kind"] != "remove-marketplace" {
                 let observed = native::inventory(target, receipts);
@@ -1375,7 +1550,8 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
         } else {
             let entry = entries
                 .iter()
-                .find(|p| p["registry_id"] == op["plugin_id"] && p["version"] == op["to_version"])
+                .find(|p| p["registry_id"] == op["plugin_id"] && p["component"] == op["artifact"]["component"]
+                    && p["version"] == op["to_version"])
                 .with_context(|| format!("Installed version did not match {}", op["name"]))?;
             ensure!(
                 op["kind"] != "reinstall"
@@ -1493,6 +1669,60 @@ fn maintenance(root: &Path, reg: &Value, receipts: &Value, p: &Value) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_linked_row_resolves_the_listed_archive_without_selecting_new_targets_or_another_plugin() {
+        let data = tempfile::tempdir().unwrap();
+        let archive = data.path().join("project.mp");
+        fs::write(&archive, "the project file").unwrap();
+        let digest = projects::file_digest(&archive).unwrap();
+        let cache = data.path().join("unpack/release");
+        let release = cache.join("sample");
+        for harness in ["pi", "opencode"] {
+            let adapter = release.join("adapters").join(harness);
+            fs::create_dir_all(&adapter).unwrap();
+            fs::write(adapter.join("package.json"), r#"{"name":"sample","version":"1"}"#).unwrap();
+            fs::write(adapter.join("INSTALL.md"), "Install").unwrap();
+        }
+        let legacy = json!({"id":"sample","project":"sample","source":cache,"name":"My sample","policy":"head",
+            "targets":["pi-main"],"distributions":[{"harness":"pi","origin":"muro","project_digest":digest}]});
+        let registry = json!({"projects":[{"id":"sample","path":archive}], "settings":{}});
+        let before = resolve_plugin(data.path(), &registry, &legacy, None).unwrap();
+        assert_eq!(before["distributions"], legacy["distributions"]);
+        let build = |release: &Path| projects::VerifiedBuild {
+            release:release.to_path_buf(), version:"1".into(), digest:digest.clone(),
+        };
+        let resolved = resolve_plugin(data.path(), &registry, &legacy, Some(&|_, _| Ok(build(&release)))).unwrap();
+        for field in ["id", "project", "name", "targets"] {
+            assert_eq!(resolved[field], legacy[field]);
+        }
+        assert_eq!(resolved["source"], json!(archive));
+        assert_eq!(resolved["resolved_project"]["harnesses"], json!(["opencode","pi"]));
+        let error = resolve_plugin(data.path(), &registry, &resolved, Some(&|_, _| Ok(build(&cache.join("other"))))).unwrap_err();
+        assert!(format!("{error:#}").contains("now holds other, but this plugin belongs to sample"));
+    }
+
+    #[test]
+    fn source_preview_shows_only_the_verified_harnesses_without_saving_a_plugin() {
+        let data = tempfile::tempdir().unwrap();
+        let fixture = tempfile::tempdir().unwrap();
+        let archive = fixture.path().join("sample.mp");
+        fs::write(&archive, "test archive").unwrap();
+        let release = fixture.path().join("release/sample");
+        let adapter = release.join("adapters/codex");
+        fs::create_dir_all(adapter.join(".codex-plugin")).unwrap();
+        fs::write(adapter.join(".codex-plugin/plugin.json"), r#"{"name":"sample","version":"2"}"#).unwrap();
+        fs::write(adapter.join("INSTALL.md"), "Install Codex").unwrap();
+        let source = json!({"id":"draft","source":archive,"policy":"head","pinned_version":"",
+            "targets":[],"name":"","distributions":[{"harness":"pi","path":adapter,"version":"2"}]});
+        let before = request(data.path(), "registry", json!({})).unwrap();
+        let preview = request_with_projects(data.path(), "inspect_plugin_source", json!({"plugin":source}), &|_, file| {
+            Ok(projects::VerifiedBuild { release:release.clone(), version:"2".into(), digest:projects::file_digest(file)? })
+        }).unwrap();
+        assert_eq!(preview, json!({"harnesses":["codex"],"project_version":"2"}));
+        assert_eq!(request(data.path(), "registry", json!({})).unwrap(), before);
+        assert!(!data.path().join("inventory.json").exists());
+    }
+
     #[test]
     fn a_failed_verification_gives_the_error_as_text_not_as_a_json_value() {
         let observed = json!({"complete":false,"error":r"Target configuration directory does not exist: C:\gone"});

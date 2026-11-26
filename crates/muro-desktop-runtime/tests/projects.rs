@@ -287,6 +287,34 @@ fn install_puts_the_build_in_the_list_and_sets_its_targets_in_one_place() {
 }
 
 #[test]
+fn checking_an_installed_project_offers_all_variants_and_later_target_edits_keep_them() {
+    let home = Home::new();
+    home.target("pi-main", "pi", true);
+    home.target("oc", "opencode", true);
+    let (file, _) = built(&home, "demo", &["opencode", "pi"]);
+    home.call("install_project", json!({"id":"demo","targets":["pi-main"]})).unwrap();
+    assert_eq!(home.plugin("demo")["distributions"].as_array().unwrap().len(), 1);
+
+    let checked = home.call("check", json!({})).unwrap();
+    assert_eq!(checked["errors"], json!([]));
+    let plugin = home.plugin("demo");
+    assert_eq!(plugin["source"], json!(file));
+    assert_eq!(plugin["targets"], json!(["pi-main"]));
+    assert_eq!(plugin["resolved_project"]["harnesses"], json!(["opencode","pi"]));
+    let out = home.files.join("export");
+    home.call("extract_plugin", json!({"id":"demo","harness":"opencode","folder":out})).unwrap();
+    assert!(out.join("opencode/INSTALL.md").is_file());
+
+    home.call("install_project", json!({"id":"demo","targets":["oc"]})).unwrap();
+    let edited = home.plugin("demo");
+    assert_eq!(edited["targets"], json!(["oc"]));
+    assert_eq!(edited["source"], plugin["source"]);
+    assert_eq!(edited["resolved_project"], plugin["resolved_project"]);
+    assert_eq!(edited["distributions"], plugin["distributions"]);
+    assert_eq!(home.registry()["plugins"].as_array().unwrap().len(), 1);
+}
+
+#[test]
 fn only_the_targets_named_are_the_plugins_and_a_target_not_named_is_not_touched_by_a_later_call() {
     let home = Home::new();
     // Two targets of one kind (the page switches targets, not kinds) and one of another.

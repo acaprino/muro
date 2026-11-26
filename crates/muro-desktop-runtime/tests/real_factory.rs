@@ -176,3 +176,139 @@ fn a_real_project_is_listed_read_installed_made_stale_and_simulated() {
 fn projects_cache(data: &Path, digest: &str) -> PathBuf {
     muro_desktop_runtime::projects::cache_dir(data).join(digest)
 }
+
+/// The same saves as Settings and Add plugin. The target uses a temporary configuration folder
+/// and reads its inventory from that folder, with no live harness or account.
+fn add_sync_source(data: &Path, repository: &Path, profile: &Path, source: &str, policy: &str, pin: &str) {
+    let call = |action: &str, payload: Value| request(data, action, payload).unwrap();
+    let current = call("registry", json!({}));
+    let mut settings = current["settings"].clone();
+    settings["python"] = json!(common::python());
+    settings["factory_path"] = json!(repository);
+    let saved = call("settings", json!({"revision": current["revision"], "settings": settings}));
+    fs::create_dir_all(profile).unwrap();
+    let saved = call("save_target", json!({"revision": saved["registry"]["revision"], "target": {
+        "id":"oc", "harness":"opencode", "name":"OpenCode", "root":profile,
+        "executable":"", "exclusive":false, "enabled":true
+    }}));
+    call("save_plugin", json!({"revision": saved["registry"]["revision"], "plugin": {
+        "id":"sync-example", "name":"Example", "source":source, "policy":policy, "pinned_version":pin,
+        "distributions":[], "targets":["oc"]
+    }}));
+}
+
+#[test]
+fn sync_checks_exports_and_installs_a_local_project_without_registering_it_in_projects() {
+    let Some(repository) = repository() else { return };
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let file = pack(&repository, root, "first");
+    let replacement = pack(&repository, root, "second");
+    let (data, profile, exports) = (root.join("data"), root.join("profile"), root.join("exports"));
+    add_sync_source(&data, &repository, &profile, file.to_str().unwrap(), "head", "");
+    let call = |action: &str, payload: Value| request(&data, action, payload);
+    let resolved = call("resolve", json!({"id":"sync-example"})).unwrap();
+    let plugin = &resolved["registry"]["plugins"][0];
+    let archive = &plugin["resolved_project"];
+    assert_eq!(archive["digest"], registry_projects::file_digest(&file).unwrap());
+    let harnesses = archive["harnesses"].as_array().unwrap();
+    assert_eq!(harnesses.len(), 2, "{archive}");
+    assert!(harnesses.contains(&json!("claude-code")) && harnesses.contains(&json!("opencode")));
+    assert_eq!(call("projects", json!({})).unwrap(), json!([]));
+    let export = |harness: &str| call("extract_plugin", json!({"id":"sync-example","harness":harness,"folder":exports}));
+    assert!(export("pi").is_err());
+    assert!(!exports.exists());
+    let plan = call("plan", json!({})).unwrap();
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    assert_eq!(plan["operations"].as_array().unwrap().len(), 1);
+    assert_eq!(plan["operations"][0]["target_id"], "oc");
+
+    fs::copy(&replacement, &file).unwrap();
+    assert!(export("opencode").is_err(), "a changed file must be checked before exporting");
+    assert!(!exports.exists());
+    assert!(call("apply", json!({"plan_id":plan["id"]})).is_err(), "a changed file invalidates the plan");
+    assert!(!profile.join("opencode.json").exists());
+    fs::write(&file, b"incomplete download").unwrap();
+    let broken = call("check", json!({})).unwrap();
+    assert_eq!(broken["errors"][0]["plugin_id"], "sync-example");
+    assert_eq!(broken["plan"]["operations"], json!([]), "a failed check must not install the cached copy");
+    assert!(!broken["plan"]["blockers"].as_array().unwrap().is_empty());
+    fs::copy(&replacement, &file).unwrap();
+    let checked = call("check", json!({})).unwrap();
+    assert_eq!(checked["errors"], json!([]), "{checked}");
+    let updated = &checked["snapshot"]["registry"]["plugins"][0];
+    assert_eq!(updated["resolved_project"]["digest"], registry_projects::file_digest(&replacement).unwrap());
+    assert!(call("extract_plugin", json!({"id":"sync-example","harness":"opencode",
+        "folder":exports,"digest":archive["digest"]})).is_err(), "an export opened before the new check is stale");
+    assert!(!exports.exists());
+    // Periodic cache cleaning must keep the checked build even though the Projects list is empty.
+    muro_desktop_runtime::projects::sweep_cache(&data);
+    assert_eq!(export("opencode").unwrap()["harness"], "opencode");
+    let adapter = exports.join("opencode");
+    assert!(adapter.join("INSTALL.md").is_file());
+    assert!(fs::read_to_string(adapter.join("index.js")).unwrap().contains("// second"));
+    assert!(!exports.join("claude-code").exists());
+    assert!(export("opencode").is_err(), "repeating Export preserves the existing folder");
+    assert!(!profile.join("opencode.json").exists(), "export did not install the plugin");
+
+    call("apply", json!({"plan_id":checked["plan"]["id"]})).unwrap();
+    let config: Value = serde_json::from_slice(&fs::read(profile.join("opencode.json")).unwrap()).unwrap();
+    assert_eq!(config["plugins"].as_array().unwrap().len(), 1);
+    assert_eq!(call("check", json!({})).unwrap()["plan"]["operations"], json!([]));
+}
+
+fn git(repo: &Path, args: &[&str]) -> String {
+    let output = Command::new("git").current_dir(repo)
+        .args(["-c", "user.name=Muro test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false"])
+        .args(args).output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).unwrap().trim().to_owned()
+}
+
+#[test]
+fn a_repository_containing_only_an_mp_uses_the_archive_at_the_selected_git_ref() {
+    let Some(repository) = repository() else { return };
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    let (data, profile, store) = (root.join("data"), root.join("profile"), root.join("remote store"));
+    fs::create_dir_all(&store).unwrap();
+    let published = store.join("tester.mp");
+    fs::copy(pack(&repository, root, "tagged"), &published).unwrap();
+    git(&store, &["init"]);
+    git(&store, &["add", "tester.mp"]);
+    git(&store, &["commit", "-m", "Publish the first project"]);
+    let pin = git(&store, &["rev-parse","HEAD"]);
+    let tagged_digest = registry_projects::file_digest(&published).unwrap();
+    fs::copy(pack(&repository, root, "latest"), &published).unwrap();
+    git(&store, &["commit", "-am", "Publish the next project"]);
+    let latest_digest = registry_projects::file_digest(&published).unwrap();
+    let url = Command::new(common::python())
+        .args(["-c", "from pathlib import Path; import sys; print(Path(sys.argv[1]).as_uri())"])
+        .arg(&store).output().unwrap();
+    assert!(url.status.success(), "{}", String::from_utf8_lossy(&url.stderr));
+    let source = String::from_utf8(url.stdout).unwrap();
+    add_sync_source(&data, &repository, &profile, source.trim(), "pinned", &pin);
+    let call = |action: &str, payload: Value| request(&data, action, payload).unwrap();
+    let resolved = call("resolve", json!({"id":"sync-example"}));
+    let mut plugin = resolved["registry"]["plugins"][0].clone();
+    assert_eq!(plugin["upstream_revision"], pin);
+    assert_eq!(plugin["resolved_project"]["digest"], tagged_digest);
+    let plan = call("plan", json!({}));
+    assert_eq!(plan["blockers"], json!([]), "{plan}");
+    assert_eq!(plan["operations"][0]["kind"], "install");
+
+    // Changing the normal Sync update policy should discover the next archive in the same source.
+    plugin["policy"] = json!("head");
+    plugin["pinned_version"] = json!("");
+    call("save_plugin", json!({"revision":resolved["registry"]["revision"], "plugin":plugin}));
+    assert!(!call("plan", json!({}))["blockers"].as_array().unwrap().is_empty());
+    assert!(request(&data, "extract_plugin", json!({"id":"sync-example", "harness":"claude-code",
+        "folder":root.join("unchecked")})).is_err());
+    let checked = call("check", json!({}));
+    assert_eq!(checked["errors"], json!([]), "{checked}");
+    assert_eq!(checked["snapshot"]["registry"]["plugins"][0]["resolved_project"]["digest"], latest_digest);
+    let out = root.join("claude-export");
+    call("extract_plugin", json!({"id":"sync-example","harness":"claude-code","folder":out}));
+    assert!(out.join("claude-code/.claude-plugin/plugin.json").is_file());
+    assert_eq!(call("projects", json!({})), json!([]));
+}

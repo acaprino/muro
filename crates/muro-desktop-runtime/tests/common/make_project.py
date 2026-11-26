@@ -43,7 +43,10 @@ def main(repository: Path, out: Path, variant: str) -> None:
     (adapters / "opencode").mkdir(parents=True)
     (adapters / "opencode" / "package.json").write_text(
         json.dumps({"name": fixtures.SLUG, "version": "0.1.0", "type": "module", "main": "index.js"}), encoding="utf-8")
-    (adapters / "opencode" / "index.js").write_text("export default async () => ({})\n", encoding="utf-8")
+    (adapters / "opencode" / "index.js").write_text(
+        f"// {variant}\nexport default async () => ({{}})\n", encoding="utf-8")
+    (adapters / "opencode" / "INSTALL.md").write_text(
+        "# Install\nAdd this folder's file URL to `plugins` in `opencode.json`.\n", encoding="utf-8")
     (adapters / "claude-code" / ".claude-plugin").mkdir(parents=True)
     (adapters / "claude-code" / ".claude-plugin" / "plugin.json").write_text(
         json.dumps({"name": fixtures.SLUG, "version": "0.1.0"}), encoding="utf-8")

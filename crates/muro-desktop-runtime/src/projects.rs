@@ -216,14 +216,41 @@ fn plugin_of<'a>(registry: &'a Value, id: &str) -> Option<&'a Value> {
 pub fn extract(data: &Path, payload: &Value) -> Result<Value> {
     let current = registry(data)?;
     let file = listed_file(&current, payload["id"].as_str().unwrap_or(""))?;
+    let result = extract_file(data, &current["settings"], &file, payload, None);
+    sweep_cache(data);
+    result
+}
+
+/// Exports one of the archive variants shown in Sync, including for repositories pinned to a Git revision.
+pub fn extract_plugin(data: &Path, payload: &Value) -> Result<Value> {
+    muro_registry::service::with_registry(data, |current| {
+        let id = payload["id"].as_str().context("Choose a plugin")?;
+        let plugin = plugin_of(current, id).context("That plugin is no longer in your list")?;
+        if let Some(reason) = plugin["project_source_error"].as_str() {
+            bail!("Check the plugin source again before exporting. {reason}");
+        }
+        let archive = &plugin["resolved_project"];
+        let path = archive["path"].as_str().context("Check for updates to find a Muro project file to export")?;
+        let digest = archive["digest"].as_str().context("Check for updates to verify this project file")?;
+        ensure!(payload.get("digest").is_none_or(|expected| expected == digest),
+                "The checked plugin changed. Reopen Export to choose its current version.");
+        ensure!(archive["harnesses"].as_array().is_some_and(|kinds| kinds.contains(&payload["harness"])),
+                "This project file has no export for the selected harness");
+        extract_file(data, &current["settings"], Path::new(path), payload, Some(digest))
+    })
+}
+
+fn extract_file(data: &Path, settings: &Value, file: &Path, payload: &Value, digest: Option<&str>) -> Result<Value> {
     let harness = payload["harness"].as_str().unwrap_or("");
     ensure!(HARNESSES.contains(&harness), "No Muro adapter for the harness {harness}");
     let folder = payload["folder"].as_str().unwrap_or("").trim();
     ensure!(Path::new(folder).is_absolute(), "Name the folder to extract into by its full path");
-    let args = vec!["project".to_owned(), "extract".into(), file.to_string_lossy().into_owned(), "--harness".into(), harness.to_owned(),
+    let mut args = vec!["project".to_owned(), "extract".into(), file.to_string_lossy().into_owned(), "--harness".into(), harness.to_owned(),
         "--out".into(), folder.to_owned(), "--cache".into(), cache_dir(data).to_string_lossy().into_owned()];
-    let done = Factory::from_settings(&current["settings"])?.json(&args, "Extracting the plugin", &|| false, READ_LIMIT);
-    sweep_cache(data);
+    if let Some(digest) = digest {
+        args.extend(["--expect-digest".into(), digest.to_owned()]);
+    }
+    let done = Factory::from_settings(settings)?.json(&args, "Extracting the plugin", &|| false, READ_LIMIT);
     done.map_err(|error| {
         let reason = format!("{error:#}");
         anyhow::anyhow!("{}", reason.strip_prefix("Project extract failed: ").unwrap_or(&reason).to_owned())
@@ -287,8 +314,14 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
     // resolves the folder itself, so the revision the builds record is the registry's own.
     let resolved = plugin_of(&current, id)
         .is_some_and(|old| old["source"] == source.as_str() && old["upstream_revision"].is_string());
-    if !resolved {
+    let follows_archive = plugin_of(&current, id).is_some_and(|old| old["resolved_project"].is_object());
+    if follows_archive {
+        crate::request(data, "resolve", json!({"id":id}))?;
+    } else if !resolved {
         update(data, |reg| {
+            if let Some(old) = plugin_of(reg, id) {
+                ensure!(old["project"] == id && old["resolved_project"].is_null(), "The plugin changed. Open the project again.");
+            }
             let mut plugin = plugin_of(reg, id).cloned().unwrap_or_else(|| {
                 json!({"id":id,"name":name,"policy":"head","pinned_version":"","targets":[]})
             });
@@ -302,10 +335,11 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
             }
             Ok(Some(("save_plugin", json!({"plugin":plugin}))))
         })?;
-        muro_registry::service::request(data, "resolve", json!({"id":id}))?;
+        crate::request(data, "resolve", json!({"id":id}))?;
     }
     let saved = update(data, |reg| {
         let mut plugin = plugin_of(reg, id).cloned().context("The plugin disappeared")?;
+        ensure!(plugin["project"] == id, "The plugin changed. Open the project again.");
         let revision = plugin["upstream_revision"].as_str().context("The project's folder was not resolved")?.to_owned();
         let mut targets: Vec<Value> = target_ids.iter().map(|target| json!(target)).collect();
         for held in plugin["targets"].as_array().into_iter().flatten() {
@@ -314,14 +348,16 @@ pub fn install(data: &Path, payload: &Value) -> Result<Value> {
                 targets.push(held.clone());
             }
         }
-        let distributions: Vec<Value> = builds
-            .iter()
-            .map(|(kind, adapter, version, _)| {
+        if plugin["resolved_project"].is_object() {
+            ensure!(plugin["resolved_project"]["digest"] == digest, "The project file changed. Open the project again.");
+        } else {
+            ensure!(!follows_archive && plugin["source"] == source.as_str(), "The plugin source changed. Open the project again.");
+            let distributions: Vec<Value> = builds.iter().map(|(kind, adapter, version, _)| {
                 json!({"harness":kind,"path":adapter.to_string_lossy(),"version":version,"origin":"muro",
                        "source_revision":revision,"project_digest":digest})
-            })
-            .collect();
-        plugin["distributions"] = json!(distributions);
+            }).collect();
+            plugin["distributions"] = json!(distributions);
+        }
         plugin["targets"] = json!(targets);
         Ok(Some(("save_plugin", json!({"plugin":plugin}))))
     })?;
@@ -373,8 +409,9 @@ fn distribution_digests(registry: &Value) -> HashSet<String> {
         .as_array()
         .into_iter()
         .flatten()
-        .flat_map(|plugin| plugin["distributions"].as_array().into_iter().flatten())
-        .filter_map(|distribution| distribution["project_digest"].as_str().map(str::to_owned))
+        .flat_map(|plugin| plugin["resolved_project"]["digest"].as_str().into_iter().chain(
+            plugin["distributions"].as_array().into_iter().flatten().filter_map(|d| d["project_digest"].as_str())))
+        .map(str::to_owned)
         .collect()
 }
 
@@ -400,15 +437,16 @@ fn is_digest(name: &str) -> bool {
 /// installed build's. Best effort: a folder that cannot be removed now is tried at the next sweep, and a
 /// registry that cannot be read leaves the cache as it is.
 pub fn sweep_cache(data: &Path) {
-    let Ok(current) = registry(data) else { return };
-    let kept = kept_digests(&current);
-    let Ok(entries) = std::fs::read_dir(cache_dir(data)) else { return };
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if is_digest(&name) && !kept.contains(&name) && entry.path().is_dir() {
-            let _ = std::fs::remove_dir_all(entry.path());
+    let _ = muro_registry::service::with_registry(data, |current| {
+        let kept = kept_digests(current);
+        for entry in std::fs::read_dir(cache_dir(data))?.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if is_digest(&name) && !kept.contains(&name) && entry.path().is_dir() {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
         }
-    }
+        Ok(())
+    });
 }
 
 /// Removes what in `folder` is older than a day at `now` and whose name `named` accepts.

@@ -665,8 +665,8 @@ test('the update check says which input is behind, and fails as the upstream doe
 test("an extract names the project, the harness and the folder, says where the plugin went, writes no project file and is refused in the runtime's words and then in the command's", async () => {
   assert.deepEqual([...EXTRACT_HARNESSES], ['claude-code', 'codex', 'opencode', 'pi', 'hermes']);
   assert.deepEqual(extractPayload('sample', 'codex', '  D:/Out  '), { id: 'sample', harness: 'codex', folder: 'D:/Out' });
-  assert.equal(extractedLine({ folders: ['D:/Out/hermes', 'D:/Out/hermes-mcp'] }), 'Extracted to D:/Out/hermes and D:/Out/hermes-mcp');
-  assert.equal(extractedLine(null), 'The plugin was extracted.');
+  assert.equal(extractedLine({ folders: ['D:/Out/hermes', 'D:/Out/hermes-mcp'] }), 'Exported to D:/Out/hermes and D:/Out/hermes-mcp');
+  assert.equal(extractedLine(null), 'The plugin was exported.');
   const fake = createTransport('projects');
   const digest = fake.behind.digest('sample');
   assert.deepEqual(await fake.request('extract_project', extractPayload('sample', 'codex', 'D:/Out/')), { harness: 'codex', folders: ['D:/Out/codex'] });

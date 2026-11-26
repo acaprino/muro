@@ -435,6 +435,7 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
         "prompts": [{"file": name, "text": (prompts_folder / name).read_text(encoding="utf-8")} for name in PROMPT_FILES],
         "instructions": _instruction_texts(folder),
         "graph": {"entries": entries, "capabilities": data["capabilities"], "examples": data["examples"]},
+        "export_harnesses": _export_harnesses(folder / "release" / plugin["slug"] / "adapters"),
         "files": _file_rows(
             plugin, meta, inputs=len(sources), decisions=len(decisions), capabilities=len(data["capabilities"]),
             entries=len(entries) if entries_doc else None, examples=len(data["examples"]),
@@ -510,15 +511,11 @@ def check_release(package: Path, built: Path) -> None:
     raise ValueError(f"{MISMATCH} ({'; '.join(differences)})")
 
 
-def verify(mp: Path, cache_root: Path) -> None:
-    """Check, as `check_release` does, the plugin a project file carries against the package it carries.
-
-    Read through `cached`, so it is the very file the digest names. A project that carries no release for its
-    plugin has nothing to disagree with: installing it is refused where the release is looked for.
-    """
-    folder = cached(mp, cache_root)
+def _verified_release(folder: Path) -> tuple[Path, dict]:
+    """Read the plugin identity and check the release of this single content-addressed unpack."""
     try:
-        slug = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))["plugin"]["slug"]
+        plugin = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))["plugin"]
+        slug = plugin["slug"]
     except (ValueError, KeyError, TypeError) as exc:
         raise ValueError(f"{MISMATCH} (the project's plugin cannot be read: {type(exc).__name__}: {exc})") from None
     if not isinstance(slug, str) or not SLUG_PATTERN.fullmatch(slug):   # it names a folder: never a path
@@ -526,19 +523,44 @@ def verify(mp: Path, cache_root: Path) -> None:
     built = folder / "release" / slug
     if built.is_dir():
         check_release(folder, built)
+    return built, plugin
 
 
-def extract(mp: Path, harness: str, out: Path, cache_root: Path) -> list[Path]:
+def verify(mp: Path, cache_root: Path) -> None:
+    """Check an embedded release against its package. A project without a release also passes."""
+    _verified_release(cached(mp, cache_root))
+
+
+def verified_build(mp: Path, cache_root: Path) -> dict:
+    """Identify the exact archive and built plugin that Sync can use, in one read of the archive."""
+    folder = cached(mp, cache_root)
+    built, plugin = _verified_release(folder)
+    if not built.is_dir():
+        raise ValueError("This project has no built plugin yet: it is built when the project is harmonized")
+    errors = validate_plugin_identity(plugin)
+    if errors:
+        raise ValueError("Invalid plugin: " + "; ".join(errors))
+    return {"verified": True, "digest": folder.name, "slug": plugin["slug"], "version": plugin["version"]}
+
+
+def _export_harnesses(adapters: Path) -> list[str]:
+    if not adapters.is_dir():
+        return []
+    return sorted(path.name for path in adapters.iterdir() if (path / "INSTALL.md").is_file())
+
+
+def extract(mp: Path, harness: str, out: Path, cache_root: Path, *, expect_digest: str | None = None) -> list[Path]:
     """The built plugin of one harness, as the project file carries it, into `out/<harness>/` (ADR-0035).
 
     Nothing is built. Hermes also gets `out/hermes-mcp/` when the build has it: its INSTALL.md reaches it as
     `../hermes-mcp`. `out` may hold other things; a folder this writes must not be there yet.
     """
-    verify(mp, cache_root)
     folder = cached(mp, cache_root)
-    slug = json.loads(_member(folder, "sources.json").read_text(encoding="utf-8"))["plugin"]["slug"]
-    adapters = folder / "release" / slug / "adapters"
-    offered = sorted(path.name for path in adapters.iterdir() if (path / "INSTALL.md").is_file())         if adapters.is_dir() else []
+    if expect_digest is not None and expect_digest != folder.name:
+        raise ValueError("The project file changed. Check for updates in Sync before exporting it.")
+    built, _ = _verified_release(folder)
+    adapters = built / "adapters"
+    offered = _export_harnesses(adapters)
     if not offered:
         raise ValueError("This project has no built plugin yet: it is built when the project is harmonized")
     if harness not in offered:
@@ -548,6 +570,8 @@ def extract(mp: Path, harness: str, out: Path, cache_root: Path) -> list[Path]:
         names.append("hermes-mcp")
     targets = [Path(out) / name for name in names]
     for target in targets:
+        if target.resolve().is_relative_to(folder.resolve()):
+            raise ValueError("Choose an export folder outside this project's cached files")
         if target.exists():
             raise ValueError(f"{target} already exists: choose another folder")
     made: list[Path] = []

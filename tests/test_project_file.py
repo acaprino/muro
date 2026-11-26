@@ -837,7 +837,7 @@ def test_the_default_cache_root_is_per_user(monkeypatch, tmp_path):
 # --- info: everything the project page shows ---------------------------------------------------------
 
 INFO_KEYS = {"project", "plugin", "inputs", "decisions", "records", "history", "changelog", "prompts", "instructions",
-             "graph", "files", "digest"}
+             "graph", "files", "digest", "export_harnesses"}
 FILE_PARTS = ["Identity", "Author and dates", "Repository", "Inputs", "Choices", "Result", "Your instructions", "History",
               "Changelog", "Decision records", "Input copies", "Built plugin"]
 RUN = {"id": "run-1", "time": "2026-11-12T10:00:00Z", "version": "0.1.0", "status": "completed", "budget_usd": None,

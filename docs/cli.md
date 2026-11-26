@@ -398,7 +398,7 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
-### `muro project extract FILE.mp --harness H --out DIR [--cache DIR]`
+### `muro project extract FILE.mp --harness H --out DIR [--cache DIR] [--expect-digest SHA256]`
 
 Writes the plugin the file carries for one harness into `DIR/<H>/`, ready to install as its `INSTALL.md` says
 ([ADR-0035](adr/ADR-0035-project-extract.md)). `H` is a harness the file's build has: `claude-code`, `codex`,
@@ -412,6 +412,9 @@ file is checked first as `verify` does. Prints `{"harness", "folders"}`. Refused
 harness the build does not have (the sentence names the ones it has), a folder already there.
 
 To write a whole plugin store into a repository instead, push the file: [the project store](project-store.md).
+
+`--expect-digest` exports only when the archive's SHA-256 equals the supplied value.
+Sync passes the digest it last checked. If the file changed, check the source again before exporting.
 
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
@@ -460,6 +463,11 @@ release's `sources.json` plugin slug and version and its capability ids must equ
 `{"verified": true}`, or exits 1 with "The plugin inside this project does not match the project: it was not
 built from it" and what differs; a project with no release has nothing to disagree with. The desktop runs it
 before it installs a project's plugin.
+
+`muro project verify FILE.mp --build-info [--cache DIR]` requires a built release. It checks that
+release and returns `{"verified": true, "digest": "...", "slug": "...", "version": "..."}`.
+The digest identifies the complete archive and the version identifies its plugin. This is the check
+Sync uses when it reads a local file or the archive inside a plugin repository.
 
 `unpack` writes into a new (or empty) folder only, all or nothing. It also refuses a member that is outside the layout above (the
 package files and folders, `project.json`, `records.json`, `history.json`, `CHANGELOG.md`, `inputs/` and `release/`): a `.mp` that

@@ -27,7 +27,7 @@ import { NO_RELEASE_REPOSITORY, busyReason, runningOn } from './write/jobs.ts';
 import { useJobs } from './write/useJobs.tsx';
 import { GatedButton, JobCard } from './write/JobCard.tsx';
 import { AddInputDialog } from './write/AddInputDialog.tsx';
-import { HarmonizeDialog } from './write/HarmonizeDialog.tsx';
+import { HarmonizeDialog, projectName } from './write/HarmonizeDialog.tsx';
 import { PinDialog } from './write/PinDialog.tsx';
 import { InstructionsDialog } from './write/InstructionsDialog.tsx';
 import { DetailsDialog } from './write/DetailsDialog.tsx';
@@ -45,15 +45,14 @@ import { ExtractDialog } from './write/ExtractDialog.tsx';
  * The changes of the project (write/): Add input and Harmonize again at the foot, Edit details in the header, Move pin, Remove and the instructions in the Inputs panel.
  * Each opens a dialog the workspace holds, so it outlives the drawer the panel may be in. A change of the package is an AI run of the runtime, one at a time: while any
  * run goes no other is offered, and the buttons and the foot say why; an edit by hand (the details) waits only for a run that changes this project. The run of this
- * project is the card at the top (JobCard). Review decisions has no operation in the runtime yet, and installing comes with the Sync page: both stay off, saying so.
+ * project is the card at the top (JobCard). Review decisions waits for the runtime. Install via Sync opens the source and target choices in Sync.
  * Release, at the foot too, changes nothing of the project: it puts the file into the repository the file names (ReleaseDialog). It is off, saying why, for a project
  * that names none, and while a run changes this project.
- * Extract, beside it, writes the plugin the file carries for one harness into a folder (ExtractDialog): it only reads the file, so it is always offered. */
+ * Export to folder writes a copy of one harness build (ExtractDialog). */
 
 const PANEL_LABELS: Record<Panel, string> = { inputs: 'Inputs', examples: 'Examples', records: 'Records', runs: 'Runs' };
-/** Why the two actions the runtime has no operation for here are off. */
+/** Why reviewing decisions is unavailable. */
 const NO_REVIEW = 'Coming with the review';
-const NO_INSTALL = 'Coming with the Sync page';
 /** Whether the shell said it cannot open a folder ("Unknown ... open_folder"): then "Open folder" is gone, for every project, until the window is loaded again. */
 let noFolderShell = false;
 
@@ -221,7 +220,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
       <InstructionsDialog id={view.id} info={info} open={dialog === 'instructions'} onOpenChange={closed} />
       <DetailsDialog id={view.id} info={info} open={dialog === 'details'} onOpenChange={closed} />
       <ReleaseDialog id={view.id} info={info} open={dialog === 'release'} onOpenChange={closed} />
-      <ExtractDialog id={view.id} info={info} open={dialog === 'extract'} onOpenChange={closed} />
+      <ExtractDialog id={view.id} name={projectName(info, view.id)} action="extract_project" harnesses={info.export_harnesses} open={dialog === 'extract'} onOpenChange={closed} />
     </Column>
   );
 }
@@ -245,11 +244,12 @@ function LeftPanel({ data, panel, onPanel, onChosen, onPin, onInstructions }: { 
 
 /** The actions of the open project, in the window's region for them. One AI run at a time, of any project or adaptation (the runtime's lock): while one goes, no change of the package is offered.
  * A release is no AI run and changes nothing: it waits only for a run that changes this project, as an edit by hand does, and needs a repository named in the project's file. */
-export function ProjectActions() {
+export function ProjectActions({ onInstall, checkingProject }: { onInstall(): void; checkingProject: boolean }) {
   const { setDialog, view, info } = useProject();
   const jobs = useJobs();
   const busy = busyReason(jobs.running);
   const noRelease = info && releaseOf(info) ? (view ? busyReason(runningOn(jobs.jobs, view.id)) : null) : NO_RELEASE_REPOSITORY;
+  const noExport = info?.export_harnesses?.length === 0 ? 'Harmonize this project to build its harness variants.' : null;
   return (
     <Cell grow>
       <Cluster justify="end">
@@ -257,8 +257,8 @@ export function ProjectActions() {
         <Spacer />
         <GatedButton off={NO_REVIEW} variant="outline">Review decisions…</GatedButton>
         <GatedButton off={busy} variant="outline" onClick={() => setDialog('harmonize')}>Harmonize again…</GatedButton>
-        <GatedButton off={NO_INSTALL} variant="outline">Install on harnesses…</GatedButton>
-        <GatedButton off={null} variant="outline" onClick={() => setDialog('extract')}>Extract…</GatedButton>
+        <GatedButton off={info?.file ? null : 'Waiting for the project file path'} loading={checkingProject} loadingText="Checking the project…" variant="outline" onClick={onInstall}>Install via Sync…</GatedButton>
+        <GatedButton off={noExport} variant="outline" onClick={() => setDialog('extract')}>Export to folder…</GatedButton>
         <GatedButton off={noRelease} variant="outline" onClick={() => setDialog('release')}>Release…</GatedButton>
         <GatedButton off={busy} onClick={() => setDialog('add')}>Add input…</GatedButton>
       </Cluster>

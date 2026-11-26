@@ -232,11 +232,16 @@ def _run_project(args: argparse.Namespace) -> int:
         elif args.project_command == "unpack":
             print(project.unpack(args.mp, args.out))
         elif args.project_command == "extract":
-            folders = project.extract(args.mp, args.harness, args.out, args.cache or project.default_cache_root())
+            folders = project.extract(args.mp, args.harness, args.out, args.cache or project.default_cache_root(),
+                                      expect_digest=args.expect_digest)
             _print_json({"harness": args.harness, "folders": [str(folder) for folder in folders]})
         elif args.project_command == "verify":
-            project.verify(args.mp, args.cache or project.default_cache_root())
-            _print_json({"verified": True})
+            cache = args.cache or project.default_cache_root()
+            if args.build_info:
+                _print_json(project.verified_build(args.mp, cache))
+            else:
+                project.verify(args.mp, cache)
+                _print_json({"verified": True})
         elif args.project_command in _WRITE_COMMANDS:
             return _run_project_write(args)
         elif args.project_command == "release":
@@ -638,6 +643,7 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("mp", type=Path, help="The .mp file")
     p.add_argument("--harness", required=True, help="A harness the build has: claude-code, codex, pi, opencode, hermes")
     p.add_argument("--out", type=Path, required=True, help="The folder to write it in")
+    p.add_argument("--expect-digest", help="Export the archive only if it still has this SHA-256")
     p.add_argument("--cache", type=Path, metavar="DIR",
                    help="Where unpacked projects are kept (default: a per-user cache folder)")
     p = project_sub.add_parser("info", help="Print what a .mp holds, as JSON (unpacked once per file content)")
@@ -650,6 +656,7 @@ def _modern_main(argv: list[str]) -> int:
     p = project_sub.add_parser("verify", help="Check that the plugin a .mp carries was built from the package it "
                                               "carries (release slug, version and capability ids); exit 1 when not")
     p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--build-info", action="store_true", help="Require a built release and print its slug, version and archive SHA-256")
     p.add_argument("--cache", type=Path, metavar="DIR",
                    help="Where unpacked projects are kept (default: a per-user cache folder)")
     # Writing a project: Python packs, records and guards; the package's meaning is the host AI's.

@@ -10,13 +10,12 @@ import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
 import { DeleteDialog, atRevision, nameOf } from './project/write/DeleteDialog.tsx';
 import { JobCard } from './project/write/JobCard.tsx';
-import { busyReason, runningOn } from './project/write/jobs.ts';
+import { busyReason, pickProjectFile, projectFileKey, runningOn } from './project/write/jobs.ts';
 import { NewProjectDialog } from './project/write/NewProjectDialog.tsx';
 import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
 
 const fileOf = (path: string): string => path.split(/[\\/]/).pop() || path;
-const flat = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
 
 /** The Projects tab: the list of project files, and the workspace of the open one. The list reads `projects`, a project `project {id}`; a file is added through the
  * shell's file dialog (`pick_file`, then `open_project`) and taken off the list with `remove_project` (the entry only, never the file). A new project is made by an AI run
@@ -76,20 +75,19 @@ function ProjectList({ list, error, loadList }: { list: ProjectSummary[] | null;
   const busy = busyReason(running);
 
   async function openFile(): Promise<void> {
-    let picked: { path: string | null } | null;
-    try { picked = await request<{ path: string | null } | null>('pick_file', { filter: 'Muro project (*.mp)' }); }
+    let path: string | null;
+    try { path = await pickProjectFile(request); }
     catch (e) {
       if (unknownTo(e, 'pick_file')) { setNoPicker(true); notify('This version of Muro cannot open a file dialog yet.', { kind: 'error' }); }
       else notify(message(e), { kind: 'error' });
       return;
     }
-    const path = picked?.path;
     if (!path) return;
     setOpening(true);
     try {
       await request('open_project', { path });
       const read = await loadList();
-      const added = read?.find(p => flat(p.path) === flat(path));
+      const added = read?.find(p => projectFileKey(p.path) === projectFileKey(path));
       notify(`${added ? nameOf(added) : 'The project'} added to your list.`);
     } catch (e) { notify(message(e), { kind: 'error' }); }
     finally { setOpening(false); }
@@ -261,9 +259,9 @@ function OpenProject({ id, summary }: { id: string; summary: ProjectSummary | nu
   }, [id, attempt, settled]);
   const { setInfo } = project;
   React.useEffect(() => {
-    setInfo(read.info);
+    setInfo(read.info && { ...read.info, file: summary?.path ?? null });
     return () => setInfo(null);
-  }, [setInfo, read.info]);
+  }, [setInfo, read.info, summary?.path]);
   const back = <Button variant="ghost" size="sm" onClick={() => project.close()}><Icon name="moveLeft" />All projects</Button>;
   if (read.error) return (
     <Column gap="lg" pad="xl">

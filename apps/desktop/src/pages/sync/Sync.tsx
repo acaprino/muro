@@ -21,23 +21,26 @@ import { AddPluginDialog } from './AddPluginDialog.tsx';
 import { AddHarnessDialog } from './AddHarnessDialog.tsx';
 import { Unlisted } from './Unlisted.tsx';
 
+export type SyncEntry = { pluginId: string } | { source: string; name: string };
 export interface SyncProps {
   /** Opens a harness in the window's inspector, which the frame holds (App.tsx); `opener` is the button focus goes back to when it closes. */
   openHarness(targetId: string, opener: HTMLElement | null): void;
+  entry?: SyncEntry;
 }
 
-export function Sync({ openHarness }: SyncProps) {
+export function Sync({ openHarness, entry }: SyncProps) {
   const { snapshot } = useRegistry();
   // The plugin whose dialog is open, kept while it closes, and the row it was opened from, where focus goes back.
-  const [plugin, setPlugin] = React.useState<{ id: string; open: boolean } | null>(null);
+  const [plugin, setPlugin] = React.useState<{ id: string; open: boolean } | null>(() => entry && 'pluginId' in entry ? { id: entry.pluginId, open: true } : null);
   const pluginOpener = React.useRef<HTMLElement | null>(null);
-  const [addingPlugin, setAddingPlugin] = React.useState(false);
+  const [initialSource, setInitialSource] = React.useState(() => entry && 'source' in entry ? entry : undefined);
+  const [addingPlugin, setAddingPlugin] = React.useState(!!initialSource);
   const [addingHarness, setAddingHarness] = React.useState(false);
   if (!snapshot) return <Column pad="xl"><Text as="p" variant="muted" role="status">Reading your registry…</Text></Column>;
 
   const { plugins, targets } = snapshot.registry;
   const noHarness = targets.length === 0, noPlugin = plugins.length === 0;
-  const addPlugin = <Button variant="outline" onClick={() => setAddingPlugin(true)}><Icon name="plus" />Add plugin</Button>;
+  const addPlugin = <Button variant="outline" onClick={() => { setInitialSource(undefined); setAddingPlugin(true); }}><Icon name="plus" />Add plugin</Button>;
   const addHarness = <Button variant="outline" onClick={() => setAddingHarness(true)}><Icon name="plus" />Add harness</Button>;
   // Each button once on the page: where an empty state offers it, the head does not.
   const listEmpty = noPlugin && !noHarness;
@@ -75,7 +78,7 @@ export function Sync({ openHarness }: SyncProps) {
       <ReviewSheet />
       {/* One dialog for each plugin opened: another row starts a dialog of its own, with nothing of the last one's form. */}
       {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} restoreFocusTo={pluginOpener} /> : null}
-      <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} />
+      <AddPluginDialog open={addingPlugin} onOpenChange={setAddingPlugin} initial={initialSource} />
       <AddHarnessDialog open={addingHarness} onOpenChange={setAddingHarness} />
     </Column>
   );

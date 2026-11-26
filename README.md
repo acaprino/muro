@@ -36,7 +36,7 @@ Muro is one window with four tabs: **Projects**, **Sync**, **Activity** and **Se
 
 ### Projects
 
-A project is one `.mp` file that holds a unified plugin and everything behind it: the plugins and skills it absorbs, at their pinned commits with their licenses, the choices made and why, the history and the prompts. Muro ships none: **Open project file…** adds yours. A project page has four views: **Inputs** (what goes in, pinned to what, and what each part became), **Examples** (the simulator), **Records** (the decision records) and **Runs** (the history of harmonizations), beside the decision graph. From it you make a project (**New project…**), add or remove an input, move a pin, write your own instructions and harmonize again: each is an AI run by Claude Code on your computer, one at a time, with a card that follows it and a Cancel (there is none while the project is being saved). A run stops after 120 minutes, and your own Claude Code settings load into it, so a small budget can run out before it ends. You also edit the project's details and its decision records by hand, and delete a project. **Review decisions** and installing a project on your harnesses are not in the window yet. The simulator shows which branch of the plugin's decision graph a request activates, and in what order: a documented example runs no AI, and a request you type is classified by the AI through a coding agent on your computer (Claude Code or Codex) or an OpenAI-compatible API, as **Settings → AI** says, and the page tells you what it may cost before the first one. See [Projects in the desktop guide](docs/desktop.md#projects).
+A project is one `.mp` file that holds a unified plugin and everything behind it: the plugins and skills it absorbs, at their pinned commits with their licenses, the choices made and why, the history and the prompts. Muro ships none: **Open project file…** adds yours. A project page has four views: **Inputs** (what goes in, pinned to what, and what each part became), **Examples** (the simulator), **Records** (the decision records) and **Runs** (the history of harmonizations), beside the decision graph. From it you make a project (**New project…**), add or remove an input, move a pin, write your own instructions and harmonize again: each is an AI run by Claude Code on your computer, one at a time, with a card that follows it and a Cancel (there is none while the project is being saved). A run stops after 120 minutes, and your own Claude Code settings load into it, so a small budget can run out before it ends. You also edit the project's details and its decision records by hand, and delete a project. **Install via Sync…** opens the plugin in Sync with its project file as the source. **Export to folder…** saves a copy for one harness. Decision review is still in development. The simulator shows which branch of the plugin's decision graph a request activates, and in what order: a documented example runs no AI, and a request you type is classified by the AI through a coding agent on your computer (Claude Code or Codex) or an OpenAI-compatible API, as **Settings → AI** says, and the page tells you what it may cost before the first one. See [Projects in the desktop guide](docs/desktop.md#projects).
 
 ### Harness manager
 
@@ -117,7 +117,7 @@ The first time Muro opens, and until it manages a harness, three steps take the 
 
    <img src="docs/assets/screenshots/first-run-3.png" alt="First run, step 3 of 3: Keep them in sync by itself? Automatic sync and Start Muro when Windows starts, both on, with Back and Finish buttons." width="880">
 
-Then, on **Sync**, **Add plugin**: give its source (a repository, or a folder on this computer) and tick the harnesses it goes on. Muro finds each harness's plugin where that harness looks for it (its manifest or its marketplace at the root, or `adapters/<harness>` in a Muro build), and a Muro build published in a folder of its repository is found from the repository's address alone, as in `https://github.com/<owner>/<repository>`; for any other plugin in a folder of its repository, add `#folder` to the address. Press **Check now**, read the strip, and press **Apply all**.
+Then, on **Sync**, **Add plugin**: give its source (a repository, a local folder or a `.mp` file) and tick the harnesses it goes on. For sources without a project file, Muro finds each harness's plugin where that harness looks for it (its manifest or its marketplace at the root, or `adapters/<harness>` in a Muro build), and a Muro build published in a folder of its repository is found from the repository's address alone, as in `https://github.com/<owner>/<repository>`; for any other plugin in a folder of its repository, add `#folder` to the address. Press **Check now**, read the strip, and press **Apply all**.
 
 ## Usage examples
 
@@ -126,6 +126,12 @@ Then, on **Sync**, **Add plugin**: give its source (a repository, or a folder on
 1. **Add plugin**, give its source, tick Claude Code, Codex and OpenCode under **Install on**, then **Add plugin**.
 2. **Check now**: Muro records the upstream version and the native build for each harness.
 3. Read the strip, then **Apply all**.
+
+### Install or export from a Muro project file
+
+1. In **Sync → Add plugin**, use **Choose .mp file…** or paste a repository URL. For a repository, Muro reads the archive at the selected Git revision. To select a specific file, append `#folder/plugin.mp` or `#plugin.mp`.
+2. Under **Install on**, select the harnesses you want. Use **Check source** to see the included and missing variants before adding. The same information is available in the saved plugin's details. Apply the ready changes in **Sync** to install them.
+3. For a shareable copy, choose **Export to folder…** in the plugin or project, select one harness and a destination. The new harness folder contains its `INSTALL.md`.
 
 ### Keep everything up to date
 

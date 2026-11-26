@@ -1,14 +1,15 @@
 import * as React from 'react';
-import { Button, Column } from '@acaprino/sigrid/primitives';
+import { Button, Cell, Column, Text } from '@acaprino/sigrid/primitives';
 import { Dialog } from '@acaprino/sigrid/components';
-import type { Snapshot, Target } from '../../types.ts';
+import type { Plugin, Snapshot, Target } from '../../types.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message } from '../../words.ts';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';
-import { DISCARD_NOTE, DiscardFooter, PluginFields, changed, fieldId, focusProblem, formOf, newPlugin, nextForm, problemsOf, revisionOf } from './PluginDialog.tsx';
+import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
+import { BuildAvailability, DISCARD_NOTE, DiscardFooter, PluginFields, changed, fieldId, focusProblem, formOf, harnessList, newPlugin, nextForm, problemsOf, revisionOf } from './PluginDialog.tsx';
 import type { PluginForm } from './PluginDialog.tsx';
-import { registryWrite } from './registryWrite.ts';
+import { registryWrite, resolvePlugin } from './registryWrite.ts';
 import { useSync } from './useSync.tsx';
 
 /** Add plugin: a plugin by its source (a repository address or a folder on this computer), the harnesses it is installed on and how it is updated, in a drawer. It saves the plugin
@@ -21,18 +22,61 @@ import { useSync } from './useSync.tsx';
 
 /** A drawer's session: whether it is open, the id the plugin will have, the form, whether Add was tried (the problems show from then on), the question before leaving, and Advanced. */
 interface Session { open: boolean; id: string; base: PluginForm; form: PluginForm; tried: boolean; asking: boolean; advanced: boolean; fault: string | null }
-const opened = (open: boolean, targets: readonly Target[]): Session => {
+type SourceFields = Pick<PluginForm, 'source' | 'name'>;
+const opened = (open: boolean, targets: readonly Target[], initial?: SourceFields): Session => {
   const form = formOf(null, targets);
+  if (initial) Object.assign(form, initial, { named: true });
   return { open, id: crypto.randomUUID(), base: form, form, tried: false, asking: false, advanced: false, fault: null };
 };
 const NO_TARGETS: readonly Target[] = [];
 
+interface SourceBuilds { harnesses: string[]; project_version: string | null }
+/** Remounted for each source, policy, pin and form session so an earlier request cannot describe a new source. */
+function SourcePreview({ plugin, disabled }: { plugin: Plugin; disabled: boolean }) {
+  const { request } = useRegistry();
+  const [builds, setBuilds] = React.useState<SourceBuilds | null>(null);
+  const [failure, setFailure] = React.useState('');
+  const [checking, setChecking] = React.useState(false);
+  const pending = React.useRef(false);
+  async function check(): Promise<void> {
+    if (pending.current) return;
+    pending.current = true;
+    setChecking(true);
+    setBuilds(null);
+    setFailure('');
+    try { setBuilds(await request<SourceBuilds>('inspect_plugin_source', { plugin })); }
+    catch (e) { setFailure(message(e)); }
+    finally { pending.current = false; setChecking(false); }
+  }
+  return <Column as="section" gap="xs" aria-label="Source preview">
+    <Cell align="start"><Button type="button" variant="outline" size="sm" loading={checking} loadingText="Checking…"
+      disabled={disabled || !plugin.source || (plugin.policy === 'pinned' && !plugin.pinned_version)} onClick={() => void check()}>Check source</Button></Cell>
+    {builds ? <Column gap="xs" role="status">
+      <Text variant="strong">{builds.project_version ? `Project file · ${builds.project_version}` : 'Published builds'}</Text>
+      <BuildAvailability harnesses={builds.harnesses} />
+    </Column> : null}
+    {failure ? <RefusalLine>{failure}</RefusalLine> : null}
+  </Column>;
+}
+
+function addedNotice(plugin: Plugin, targets: readonly Target[]): string {
+  let notice = `${plugin.name} added to your list.`;
+  const archive = plugin.resolved_project;
+  if (!archive) return notice;
+  notice += archive.harnesses.length ? ` The .mp includes ${harnessList(archive.harnesses)}.` : ' The .mp has no harness builds.';
+  const selected = targets.filter(t => t.enabled && plugin.targets.includes(t.id));
+  if (!selected.length) return notice + ' No active harness selected.';
+  if (!selected.some(t => archive.harnesses.includes(t.harness))) return notice + ' The selected harnesses need other builds.';
+  return notice;
+}
+
 export interface AddPluginDialogProps {
   open: boolean;
   onOpenChange(open: boolean): void;
+  initial?: SourceFields;
 }
 
-export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
+export function AddPluginDialog({ open, onOpenChange, initial }: AddPluginDialogProps) {
   const { snapshot, request } = useRegistry();
   const sync = useSync();
   const notify = useNotify();
@@ -45,10 +89,10 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
   const added = React.useRef<string | null>(null);
 
   // A drawer that opens is a new form, and what was typed in the last one is not kept; one that closes keeps what it showed until it is gone.
-  const [held, setHeld] = React.useState<Session>(() => opened(open, targets));
+  const [held, setHeld] = React.useState<Session>(() => opened(open, targets, initial));
   let session = held;
   if (open && !held.open) {
-    session = opened(true, targets);
+    session = opened(true, targets, initial);
     opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
     added.current = null;
   } else if (open !== held.open) session = { ...held, open };
@@ -100,11 +144,11 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
       // From here the plugin is in the list. Its source is checked now; the window takes one snapshot, the last, so it plans once.
       if (live.current) setPhase('checking');
       let after = saved, unresolved: string | null = null;
-      try { after = await latest.current.request<Snapshot>('resolve', { id: plugin.id }); }
+      try { after = await resolvePlugin(latest.current.request, plugin.id, refreshed => { after = refreshed; }); }
       catch (e) { unresolved = message(e); }
       added.current = plugin.name;
       latest.current.adopt(after);
-      if (unresolved === null) latest.current.notify(`${plugin.name} added to your list.`);
+      if (unresolved === null) latest.current.notify(addedNotice(after.registry.plugins.find(p => p.id === plugin.id) ?? plugin, after.registry.targets));
       else latest.current.notify(`${plugin.name} was added to your list, but its source could not be checked: ${unresolved}`, { kind: 'error' });
       if (live.current) onOpenChange(false);
     } finally {
@@ -131,7 +175,7 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
         (row ?? main)?.focus();
       }}
       title={asking ? 'Discard changes to the new plugin?' : 'Add a plugin'}
-      description={asking ? DISCARD_NOTE : 'A plugin installed as its author ships it.'}
+      description={asking ? DISCARD_NOTE : 'Choose a source and the harnesses you use. Muro checks the source for a build for each harness.'}
       footer={asking ? <DiscardFooter key="discard" onKeep={keep} onDiscard={() => onOpenChange(false)} /> : (
         <React.Fragment key="form">
           <Button variant="outline" disabled={phase !== null} onClick={leave}>Cancel</Button>
@@ -141,7 +185,8 @@ export function AddPluginDialog({ open, onOpenChange }: AddPluginDialogProps) {
     >
       {asking ? null : (
         <form key="form" id={formId} noValidate onSubmit={e => { e.preventDefault(); void add(); }}><Column gap="lg">
-          <PluginFields ids={ids} form={form} onChange={change} problems={problems} targets={targets} saved={false} advanced={advanced} onAdvanced={value => patch({ advanced: value })} />
+          <PluginFields ids={ids} form={form} onChange={change} problems={problems} targets={targets} saved={false} advanced={advanced} onAdvanced={value => patch({ advanced: value })}
+            sourcePreview={<SourcePreview key={JSON.stringify([id, form.source.trim(), form.policy, form.pinned.trim()])} plugin={newPlugin(id, form, targets)} disabled={phase !== null} />} />
           {fault ? <NotSaved text={fault} /> : null}
         </Column></form>
       )}

@@ -147,6 +147,118 @@ await test('Add plugin: wrong fields say so, the name follows the source, a refu
   await page.waitForFunction(() => document.activeElement?.textContent?.trim() === '<Test plugin>');
 });
 
+await test('a file picked in Add plugin installs through Sync without a separate export', 'default', {}, async app => {
+  const { page } = app;
+  const file = 'D:/Shared/notes.mp';
+  await app.flags({ pickPath: null, projectSources: { [file]: { file, digest: '3'.repeat(64), harnesses: ['codex'], version: '1.4.0' } } });
+  const s = await openAdd(page);
+  const picker = fold(s, 'Choose .mp file…');
+  await field(s, 'source').fill('https://github.com/owner/original');
+  await picker.click();
+  assert.equal(await field(s, 'source').inputValue(), 'https://github.com/owner/original', 'closing the picker keeps the typed source');
+  await app.flags({ pickPath: file });
+  await picker.click();
+  await page.waitForFunction(expected => document.querySelector('input[name="source"]')?.value === expected, file);
+  assert.deepEqual((await callsOf(app, 'pick_file')).map(c => c.payload), Array(2).fill({ filter: 'Muro project (*.mp)' }));
+  assert.equal(await field(s, 'name').inputValue(), 'notes');
+  await addSubmit(s).click();
+  await s.waitFor({ state: 'detached' });
+  await page.locator('[data-toasts]').getByText(/notes added to your list.*The \.mp includes Codex/i).waitFor();
+  const saved = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin;
+  assert.equal(saved.source, file);
+  assert.deepEqual(saved.targets, ['t1']);
+  assert.deepEqual((await callsOf(app, 'resolve')).map(c => c.payload.id), [saved.id]);
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply all 1 change', exact: true }).click();
+  await notice(page, '1 change applied.').waitFor();
+  const codexCell = page.getByRole('row').filter({ has: rowOf(page, 'notes') }).getByRole('cell').last();
+  await codexCell.getByText('1.4.0', { exact: true }).waitFor();
+  for (const separate of ['open_project', 'extract_plugin', 'extract_project', 'adapt']) {
+    assert.equal((await callsOf(app, separate)).length, 0, separate);
+  }
+});
+
+await test('Check source previews without saving; a late answer for a replaced source is ignored and the selected targets survive the next check', 'two-harnesses', {}, async app => {
+  const { page } = app;
+  const first = 'D:/Shared/first.mp', second = 'D:/Shared/second.mp';
+  await app.flags({ holdInspection: true, projectSources: {
+    [first]: { file: first, digest: '1'.repeat(64), harnesses: ['codex'], version: '1.0.0' },
+    [second]: { file: second, digest: '2'.repeat(64), harnesses: ['opencode'], version: '2.0.0' },
+  } });
+  const s = await openAdd(page);
+  const check = fold(s, 'Check source');
+  await field(s, 'source').fill(first);
+  await check.click();
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'inspect_plugin_source'));
+  await s.getByRole('checkbox', { name: 'Codex isolated test', exact: true }).click();
+  await field(s, 'source').fill(second);
+  await app.flags({ holdInspection: false });
+  await page.evaluate(async () => {
+    window.behind.finishInspection();
+    await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
+  });
+  const preview = s.getByRole('region', { name: 'Source preview' });
+  assert.equal(await preview.getByText(/1\.0\.0/).count(), 0, 'the old archive version never describes its replacement');
+  await check.click();
+  await preview.getByText(/2\.0\.0/).waitFor();
+  assert.match(await preview.innerText(), /Included[^\n]*OpenCode/);
+  assert.match(await preview.innerText(), /Missing[^\n]*Codex/);
+  assert.equal(await s.getByRole('checkbox', { name: 'Codex isolated test', exact: true }).isChecked(), false);
+  assert.equal(await s.getByRole('checkbox', { name: 'OpenCode isolated test', exact: true }).isChecked(), true);
+  assert.deepEqual((await callsOf(app, 'inspect_plugin_source')).map(c => c.payload.plugin.source), [first, second]);
+  for (const action of ['save_plugin', 'apply', 'resolve']) assert.equal((await callsOf(app, action)).length, 0, action);
+  await addSubmit(s).click();
+  await s.waitFor({ state: 'detached' });
+  const saved = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin;
+  assert.equal(saved.source, second);
+  assert.deepEqual(saved.targets, ['t2']);
+});
+
+await test('a repository with an .mp shows its variants and exports a selected one independently of the Sync targets', 'default', {}, async app => {
+  const { page } = app;
+  const source = 'https://github.com/owner/tools';
+  const file = 'D:/isolated/data/sources/123/tools.mp';
+  const digest = '7'.repeat(64);
+  await app.flags({ projectSources: { [source]: { file, digest, harnesses: ['claude-code', 'codex'], version: '1.4.0' } } });
+  const add = await openAdd(page);
+  await field(add, 'source').fill(source);
+  await addSubmit(add).click();
+  await add.waitFor({ state: 'detached' });
+  const id = (await callsOf(app, 'save_plugin')).at(-1).payload.plugin.id;
+  const s = await openPlugin(page, 'tools');
+  const builds = s.getByRole('region', { name: 'Project file builds' });
+  await builds.waitFor();
+  assert.match(await builds.innerText(), /Included[\s\S]*Claude Code[\s\S]*Codex/);
+  assert.match(await builds.innerText(), /Missing[\s\S]*OpenCode/);
+  const exportButton = fold(s, 'Export to folder…');
+  await exportButton.waitFor();
+  await field(s, 'source').fill('https://github.com/owner/replacement');
+  assert.ok(!(await exportButton.count()) || await exportButton.isDisabled(), 'an edited source cannot export the previous file');
+  await field(s, 'source').fill(source);
+  await exportButton.click();
+  const dialog = page.getByRole('dialog', { name: /export tools/i });
+  const picker = dialog.getByRole('combobox');
+  await picker.click();
+  await page.getByRole('option', { name: 'Codex', exact: true }).waitFor();
+  const options = page.getByRole('option');
+  assert.deepEqual((await options.allTextContents()).sort(), ['Claude Code', 'Codex']);
+  await page.getByRole('option', { name: 'Claude Code', exact: true }).click();
+  await dialog.getByRole('textbox').fill('D:/Export only');
+  await dialog.getByRole('button', { name: 'Export', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  await notice(page, 'Exported to D:/Export only/claude-code').waitFor();
+  assert.deepEqual((await callsOf(app, 'extract_plugin')).map(c => c.payload), [{ id, digest, harness: 'claude-code', folder: 'D:/Export only' }]);
+  for (const separate of ['apply', 'extract_project', 'adapt']) assert.equal((await callsOf(app, separate)).length, 0, separate);
+
+  await app.flags({ projectSources: { [source]: { error: 'The updated archive could not be verified' } } });
+  await page.getByRole('button', { name: 'Check now', exact: true }).click();
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'check'));
+  const stale = await openPlugin(page, 'tools');
+  await stale.getByText(/The updated archive could not be verified/).waitFor();
+  const staleExport = fold(stale, 'Export to folder…');
+  assert.ok(!(await staleExport.count()) || await staleExport.isDisabled(), 'a failed source check cannot export the older build');
+});
+
 await test('Add plugin from a list that has plugins: the keyboard goes back to Add plugin', 'changes', {}, async app => {
   const { page } = app;
   const s = await openAdd(page);

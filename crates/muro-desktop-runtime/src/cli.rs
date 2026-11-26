@@ -464,6 +464,9 @@ fn relocate_owned_paths(data: &Path) -> Result<()> {
                         if let Some(path) = plugin.get_mut("custom_instructions_dir") {
                             rebase(path, &old, &current);
                         }
+                        if let Some(path) = plugin.get_mut("resolved_project").and_then(|archive| archive.get_mut("path")) {
+                            rebase(path, &old, &current);
+                        }
                         if let Some(distributions) = plugin["distributions"].as_array_mut() {
                             for d in distributions {
                                 rebase(&mut d["path"], &old, &current);

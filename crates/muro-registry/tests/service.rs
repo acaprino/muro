@@ -1873,6 +1873,64 @@ mod registered_adaptation {
 }
 
 #[test]
+fn hermes_project_sync_tracks_both_packages_and_recovers_after_a_partial_install() {
+    let (_t, root, profile, adapters) = fixture();
+    let main = adapters.join("hermes");
+    let server = adapters.join("hermes-mcp");
+    fs::create_dir(&main).unwrap();
+    fs::create_dir(&server).unwrap();
+    fs::write(main.join("plugin.yaml"), r#"{"name":"demo","version":"1.0"}"#).unwrap();
+    fs::write(server.join("plugin.json"), r#"{"name":"demo-mcp","version":"1.0"}"#).unwrap();
+    fs::write(server.join("mcp.json"), "{}").unwrap();
+    request(&root, "save_target", json!({"revision":0,"target":{"id":"h","harness":"hermes","name":"Hermes","root":profile,
+        "executable":env!("CARGO_BIN_EXE_fake-hermes"),"exclusive":false,"enabled":true}})).unwrap();
+    let saved = snapshot(&root);
+    request(&root, "save_plugin", json!({"revision":saved["registry"]["revision"],"plugin":{"id":"demo","name":"Demo","source":adapters,
+        "policy":"head","pinned_version":"","targets":["h"],"distributions":[{"harness":"hermes","path":main,"version":"1.0","project_digest":"snapshot"}]}})).unwrap();
+
+    // An independently installed package with the server's name is never overwritten.
+    let state = profile.join("installed.json");
+    fs::write(&state, r#"[{"name":"demo-mcp","version":"1.5","status":"enabled"}]"#).unwrap();
+    let blocked = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(blocked["operations"], json!([]), "{blocked}");
+    assert!(blocked["blockers"].to_string().contains("demo-mcp"));
+    fs::write(&state, "[]").unwrap();
+
+    let initial = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(initial["operations"].as_array().unwrap().len(), 2, "{initial}");
+    fs::write(profile.join("refuse-server"), "").unwrap();
+    assert!(request(&root, "apply", json!({"plan_id":initial["id"]})).is_err());
+    fs::remove_file(profile.join("refuse-server")).unwrap();
+    let retry = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(retry["operations"].as_array().unwrap().len(), 1, "{retry}");
+    assert_eq!(retry["operations"][0]["name"], "demo-mcp");
+    request(&root, "apply", json!({"plan_id":retry["id"]})).unwrap();
+    assert_eq!(request(&root, "plan", json!({})).unwrap()["operations"], json!([]));
+
+    let repair = request(&root, "plan", json!({"reinstall":"demo"})).unwrap();
+    assert_eq!(repair["operations"].as_array().unwrap().len(), 2, "{repair}");
+    request(&root, "apply", json!({"plan_id":repair["id"]})).unwrap();
+    fs::write(server.join("mcp.json"), r#"{"changed":true}"#).unwrap();
+    let updated = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(updated["operations"].as_array().unwrap().len(), 1, "{updated}");
+    assert_eq!(updated["operations"][0]["kind"], "update");
+    request(&root, "apply", json!({"plan_id":updated["id"]})).unwrap();
+
+    // The new release drops just the companion. Even on a non-exclusive target it
+    // is retired, with the normal removal confirmation, while the primary stays.
+    fs::remove_dir_all(&server).unwrap();
+    let removed = request(&root, "plan", json!({})).unwrap();
+    assert_eq!(removed["operations"].as_array().unwrap().len(), 1, "{removed}");
+    assert_eq!(removed["operations"][0]["native_id"], "demo-mcp");
+    assert!(request(&root, "apply", json!({"plan_id":removed["id"]})).is_err());
+    request(&root, "apply", confirmed(&removed)).unwrap();
+    assert_eq!(request(&root, "plan", json!({})).unwrap()["operations"], json!([]));
+    let installed: Vec<Value> = serde_json::from_slice(&fs::read(state).unwrap()).unwrap();
+    assert_eq!(installed.len(), 1);
+    assert_eq!(installed[0]["name"], "demo");
+}
+
+#[test]
 #[ignore = "runs an installed native Hermes in an isolated temporary home"]
 fn hermes_native_round_trip() {
     let exe = std::env::var("MURO_HERMES_TEST_EXE").expect("MURO_HERMES_TEST_EXE");
