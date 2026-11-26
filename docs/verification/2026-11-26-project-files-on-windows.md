@@ -63,7 +63,14 @@ machine, where the unpacked folder shows 0 executable files:
 | after `edit` | 467 | 67 | yes |
 | after an unpack and `commit --step none` | 467 | 67 | yes |
 
-## Found on the way, not fixed: line endings of a build made on Windows
+## Found on the way, fixed afterwards: line endings of a build made on Windows
+
+Fixed the same day: the factory's files are copied into a build with LF whatever the checkout has, and what the
+build and a project commit write as text asks for LF (`tests/test_line_endings.py`, which plays Windows on any
+computer). Run on Windows on both Linux-made files, unpacked and committed again: no file differs from the
+original only in line endings (616 and 824 before), and the executable files stay (126 and 467). The 87 files
+that still differ in each are the factory's runtime files changed since `muro-v0.10.0`, the guides, which carry
+the build time, and the three files that record the run. What was found:
 
 The rebuilt release has the same file names as the Linux one, and 616 files of the first project (824 of the
 second) differ from it only in line endings. Two causes were seen in the first project's root folder (91 of its

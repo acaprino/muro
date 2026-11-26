@@ -65,7 +65,7 @@ def _now() -> str:
 
 
 def _write_json(path: Path, document: Any) -> None:
-    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(document, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def _read_json(path: Path) -> Any:
@@ -132,7 +132,7 @@ def new_workspace(folder: Path, *, name: str, slug: str, author: str,
     _write_json(folder / "project.json", meta)
     _write_json(folder / "records.json", {"records": []})
     _write_json(folder / "history.json", {"runs": []})
-    (folder / "CHANGELOG.md").write_text("", encoding="utf-8")
+    (folder / "CHANGELOG.md").write_text("", encoding="utf-8", newline="\n")
     return folder
 
 
@@ -410,7 +410,7 @@ def edit(mp: Path, *, expect_digest: str, name: Any = _KEEP, author: Any = _KEEP
             if not isinstance(changelog, str) or len(changelog.encode("utf-8")) > _MAX_CHANGELOG:
                 raise ValueError("The changelog must be text of at most 1 MiB")
             (folder / "CHANGELOG.md").write_text(changelog if not changelog or changelog.endswith("\n") else changelog + "\n",
-                                                 encoding="utf-8")
+                                                 encoding="utf-8", newline="\n")
         cache = scratch / "sources"            # this file's own copies only: never a cache other projects read
         seed_cache(folder, cache, project.executable_members(mp))
         release = folder / "release"
@@ -586,7 +586,7 @@ def commit(work: Path, out: Path, *, expect_digest: str | None = None, create: b
         meta.update({"version": version, "changed": now})
         _write_json(work / "project.json", meta)
         entry = f"# {plugin['name']} {version}\n\n" + (f"{text}\n\n" if text else "") + "".join(f"- {line}\n" for line in lines)
-        (work / "CHANGELOG.md").write_text(entry + ("\n" + old_log if old_log.strip() else ""), encoding="utf-8")
+        (work / "CHANGELOG.md").write_text(entry + ("\n" + old_log if old_log.strip() else ""), encoding="utf-8", newline="\n")
         cache = scratch / "sources"           # the old file's own copies: an input it already carried is not fetched again
         if before is not None:
             seed_cache(before, cache, project.executable_members(out))

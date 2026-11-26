@@ -257,11 +257,20 @@ def _install_steps(host: str, plugin: dict, reviews_hooks: bool) -> str:
     return f"\n\n## Install\n\n{steps}"
 
 
+def copy_as_lf(source: str, target: str) -> str:
+    """A file of the factory into a build, with LF whatever the checkout of Muro has (Git's `core.autocrlf`)."""
+    data = Path(source).read_bytes()
+    Path(target).write_bytes(data if b"\0" in data else data.replace(b"\r\n", b"\n"))
+    shutil.copystat(source, target)
+    return target
+
+
 def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities: list | None = None,
                    entries: list[dict] | None = None, delivery: dict | None = None) -> None:
     """Write documented skill layouts and independently runnable host launchers."""
-    shutil.copytree(package_source, dist / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    (dist / "muro.py").write_text(_LAUNCHER, encoding="utf-8")
+    shutil.copytree(package_source, dist / "muro", ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+                    copy_function=copy_as_lf)
+    (dist / "muro.py").write_text(_LAUNCHER, encoding="utf-8", newline="\n")
     plugin_doc = {
         "name": plugin["slug"], "displayName": plugin["name"],
         "version": plugin["version"],
@@ -269,7 +278,7 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         "author": {"name": "Muro contributors"},
     }
     (dist / ".claude-plugin").mkdir()
-    (dist / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin_doc, indent=2), encoding="utf-8")
+    (dist / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin_doc, indent=2), encoding="utf-8", newline="\n")
     if capabilities is None and (dist / "capabilities").is_dir():
         from .core import parse_capability
         capabilities = [parse_capability(p) for p in sorted((dist / "capabilities").glob("*.md"))]
@@ -285,8 +294,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         if capabilities:
             (skill_dir / "SKILL.md").write_text(
                 _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt, entries=entries),
-                encoding="utf-8")
-        (skill_dir / "muro.py").write_text(_LAUNCHER, encoding="utf-8")
+                encoding="utf-8", newline="\n")
+        (skill_dir / "muro.py").write_text(_LAUNCHER, encoding="utf-8", newline="\n")
         # A skill directory is independently installable; omit build-only graph bundle inside runtime muro/.
         shutil.copytree(
             dist / "muro",
@@ -319,7 +328,7 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             entry_dir.mkdir()
             (entry_dir / "SKILL.md").write_text(
                 _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt, entry=entry),
-                encoding="utf-8")
+                encoding="utf-8", newline="\n")
             entry_names.append(entry["name"])
         replaces = [r for r in plugin.get("replaces", []) if isinstance(r, str) and r.strip()]
         replaces_note = ""
@@ -342,16 +351,16 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             f"See README.md in the source project for current verification limits.{replaces_note}"
             f"{install_note(delivery, host, plugin['command'])}"
             f"{_install_steps(host, plugin, host == 'codex' and bool(codex_hooks(delivery, plugin['command'], plugin['name'])))}\n",
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
         if host == "claude-code":
             (root / ".claude-plugin").mkdir()
-            (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin_doc, indent=2), encoding="utf-8")
+            (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(plugin_doc, indent=2), encoding="utf-8", newline="\n")
             # The adapter folder is its own marketplace, so the host's install command accepts it as it is.
             marketplace = {"name": plugin["slug"], "owner": plugin_doc["author"],
                            "metadata": {"description": f"{plugin['name']}, installed from this folder"},
                            "plugins": [{"name": plugin["slug"], "source": "./",
                                         "description": plugin_doc["description"], "version": plugin["version"]}]}
-            (root / MARKETPLACE_FILES[host]).write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+            (root / MARKETPLACE_FILES[host]).write_text(json.dumps(marketplace, indent=2), encoding="utf-8", newline="\n")
             # Installing the plugin is the consent: what delivery.json declares is registered when it is enabled.
             registered = claude_code_hooks(delivery, plugin["command"], plugin["name"])
             module = write_claude_policy(root, plugin)
@@ -360,35 +369,35 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
                 registered["modules"] = [module]
             if registered:
                 (root / "hooks").mkdir(exist_ok=True)
-                (root / "hooks" / "hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+                (root / "hooks" / "hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8", newline="\n")
             servers = claude_code_mcp(delivery, plugin["command"])
             if servers:
-                (root / ".mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
+                (root / ".mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8", newline="\n")
         elif host == "codex":
             # Both modern and compatibility entrypoints refer to the same packaged resources.
             portable = {"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
                         "name": plugin["slug"], "version": plugin["version"],
                         "description": plugin_doc["description"]}
-            (root / "plugin.json").write_text(json.dumps(portable, indent=2), encoding="utf-8")
+            (root / "plugin.json").write_text(json.dumps(portable, indent=2), encoding="utf-8", newline="\n")
             (root / ".codex-plugin").mkdir()
             compatibility = {"name": plugin["slug"], "version": plugin["version"],
                              "description": plugin_doc["description"], "skills": "./skills/"}
-            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compatibility, indent=2), encoding="utf-8")
+            (root / ".codex-plugin/plugin.json").write_text(json.dumps(compatibility, indent=2), encoding="utf-8", newline="\n")
             # The adapter folder is its own marketplace, so `codex plugin marketplace add` accepts it as it is.
             marketplace = {"name": plugin["slug"], "interface": {"displayName": plugin["name"]},
                            "plugins": [{"name": plugin["slug"], "source": {"source": "local", "path": "./"},
                                         "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
                                         "category": "Productivity"}]}
             (root / MARKETPLACE_FILES[host]).parent.mkdir(parents=True)
-            (root / MARKETPLACE_FILES[host]).write_text(json.dumps(marketplace, indent=2), encoding="utf-8")
+            (root / MARKETPLACE_FILES[host]).write_text(json.dumps(marketplace, indent=2), encoding="utf-8", newline="\n")
             registered = codex_hooks(delivery, plugin["command"], plugin["name"])
             if registered:
                 (root / "hooks").mkdir()
-                (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8")
+                (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8", newline="\n")
             # Beside the root Agent Plugins manifest written above, which is where Codex looks for it.
             servers = agent_plugins_mcp(delivery, f"${{PLUGIN_ROOT}}/skills/{plugin['command']}")
             if servers:
-                (root / "mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8")
+                (root / "mcp.json").write_text(json.dumps(servers, indent=2), encoding="utf-8", newline="\n")
         elif host == "pi":
             write_pi_adapter(root, plugin, bool(policy), placeholder_launches(delivery))
         elif host == "opencode":
@@ -430,5 +439,5 @@ def write_repository_marketplaces(repository: Path, folder: str) -> list[Path]:
         documents[repository / name] = document
     for path, document in documents.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, indent=2), encoding="utf-8")
+        path.write_text(json.dumps(document, indent=2), encoding="utf-8", newline="\n")
     return list(documents)

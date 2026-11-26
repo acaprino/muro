@@ -768,5 +768,5 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
     rendered = re.sub('|'.join(re.escape(token) for token in replacements),
                       lambda match: replacements[match.group()], template)
     destination = dist / 'GUIDE.html'
-    destination.write_text(rendered, encoding='utf-8')
+    destination.write_text(rendered, encoding='utf-8', newline="\n")
     return destination
