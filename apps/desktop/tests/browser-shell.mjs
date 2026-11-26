@@ -198,6 +198,23 @@ await test('Settings has the glass of the window, off at first; a press makes it
   assert.equal(await options(page).filter({ hasText: 'Glass' }).getAttribute('aria-checked'), 'true', 'the command of the look is checked');
 });
 
+await test('Settings switches the automatic sync and saves it at once on the registry as it is; the status row says when the next check is', 'default', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await tab(page, 'Settings').click();
+  const automatic = content(page).getByRole('switch', { name: 'Automatic sync' });
+  assert.equal(await automatic.isChecked(), false);
+  await automatic.focus();
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'settings'));
+  const saved = (await app.calls()).filter(c => c.action === 'settings').map(c => c.payload.settings);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].auto_sync, true);
+  assert.equal(saved[0].interval_minutes, 60, 'the other settings are sent as they were');
+  await status(page).getByText(/next check soon/).waitFor();
+  assert.equal(await automatic.isChecked(), true);
+});
+
 await test('Settings chooses the theme with the shell\'s own commands: dark at first, light and system from the page, kept as the palette keeps it', 'default', { colorScheme: 'light' }, async app => {
   const { page } = app;
   await ready(page);

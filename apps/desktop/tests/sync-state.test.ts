@@ -4,7 +4,7 @@
 // live in useSync.tsx and are run by the browser tests of the Sync page (tests/browser-sync.mjs, on the fake service).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appliedMessage, applyRequest, checkedLine, chipOf, executedOf, nameList, noteOf, timesLine } from '../src/pages/sync/words.ts';
+import { appliedMessage, applyRequest, checkedLine, chipOf, executedOf, nameList, noteOf, reasonOf, timesLine } from '../src/pages/sync/words.ts';
 import type { SyncHeadline } from '../src/model.ts';
 import type { Operation, Plan, Plugin, Snapshot, Target } from '../src/types.ts';
 
@@ -195,6 +195,17 @@ test('the lines of times: the last check, the last sync, and the next check or t
   assert.equal(checkedLine(automatic), 'Last check May 5 · next check soon', 'a time the service wrote in words stays as it is, and the next one is soon');
   assert.equal(timesLine(automatic), 'Last check May 5 · Last sync May 4 · Next check soon');
   assert.equal(checkedLine(snapshot(record(), [target('t1', 'Codex')], true)), 'Last check never · next check soon');
+});
+
+test('the review sheet says why in plain words: the service\'s own terms become the change they stand for, any other reason stays', () => {
+  const with_ = (kind: string, reason: string, from = '1', to = '2'): Operation => ({ ...op(kind), reason, from_version: from, to_version: to });
+  assert.equal(reasonOf(with_('install', 'Missing desired distribution', '')), 'Not installed yet');
+  assert.equal(reasonOf(with_('remove', 'Not in desired registry for this target', '1', '')), 'Not in your list for this harness');
+  assert.equal(reasonOf(with_('update', 'Reconcile desired artifact')), 'New version');
+  assert.equal(reasonOf(with_('update', 'Reconcile desired artifact', '2', '2')), 'The build changed');
+  assert.equal(reasonOf(with_('activate', 'Reconcile desired artifact', '2', '2')), 'Installed but switched off');
+  assert.equal(reasonOf(with_('reinstall', 'Reconcile desired artifact', '2', '2')), 'Installed again on request');
+  assert.equal(reasonOf(with_('update', 'Files missing')), 'Files missing');
 });
 
 test('a list of names: one or two as they are, more as the first and how many are left', () => {

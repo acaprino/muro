@@ -32,6 +32,20 @@ export function appliedMessage(plan: Plan, answer: Pick<Snapshot, 'skipped_remov
   return `${appliedNotice(plan.operations.length - skipped, skipped)}${left ? ` ${left} left out.` : ''}`;
 }
 
+/** Why the service planned an operation, in the words of the review sheet. Its three generic reasons are its own terms (desired distribution, artifact,
+ * registry): they are said as the change they stand for. Any other reason (files missing, a marketplace that cannot be loaded) is already plain and stays. */
+export function reasonOf(o: Operation): string {
+  switch (o.reason) {
+    case 'Missing desired distribution': return 'Not installed yet';
+    case 'Not in desired registry for this target': return 'Not in your list for this harness';
+    case 'Reconcile desired artifact':
+      return o.kind === 'activate' ? 'Installed but switched off'
+        : o.kind === 'reinstall' ? 'Installed again on request'
+          : o.from_version && o.from_version !== o.to_version ? 'New version' : 'The build changed';
+    default: return o.reason;
+  }
+}
+
 /** What each operation kind is called in the list of what a check found. */
 const CHANGE_WORDS: [string, string][] = [['install', 'install'], ['update', 'update'], ['reinstall', 'reinstall'], ['activate', 'activation'], ['remove', 'removal'], ['remove-marketplace', 'broken marketplace']];
 /** One or two names as they are; more, the first and how many are left. */

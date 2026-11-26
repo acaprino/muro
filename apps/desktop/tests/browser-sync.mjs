@@ -162,7 +162,7 @@ await test('with blockers Apply all opens the review sheet, which says what is n
   await sheet(page).getByText('It is left out of this sync.', { exact: true }).waitFor();
   const update = sheet(page).locator('[data-operation="update"]');
   assert.match(await update.textContent(), /Package/);
-  assert.match(await update.textContent(), /1 → 2 · Reconcile desired artifact/, 'the versions and the reason');
+  assert.match(await update.textContent(), /1 → 2 · New version/, 'the versions and the reason, in plain words');
   assert.equal((await actions(app)).includes('apply'), false, 'nothing is applied before the sheet\'s Apply');
   await focusOn(page, 'Apply 1 change');
   await page.screenshot({ path: shots + '/sync-review.png' });
