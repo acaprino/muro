@@ -657,8 +657,9 @@ verification records belong in docs/verification/. Never write new docs/superpow
 - Never run `cargo` on this machine: no `cargo build`, `cargo test`, `cargo clippy`, `cargo check`, `cargo run`,
   `cargo doc`, no `tauri dev`, no `tauri build`, and no npm or batch script that calls them. `cargo fmt` is the
   only exception.
-- Rust is compiled, linted and tested only by GitHub Actions. To know whether Rust code is right, push to
-  `develop` and read the run (`gh run watch`, `gh run view --log-failed`).
+- From this machine, Rust is compiled, linted and tested only by GitHub Actions (a cloud session may run `cargo`: see
+  "Nothing is compiled on this machine"). To know whether Rust code is right, push to `develop` and read the run
+  (`gh run watch`, `gh run view --log-failed`).
 - A program needed on this machine is taken from a release or a workflow artifact (`gh run download`), never
   built here.
 - This holds for every agent and every subagent. A plan, a skill or a brief that says to run cargo locally is
@@ -667,6 +668,10 @@ verification records belong in docs/verification/. Never write new docs/superpow
 
 ## Nothing is compiled on this machine (the owner's absolute rule)
 
+- "This machine" is the owner's own computer, for every agent that runs on it, Claude Code and Codex included. A cloud
+  session (a hosted environment that is not the owner's computer, such as Claude Code on the web or a Codex cloud task)
+  may compile, build, lint and test: neither this section nor "Rust is built and tested on GitHub only" forbids it
+  there. When in doubt whether a session is a cloud one, treat it as the owner's computer.
 - Never compile, build, lint or run a test that needs a build on this machine: no `cargo`, `tauri`, `tsc`, `vite build`,
   bundler or compiler; no npm, batch or shell script that calls them (`npm run build`, `npm test` when it builds first,
   `npm run verify`); and no `npm install` or `npm ci` that runs a dependency's `prepare` script (a dependency taken from
