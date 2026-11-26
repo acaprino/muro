@@ -218,7 +218,8 @@ def _run_license_check(folder: Path) -> int:
 
 
 def _run_project(args: argparse.Namespace) -> int:
-    """`muro project pack|unpack|info|verify|new|edit|commit`: the `.mp` file (muro/project.py, muro/project_work.py)."""
+    """`muro project pack|unpack|extract|info|verify|new|edit|commit|release`: the `.mp` file (muro/project.py,
+    muro/project_work.py, muro/project_release.py)."""
     from . import project
     try:
         if args.project_command == "pack":
@@ -230,11 +231,22 @@ def _run_project(args: argparse.Namespace) -> int:
                                release_dir=args.release))
         elif args.project_command == "unpack":
             print(project.unpack(args.mp, args.out))
+        elif args.project_command == "extract":
+            folders = project.extract(args.mp, args.harness, args.out, args.cache or project.default_cache_root())
+            _print_json({"harness": args.harness, "folders": [str(folder) for folder in folders]})
         elif args.project_command == "verify":
             project.verify(args.mp, args.cache or project.default_cache_root())
             _print_json({"verified": True})
         elif args.project_command in _WRITE_COMMANDS:
             return _run_project_write(args)
+        elif args.project_command == "release":
+            from . import project_release
+            document, warnings = project_release.release(
+                args.mp, cache_root=args.cache or project.default_cache_root(), expect_digest=args.expect_digest,
+                init=args.init, dry_run=args.dry_run)
+            for warning in warnings:        # stdout is the one JSON object
+                print(f"Warning: {warning}", file=sys.stderr)
+            _print_json(document)
         else:
             read = project.summary if args.summary else project.info
             print(json.dumps(read(args.mp, args.cache or project.default_cache_root()),
@@ -610,7 +622,7 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("decisions", type=Path, help="The host AI's decisions JSON")
     p = sub.add_parser("project", help="The .mp project file: one zip with a package, its inputs and its release")
     project_sub = p.add_subparsers(dest="project_command", required=True,
-                                   metavar="pack|unpack|info|verify|new|edit|commit|simulate|simulate-prepare|simulate-check")
+                                   metavar="pack|unpack|extract|info|verify|new|edit|commit|release|simulate|simulate-prepare|simulate-check")
     p = project_sub.add_parser("pack", parents=[common],
                                help="Pack a package, its sources at their pins and a built release into a .mp")
     p.add_argument("--out", type=Path, required=True, help="The .mp file to write")
@@ -621,6 +633,13 @@ def _modern_main(argv: list[str]) -> int:
     p = project_sub.add_parser("unpack", help="Unpack a .mp into a new folder (refuses unsafe members and limits)")
     p.add_argument("mp", type=Path, help="The .mp file")
     p.add_argument("--out", type=Path, required=True, help="A new folder")
+    p = project_sub.add_parser("extract", help="Write the plugin a .mp carries for one harness into <out>/<harness>/ "
+                                               "(Hermes also gets hermes-mcp/); nothing is built or overwritten")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--harness", required=True, help="A harness the build has: claude-code, codex, pi, opencode, hermes")
+    p.add_argument("--out", type=Path, required=True, help="The folder to write it in")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
     p = project_sub.add_parser("info", help="Print what a .mp holds, as JSON (unpacked once per file content)")
     p.add_argument("mp", type=Path, help="The .mp file")
     p.add_argument("--summary", action="store_true",
@@ -670,6 +689,16 @@ def _modern_main(argv: list[str]) -> int:
     p.add_argument("--budget", type=float, help="Its budget in USD, for the history")
     for option, what in (("--slug", "plugin id"), ("--name", "name"), ("--author", "author")):
         p.add_argument(option, help=f"With --create: the {what} the project was started with, which it must still have")
+    p = project_sub.add_parser("release", help="Put a project's file into its repository with your own Git, as "
+                                               "<slug>.mp on its branch: the repository's workflow releases it")
+    p.add_argument("mp", type=Path, help="The .mp file")
+    p.add_argument("--expect-digest", metavar="SHA256", help="Release the file only while it has this digest")
+    p.add_argument("--init", action="store_true",
+                   help="Add the workflow that calls Muro's store workflow, pinned to this Muro, when the "
+                        "repository has none")
+    p.add_argument("--dry-run", action="store_true", help="Do everything but the push, and say what would be pushed")
+    p.add_argument("--cache", type=Path, metavar="DIR",
+                   help="Where unpacked projects are kept (default: a per-user cache folder)")
     # The simulator: the AI decides which capabilities a request activates; Python prepares and validates.
     where = argparse.ArgumentParser(add_help=False)
     where.add_argument("mp", nargs="?", type=Path, help="The .mp file (or name --manifest instead)")

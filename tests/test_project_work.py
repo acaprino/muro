@@ -416,6 +416,25 @@ def test_edit_changes_the_details_records_and_changelog_offline_and_keeps_the_re
     project.verify(mp, tmp_path / "cache")
 
 
+def test_an_edit_and_a_commit_keep_the_executable_files_on_a_disk_that_has_no_such_bit(tmp_path, monkeypatch):
+    """Windows: the unpacked folder cannot say which files were executable. The inputs keep what the file they came
+    from says, and the helpers of the build are marked by the build's own rule."""
+    from muro.release import build_release
+    from test_project_file import make_scripts_upstream, scripts_package
+    pkg = scripts_package(tmp_path / "pkg", *make_scripts_upstream(tmp_path / "upstream"))
+    build_release(pkg / "sources.json", pkg, tmp_path / "stage")
+    mp = project.pack(pkg, tmp_path / "files" / "tester.mp", release_dir=tmp_path / "stage")
+    marked = project.executable_members(mp)
+    assert "inputs/demo/bin/run" in marked and "inputs/demo/bin/plain.sh" not in marked              # Git's mode
+    assert {f"release/{SLUG}/scripts/demo/bin/{name}" for name in ("run", "plain.sh")} <= marked      # the build's rule
+    monkeypatch.setattr(project, "_executable", lambda path: False)
+    project_work.edit(mp, expect_digest=project.digest(mp), author="someone else")
+    assert project.executable_members(mp) == marked
+    work, digest = checkout(mp, tmp_path)
+    project_work.commit(work, mp, expect_digest=digest, step="none", operation="Again")
+    assert project.executable_members(mp) == marked
+
+
 def test_edit_can_take_the_repository_away(tmp_path, mp):
     project_work.edit(mp, expect_digest=project.digest(mp), repo=None)
     assert project.info(mp, tmp_path / "cache")["project"]["repository"] is None

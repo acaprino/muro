@@ -2,12 +2,12 @@
 // fails when one fails. A single file runs on its own: node apps/desktop/tests/browser-shell.mjs
 // The files of the React window: Muro in Imago's shell (browser-shell.mjs), the project workspace (browser-workspace.mjs) and the write side of a
 // project: the AI dialogs (-write-ai), the edits by hand (-write-edit) and the new project and its delete (-write-new). The
-// pages that are not in it yet (Sync, Activity, Settings, the first run) bring their own file when they are ported.
+// pages that are not in it yet (the first run) bring their own file when they are ported.
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
-const files = ['browser-shell.mjs', 'browser-sync.mjs', 'browser-sync-dialogs.mjs', 'browser-sync-harness.mjs', 'browser-workspace.mjs', 'browser-write-ai.mjs', 'browser-write-edit.mjs', 'browser-write-new.mjs'];
+const files = ['browser-shell.mjs', 'browser-sync.mjs', 'browser-sync-dialogs.mjs', 'browser-sync-harness.mjs', 'browser-activity.mjs', 'browser-workspace.mjs', 'browser-write-ai.mjs', 'browser-write-edit.mjs', 'browser-write-new.mjs'];
 const failed = [];
 for (const file of files) {
   console.log(`--- ${file}`);

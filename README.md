@@ -66,7 +66,7 @@ Muro can stay in the notification area and keep your harnesses in line without a
 - **Start Muro when Windows starts** (Settings → Background) starts it in the notification area, with no window. Closing the window leaves Muro there unless you turn off **Keep running when the window is closed**; **Quit Muro** in the tray menu ends it, after the sync in progress.
 - At start and then at every interval (every hour by default) Muro resolves your plugins' sources, reads every harness and records the result, so the tray icon and the Sync page say how things stand. With **Automatic sync** on it also applies what is ready, except removals: it never uninstalls, and says how many removals wait for your confirmation; with it off it only checks, and the tray says how many changes are waiting.
 - The tray menu has **Open Muro**, **Sync now**, **Pause automatic sync** and **Quit Muro**.
-- **Activity** lists what Muro did, newest first, with the adaptations that are running, and filters for Sync, AI adaptation and Problems.
+- **Activity** lists what Muro did, newest first, with the AI run that is running, and filters for Sync, AI runs and Problems.
 
 <img src="docs/assets/screenshots/settings.png" alt="Settings: Sync, Background, Appearance, AI adaptation and Maintenance, each with its controls, saved as you change them." width="880">
 

@@ -1,5 +1,5 @@
 //! Making and changing projects from the desktop (ADR-0032): what the runtime refuses before an AI run is
-//! paid for, the runs themselves, and the edits, deletion and update check it makes through the factory. The
+//! paid for, the runs themselves, and the edits, deletion, update check and release it makes through the factory. The
 //! factory is the stand-in of `common`; the agent is `AGENT`, a Python script a debug build runs in place of
 //! Claude Code (`project_jobs::TEST_AGENT_SETTING`), so a run here costs nothing and proves the runtime's part:
 //! the status and the message it ends with, what it hands the factory, and the project file it leaves.
@@ -536,4 +536,116 @@ fn the_update_check_reads_the_report_whatever_its_exit_code() {
     assert_eq!(report["inputs"][0]["upstream"], "v2.0.0");
     let baseline = calls(&home.factory).into_iter().find(|args| args[0] == "baseline").unwrap();
     assert!(baseline[2].ends_with("sources.json") && baseline[3] == "--json");
+}
+
+// --- releasing a project ----------------------------------------------------------------------------
+
+fn repository() -> Value {
+    json!({"url":"https://example.invalid/owner/demo","branch":"main","tag_prefix":"demo-v"})
+}
+
+fn releases(home: &Home) -> Vec<Vec<String>> {
+    calls(&home.factory).into_iter().filter(|args| args[..2] == ["project", "release"]).collect()
+}
+
+#[test]
+fn a_release_asks_the_factory_on_the_digest_the_page_read_and_answers_what_it_printed() {
+    let home = Home::new();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"repository":repository()}));
+    let asked_on = digest(&file);
+    let done = home.call("release_project", json!({"id":"demo","digest":asked_on.clone()})).unwrap();
+    // the command's document as it is; its warning, a line on stderr too, is the end of the reason and nothing else
+    assert_eq!(done, json!({"repository":"https://example.invalid/owner/demo","branch":"main","file":"demo.mp","version":"1.0.0","tag":"demo-v1.0.0",
+        "pushed":true,"commit":"c".repeat(40),"initialized":false,
+        "reason":"Pushed demo.mp to main. No workflow of the repository calls Muro's store workflow."}));
+    let asked = releases(&home);
+    assert_eq!(asked.len(), 1);
+    // the file, the digest that guards it and the runtime's own cache; neither switch unless it was asked for
+    assert_eq!(asked[0][2..], [file.to_string_lossy().into_owned(), "--expect-digest".to_owned(), asked_on,
+        "--cache".to_owned(), home.data.join("project-cache").to_string_lossy().into_owned()]);
+    assert_eq!(digest(&file), done_on(&home), "a release reads the file and never writes it");
+}
+
+/// The digest the last release was asked on.
+fn done_on(home: &Home) -> String {
+    value_after(&releases(home).pop().unwrap(), "--expect-digest")
+}
+
+#[test]
+fn the_switches_of_a_release_are_passed_through_and_anything_but_a_switch_is_refused() {
+    let home = Home::new();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"repository":repository()}));
+    let release = |more: Value| {
+        let mut payload = json!({"id":"demo","digest":digest(&file)});
+        for (key, value) in more.as_object().unwrap() {
+            payload[key.as_str()] = value.clone();
+        }
+        home.call("release_project", payload)
+    };
+    let with_workflow = release(json!({"init":true})).unwrap();
+    assert_eq!((&with_workflow["initialized"], &with_workflow["pushed"]), (&json!(true), &json!(true)));
+    let asked = releases(&home).pop().unwrap();
+    assert!(asked.contains(&"--init".to_owned()) && !asked.contains(&"--dry-run".to_owned()), "{asked:?}");
+    let preview = release(json!({"dry_run":true,"init":false})).unwrap();
+    assert_eq!((&preview["pushed"], &preview["commit"]), (&json!(false), &Value::Null));
+    assert!(preview["reason"].as_str().unwrap().starts_with("Dry run: nothing was pushed."), "{preview}");
+    let asked = releases(&home).pop().unwrap();
+    assert!(asked.contains(&"--dry-run".to_owned()) && !asked.contains(&"--init".to_owned()), "{asked:?}");
+    // null is off, as an absent key is
+    release(json!({"init":null,"dry_run":null})).unwrap();
+    assert_eq!(releases(&home).pop().unwrap().len(), 7, "the file, the digest and the cache, and no switch");
+    for (bad, said) in [(json!({"init":"yes"}), "init must be true or false"), (json!({"dry_run":1}), "dry_run must be true or false")] {
+        assert_eq!(error_of(release(bad)), said);
+    }
+    assert_eq!(releases(&home).len(), 3, "a request that is wrong reaches no factory");
+}
+
+#[test]
+fn a_release_with_nothing_to_push_is_an_answer_and_not_an_error() {
+    let home = Home::new();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"repository":repository(),"release":{"held":true,"caller":true}}));
+    let done = home.call("release_project", json!({"id":"demo","digest":digest(&file)})).unwrap();
+    assert_eq!((&done["pushed"], &done["commit"]), (&json!(false), &Value::Null));
+    assert_eq!(done["reason"], "The repository already holds this file as demo.mp: nothing to push.");
+}
+
+#[test]
+fn a_release_that_is_refused_says_the_commands_sentence_as_it_is() {
+    let home = Home::new();
+    // the command's own refusals: its sentence, without the prefix it prints before it
+    let taken = "demo-v1.0.0: the same version was already released from another file: change the version";
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"repository":repository(),"release":{"refused":taken}}));
+    assert_eq!(error_of(home.call("release_project", json!({"id":"demo","digest":digest(&file)}))), taken);
+    let stale = home.call("release_project", json!({"id":"demo","digest":"0".repeat(64)}));
+    assert_eq!(error_of(stale), project_jobs::CHANGED);
+    let local = home.listed("local", json!({"plugin":plugin("Local","local")}));
+    let unnamed = home.call("release_project", json!({"id":"local","digest":digest(&local)}));
+    assert_eq!(error_of(unnamed), "This project names no repository: give it one with `muro project edit --repository`");
+    assert_eq!(releases(&home).len(), 3);
+    // the runtime's own, before any factory runs
+    let none = home.call("release_project", json!({"id":"demo"}));
+    assert_eq!(error_of(none), "Open the project again: the release names no version of its file");
+    let missing = home.call("release_project", json!({"id":"other","digest":digest(&file)}));
+    assert!(error_of(missing).contains("not in your list"));
+    assert_eq!(releases(&home).len(), 3);
+}
+
+#[test]
+fn a_project_an_ai_run_is_changing_is_not_released_and_another_one_is() {
+    let home = Home::new().with_agent();
+    let file = home.listed("demo", json!({"plugin":plugin("Demo","demo"),"repository":repository()}));
+    let other = home.listed("other", json!({"plugin":plugin("Other","other"),"repository":repository()}));
+    let started = harmonize(&home, &file, "STUB:wait");
+    agent_started(&home, &started);
+    let refused = home.call("release_project", json!({"id":"demo","digest":digest(&file)}));
+    assert_eq!(error_of(refused), "An AI run is changing this project: wait for it to finish");
+    assert!(releases(&home).is_empty(), "nothing left this computer");
+    // a release is no AI run: the run of one project does not hold back the release of another
+    let done = home.call("release_project", json!({"id":"other","digest":digest(&other)})).unwrap();
+    assert_eq!(done["pushed"], true);
+    fs::write(job_dir(&home, &started).join("go"), b"go").unwrap();
+    assert_eq!(finished(&home, &started)["status"], "completed");
+    // the run wrote the file: the release of it names the file as it is now
+    let done = home.call("release_project", json!({"id":"demo","digest":digest(&file)})).unwrap();
+    assert_eq!(done["file"], "demo.mp");
 }

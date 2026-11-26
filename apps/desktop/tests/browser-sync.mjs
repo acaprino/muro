@@ -225,6 +225,41 @@ await test('a harness that cannot be read is never in sync: the note names it, t
   await page.screenshot({ path: shots + '/sync-unreadable.png' });
 });
 
+// Owner, 2026-11-25, "Muro deve funzionare": one marketplace of Codex whose folder was gone made the whole harness read as "cannot be read". And, the same day, "mi sarei
+// aspettato lo rimuovesse, non essendo in lista": the list is the truth, so the plan takes the broken marketplace out of the harness, whatever the harness does with the rest.
+await test('a harness that holds a marketplace it cannot load is read all the same; the plan takes the marketplace out, and after the apply everything is in sync', 'changes', {}, async app => {
+  const { page } = app;
+  await ready(page);
+  await app.flags({ brokenMarketplace: true });
+  await check(app);
+  assert.equal(await kind(page), 'changes', 'the harness was read: its changes are ready');
+  assert.equal(await noteText(page).textContent(), '1 update, 1 broken marketplace. Nothing changes until you apply.');
+  assert.equal(await content(page).getByText('cannot be read').count(), 0);
+  assert.equal(await head(page, 'Codex isolated test').getByText('Cannot be read', { exact: true }).count(), 0);
+  const warning = page.locator('#harness-warnings');
+  await warning.waitFor();
+  const said = await warning.textContent();
+  for (const words of ['Codex isolated test holds an entry that cannot be loaded', 'Codex isolated test: The marketplace old-notes points to a folder that is gone: D:/Projects/gone/old-notes', 'The next sync repairs it']) {
+    assert.ok(said.includes(words), `${words}: ${said}`);
+  }
+  await page.screenshot({ path: shots + '/sync-broken-marketplace.png' });
+  // Apply all never takes it out unseen: the sheet says what goes.
+  await barButton(page, 'Apply all 2 changes').click();
+  await sheet(page).waitFor();
+  const removal = await sheet(page).locator('[data-operation="remove-marketplace"]').textContent();
+  for (const words of ['Remove', 'The broken marketplace old-notes', 'The marketplace old-notes points to a folder that is gone: D:/Projects/gone/old-notes', 'With it: notes@old-notes']) {
+    assert.ok(removal.includes(words), `${words}: ${removal}`);
+  }
+  assert.equal((await actions(app)).includes('apply'), false, 'nothing is applied before the sheet\'s Apply');
+  await page.screenshot({ path: shots + '/sync-broken-marketplace-review.png' });
+  await sheetFoot(page).getByRole('button', { name: 'Apply 2 changes', exact: true }).click();
+  await sheet(page).waitFor({ state: 'detached' });
+  await notice(page, '2 changes applied.').waitFor();
+  await titled(page, 'Everything is in sync');
+  assert.equal(await warning.count(), 0, 'repaired: the warning is gone');
+  await head(page, 'Codex isolated test').getByText('In sync', { exact: true }).waitFor();
+});
+
 await test('a source the check could not resolve is listed with the service\'s words, and the plan stays', 'changes', {}, async app => {
   const { page } = app;
   await ready(page);

@@ -17,6 +17,15 @@
 //! under `custom-instructions/`) and `project commit`: refused when `--expect-digest` is not the file's, or when
 //! the work folder holds `commit-fails`; waiting for a `go-commit` file beside the work folder when it holds
 //! `commit-waits`; else the file written as a descriptor with what the commit was asked under `committed`.
+//!
+//! `project extract` answers from the descriptor's `build`: refused for a harness it does not name; else it writes
+//! `<out>/<harness>/INSTALL.md` and prints `{"harness", "folders"}`.
+//!
+//! `project release` answers from the descriptor too, and reaches no repository: refused when `--expect-digest` is
+//! not the file's, when the descriptor has no `repository` (`{"url","branch","tag_prefix"}`) or when its `release`
+//! says `{"refused": "<sentence>"}`; nothing to push when `release` says `{"held": true}`; else the document the
+//! real command prints, with `--init` and `--dry-run` shown in it. A repository without the caller workflow
+//! (`release` without `"caller": true`, and no `--init`) adds a `Warning:` line on stderr, as the real command does.
 #![allow(dead_code)]
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -172,6 +181,51 @@ elif args[:2] == ["project", "commit"]:
                          "summary": Path(summary).read_text(encoding="utf-8") if summary else None}
     out.write_text(json.dumps(held), encoding="utf-8")
     print(json.dumps({"path": str(out), "digest": hashlib.sha256(out.read_bytes()).hexdigest()}))
+elif args[:2] == ["project", "extract"]:
+    held = json.loads(Path(args[2]).read_text(encoding="utf-8"))
+    harness, offered = option("--harness"), sorted(held.get("build", {}))
+    if harness not in offered:
+        print(f"Project extract failed: This project's build has no adapter for {harness}: it has {', '.join(offered)}", file=sys.stderr)
+        sys.exit(1)
+    target = Path(option("--out")) / harness
+    target.mkdir(parents=True)
+    (target / "INSTALL.md").write_text("Install\n", encoding="utf-8")
+    print(json.dumps({"harness": harness, "folders": [str(target)]}))
+elif args[:2] == ["project", "release"]:
+    # what a repository would answer is in the descriptor: nothing is fetched or pushed
+    data = Path(args[2]).read_bytes()
+    held = json.loads(data)
+
+    def refuse(sentence):
+        print("Project release failed: " + sentence, file=sys.stderr)
+        sys.exit(1)
+
+    if option("--expect-digest") not in (None, hashlib.sha256(data).hexdigest()):
+        refuse("The project file changed since it was opened: open it again and repeat the change")
+    repo = held.get("repository")
+    if not repo:
+        refuse("This project names no repository: give it one with `muro project edit --repository`")
+    knobs = held.get("release", {})
+    if knobs.get("refused"):
+        refuse(knobs["refused"])
+    plugin, branch = held["plugin"], repo.get("branch", "main")
+    name, tag = plugin["slug"] + ".mp", repo.get("tag_prefix", "") + plugin["version"]
+    init = "--init" in args and not knobs.get("caller")
+    shown = {"repository": repo["url"], "branch": branch, "file": name, "version": plugin["version"], "tag": tag,
+             "pushed": False, "commit": None, "initialized": init, "reason": ""}
+    if knobs.get("held") and not init:
+        shown["reason"] = "The repository already holds this file as " + name + ": nothing to push."
+    elif "--dry-run" in args:
+        shown["reason"] = "Dry run: nothing was pushed. It would push " + name + " to " + branch + "."
+    else:
+        shown.update(pushed=True, commit="c" * 40)
+        shown["reason"] = "Pushed " + name + " to " + branch + "."
+    if not init and not knobs.get("caller"):
+        # a warning is a line on stderr and the end of the reason; stdout stays the one JSON object
+        warning = "No workflow of the repository calls Muro's store workflow."
+        print("Warning: " + warning, file=sys.stderr)
+        shown["reason"] += " " + warning
+    print(json.dumps(shown))
 elif args[:1] == ["baseline"]:
     # exit 1: something moved, and the JSON is the report all the same
     print(json.dumps({"baseline": [{"id": "alpha", "pin": "release", "pinned": "v1.0.0", "upstream": "v2.0.0", "status": "behind", "note": ""},

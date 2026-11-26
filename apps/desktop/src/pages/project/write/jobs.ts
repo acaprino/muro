@@ -1,5 +1,5 @@
 import type {
-  ChangeOperation, InstructionEdit, InstructionFile, Job, ProjectOperation, ProjectRecord, ProjectRepository, VersionStep,
+  ChangeOperation, InstructionEdit, InstructionFile, Job, ProjectOperation, ProjectRecord, ProjectRelease, ProjectRepository, VersionStep,
 } from '../../../types.ts';
 
 /** The write side of a project, as plain data (ADR-0032): the shapes of the requests the runtime reads (`crates/muro-desktop-runtime/src/project_jobs.rs`), the checks of what a person typed
@@ -313,6 +313,45 @@ export function editPayload(id: string, digest: string, patch: EditPatch): EditP
 
 /** `delete_project` for the project `id`, with the revision of the registry the page read. */
 export const deletePayload = (id: string, revision: number): DeletePayload => ({ id, revision });
+
+// ---------- releasing a project ----------
+
+/** Releasing (ADR-0034): the runtime has the factory put the project's file into the repository its `project.json` names (`release_project`, `muro project release`), with the person's own Git, and
+ * that repository's workflow makes the release. No AI runs. What the page says before the release is what the file says (`releaseOf` in data.ts); what it says after is the command's own sentence. */
+
+/** Why Release… is off for a project whose file names no repository, and where one is given. */
+export const NO_RELEASE_REPOSITORY = 'This project names no repository: give it one in Edit details…';
+/** What the release dialog says under its title: what is done, by whom, and that it is not taken back from here. */
+export const RELEASE_ABOUT = 'The project file is pushed to its repository with your own Git, and the workflow of that repository then makes the release. A push cannot be taken back from here.';
+/** What it says under the facts of the release: whose push it is, and what the repository does with the file. */
+export const RELEASE_NOTE = 'Git pushes under your name and with your credentials: Muro asks for none, keeps none and forces nothing. The workflow of the repository builds the plugin store from the file and publishes the release under its tag.';
+/** The one switch of the dialog (`init`), and what it does. */
+export const RELEASE_INIT = 'Add the release workflow when the repository has none';
+export const RELEASE_INIT_HINT = 'The workflow is added as .github/workflows/release.yml, in the same commit as the project file, and calls the store workflow of this version of Muro. A workflow that is already there is never replaced.';
+/** `release_project`: the digest of the file the page read, and whether the release workflow is added to a repository that has none. */
+export type ReleasePayload = { id: string; digest: string; init: boolean };
+/** `release_project` for the project `id`, on the file whose digest the page read (`info.digest`). */
+export const releasePayload = (id: string, digest: string, init: boolean): ReleasePayload => ({ id, digest, init });
+/** What the page says once a release is answered: the command's own sentence (`reason`), which also says that nothing was pushed when the repository already holds the file, and carries its
+ * warnings. An answer without one says only whether a commit was pushed. */
+export function releasedLine(done: Partial<ProjectRelease> | null | undefined): string {
+  const said = typeof done?.reason === 'string' ? done.reason.trim() : '';
+  return said || (done?.pushed === true ? 'The project file was pushed to its repository.' : 'Nothing was pushed.');
+}
+
+// ---------- extracting a project for one harness ----------
+
+/** Extracting (ADR-0035): the runtime has the factory write the plugin the file carries for one harness into a folder (`extract_project`, `muro project extract`). Nothing is built. */
+export const EXTRACT_ABOUT = 'The plugin the project file carries for one harness is written into the folder you choose, in a new folder named after the harness. Nothing is built, the project file is only read and nothing already there is overwritten.';
+/** The harnesses Muro builds an adapter for (the runtime's `HARNESSES`). A file whose build lacks one is refused by the command, which says which it has. */
+export const EXTRACT_HARNESSES = ['claude-code', 'codex', 'opencode', 'pi', 'hermes'] as const;
+export type ExtractPayload = { id: string; harness: string; folder: string };
+export const extractPayload = (id: string, harness: string, folder: string): ExtractPayload => ({ id, harness, folder: folder.trim() });
+/** What the page says once it is done: the folders written, as the command named them. */
+export function extractedLine(done: { folders?: unknown } | null | undefined): string {
+  const folders = Array.isArray(done?.folders) ? done.folders : [];
+  return folders.length ? `Extracted to ${folders.join(' and ')}` : 'The plugin was extracted.';
+}
 
 // ---------- the runs the runtime holds ----------
 

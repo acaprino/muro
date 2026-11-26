@@ -1,0 +1,256 @@
+name: Project store
+
+# A reusable workflow that Muro owns (ADR-0034, docs/project-store.md). A store repository holds one Muro project
+# file, <slug>.mp, and what a release generates from it. It calls this workflow, pinned to a Muro tag or commit, from
+# a ten-line workflow of its own whose trigger is a push of *.mp on its branch, so no store repository copies any of
+# this. What reads a value of the file or decides something is in .github/scripts/project_store.py.
+#
+#   gate     the project file is found, verified and unpacked; its identity is checked against the repository and
+#            the branch it was pushed to; the version's tag says whether to release, finish, do nothing or fail;
+#            then the package validates, its sources are checked at their pins, it builds, and the repository's own
+#            tests run on the unpacked file.
+#   publish  <slug>/ becomes the release the file carries, the root marketplaces and releases/<tag>.md are written,
+#            those paths are committed and tagged, and the GitHub release gets the file, the plugin zip and the
+#            SHA-256 of each.
+#
+# `gate` runs the build and the repository's tests with a token that only reads; `publish`, which writes, runs neither.
+#
+# The caller grants `permissions: contents: write`: a called workflow can lower the token's permissions, never raise
+# them. No secret is used: the token is the workflow's own.
+#
+# The commit that `publish` pushes does not start the caller again, for two reasons: a push made with the workflow's
+# own token starts no workflow, and the commit touches no *.mp file, which is the caller's trigger.
+on:
+  workflow_call:
+    inputs:
+      project:
+        description: The project file's name, when the root of the repository holds several .mp files
+        type: string
+        default: ''
+      tests:
+        description: The folder of the repository's own tests, run on the unpacked project (skipped when absent)
+        type: string
+        default: tests
+      muro_ref:
+        description: The commit or tag of Muro to run, where the runner does not say which commit this workflow is from
+        type: string
+        default: ''
+    outputs:
+      action:
+        description: What the run did with the pushed file (release, finish or nothing)
+        value: ${{ jobs.gate.outputs.action }}
+      tag:
+        description: The tag of the project's version
+        value: ${{ jobs.gate.outputs.tag }}
+
+permissions:
+  contents: read
+
+# One release at a time for a branch. A run that waits is replaced by a newer one that waits: the newest file wins.
+concurrency:
+  group: project-store-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      action: ${{ steps.tag.outputs.action }}
+      file: ${{ steps.project.outputs.file }}
+      slug: ${{ steps.project.outputs.slug }}
+      version: ${{ steps.project.outputs.version }}
+      name: ${{ steps.project.outputs.name }}
+      tag: ${{ steps.project.outputs.tag }}
+      sha256: ${{ steps.project.outputs.sha256 }}
+      muro_repository: ${{ steps.muro.outputs.repository }}
+      muro_commit: ${{ steps.muro.outputs.commit }}
+    env:
+      MURO_ROOT: ${{ github.workspace }}/factory
+      PYTHONPATH: ${{ github.workspace }}/factory
+      # Python does not put the folder it is started in on its import path: `python -m muro` is the factory's.
+      PYTHONSAFEPATH: '1'
+      STORE: ${{ github.workspace }}/factory/.github/scripts/project_store.py
+    steps:
+      # In a called workflow `github.sha`, `github.workflow_sha` and `github.workflow_ref` are the caller's. The
+      # commit of this file is `job.workflow_sha` (`github.job_workflow_sha` on a runner that has only that one).
+      - name: Which Muro
+        id: muro
+        env:
+          REPOSITORY: ${{ job.workflow_repository || 'acaprino/muro' }}
+          COMMIT: ${{ inputs.muro_ref || job.workflow_sha || github.job_workflow_sha }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" != branch ]; then
+            echo "::error::A project is released from a branch, and this run is on the $GITHUB_REF_TYPE $GITHUB_REF_NAME."
+            exit 1
+          fi
+          if [ -z "$COMMIT" ]; then
+            echo "::error::The runner did not say which commit of Muro this workflow is from. Pass it as the input muro_ref: the ref the caller names after the @."
+            exit 1
+          fi
+          echo "repository=$REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+      - name: The store repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: store
+          persist-credentials: false
+      - name: Muro, at the commit of this workflow
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.muro.outputs.repository }}
+          ref: ${{ steps.muro.outputs.commit }}
+          path: factory
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: The project file
+        id: project
+        working-directory: store
+        env:
+          NAMED: ${{ inputs.project }}
+        run: |
+          if [ ! -f "$STORE" ]; then
+            echo "::error::The commit of Muro that was checked out does not hold this workflow's script, so it is not the commit of this workflow. Pass the right one as the input muro_ref."
+            exit 1
+          fi
+          file=$(python "$STORE" find . --project "$NAMED")
+          python -m muro project verify "$file" --cache "$RUNNER_TEMP/cache"
+          python -m muro project unpack "$file" --out "$RUNNER_TEMP/project"
+          python "$STORE" identity . "$file" --cache "$RUNNER_TEMP/cache" --unpacked "$RUNNER_TEMP/project" \
+            --calling "$GITHUB_REPOSITORY" --branch "$GITHUB_REF_NAME"
+      # The tag of this version, the project file among the assets of its release and the one in the tagged
+      # commit: project_store.py decides from the three (release, finish, nothing, or a failure).
+      - name: Was this version released
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.project.outputs.tag }}
+          FILE: ${{ steps.project.outputs.file }}
+          SHA256: ${{ steps.project.outputs.sha256 }}
+        run: |
+          exists=no released='' tagged=''
+          count=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" --jq "[.[] | select(.ref == \"refs/tags/$TAG\")] | length")
+          if [ "$count" != 0 ]; then
+            exists=yes
+            if gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$FILE" --dir "$RUNNER_TEMP/released" 2> /dev/null; then
+              released=$(sha256sum "$RUNNER_TEMP/released/$FILE" | cut -d ' ' -f 1)
+            fi
+            if gh api -H "Accept: application/vnd.github.raw+json" "repos/$GITHUB_REPOSITORY/contents/$FILE?ref=$TAG" > "$RUNNER_TEMP/tagged.mp" 2> /dev/null; then
+              tagged=$(sha256sum "$RUNNER_TEMP/tagged.mp" | cut -d ' ' -f 1)
+            fi
+          fi
+          python "$STORE" decide --tag "$TAG" --pushed "$SHA256" --exists "$exists" --released "$released" --tagged "$tagged"
+      - name: The package validates
+        if: steps.tag.outputs.action == 'release'
+        run: python "$MURO_ROOT/muro_build.py" --manifest "$RUNNER_TEMP/project/sources.json" --validate
+      - name: Its sources are what their pins say
+        if: steps.tag.outputs.action == 'release'
+        run: python "$MURO_ROOT/muro_build.py" --manifest "$RUNNER_TEMP/project/sources.json" --check-sources
+      - name: It builds
+        if: steps.tag.outputs.action == 'release'
+        run: python "$MURO_ROOT/muro_build.py" --manifest "$RUNNER_TEMP/project/sources.json" --build --out "$RUNNER_TEMP/build"
+      # MURO_ROOT is the Muro checkout and MURO_PROJECT the unpacked project. The tests are the repository's
+      # own code, so here Python finds their modules from the folder it is started in, as on their author's machine.
+      - name: The repository's own tests
+        if: steps.tag.outputs.action == 'release'
+        working-directory: store
+        env:
+          TESTS: ${{ inputs.tests }}
+          PYTHONSAFEPATH: ''
+        run: |
+          if [ -z "$TESTS" ] || [ ! -d "$TESTS" ]; then
+            echo "The repository has no tests folder: none were run." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python -m pip install --quiet pytest
+          MURO_PROJECT="$RUNNER_TEMP/project" python -m pytest -q "$TESTS"
+
+  publish:
+    needs: gate
+    if: needs.gate.outputs.action == 'release' || needs.gate.outputs.action == 'finish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MURO_ROOT: ${{ github.workspace }}/factory
+      PYTHONPATH: ${{ github.workspace }}/factory
+      PYTHONSAFEPATH: '1'
+      STORE: ${{ github.workspace }}/factory/.github/scripts/project_store.py
+      ACTION: ${{ needs.gate.outputs.action }}
+      FILE: ${{ needs.gate.outputs.file }}
+      SLUG: ${{ needs.gate.outputs.slug }}
+      VERSION: ${{ needs.gate.outputs.version }}
+      NAME: ${{ needs.gate.outputs.name }}
+      TAG: ${{ needs.gate.outputs.tag }}
+      SHA256: ${{ needs.gate.outputs.sha256 }}
+    steps:
+      # The pushed commit, or the tagged one when an earlier run made the tag and stopped before the release.
+      - name: The store repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.action == 'finish' && needs.gate.outputs.tag || github.sha }}
+          path: store
+      - name: Muro, at the commit of this workflow
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ needs.gate.outputs.muro_repository }}
+          ref: ${{ needs.gate.outputs.muro_commit }}
+          path: factory
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: The file the gate read
+        working-directory: store
+        run: |
+          echo "$SHA256  $FILE" | sha256sum --check --quiet
+          python -m muro project unpack "$FILE" --out "$RUNNER_TEMP/project"
+      # What is published is what the file holds: its own release/<slug>/, not the build the gate made.
+      - name: The store, from the file
+        if: env.ACTION == 'release'
+        working-directory: store
+        run: |
+          rm -rf -- "$SLUG"
+          cp -a "$RUNNER_TEMP/project/release/$SLUG" "$SLUG"
+          python -m muro marketplace . "$SLUG"
+          python "$STORE" notes --unpacked "$RUNNER_TEMP/project" --out "releases/$TAG.md" --name "$NAME" \
+            --version "$VERSION" --file "$FILE" --sha256 "$SHA256" --calling "$GITHUB_REPOSITORY" \
+            --commit "$GITHUB_SHA" --muro "$(git -C "$MURO_ROOT" rev-parse HEAD)"
+      # Only the generated paths are committed. The push is of the commit and the tag together, or of neither.
+      - name: Commit and tag
+        if: env.ACTION == 'release'
+        working-directory: store
+        run: |
+          if [ "$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" | cut -f 1)" != "$GITHUB_SHA" ]; then
+            echo "::error::$GITHUB_REF_NAME moved after this push, so nothing was published. Run the workflow by hand to release the file the branch holds now."
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all --force -- "$SLUG" .claude-plugin/marketplace.json .agents/plugins/marketplace.json "releases/$TAG.md"
+          git diff --cached --quiet || git commit --quiet -m "release $TAG"
+          git tag -a "$TAG" -m "$NAME $VERSION"
+          git push --atomic origin "HEAD:refs/heads/$GITHUB_REF_NAME" "refs/tags/$TAG"
+      - name: The GitHub release
+        working-directory: store
+        run: |
+          if [ ! -d "$SLUG" ] || [ ! -f "releases/$TAG.md" ]; then
+            echo "::error::The commit of $TAG holds no store ($SLUG/ and releases/$TAG.md): the tag was not made by this workflow."
+            exit 1
+          fi
+          assets="$RUNNER_TEMP/assets"
+          mkdir -p "$assets"
+          cp "$FILE" "$assets/$FILE"
+          zip --quiet --recurse-paths "$assets/$SLUG-$VERSION.zip" "$SLUG"
+          (cd "$assets" && for name in "$FILE" "$SLUG-$VERSION.zip"; do sha256sum "$name" > "$name.sha256"; done)
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber "$assets"/*
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$NAME $VERSION" \
+              --notes-file "releases/$TAG.md" "$assets"/*
+          fi
+          echo "$TAG: released $NAME $VERSION with $FILE and $SLUG-$VERSION.zip." >> "$GITHUB_STEP_SUMMARY"

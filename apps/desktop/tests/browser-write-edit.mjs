@@ -1,6 +1,8 @@
 // Plan W, Task 3: the details and the decision records edited by hand, on the fake transport (fake-transport.js). Edits are no AI runs: `edit_project` carries the digest of the file the page
 // shows, the runtime saves it offline, and the page reads the project again, so the next edit names the file the last one wrote. The dialogs are opened through the workspace's own buttons
 // (Edit details… in the header, Add record… and the Edit and Delete of a record in the Records panel).
+// And the release of a project (ADR-0034), which is no AI run either and writes no file: Release… at the foot asks first, `release_project` carries the digest and the one switch, and what the
+// runtime answers is said as it came. The fake reaches no repository.
 //   node apps/desktop/tests/browser-write-edit.mjs        (MURO_UI_PORT moves the dev server off 1422; MURO_ONLY=<part of a test name> runs one test)
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
@@ -298,6 +300,155 @@ await test('Records: at 500px the panel is a drawer, and a record added from it 
   await notice(page, 'Record added.').waitFor();
   assert.equal((await editsOf(app)).length, 1);
   await drawer.getByText('Said from the drawer.', { exact: true }).waitFor();
+});
+
+// ---------- release ----------
+const RELEASE_ABOUT = 'The project file is pushed to its repository with your own Git, and the workflow of that repository then makes the release. A push cannot be taken back from here.';
+const RELEASE_INIT = 'Add the release workflow when the repository has none';
+const NO_RELEASE_REPOSITORY = 'This project names no repository: give it one in Edit details…';
+const releaseButton = page => page.getByRole('button', { name: 'Release…', exact: true });
+/** The payloads of every `release_project` the page sent, oldest first. */
+const releasesOf = async app => (await callsOf(app, 'release_project')).map(c => c.payload);
+const openRelease = async (page, name = 'Sample') => {
+  await releaseButton(page).click();
+  const dialog = windowOf(page, `Release ${name}?`);
+  await dialog.waitFor();
+  return dialog;
+};
+const initSwitch = dialog => dialog.getByRole('switch', { name: RELEASE_INIT, exact: true });
+
+await test('Release: it asks first with the focus on Cancel and says what the file says; the request carries the digest the page read and the switch; while the file is on its way the button waits and the window stays; the command\'s sentence is the notice', 'projects', {}, async app => {
+  const { page } = app;
+  await openSample(page);
+  const read = await digest(page);
+  assert.equal(await releaseButton(page).isDisabled(), false, 'the project names a repository');
+  assert.equal(await releaseButton(page).getAttribute('data-variant'), 'outline', 'not the solid action of the window');
+  let dialog = await openRelease(page);
+  await page.waitForFunction(() => document.activeElement?.textContent === 'Cancel');
+  await dialog.getByText(RELEASE_ABOUT, { exact: true }).waitFor();
+  const said = await dialog.textContent();
+  for (const fact of ['https://github.com/owner/sample', 'main', 'sample.mp', '0.5.0', 'sample-v0.5.0', 'Git pushes under your name and with your credentials: Muro asks for none, keeps none and forces nothing.']) {
+    assert.ok(said.includes(fact), `the window says ${fact}: ${said}`);
+  }
+  assert.equal(await initSwitch(dialog).isChecked(), false, 'the workflow is added only when the person asks');
+  assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
+  await page.screenshot({ path: shots + '/write-release.png' });
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  assert.deepEqual(await releasesOf(app), [], 'Cancel sends nothing');
+
+  dialog = await openRelease(page);
+  await initSwitch(dialog).focus();
+  await page.keyboard.press('Space');
+  assert.equal(await initSwitch(dialog).isChecked(), true);
+  await app.flags({ releaseDelay: 2000 });
+  await dialog.getByRole('button', { name: 'Release Sample', exact: true }).click();
+  await dialog.locator('button[aria-busy="true"]').getByText('Releasing…').waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(await dialog.isVisible(), true, 'the window does not close while the file is on its way');
+  await dialog.waitFor({ state: 'detached' });
+  await notice(page, "Pushed sample.mp and .github/workflows/release.yml to main. The repository's workflow releases it as sample-v0.5.0.").waitFor();
+  assert.deepEqual(await releasesOf(app), [{ id: 'sample', digest: read, init: true }], 'the file the page showed, and the switch');
+  assert.equal(await digest(page), read, 'a release does not write the file');
+  // A window that opens again starts from its first values.
+  await app.flags({ releaseDelay: 0 });
+  dialog = await openRelease(page);
+  assert.equal(await initSwitch(dialog).isChecked(), false);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  assert.equal((await releasesOf(app)).length, 1, 'Cancel sends nothing');
+});
+
+await test('Release: what the runtime refuses is said in the window as it came and the window stays open; a file that changed after the page read it is refused too; the project read again is released', 'projects', {}, async app => {
+  const { page } = app;
+  await openSample(page);
+  const read = await digest(page);
+  const taken = 'sample-v0.5.0: the same version was already released from another file: change the version';
+  await app.flags({ releaseError: taken, releaseCaller: true });
+  const dialog = await openRelease(page);
+  const confirm = dialog.getByRole('button', { name: 'Release Sample', exact: true });
+  await confirm.click();
+  await dialog.getByRole('alert').getByText(taken, { exact: true }).waitFor();
+  assert.equal(await dialog.isVisible(), true, 'the window stays open');
+  assert.equal(await confirm.getAttribute('aria-busy'), null, 'and can be tried again');
+  assert.equal(await page.locator('[data-toasts]').getByText(/Pushed/).count(), 0, 'nothing is said to have been pushed');
+  await page.screenshot({ path: shots + '/write-release-refused.png' });
+  // The file is written behind the page: the digest the page read is stale, and the runtime says so.
+  await app.flags({ releaseError: '' });
+  await page.evaluate(() => window.behind.touch('sample'));
+  const touched = await digest(page);
+  await confirm.click();
+  await dialog.getByRole('alert').getByText(CHANGED, { exact: true }).waitFor();
+  assert.equal(await dialog.getByText(taken, { exact: true }).count(), 0, 'the refusal before it is no longer said');
+  assert.deepEqual(await releasesOf(app), [{ id: 'sample', digest: read, init: false }, { id: 'sample', digest: read, init: false }], 'both named the file the page had read');
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  // The project opened again is the file as it is now.
+  await page.getByRole('button', { name: 'All projects', exact: true }).click();
+  await page.getByRole('button', { name: 'Sample', exact: true }).click();
+  await page.getByRole('heading', { name: 'Sample', level: 1 }).waitFor();
+  const again = await openRelease(page);
+  assert.equal(await again.getByRole('alert').count(), 0, 'a window that opens has not failed yet');
+  await again.getByRole('button', { name: 'Release Sample', exact: true }).click();
+  await again.waitFor({ state: 'detached' });
+  await notice(page, "Pushed sample.mp to main. The repository's workflow releases it as sample-v0.5.0.").waitFor();
+  assert.deepEqual((await releasesOf(app))[2], { id: 'sample', digest: touched, init: false });
+});
+
+await test('Release: a project that names no repository has it off, saying why; once Edit details gives it one, it is on and the window says the new repository', 'projects', {}, async app => {
+  const { page } = app;
+  await app.flags({ pickPath: 'D:/Notes/Notes.mp' });
+  await goProjects(page);
+  await page.getByRole('button', { name: 'Open project file…', exact: true }).click();
+  await notice(page, 'Notes added to your list.').waitFor();
+  await page.getByRole('button', { name: 'Notes', exact: true }).click();
+  await page.getByRole('heading', { name: 'Notes', level: 1 }).waitFor();
+  assert.equal(await releaseButton(page).isDisabled(), true, 'there is nowhere to release it to');
+  assert.equal(await releaseButton(page).getAttribute('title'), NO_RELEASE_REPOSITORY);
+  const details = await openDetails(page);
+  await details.locator('input[name="repository-url"]').fill('https://github.com/owner/notes');
+  await details.locator('input[name="repository-tag_prefix"]').fill('notes-v');
+  await save(details).click();
+  await details.waitFor({ state: 'detached' });
+  await page.locator('button:enabled').filter({ hasText: /^Release…$/ }).waitFor();
+  assert.equal(await releaseButton(page).getAttribute('title'), null, 'nothing to say once it can be released');
+  const dialog = await openRelease(page, 'Notes');
+  const said = await dialog.textContent();
+  for (const fact of ['https://github.com/owner/notes', 'main', 'notes.mp', '0.5.0', 'notes-v0.5.0']) assert.ok(said.includes(fact), `the window says ${fact}: ${said}`);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await dialog.waitFor({ state: 'detached' });
+  assert.deepEqual(await releasesOf(app), [], 'looking sends nothing');
+});
+
+// ---------- extract ----------
+await test('Extract: the window sends the project, the harness and the folder chosen; a folder that is not a full path sends nothing; a refusal is said as it came with the window open; the notice says where the plugin went', 'projects', {}, async app => {
+  const { page } = app;
+  await openSample(page);
+  const read = await digest(page);
+  await app.flags({ pickFolder: 'D:/Out' });
+  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
+  const dialog = windowOf(page, 'Extract Sample');
+  await dialog.waitFor();
+  assert.deepEqual(await unnamed(dialog), [], 'every control of the window has a name');
+  const confirm = dialog.getByRole('button', { name: 'Extract', exact: true });
+  await dialog.locator('input').last().fill('Out');
+  await confirm.click();
+  await dialog.getByText('Choose the folder with its full path', { exact: true }).waitFor();
+  assert.deepEqual(await callsOf(app, 'extract_project'), [], 'nothing is sent for a folder that is not a full path');
+  await dialog.getByRole('button', { name: 'Choose folder…', exact: true }).click();
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="dialog-content"] input')].some(e => e.value === 'D:/Out'));
+  await page.screenshot({ path: shots + '/write-extract.png' });
+  await confirm.click();
+  await dialog.waitFor({ state: 'detached' });
+  await notice(page, 'Extracted to D:/Out/claude-code').waitFor();
+  assert.deepEqual((await callsOf(app, 'extract_project')).map(c => c.payload), [{ id: 'sample', harness: 'claude-code', folder: 'D:/Out' }]);
+  assert.equal(await digest(page), read, 'the project file is only read');
+  // The same folder again: the command's refusal is said, and the window stays.
+  await page.getByRole('button', { name: 'Extract…', exact: true }).click();
+  await dialog.waitFor();
+  await confirm.click();
+  await dialog.getByRole('alert').getByText('D:/Out/claude-code already exists: choose another folder', { exact: true }).waitFor();
+  assert.equal(await dialog.isVisible(), true);
 });
 
 if (failed.length) { console.error('FAILED:\n  ' + failed.join('\n  ')); process.exit(1); }

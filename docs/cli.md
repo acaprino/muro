@@ -207,6 +207,8 @@ desktop app then find the plugin from the repository's address. Every file is
 read before any is written: a folder that is not inside the repository, or
 holds no built Claude Code or Codex adapter, writes nothing and exits `1`.
 It is made for the release workflow of a package that publishes its build in a folder of its own repository.
+The reusable workflow `.github/workflows/project-store.yml` runs it for a project's repository, after it has put
+the release a project file carries in `<slug>/` ([a project's repository is a plugin store](project-store.md)).
 
 ```sh
 muro marketplace ./package my-package
@@ -396,9 +398,25 @@ muro absorb https://github.com/DietrichGebert/ponytail pkg/ponytail \
   --model gpt-5.2 --harness claude-code --home ~/.claude
 ```
 
+### `muro project extract FILE.mp --harness H --out DIR [--cache DIR]`
+
+Writes the plugin the file carries for one harness into `DIR/<H>/`, ready to install as its `INSTALL.md` says
+([ADR-0035](adr/ADR-0035-project-extract.md)). `H` is a harness the file's build has: `claude-code`, `codex`,
+`opencode`, `pi` or `hermes`. Nothing is built and the file is only read: what comes out is `release/<slug>/adapters/<H>/`
+of the file, byte for byte. For `hermes`, a plugin with its own servers also gets `DIR/hermes-mcp/`, which its
+`INSTALL.md` reaches as `../hermes-mcp`.
+
+`DIR` may hold other things, but a folder the command would write must not be there yet: nothing is overwritten. The
+file is checked first as `verify` does. Prints `{"harness", "folders"}`. Refused, with exit 1 and
+`Project extract failed: <sentence>`: a plugin that was not built from its project, a file with no built plugin, a
+harness the build does not have (the sentence names the ones it has), a folder already there.
+
+To write a whole plugin store into a repository instead, push the file: [the project store](project-store.md).
+
 ### `muro project pack --manifest PKG/sources.json --out FILE.mp [--sources-cache DIR] [--release DIR]` / `muro project unpack FILE.mp --out DIR` / `muro project info FILE.mp [--summary] [--cache DIR]` / `muro project verify FILE.mp [--cache DIR]`
 
-(Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below.)
+(Writing a project: [`muro project new` / `edit` / `commit`](#muro-project-new--edit--commit) below. Releasing it:
+[`muro project release`](#muro-project-release-filemp---expect-digest-sha256---init---dry-run---cache-dir).)
 
 The `.mp` project file ([ADR-0028](adr/ADR-0028-desktop-projects-and-sync.md) decision 12): one zip that carries
 everything about a unified plugin. Its first member, stored uncompressed, is `mimetype`
@@ -420,13 +438,22 @@ functions `check-sources` and `build` use (license gate, coverage gate, the pin'
 keeps one snapshot per source id and commit (`<DIR>/<id>/<commit>/…`, the files exactly as `inputs/<id>/`
 holds them) and, beside it, `<DIR>/<id>/<commit>.stamp`: the digest of what the snapshot was fetched for
 (the commit and the source's `selected_paths`, `media_paths`, `notice_paths`, `license_path`, `excluded_paths`
-and `license`). `pack` reads a snapshot whose stamp matches without fetching, and fetches again, replacing it,
-when the stamp differs or is missing (a snapshot made before stamps existed, or by hand); it stores the one it
-fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
+and `license`), and `<DIR>/<id>/<commit>.modes`: the names of the snapshot's executable files, as a JSON list
+(a Windows disk keeps no such bit, so the folder alone cannot say). `pack` reads a snapshot whose stamp matches
+without fetching, and fetches again, replacing it, when the stamp differs or is missing (a snapshot made before
+stamps existed, or by hand) or the list of names is missing (a snapshot made before it was kept); it stores the
+one it fetched. To use a cache without the network, fill it with a pack first. `--release` is the `--out` folder of a
 build (`<DIR>/<slug>/…`); `pack` refuses one that is not the build of this package (the `sources.json` plugin
 slug and version, and the capability ids, must be the package's: `muro project verify`'s check); without it the
 file carries no release. The file is written whole or not at all, and the same project packs
 to the same bytes (sorted members, fixed times), so the SHA-256 of the file identifies it.
+
+Which members are executable does not depend on the disk the file is written on. An input is executable when
+its mode in Git at the pin says so: `pack` reads it from the commit, the cache keeps the names, and `edit` and
+`commit` take them from the file they change. A helper of the built plugin (a file under a `scripts/` folder, at
+the root of the build or in an adapter) is executable by the build's own rule: it starts with `#!`. So a file
+written on Windows marks the same inputs and helpers as one written on Linux. A package's own file
+(`capabilities/`, `prompts/`, `custom-instructions/`) is executable only where the disk says so.
 
 `verify` checks that the plugin a `.mp` carries (`release/<slug>/`) was built from the package it carries: the
 release's `sources.json` plugin slug and version and its capability ids must equal the package's. It prints
@@ -521,6 +548,90 @@ digest guard. An input the old file already carried at the same pin and selectio
 is written to `--out` unless all of it succeeds. Prints `{path, digest, version, run}`.
 
 All three exit `0` on success and `1` with the reason on stderr (`Project new|edit|commit failed: ...`).
+
+### `muro project release FILE.mp [--expect-digest SHA256] [--init] [--dry-run] [--cache DIR]`
+
+Puts a project's file into the repository its `project.json` names, as `<slug>.mp` at the root of its branch. That
+repository is a plugin store ([ADR-0034](adr/ADR-0034-project-stores.md), [project-store.md](project-store.md)): its
+workflow releases the file that is pushed, so this command is how a release starts from a computer. It runs your own
+Git, found on `PATH`, with your identity, your credentials and your configuration. Muro handles no token, forces
+nothing and runs no shell.
+
+What it does, in a scratch folder that is removed at the end:
+
+1. It copies the file and reads only that copy: its SHA-256 (`--expect-digest` refuses another one), its identity
+   (`muro project info --summary`'s reading), `muro project verify`'s check, and the rules of a store that need no
+   repository (the version and the tag are letters, digits, dots, underscores and hyphens; the name is one line; the
+   file carries a built plugin). The rules are the ones the store workflow applies, in `muro/project_store.py`.
+2. It asks the repository for its branches and the tag `<tag_prefix><version>` (`git ls-remote`), then fetches the tip
+   of the branch, one commit deep and without a checkout. A repository with no branch at all is allowed: the release
+   creates the branch.
+3. It decides. The tip already holds this very file as `<slug>.mp`: nothing to do, exit `0`. The tag exists and the
+   file is another one: refused. Otherwise it commits the file, byte for byte, as `<slug>.mp` on top of the tip, with
+   the message `<name> <version>`, and pushes that commit to the branch with a plain push.
+
+`--init` adds `.github/workflows/release.yml`, the caller of [project-store.md](project-store.md) for the project's
+branch, in the same commit, when no file under `.github/workflows/` of the repository contains `project-store.yml`. It
+is pinned to this Muro: `uses: acaprino/muro/.github/workflows/project-store.yml@muro-v<this Muro's version>`. An
+existing caller is never rewritten, and an existing `release.yml` that is not a caller is refused, not replaced. When
+the file is already there and only the caller is missing, the caller is pushed alone (`<name>: the release workflow`);
+that push starts no release, so the workflow is run by hand. Without `--init` a repository with no caller is released
+into anyway, with one `Warning:` line on stderr: nothing builds the store there until a workflow calls Muro's.
+
+`--dry-run` does everything but the push, the commit included (it is made in the scratch folder and removed with it),
+and says in `reason` what it would push.
+
+Stdout is one JSON object:
+
+| Key | What it holds |
+| --- | --- |
+| `repository` | the address, without a user name or a password |
+| `branch`, `file`, `version`, `tag` | the branch, `<slug>.mp`, the plugin's version and `<tag_prefix><version>` |
+| `pushed` | `true` when a commit was pushed; `false` for nothing to do and for a dry run |
+| `commit` | the pushed commit, or `null` |
+| `initialized` | `true` when the commit carries the caller workflow (with `--dry-run`: it would) |
+| `reason` | what happened, in a sentence or two, then the warnings |
+
+Refused, each with one sentence after `Project release failed: ` on stderr and exit `1`:
+
+- a file that is missing or is not a project (`The project file cannot be read: ...`);
+- a file whose digest is not `--expect-digest` ("The project file changed since it was opened: open it again and repeat
+  the change", as `edit` and `commit` say);
+- a project that names no repository ("give it one with `muro project edit --repository`");
+- an address that is not `https://` (or `file:///`, for a repository in a folder of this computer, never on another
+  host), and a branch that is not a plain name of letters, digits, dots, underscores, hyphens and slashes: they come
+  from a file and become arguments of Git;
+- a version, a tag or a name the store's rules refuse, a plugin that was not built from the project (`verify`), and a
+  file that carries no built plugin (`release/<slug>/`);
+- Git that is not installed, or that has no name and email for you ("Please tell me who you are"); it is checked before
+  the repository is asked;
+- a repository that cannot be reached, or that has branches but not the project's;
+- `<slug>/` in the repository that is not an earlier build of this plugin, which the release would replace;
+- the tag of this version on the remote, with another file on the branch: "the same version was already released from
+  another file: change the version";
+- a commit or a push that Git refuses. A branch that moved after the fetch refuses the push; Git's own text follows
+  "The push to <branch> was refused, and nothing was forced", and running the command again releases onto the new tip.
+
+The network steps (the listing, the fetch, the push) have a time limit of 15 minutes each, and Git never prompts in
+the terminal (`GIT_TERMINAL_PROMPT=0`): a credential that is missing fails. One release costs three network calls and
+the tip commit of the branch, downloaded once; its files are not written to the disk. A user name or a password in
+the address is never printed, in the JSON or in an error, and a warning says that the file is published with it.
+
+```sh
+muro project release <project>.mp --dry-run
+muro project release <project>.mp --init --expect-digest <sha256>
+# {
+#   "repository": "https://github.com/<owner>/<repository>",
+#   "branch": "main",
+#   "file": "<slug>.mp",
+#   "version": "<version>",
+#   "tag": "<tag_prefix><version>",
+#   "pushed": true,
+#   "commit": "<commit>",
+#   "initialized": true,
+#   "reason": "Pushed <slug>.mp and .github/workflows/release.yml to main. The repository's workflow releases it as <tag_prefix><version>."
+# }
+```
 
 ### `muro project simulate` / `simulate-prepare` / `simulate-check`
 
@@ -627,6 +738,12 @@ project simulate FILE.mp --task "…" --model M` (or `simulate-prepare` and
 `simulate-check` from a host that does the classifying) to see which capabilities a
 request activates. The desktop app opens the same file under Projects.
 
+**Release a project.** Name its repository once, `muro project edit FILE.mp --expect-digest SHA256
+--repository URL --tag-prefix PREFIX`, then `muro project release FILE.mp --init`: the file is
+pushed to the repository as `<slug>.mp` with your own Git, and the repository's workflow builds the
+store and publishes the version ([project-store.md](project-store.md)). After each change of the
+project, `muro project release FILE.mp` again.
+
 **Keep a package current.** Poll `muro baseline --json` (exit 1 = something
 moved); before re-pinning, run `muro review` and follow AGENTS.md "Adding or
 re-pinning a source"; after re-pinning, re-run intake for that source,
@@ -641,6 +758,9 @@ harmonize, validate, build, install.
   traversal is rejected before any write.
 - A `.mp` from elsewhere is untrusted input: `unpack` refuses traversal, absolute paths, drive letters and links
   before it writes anything, and stops at 2 GiB or 50,000 members.
+- `muro project release` handles no token: the push is your Git's, with its credentials. The address and the branch
+  of a project file reach Git only as an `https://` address (or a folder of this computer) and a plain name, Git is
+  run without a shell and without a prompt, and no user name or password of an address is printed.
 - Source material is evidence, not instructions: intake and build never
   execute upstream code, and the license gate runs before anything is
   packaged or scaffolded.

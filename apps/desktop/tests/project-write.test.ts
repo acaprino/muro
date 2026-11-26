@@ -5,11 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Job } from '../src/types.ts';
 import {
-  ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, PROJECT_RUN_MINUTES, REPOSITORY_FIELDS, SAVING_PHASE,
-  VERSION_STEPS,
+  ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, NO_RELEASE_REPOSITORY, PROJECT_RUN_MINUTES, RELEASE_ABOUT,
+  RELEASE_INIT, RELEASE_INIT_HINT, RELEASE_NOTE, REPOSITORY_FIELDS, SAVING_PHASE, VERSION_STEPS,
   agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
   defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
-  operationWords, outcomeOf, parseBudget, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
+  operationWords, outcomeOf, parseBudget, releasePayload, releasedLine, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
+  EXTRACT_HARNESSES, extractPayload, extractedLine,
 } from '../src/pages/project/write/jobs.ts';
 import { createTransport } from './fake-transport.js';
 
@@ -239,6 +240,33 @@ test('an edit carries the digest and only what changes; null takes the repositor
 
 // ---------- the runs the runtime holds ----------
 const run = (over: Partial<Job> = {}): Job => ({ id: 'j1', kind: 'project', project_id: 'demo', operation: 'harmonize', title: 'Harmonize again', status: 'running', phase: 'Opening the project', budget_usd: 5, log_path: 'D:/log/output.log', message: '', time: 100, ...over });
+
+test('a release carries the project, the digest of the file the page read and the switch, and nothing else', () => {
+  assert.deepEqual(releasePayload('sample', DIGEST, false), { id: 'sample', digest: DIGEST, init: false });
+  assert.deepEqual(releasePayload('sample', DIGEST, true), { id: 'sample', digest: DIGEST, init: true });
+  assert.deepEqual(keys(releasePayload('sample', DIGEST, true)), ['digest', 'id', 'init'], 'the runtime reads id, digest, init and dry_run: the page asks for no dry run');
+});
+
+test("what is said after a release is the command's own sentence; without one, only whether a commit was pushed", () => {
+  assert.equal(releasedLine({ reason: ' Pushed sample.mp to main. ', pushed: true }), 'Pushed sample.mp to main.');
+  assert.equal(releasedLine({ reason: 'This file is already released under this version: nothing to do.', pushed: false }), 'This file is already released under this version: nothing to do.');
+  assert.equal(releasedLine({ reason: '', pushed: true }), 'The project file was pushed to its repository.');
+  assert.equal(releasedLine({ pushed: false }), 'Nothing was pushed.');
+  assert.equal(releasedLine({ reason: 5 as unknown as string }), 'Nothing was pushed.', 'a reason that is no text is no sentence');
+  assert.equal(releasedLine(null), 'Nothing was pushed.');
+});
+
+test('the words of a release say whose push it is, who makes the release, what the switch adds and why a project without a repository has none', () => {
+  assert.match(RELEASE_ABOUT, /pushed to its repository with your own Git/);
+  assert.match(RELEASE_ABOUT, /the workflow of that repository then makes the release/);
+  assert.match(RELEASE_ABOUT, /cannot be taken back from here/);
+  assert.match(RELEASE_NOTE, /Muro asks for none, keeps none and forces nothing/, 'no credential is asked for or kept');
+  assert.equal(RELEASE_INIT, 'Add the release workflow when the repository has none');
+  assert.match(RELEASE_INIT_HINT, /\.github\/workflows\/release\.yml/);
+  assert.match(RELEASE_INIT_HINT, /never replaced/);
+  assert.match(NO_RELEASE_REPOSITORY, /^This project names no repository: /);
+  for (const said of [RELEASE_ABOUT, RELEASE_NOTE, RELEASE_INIT, RELEASE_INIT_HINT, NO_RELEASE_REPOSITORY]) assert.doesNotMatch(said, /\u2014/, 'no em dash');
+});
 
 test('which run goes and on which project, how a run is called, when the runtime stops it and when it cannot be cancelled', () => {
   const adaptation = run({ id: 'a1', kind: undefined, title: undefined, project_id: undefined, operation: undefined, plugin_id: 'p1', harness: 'codex', phase: 'harmonization' });
@@ -632,4 +660,75 @@ test('the update check says which input is behind, and fails as the upstream doe
   assert.deepEqual(await fake.request('pick_folder'), { path: null }, 'a dialog closed without a folder');
   fake.flags.noShellActions = true;
   await assert.rejects(fake.request('pick_folder'), { message: 'Unknown registry action: pick_folder' });
+});
+
+test("an extract names the project, the harness and the folder, says where the plugin went, writes no project file and is refused in the runtime's words and then in the command's", async () => {
+  assert.deepEqual([...EXTRACT_HARNESSES], ['claude-code', 'codex', 'opencode', 'pi', 'hermes']);
+  assert.deepEqual(extractPayload('sample', 'codex', '  D:/Out  '), { id: 'sample', harness: 'codex', folder: 'D:/Out' });
+  assert.equal(extractedLine({ folders: ['D:/Out/hermes', 'D:/Out/hermes-mcp'] }), 'Extracted to D:/Out/hermes and D:/Out/hermes-mcp');
+  assert.equal(extractedLine(null), 'The plugin was extracted.');
+  const fake = createTransport('projects');
+  const digest = fake.behind.digest('sample');
+  assert.deepEqual(await fake.request('extract_project', extractPayload('sample', 'codex', 'D:/Out/')), { harness: 'codex', folders: ['D:/Out/codex'] });
+  assert.equal(fake.behind.digest('sample'), digest, 'the project file is only read');
+  const refused = (harness: string, folder: string, said: string) => assert.rejects(fake.request('extract_project', { id: 'sample', harness, folder }), { message: said }, `${harness} ${folder}`);
+  await refused('vim', 'D:/Out', 'No Muro adapter for the harness vim');
+  await refused('codex', 'Out', 'Name the folder to extract into by its full path');
+  await refused('pi', 'D:/Out', "This project's build has no adapter for pi: it has claude-code, codex, opencode");
+  await refused('codex', 'D:/Out', 'D:/Out/codex already exists: choose another folder');
+  await assert.rejects(fake.request('extract_project', { id: 'nope', harness: 'codex', folder: 'D:/Out' }), { message: 'That project is not in your list' });
+});
+
+test("a release answers the command's document, passes the switches on, writes no file, and is refused in the runtime's words and then in the command's", async () => {
+  const fake = createTransport('projects');
+  const digest = fake.behind.digest('sample');
+  const done: any = await fake.request('release_project', { id: 'sample', digest });
+  assert.deepEqual(keys(done), ['branch', 'commit', 'file', 'initialized', 'pushed', 'reason', 'repository', 'tag', 'version']);
+  assert.deepEqual([done.repository, done.branch, done.file, done.version, done.tag, done.pushed, done.initialized], ['https://github.com/owner/sample', 'main', 'sample.mp', '0.5.0', 'sample-v0.5.0', true, false]);
+  assert.match(done.commit, /^[0-9a-f]{40}$/);
+  assert.match(done.reason, /^Pushed sample\.mp to main\. No workflow of the repository calls Muro's store workflow, /, 'a repository without the workflow: the command warns at the end of its sentence');
+  assert.equal(fake.behind.digest('sample'), digest, 'a release reads the file and never writes it');
+  const init: any = await fake.request('release_project', { id: 'sample', digest, init: true });
+  assert.deepEqual([init.pushed, init.initialized, init.reason], [true, true, "Pushed sample.mp and .github/workflows/release.yml to main. The repository's workflow releases it as sample-v0.5.0."]);
+  const dry: any = await fake.request('release_project', { id: 'sample', digest, dry_run: true, init: null });
+  assert.deepEqual([dry.pushed, dry.commit], [false, null]);
+  assert.match(dry.reason, /^Dry run: nothing was pushed\. It would push sample\.mp to main as the commit "Sample 0\.5\.0"\./);
+  // the repository already holds this very file, and has its workflow: nothing to push is an answer, not a refusal
+  Object.assign(fake.flags, { releaseHeld: true, releaseCaller: true });
+  const held: any = await fake.request('release_project', { id: 'sample', digest, init: true });
+  assert.deepEqual([held.pushed, held.commit, held.initialized, held.reason], [false, null, false, 'This file is already released under this version: nothing to do.']);
+  Object.assign(fake.flags, { releaseHeld: false });
+  const called: any = await fake.request('release_project', { id: 'sample', digest });
+  assert.equal(called.reason, "Pushed sample.mp to main. The repository's workflow releases it as sample-v0.5.0.");
+  // the runtime's refusals, in its order
+  const refused = (payload: Record<string, unknown>, said: string) => assert.rejects(fake.request('release_project', payload), { message: said }, JSON.stringify(payload));
+  await refused({ id: 'nope', digest }, 'That project is not in your list');
+  await refused({ id: 'sample' }, 'Open the project again: the release names no version of its file');
+  await refused({ id: 'sample', digest: 'abc' }, 'Open the project again: the release names no version of its file');
+  await refused({ id: 'sample', digest, init: 'yes' }, 'init must be true or false');
+  await refused({ id: 'sample', digest, dry_run: 1 }, 'dry_run must be true or false');
+  // the command's
+  await refused({ id: 'sample', digest: DIGEST }, CHANGED);
+  fake.flags.releaseError = 'sample-v0.5.0: the same version was already released from another file: change the version';
+  await refused({ id: 'sample', digest }, fake.flags.releaseError);
+  fake.flags.releaseError = '';
+  await fake.request('open_project', { path: 'D:/Notes/Notes.mp' });
+  await refused({ id: 'notes', digest: fake.behind.digest('notes') }, 'This project names no repository: give it one with `muro project edit --repository`');
+});
+
+test('a project an AI run is changing is not released; the run of another project does not hold a release back, and the file a run wrote is released on its new digest', async () => {
+  const fake = createTransport('projects');
+  await fake.request('open_project', { path: 'D:/Notes/Notes.mp' });
+  const digest = fake.behind.digest('sample');
+  await fake.request('project_job', harmonize(fake));
+  await assert.rejects(fake.request('release_project', { id: 'sample', digest }), { message: 'An AI run is changing this project: wait for it to finish' });
+  fake.behind.finish();
+  await assert.rejects(fake.request('release_project', { id: 'sample', digest }), { message: CHANGED }, 'the run wrote the file: the digest the page read is stale');
+  const after: any = await fake.request('release_project', { id: 'sample', digest: fake.behind.digest('sample') });
+  assert.deepEqual([after.version, after.tag], ['0.5.1', 'sample-v0.5.1'], "the version is the file's, as the run left it");
+  // a run of another project: a release is no AI run, and it waits only for a run of its own project
+  await fake.request('project_job', harmonize(fake, { id: 'notes', digest: fake.behind.digest('notes') }));
+  const beside: any = await fake.request('release_project', { id: 'sample', digest: fake.behind.digest('sample') });
+  assert.equal(beside.pushed, true);
+  fake.behind.finish('cancelled');
 });

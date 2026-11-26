@@ -5,7 +5,7 @@ import type { ProjectInfo } from '../types.ts';
 import { useRegistry } from './registry.tsx';
 
 /** The dialogs of a project: the ones its actions open, and the ones its header and its panel open. */
-export type ProjectDialog = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details';
+export type ProjectDialog = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details' | 'release' | 'extract';
 
 /** The open project of the Projects tab, for the workspace and for the window's inspector.
  * The state is `state/project.ts`'s; this only holds it in React and writes it to the
@@ -16,7 +16,7 @@ export interface ProjectApi {
   /** What the service said of the open project, while its workspace is on screen. */
   info: ProjectInfo | null;
   setInfo(info: ProjectInfo | null): void;
-  /** The dialog open over the workspace, if any: the window's actions open two of them. */
+  /** The dialog open over the workspace, if any: the window's actions open three of them. */
   dialog: ProjectDialog | null;
   setDialog(dialog: ProjectDialog | null): void;
   /** The latest state, for a caller that awaited something and must check it is still the one it started from (a simulation waited for). */

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { listedPlugin, listing, inList, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp, versionOf, removals, removalLabel, applyPayload, appliedNotice, mustReview } from '../src/model.ts';
+import { harnessWarnings, listedPlugin, listing, inList, pluginState, filterPlugins, cellState, harnessState, syncSummary, syncHeadline, sameOperations, unlisted, exclusiveMode, intervalOptions, stamp, versionOf, removals, removalLabel, applyPayload, appliedNotice, mustReview } from '../src/model.ts';
 import type { Snapshot, Plugin, Plan, Operation, Target, InstalledPlugin } from '../src/types.ts';
 
 // The rules of the window's model (src/model.ts): what a snapshot and a plan say of each plugin, harness and sync. Plan R0, Task 6 took out of this file what tested the
@@ -338,4 +338,26 @@ test('the list already holds a plugin Muro installed or one with a build in the 
   assert.equal(inList(holding([listedPlugin({ ...listInstalled, path: 'D:/plugins/other' }, listTarget)]), listTarget, listInstalled), false, 'another folder is another plugin');
   assert.equal(inList(holding([{ ...listedPlugin(listInstalled, listTarget), targets: ['t2'] }]), listTarget, listInstalled), false, 'an entry for another harness does not count');
   assert.equal(inList(holding([listedPlugin({ ...listInstalled, path: '' }, listTarget)]), listTarget, { ...listInstalled, path: '' }), false, 'no folder never matches by its emptiness');
+});
+// Owner, 2026-11-25, "Muro deve funzionare": a marketplace of Codex whose folder was gone made Sync say that Codex could not be read. The service now reads around it and says
+// so in `warnings`: the harness is read, its state is what its plugins say, and the warning is told beside it.
+test('harnessWarnings: what a harness cannot load is told with its harness, and the harness still reads as what its plugins say',()=>{
+ const s=snapshot(),t=s.registry.targets[0];
+ assert.deepEqual(harnessWarnings(s),[],'a record without the field has none');
+ s.inventory[0].warnings=['The marketplace old-notes points to a folder that is gone: D:/gone'];s.inventory[0].plugins[0].version='2';
+ assert.deepEqual(harnessWarnings(s).map(w=>[w.target.id,w.message]),[['target','The marketplace old-notes points to a folder that is gone: D:/gone']]);
+ assert.deepEqual(harnessState(t,s,plan([])),{kind:'ok',count:0},'read all the same: never "cannot be read" for a warning');
+ assert.equal(syncHeadline(s,plan([])).kind,'ok');assert.deepEqual(syncHeadline(s,plan([])).unreadable,[]);
+ assert.equal(cellState(plugin,t,s,plan([])).kind,'ok');
+ s.registry.targets[0].enabled=false;assert.deepEqual(harnessWarnings(s),[],'a paused harness says nothing');
+});
+test('a broken marketplace to take out of a harness is a change of the plan, counted on its harness, and Apply all shows it first',()=>{
+ const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
+ const out:Operation={target_id:'target',plugin_id:'',name:'old-notes',kind:'remove-marketplace',from_version:'',to_version:'',reason:'The marketplace old-notes points to a folder that is gone: D:/gone',plugins:['notes@old-notes']};
+ const p=plan([out]);
+ assert.deepEqual(harnessState(t,s,p),{kind:'changes',count:1});
+ assert.deepEqual(syncSummary(s,p).byKind,{'remove-marketplace':1});assert.equal(syncHeadline(s,p).kind,'changes');
+ assert.deepEqual(removals(p),{total:0,uninstall:0,missing:0},'not one of the removals a person confirms by their number');
+ assert.deepEqual(applyPayload(p,'confirm'),{plan_id:p.id});
+ assert.equal(mustReview(p,p),true,'the sheet names what goes with it');
 });

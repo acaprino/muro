@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def _write_json(path: Path, value: object) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def _servers_js(servers: list[dict], package_url: str) -> str:
@@ -37,7 +37,7 @@ def write_pi_adapter(root: Path, plugin: dict, has_policy: bool, servers: list[d
             '  pi.on("before_agent_start", (event) => {\n'
             f'    event.systemPromptOptions.sections[{section}] = policy;\n'
             '  });\n'
-            '}\n', encoding="utf-8")
+            '}\n', encoding="utf-8", newline="\n")
     if servers:
         manifest["pi"]["extensions"].append("./extensions/mcp.js")
         (root / "extensions").mkdir(exist_ok=True)
@@ -49,7 +49,7 @@ def write_pi_adapter(root: Path, plugin: dict, has_policy: bool, servers: list[d
             '  for (const {name, command, args, env} of servers) {\n'
             '    pi.registerMcpServer(name, {command, args, env});\n'
             '  }\n'
-            '}\n', encoding="utf-8")
+            '}\n', encoding="utf-8", newline="\n")
     _write_json(root / "package.json", manifest)
 
 
@@ -109,4 +109,4 @@ def write_opencode_adapter(root: Path, plugin: dict, has_policy: bool, servers: 
         '        editor.add({...skill, path: fileURLToPath(new URL(skill.path, import.meta.url))});\n'
         '      }\n'
         '    });\n'
-        + policy_hooks + server_setup + '  },\n};\n', encoding="utf-8")
+        + policy_hooks + server_setup + '  },\n};\n', encoding="utf-8", newline="\n")

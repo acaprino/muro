@@ -143,11 +143,19 @@ there, in a marked line, and a live session checks it.
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: a package is a directory
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, its own
-plugin identity) that lives in its own repository, with its own tests, CI and
-release, and is built with Muro at a pinned ref. This repository holds no
+plugin identity). Owner, 2026-11-25 ("è da un muro project che nasce tutto",
+"l'mp contiene tutto", "un push dell'mp scatena una nuova release", "non
+repository aperte o scompattate"; ADR-0034): a package lives as a Muro project,
+one file `<slug>.mp` that carries that directory, its inputs at their pins, its
+records and history and its built release. Its repository is a plugin store: it
+holds the file and what `.github/workflows/project-store.yml`, called from the
+repository's own ten lines, generates from it (the plugin folder, the root
+marketplaces, the notes), and a push of the file is a release. No package lives
+unpacked in a repository. `muro project release` and **Release…** in the app
+put the file there (`docs/project-store.md`). This repository holds no
 package: the factory's tests use the invented one in `tests/fixtures/package/`.
 Paths below that name those files are relative to a
-package directory. Keep package-specific knowledge (named dependencies, domain
+package directory (a project's work folder, or its file unpacked). Keep package-specific knowledge (named dependencies, domain
 rules) out of `muro/` and `prompts/`. Prompts and the shipped runtime come from
 the factory unless the package directory has its own (ADR-0011).
 
@@ -482,8 +490,9 @@ verified) runs every Python test and the desktop job: no test names a package, n
 deselected, and a test that needs a whole package borrows the neutral fixture
 `tests/fixtures/package/` (`tests/routing_helpers.py`: `FIXTURE`, `copy_fixture`), whose
 sources are remotes that do not exist, so it is validated and never fetched or built. A
-package's own tests, its manifest validation, its source check, its build and the gate of
-its release run in the package's repository, against a Muro checkout at a pinned ref. The release of Muro
+project's validation, its source check, its build and its repository's own tests run in the
+store workflow of that repository, on the pushed file unpacked, with Muro at the commit its
+caller pins (ADR-0034). The release of Muro
 (`release.yml`) runs no package test or check and bundles no package (owner decision of
 2026-11-25, below): `build-release.bat` runs `scripts/desktop_resources.py`, which stages
 the private Python and the factory and nothing else. Muro ships no project and reserves no
@@ -498,9 +507,8 @@ repository address). The records of what was decided and verified (`docs/adr/`,
 `docs/verification/`, `docs/releases/`, `docs/frd/`, `docs/mockups/`) keep the names they
 were written with (owner's answer of the same day: "Solo ciò che esegue"). Add nothing new
 that names a package. The rule is applied in full: the factory tests run on the neutral
-fixture, inside the `Tests` run; the package that lived under `examples/`, its own tests
-and its two workflows are in the package's repository; and no passage of this file names
-a package.
+fixture, inside the `Tests` run; no package, package test or package workflow lives in this repository; and no passage
+of this file names a package.
 
 Run `python -m pytest -q` and `python muro_build.py --manifest
 tests/fixtures/package/sources.json --validate`. For source/build changes also run
@@ -582,8 +590,8 @@ the method uses at run time, declare binary media in `media_paths` with its
 credit files in `notice_paths`, and explain in `omissions` each named file that
 stays out; `check-sources` and `build` refuse the source otherwise (ADR-0026,
 ADR-0027). Write the pin and its release into each capability's `## Sources`
-line and into the package's own test of that source, which lives with the
-package. Record in `delivery.json` what
+line and into the test of that source, where the project's repository has
+tests. Record in `delivery.json` what
 each part of the source became and why, and review the earlier decisions. When
 the source ships an MCP server, judge its tools again (`server_review` is judged on
 a commit, and the build refuses a package with a server whose record is judged on
@@ -602,14 +610,17 @@ repository (owner request of 2026-11-19, ADR-0011 amendment). This repository re
   at every merge of `develop` into `main` by `.github/workflows/release.yml` (see "Git"). The GitHub Release
   carries `Muro-<version>-windows-x64.zip`, the portable folder `build-release.bat` makes. Do not bump
   `__version__` or create `muro-v*` tags by hand.
-- A package, `<slug>-v<version>` (version in its `sources.json`, `plugin.version`), is released from its own
-  repository by its own workflow, which builds it with Muro at a pinned ref and publishes the tag and
-  `<slug>-<version>.zip` with its SHA-256 there. Nothing in this repository builds, tags or publishes a package;
-  the package releases published here before the package had its own repository stay among this repository's
+- A project, `<tag_prefix><version>` (the version in its `sources.json`, `plugin.version`; the prefix in its
+  `project.json`), is released by pushing its file to its repository, with `muro project release FILE.mp` or
+  **Release…** in the app. The store workflow of that repository runs `--validate`, `--check-sources`, a build
+  and the repository's own tests on the file unpacked, then writes the plugin store from the release the file
+  carries and publishes the tag with the file, `<slug>-<version>.zip` and the SHA-256 of each (ADR-0034,
+  `docs/project-store.md`). Nothing in this repository builds, tags or publishes a package; the package
+  releases published here before packages had repositories of their own stay among this repository's
   releases. A package changes version whenever its catalog, policy or packaged files changed: hosts cache an
-  installed plugin by version. Its release notes say what changed for a user, the verification results, and
-  what was not executed. On the commit to release, the package's tests, `--validate` and `--check-sources` pass
-  and a fresh build is staged with `--build --out <scratch>`. A published tag is preserved.
+  installed plugin by version, and the same version from another file is refused. The top entry of the file's
+  changelog is the release notes: it says what changed for a user, the verification results, and what was not
+  executed. A published tag is preserved.
 - Do not commit `dist/`, and do not push tags by hand: the workflows are the way.
 
 The README header shows `docs/assets/branding/muro-logo.png`. Keep that
@@ -646,8 +657,9 @@ verification records belong in docs/verification/. Never write new docs/superpow
 - Never run `cargo` on this machine: no `cargo build`, `cargo test`, `cargo clippy`, `cargo check`, `cargo run`,
   `cargo doc`, no `tauri dev`, no `tauri build`, and no npm or batch script that calls them. `cargo fmt` is the
   only exception.
-- Rust is compiled, linted and tested only by GitHub Actions. To know whether Rust code is right, push to
-  `develop` and read the run (`gh run watch`, `gh run view --log-failed`).
+- From this machine, Rust is compiled, linted and tested only by GitHub Actions (a cloud session may run `cargo`: see
+  "Nothing is compiled on this machine"). To know whether Rust code is right, push to `develop` and read the run
+  (`gh run watch`, `gh run view --log-failed`).
 - A program needed on this machine is taken from a release or a workflow artifact (`gh run download`), never
   built here.
 - This holds for every agent and every subagent. A plan, a skill or a brief that says to run cargo locally is
@@ -656,6 +668,10 @@ verification records belong in docs/verification/. Never write new docs/superpow
 
 ## Nothing is compiled on this machine (the owner's absolute rule)
 
+- "This machine" is the owner's own computer, for every agent that runs on it, Claude Code and Codex included. A cloud
+  session (a hosted environment that is not the owner's computer, such as Claude Code on the web or a Codex cloud task)
+  may compile, build, lint and test: neither this section nor "Rust is built and tested on GitHub only" forbids it
+  there. When in doubt whether a session is a cloud one, treat it as the owner's computer.
 - Never compile, build, lint or run a test that needs a build on this machine: no `cargo`, `tauri`, `tsc`, `vite build`,
   bundler or compiler; no npm, batch or shell script that calls them (`npm run build`, `npm test` when it builds first,
   `npm run verify`); and no `npm install` or `npm ci` that runs a dependency's `prepare` script (a dependency taken from

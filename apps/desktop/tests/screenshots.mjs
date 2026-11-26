@@ -3,7 +3,7 @@
 // MURO_UI_PORT moves the dev server when 1422 is taken; MURO_SHOTS_OUT=<folder> writes somewhere else;
 // MURO_GUIDE=<path of a release's GUIDE.html> also captures that release's offline guide.
 // The pages of the React window: the Projects list, and the workspace of a project with a documented example lit, with an
-// answer to a free-text request, and in the light theme. Sync, Activity, Settings and the first run are not in the window yet
+// answer to a free-text request, and in the light theme. The first run is not in the window yet
 // (plan R0), so nothing here draws them: their pictures in docs/assets/screenshots are those of the earlier window.
 // The selectors are those of browser-workspace.mjs.
 import { chromium } from '@playwright/test';

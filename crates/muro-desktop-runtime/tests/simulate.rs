@@ -486,5 +486,7 @@ fn a_supervised_process_that_is_cancelled_or_out_of_time_is_killed() {
     assert!(matches!(timed_out, exec::Ended::Stopped(exec::Stop::TimedOut)));
     let error = exec::capture(python("import time; time.sleep(60)"), "The test run", &|| false, Duration::from_millis(600)).err().unwrap();
     assert!(error.to_string().contains("The test run ran out of time"), "{error}");
+    assert!(exec::out_of_time(&error), "a caller can tell a process that was stopped at its limit from one that failed");
+    assert!(!exec::out_of_time(&anyhow::anyhow!("The test run ran out of time")), "by what it is, not by its words");
     assert!(exec::supervise(std::process::Command::new("muro-no-such-program-anywhere"), &|| false, Duration::from_secs(5)).is_err());
 }
