@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import type { ProjectInfo, ProjectInput } from '../src/types.ts';
 import { engineOf } from '../src/model.ts';
 import { aboutLine, asking, countsOf, harnessName, noteText, whoLine } from '../src/pages/project/lines.ts';
-import { becameParts, pinnedOf, projectData, runsOf, said, tagOf } from '../src/pages/project/data.ts';
+import { becameParts, pinnedOf, projectData, releaseOf, runsOf, said, tagOf } from '../src/pages/project/data.ts';
 
 // ---------- fixtures ----------
 const ai = (over: Record<string, unknown> = {}) => ({ engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY', ...over });
@@ -70,6 +70,15 @@ test('the tag of a run comes from the repository\'s tag prefix, and a project wi
   assert.equal(tagOf(info({ project: meta({ url: 'https://example.com/x', branch: 'main', tag_prefix: 'v' }) }), '0.5.0'), 'v0.5.0');
   assert.equal(tagOf(info({ project: meta(null) }), '0.5.0'), '');
   assert.equal(tagOf(info(), ''), '', 'a run with no version has no tag');
+});
+
+test('what a release publishes is what the file says: its repository and branch, the file, the version and its tag; a project that names no repository has no release', () => {
+  assert.deepEqual(releaseOf(info()), { repository: 'https://github.com/owner/sample', branch: 'main', file: 'sample.mp', version: '0.5.0', tag: 'sample-v0.5.0' });
+  assert.deepEqual(releaseOf(info({ project: meta({ url: ' https://example.com/x ', branch: 'stable', tag_prefix: '' }) })), { repository: 'https://example.com/x', branch: 'stable', file: 'sample.mp', version: '0.5.0', tag: '0.5.0' });
+  assert.equal(releaseOf(info({ project: meta(null) })), null);
+  assert.equal(releaseOf(info({ project: meta({ url: '   ', branch: 'main', tag_prefix: 'v' }) })), null, 'an empty address is no repository');
+  assert.equal(releaseOf(info({ project: meta({ url: { at: 'x' }, branch: 3 }) })), null, 'a field in another shape is not an address');
+  assert.equal(releaseOf(info({ plugin: { name: 'Sample', slug: 'sample', version: '1.0.0' } }))?.tag, 'sample-v1.0.0', "the version is the plugin's");
 });
 
 // ---------- the inputs ----------

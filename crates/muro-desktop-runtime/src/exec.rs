@@ -72,6 +72,24 @@ pub fn supervise(mut command: Command, cancelled: &dyn Fn() -> bool, limit: Dura
     }
 }
 
+/// A process `capture` stopped at its limit. What it had done by then is not known: a caller whose process
+/// changes something outside this computer says so (`out_of_time`).
+#[derive(Debug)]
+pub struct OutOfTime(String);
+
+impl std::fmt::Display for OutOfTime {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for OutOfTime {}
+
+/// Whether `error` is a process that ran out of time (`OutOfTime`), or was caused by one.
+pub fn out_of_time(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| cause.is::<OutOfTime>())
+}
+
 /// What a process that ran to its end printed.
 pub struct Captured {
     pub status: ExitStatus,
@@ -80,7 +98,8 @@ pub struct Captured {
 }
 
 /// `supervise` with the output kept: each stream goes to an unnamed temporary file, read once the
-/// process has ended. A process that was cancelled or ran out of time is an error naming `what`.
+/// process has ended. A process that was cancelled or ran out of time is an error naming `what`; the
+/// second is an `OutOfTime`.
 pub fn capture(mut command: Command, what: &str, cancelled: &dyn Fn() -> bool, limit: Duration) -> Result<Captured> {
     let out = tempfile::tempfile()?;
     let err = tempfile::tempfile()?;
@@ -90,7 +109,9 @@ pub fn capture(mut command: Command, what: &str, cancelled: &dyn Fn() -> bool, l
     let status = match supervise(command, cancelled, limit)? {
         Ended::Finished(status) => status,
         Ended::Stopped(Stop::Cancelled) => bail!("{what} was cancelled"),
-        Ended::Stopped(Stop::TimedOut) => bail!("{what} ran out of time ({} seconds)", limit.as_secs()),
+        Ended::Stopped(Stop::TimedOut) => {
+            return Err(OutOfTime(format!("{what} ran out of time ({} seconds)", limit.as_secs())).into());
+        }
     };
     let read = |mut file: std::fs::File| -> Result<String> {
         let mut bytes = vec![];

@@ -36,6 +36,11 @@
 //                                a cancel whatever the flag says, as the runtime does once the commit started; a cancel before that ends the run as `cancelled`, with the words of the phase it was in (below)
 //             staleDeletes (n)   the next n delete_project requests are refused as the registry refuses a stale revision, and the registry has moved on (its revision is one higher), so the page's retry carries a new one
 //             updatesError       project_updates fails with this message (an upstream that cannot be reached)
+//             Releasing (release_project, the runtime's `release` and the factory's `muro project release`): the fake reaches no repository, and what one would answer is these knobs'.
+//             releaseError       the command refuses with this sentence (the version's tag belongs to another file, the repository cannot be reached, the push was refused)
+//             releaseHeld        the repository already holds this very file: nothing is pushed, and the answer says so
+//             releaseCaller      the repository has the workflow that calls Muro's: no warning, and `init` adds nothing. Without it a release without `init` ends with the command's warning
+//             releaseDelay (ms)  the release takes that long
 //             A run is a job of kind "project" (jobs, snapshot.jobs): the runtime's fields (project_id, operation, title, file, phase, budget_usd, log_path, message, time in epoch seconds). One goes at a time,
 //             and an adaptation counts. When a run completes it does what the factory's commit does and nothing about meaning: a new project is listed (and its file exists); a change moves the version by its
 //             step, adds the run to the history and an entry to the changelog, gives the file a new digest, and adds, removes or re-pins the input it names, or writes the instruction files. A project's digest is
@@ -182,7 +187,7 @@ function scenarioData(scenario) {
       const synced = { claude: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, codex: { checked: ago(checkedAgo), synced: ago(syncedAgo) }, opencode: { checked: ago(checkedAgo), synced: ago(syncedAgo) } };
       const jobs = done ? [] : [{ id: 'job-1', plugin_id: 'docs-writer', harness: 'opencode', status: 'running', phase: 'harmonization', budget_usd: 2, log_path: 'C:/Users/you/Muro/data/jobs/job-1/log.txt', message: 'Claude Code is adapting the plugin for OpenCode.', time: ago(3) }];
       const earlier = scenario === 'demo-activity' ? [{ id: 'a0', time: ago(2900), action: 'check', status: 'failed', message: 'Plan calculated; sources not resolved: sql-companion' }] : [], between = scenario === 'demo-activity' ? [{ id: 'a3', time: ago(75), action: 'Automatic sync', status: 'complete', message: '2 changes applied' }] : [];
-      const activity = [...earlier, { id: 'a1', time: ago(1500), action: 'apply', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, ...between, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
+      const activity = [...earlier, { id: 'a1', time: ago(1500), action: 'sync', status: 'complete', message: '3 operations applied. Inventory refreshed.' }, ...between, { id: 'a2', time: ago(14), action: 'check', status: 'complete', message: 'Sources resolved and plan calculated' }];
       return { ...base, auto_sync: true, targets, plugins, installed, found: [foundHarness('pi', 'Pi', { version: '0.9.1' }), foundHarness('hermes', 'Hermes Agent', { version: '0.7.0' })], jobs, activity, sync: { last_check: ago(checkedAgo), last_sync: ago(syncedAgo), revision: null, pending: null, blockers: null, errors: null, targets: synced } };
     }
     default: return { ...base, found: [foundHarness('codex', 'Codex', { version: 'test' })] };
@@ -196,6 +201,7 @@ export function createTransport(scenario = 'default') {
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
   Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '', staleDeletes: 0 });   // the knobs of the project writes
+  Object.assign(flags, { releaseError: '', releaseHeld: false, releaseCaller: false, releaseDelay: 0 });   // the knobs of a release
   const installed = data.installed, plans = new Map(), sync = data.sync, activity = data.activity, jobs = data.jobs;
   const projects = structuredClone(data.projects || []);
   let autostart = false, seeded = false, planNumber = 0, activityNumber = 0;
@@ -284,7 +290,7 @@ export function createTransport(scenario = 'default') {
   }
   const unknownShellAction = action => { if (flags.noShellActions) throw new Error('Unknown registry action: ' + action); };
   // ---------- the write side of the projects ----------
-  // What the runtime does for create_project, project_job, edit_project, delete_project, project_updates, cancel_job and the shell's pick_folder (crates/muro-desktop-runtime/src/project_jobs.rs, ADR-0032),
+  // What the runtime does for create_project, project_job, edit_project, delete_project, release_project, project_updates, cancel_job and the shell's pick_folder (crates/muro-desktop-runtime/src/project_jobs.rs, ADR-0032),
   // with its refusals in its own words and in its own order, each checked here by its own copy (never by the page's: the fake is the other side of the wire). A change of the package is an AI run, a job of kind
   // "project" that goes on until a test ends it (behind.finish) or a flag makes it end by itself (flags.runEnds); what a run did is mechanical, as the factory's commit is. The fake judges nothing.
   const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
@@ -568,6 +574,38 @@ export function createTransport(scenario = 'default') {
     flags.existingFiles = flags.existingFiles.filter(f => sameFile(f) !== sameFile(entry.path));
     return bump();
   }
+  // release_project {id, digest, init?, dry_run?}: the factory puts the project's file into the repository its project.json names, with the person's own Git, and answers the document the command
+  // prints. The refusals come in the runtime's order (the list, the shape of the digest, the two switches, a run that changes the project) and then the command's own (the file changed, no
+  // repository, what the repository says). The file is read and never written: its digest stays.
+  const NO_CALLER = "No workflow of the repository calls Muro's store workflow, so nothing builds the store or publishes the release there: run this command with --init, or add the caller of docs/project-store.md as .github/workflows/release.yml";
+  const switchOf = (value, key) => {
+    if (value === undefined || value === null) return false;
+    if (typeof value !== 'boolean') throw new Error(`${key} must be true or false`);
+    return value;
+  };
+  async function releaseProject(p) {
+    const entry = listedFile(p.id);
+    digestGiven(p.digest, 'release');
+    const init = switchOf(p.init, 'init'), dryRun = switchOf(p.dry_run, 'dry_run');
+    if (runningOn(entry.id)) throw new Error('An AI run is changing this project: wait for it to finish');
+    if (flags.releaseDelay) await new Promise(done => setTimeout(done, flags.releaseDelay));
+    if (p.digest !== entry.info.digest) throw new Error(CHANGED);
+    const repo = entry.info.project.repository;
+    if (!repo) throw new Error('This project names no repository: give it one with `muro project edit --repository`');
+    if (flags.releaseError) throw new Error(flags.releaseError);
+    const { name, slug, version } = entry.info.plugin, file = `${slug}.mp`, tag = `${repo.tag_prefix}${version}`;
+    const adds = init && !flags.releaseCaller, warning = init || flags.releaseCaller ? '' : ` ${NO_CALLER}`;
+    const answer = { repository: repo.url, branch: repo.branch, file, version, tag, pushed: false, commit: null, initialized: adds, reason: '' };
+    if (flags.releaseHeld && !adds) answer.reason = `This file is already released under this version: nothing to do.${warning}`;
+    else if (dryRun) answer.reason = `Dry run: nothing was pushed. It would push ${file} to ${repo.branch} as the commit "${name} ${version}".${warning}`;
+    else {
+      // The file is already there and only the workflow is missing: the workflow is pushed alone, and that push starts no release.
+      const said = flags.releaseHeld ? `The repository already holds this file as ${file}; .github/workflows/release.yml was pushed to ${repo.branch}. Run that workflow by hand to release it as ${tag}.`
+        : `Pushed ${adds ? `${file} and .github/workflows/release.yml` : file} to ${repo.branch}.${adds || flags.releaseCaller ? ` The repository's workflow releases it as ${tag}.` : ''}${warning}`;
+      Object.assign(answer, { pushed: true, commit: digestOf(`release:${entry.id}:${version}`).slice(0, 40), reason: said });
+    }
+    return answer;
+  }
   // project_updates {id}: how each input's pin stands against its upstream (the first input is behind, at v9.9.9, the others are current).
   function projectUpdates({ id }) {
     const entry = listedFile(id);
@@ -621,7 +659,7 @@ export function createTransport(scenario = 'default') {
     }
     const time = ago(0), touched = [...new Set(executed.map(o => o.target_id))];
     for (const id of touched) sync.targets[id] = { ...sync.targets[id], synced: time };
-    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('apply', 'complete', `${executed.length} operations applied`); }
+    if (touched.length) { sync.last_sync = time; sync.pending = Math.max(0, (sync.pending ?? 0) - executed.length); log('sync', 'complete', `${executed.length} operations applied`); }
     const result = snapshot();
     if (payload.allow_blocked) result.left_out = plan.blockers;
     result.skipped_removals = skip ? removals : 0;
@@ -674,6 +712,7 @@ export function createTransport(scenario = 'default') {
       case 'project_job': return projectJob(payload);
       case 'edit_project': return editProject(payload);
       case 'delete_project': return deleteProject(payload);
+      case 'release_project': return releaseProject(payload);
       case 'project_updates': return projectUpdates(payload);
       case 'remove_project': return removeProject(payload);
       case 'simulate': return simulate(payload);

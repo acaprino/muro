@@ -41,6 +41,8 @@ export interface Autostart { supported:boolean; enabled:boolean; current:boolean
 export interface Maintenance { message:string; details:string[] }
 export type Transport = <T>(action:string,payload?:Record<string,unknown>)=>Promise<T>;
 export type Page = 'projects'|'sync'|'activity'|'settings';
+/** What the Activity page lists: everything, the sync runs, the AI runs, or what did not end well. */
+export type ActivityFilter = 'all'|'sync'|'ai'|'problems';
 /** `project.json` of a project file. */
 export interface ProjectMeta { schema:number; name:string; slug:string; version:string; author:string; created:string; changed:string; repository:{url:string;branch:string;tag_prefix:string}|null; builtin:boolean }
 /** What the action `projects` returns for each listed project: its id and file, then what `muro project info` knows in short (a count the runtime does not send is absent), or `error` when the file is missing or invalid. */
@@ -68,5 +70,9 @@ export type VersionStep = 'patch'|'minor'|'major';
 export type InstructionEdit = { path:string; text:string|null };
 /** How one input's pin stands against its upstream (`project_updates`, from `muro baseline`): `behind` names the newest release or commit in `upstream`. */
 export interface ProjectUpdate { id:string; pin:string; pinned:string; upstream:string|null; status:'current'|'behind'|'frozen'|'drifted'|'unknown'|'error'; note:string }
+/** What `release_project` answers, the document `muro project release` prints: where the file went (`repository` without a user name or a password, `branch`, `file`), the `version` and its `tag`,
+ * whether a commit was `pushed` (false when the repository already holds this file) and which, whether it carries the release workflow (`initialized`), and `reason`: what happened, in a sentence
+ * or two, then the command's warnings. */
+export interface ProjectRelease { repository:string; branch:string; file:string; version:string; tag:string; pushed:boolean; commit:string|null; initialized:boolean; reason:string }
 /** The last update check of a project's inputs, for the file it was made on (`digest`). */
 export interface ProjectUpdates { id:string; digest:string; inputs:ProjectUpdate[] }
