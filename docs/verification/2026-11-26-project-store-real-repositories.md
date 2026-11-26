@@ -64,8 +64,8 @@ The repositories' tests read the package from `MURO_PROJECT` since this move; be
 
 - `muro project release` pushed to two repositories on GitHub: `pushed: true`, the commit `<name> <version>`,
   the file byte for byte (the SHA-256 of the release's asset is the one given to `--expect-digest`).
-- A push of the file alone started the caller. A push of the file and its caller in one commit (`--init`) also
-  started it. Both were listed as unproven in the ADR.
+- A push of the file alone started the caller, as on the probe. A push of the file and its caller in one commit
+  (`--init`) also started it: that one was listed as unproven in the ADR.
 - The shallow fetch of a store that holds a file of 35 MB worked within the time limit.
 - The store workflow released at the first run in both: `gate` and `publish` green. The step of the repository's
   own tests ran for real for the first time (309 and 23 passed).
