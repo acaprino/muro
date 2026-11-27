@@ -82,8 +82,10 @@ def test_install_notes_name_the_host_command_and_what_is_active_after_it(portabl
     assert "no further step" not in notes["codex"]
 
 
-def test_codex_asks_for_no_review_when_the_release_registers_no_hook(portable_project, tmp_path):
+def test_codex_asks_for_the_review_of_the_muro_system_hooks_even_with_nothing_declared(portable_project, tmp_path):
+    # ADR-0037: the Muro system section reaches Codex through SessionStart and SubagentStart, and Codex runs a
+    # plugin's hooks only after its user trusts them in /hooks, so every release with a skill asks for that review.
     release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
     note = (release / "adapters" / "codex" / "INSTALL.md").read_text(encoding="utf-8")
     assert "codex plugin add muro@muro" in note
-    assert "/hooks" not in note and not (release / "adapters" / "codex" / "hooks").exists()
+    assert "/hooks" in note and (release / "adapters" / "codex" / "hooks" / "hooks.json").is_file()

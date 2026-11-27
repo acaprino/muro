@@ -6,9 +6,11 @@ takes (on-demand capability, always-on session text, active hook, dropped) is an
 judgment recorded in `delivery.json`. Python checks shape and references, emits the
 host files that the document declares, and never chooses a form.
 """
+import base64
 import copy
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -189,11 +191,22 @@ def test_hook_wirings_are_checked(over, message):
     assert any(message in error for error in errors), errors
 
 
-def test_a_package_without_the_document_registers_nothing(portable_project, tmp_path):
+def test_a_package_without_the_document_registers_only_the_muro_system(portable_project, tmp_path):
+    # ADR-0016: nothing declared registers without delivery.json. ADR-0037 (owner, 2026-11-27): every release
+    # with a skill still injects the Muro system section, which says when to use those skills.
     release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
     assert not (release / "delivery.json").exists()
     for host in HOSTS:
-        assert not (release / "adapters" / host / "hooks").exists()
+        root = release / "adapters" / host
+        assert (root / "policy.md").read_text(encoding="utf-8").startswith("# Muro system: ")
+        assert not (root / ".mcp.json").exists() and not (root / "mcp.json").exists()
+    claude = json.loads((release / "adapters/claude-code/hooks/hooks.json").read_text(encoding="utf-8"))
+    assert claude == {"modules": ["./policy.mjs"]}                 # the section, and no declared hook
+    codex = json.loads((release / "adapters/codex/hooks/hooks.json").read_text(encoding="utf-8"))
+    assert set(codex["hooks"]) == {"SessionStart", "SubagentStart"}
+    for groups in codex["hooks"].values():            # the trampoline carries its argv base64-encoded
+        payload = re.search(r"b64decode\('([A-Za-z0-9+/=]+)'\)", groups[0]["hooks"][0]["command"]).group(1)
+        assert "session-context" in json.loads(base64.b64decode(payload))["run"]
 
 
 def test_invalid_delivery_stops_the_build(portable_project, tmp_path):
@@ -224,7 +237,8 @@ def test_session_policy_is_a_native_claude_system_section_and_standalone_text(po
     skill = plugin_root / "skills" / "muro"
     printed = subprocess.run([sys.executable, str(skill / "muro.py"), "session-context"], cwd=tmp_path,
                              capture_output=True, text=True, encoding="utf-8", check=True).stdout
-    assert printed.strip() == TEXT
+    # The Muro system section first, then the declared text in its own words (ADR-0037).
+    assert printed.startswith("# Muro system: ") and printed.strip().endswith("\n" + TEXT)
 
 
 def test_every_native_adapter_carries_its_declared_policy_and_registration(portable_project, tmp_path):
@@ -234,7 +248,8 @@ def test_every_native_adapter_carries_its_declared_policy_and_registration(porta
         root = release / "adapters" / host
         assert (root / "skills" / "muro" / "delivery.json").is_file()
         install = (root / "INSTALL.md").read_text(encoding="utf-8")
-        assert (root / "policy.md").read_text(encoding="utf-8") == TEXT
+        policy = (root / "policy.md").read_text(encoding="utf-8")
+        assert policy.startswith("# Muro system: ") and policy.endswith("\n\n" + TEXT)
         assert "registers automatically" in install
         assert "does not register" not in install
         entrypoint = {"claude-code": "hooks/policy.mjs", "codex": "hooks/hooks.json",
@@ -242,12 +257,14 @@ def test_every_native_adapter_carries_its_declared_policy_and_registration(porta
         assert (root / entrypoint).is_file()
 
 
-def test_a_release_without_session_text_prints_nothing(portable_project, tmp_path):
+def test_a_release_without_session_text_prints_only_the_muro_system(portable_project, tmp_path):
     release = build_release(portable_project / "sources.json", portable_project, tmp_path / "out")
     skill = release / "adapters" / "codex" / "skills" / "muro"
     done = subprocess.run([sys.executable, str(skill / "muro.py"), "session-context"], cwd=tmp_path,
                           capture_output=True, text=True, encoding="utf-8")
-    assert done.returncode == 0 and done.stdout == ""
+    policy = (release / "adapters" / "codex" / "policy.md").read_text(encoding="utf-8")
+    assert done.returncode == 0 and done.stdout.strip() == policy.strip()
+    assert policy.startswith("# Muro system: ") and "Demo facts" not in policy
 
 
 def test_an_active_source_hook_is_wired_with_the_plugin_root(portable_project, tmp_path):

@@ -638,7 +638,7 @@ def test_the_keys_come_after_the_other_notes_so_no_note_falls_under_their_headin
     document["always_on"] = "A fact for every session."
     (portable_project / "delivery.json").write_text(json.dumps(document), encoding="utf-8")
     note = (build(portable_project, tmp_path) / "adapters/claude-code/INSTALL.md").read_text(encoding="utf-8")
-    assert note.index("The declared policy in `policy.md`") < note.index("## Keys") < note.index("## Install")
+    assert note.index("the Muro system section and then the declared policy") < note.index("## Keys") < note.index("## Install")
     assert "\n## " not in note.split("\n## Keys", 1)[0]
 
 

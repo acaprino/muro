@@ -159,6 +159,37 @@ source prescribes (`prompts/intake.md`, `prompts/harmonizer.md`,
 `prompts/review.md`, ADR-0036). The AI judges; no Python rule finds a relation,
 and nothing gates a package on the study yet.
 
+Owner correction of the same day, watching a production session in which the host
+had designed screens by hand until it was told to use the package, then ran one
+capability for "È tutto troppo statico rigido quadrato", "Ma magari icone?": "Non
+stai usando marionette al massimo", then "Ancora l'uso di marionette non è naturale
+e soddisfacente". So a package is used for the whole result, on every turn, and
+without talk of its mechanics. Classification is sized to the result the user
+wants, not to the words of the request: a precise operation is one capability, a
+result to make or make better takes every capability whose craft it needs. The
+first call names every discovery entry the result needs (an entry's name in
+`--focus` stands for its capabilities). A later request, or a part of a larger
+task, that the catalog covers goes through the skill again, invoked anew, before it
+is done by hand. Work the user asked for is confirmed in the classification call.
+The host speaks of the work, not of plans, steps and records. A section of the
+session text that governs a kind of work (code, replies) draws, in a marked line,
+its boundary with the capabilities that do part of that work and names their
+entries: its size rules (the smallest change) are not rules for how much of a
+capability's work a result gets (`prompts/classify.md`, `prompts/delivery.md`,
+`prompts/review.md`, the generated `SKILL.md`, ADR-0037).
+
+Owner, the same evening: "ogni skill, ogni comando, plugin nuovo che viene generato
+da questa armonizzazione deve avere una parte nel contesto in modo che sia
+chiamabile", and "ogni plugin o muro comunque dovrebbero iniettare automaticamente
+anche una parte di system prompt per guidare bene l'uso. Chiamato muro system". So
+every release with a skill adds, before any session text its package declares and
+through the same channel on every host, a "Muro system" section written from the
+package's data alone (`muro/system_section.py`): each of its skills with the titles
+of the capabilities it covers, and the rules to invoke them also inside a larger
+task and on every later change, to name every area the result needs, to speak of the
+work, and not to invoke an absorbed original. It is the one text a release
+registers without `delivery.json` (ADR-0037, amending ADR-0016).
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: a package is a directory
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, its own
@@ -400,7 +431,8 @@ harmonized with the others, and "questo è anche il tipo di sensibilità che mi
 aspetto da Muro" for every new intake. So the form of each absorbed part is an AI
 judgment with a recorded reason (`prompts/delivery.md`), always-on is the
 exception, and never a Python rule or a default taken from the source's shape.
-A package without the document registers nothing. Intake and build still execute
+A package without the document registers nothing it declares; only the Muro system
+section below is added to every release with a skill. Intake and build still execute
 and register nothing on the factory machine, and classification never registers
 a hook. All five native adapters deliver permanent policy through the host's
 system/developer instruction channel. Hermes caps a section at 4,000 characters
@@ -492,7 +524,7 @@ router/catalog → AI-response boundary → plan/state → portable host adapter
 Test malformed/unknown/stale decisions, new non-UI intents, negation-sensitive
 examples supplied as AI fixtures, variant constraints, dependencies, state
 preservation, missing tools, hook metadata and delivery declarations (a release
-registers exactly what `delivery.json` declares, and nothing without it). A fixture does not prove
+registers exactly what `delivery.json` declares, and without it only the Muro system section). A fixture does not prove
 AI reasoning quality. Report real and simulated integrations separately.
 
 Owner rule of 2026-11-17 ("le suite falle sempre in remoto in github actions"):

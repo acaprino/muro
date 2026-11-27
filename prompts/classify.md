@@ -31,13 +31,21 @@ Never install/register a hook, or run source commands, merely because metadata
 describes a default. Python does not verify tool availability or execute hooks.
 
 Classify the desired outcomes, respecting negation, language, requested stage,
-existing artifacts and explicit non-goals. Select the smallest sufficient set of
-capabilities. The coordinator adds their `after` prerequisites mechanically.
+existing artifacts and explicit non-goals. Size the selection to the outcome, not
+to the words of the request. A precise operation (check one property, convert a
+file, report without changing anything) is the capability that does it. A result
+the user wants made, or made better, takes every capability in the catalog whose
+own work that result needs in order to be complete and good, also those the request
+does not name: the user names a result, not the crafts it takes. Read the whole
+catalog for them, the brief groups included, and order them so that each builds on
+what comes before it, the capabilities that make or change the result before those
+that only check it. Never add a capability whose work only repeats one already
+selected. The coordinator adds their `after` prerequisites mechanically.
 If a prerequisite's outputs exist, record/reuse them through the workflow rather
 than inventing completion. Do not select a capability just because its stack exists.
-Do not extrapolate unrequested stages: a static layout does not imply animation;
-an interaction specification does not imply scroll or runtime code; mentioning an
-external design or document tool as inspiration does not request editing in it.
+A stage the user rules out stays out, and so does a stage the result does not
+contain: a specification asked for on its own does not ask for its code; mentioning
+an external design or document tool as inspiration does not request editing in it.
 
 Choose at most one variant per role, justified by the request and compatible stack.
 Respect `conflicts` for the whole selected/prerequisite graph. Compare actual
@@ -77,7 +85,7 @@ and `catalog_digest`. Add exactly `status`, `selections`, `reason`, `questions`:
 - `selected`: nonempty selections, one entry per step, no questions. When the
   same capability must run multiple distinct operations in one plan, give each
   occurrence an explicit `"step_id": "<capability>#<n>"` (for example `#1`, `#2`).
-  Select complementary capabilities explicitly when both are requested, in
+  Select complementary capabilities explicitly when the result needs both, in
   execution order: a capability that consumes another's outputs comes after it.
   The catalog's `reads` lists the outputs each capability uses when recorded.
   The coordinator keeps this order and adds only declared `after` prerequisites.

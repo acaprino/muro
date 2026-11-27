@@ -566,13 +566,18 @@ def claude_code_hooks(document: dict[str, Any] | None, slug: str, name: str) -> 
     return {"description": f"{name}: registered from this release's {DELIVERY_FILE}", "hooks": events}
 
 
-def codex_hooks(document: dict[str, Any] | None, slug: str, name: str) -> dict[str, Any] | None:
-    """Codex's native developer-instruction channel, plus explicitly declared source hooks."""
-    if not document:
+def codex_hooks(document: dict[str, Any] | None, slug: str, name: str, injected: bool = False) -> dict[str, Any] | None:
+    """Codex's native developer-instruction channel, plus explicitly declared source hooks.
+
+    `injected` is true when the release has text for the system prompt, the Muro system section included
+    (ADR-0037): that text reaches Codex through `session-context` even when the package declares none.
+    """
+    if not document and not injected:
         return None
+    document = document or {}
     package_root = f"${{PLUGIN_ROOT}}/skills/{slug}"
     events: dict[str, list] = {}
-    if session_text(document):
+    if injected or session_text(document):
         for event in ("SessionStart", "SubagentStart"):
             hook = {"type": "command", "command": _command(
                 ["python", "<package_root>/muro.py", "session-context", "--hook-event", event], package_root)}
@@ -644,12 +649,17 @@ def _one_line(text: Any) -> str:
     return " ".join(str(text).split())
 
 
-def install_note(document: dict[str, Any] | None, host: str, command: str) -> str:
-    """What this host's adapter registers by itself, and what it does not."""
+def install_note(document: dict[str, Any] | None, host: str, command: str, policy: str = "") -> str:
+    """What this host's adapter registers by itself, and what it does not.
+
+    `policy` is the text the release writes to `policy.md`: the Muro system section, which every release with a
+    skill registers, then the declared session text (ADR-0037).
+    """
+    document = document or {}
     declaration = package_server(document)
     keys = _keys_note(document)
-    if not document or not (session_text(document) or document.get("hooks") or mcp_servers(document) or declaration
-                            or keys):
+    if not (policy or session_text(document) or document.get("hooks") or mcp_servers(document) or declaration
+            or keys):
         return ""
     notes = []
     channel = _SERVER_CHANNELS.get(host)
@@ -664,15 +674,18 @@ def install_note(document: dict[str, Any] | None, host: str, command: str) -> st
         server_note = f"{server_note} {_package_server_note(declaration, host, bool(mcp_servers(document)))}".strip()
     if server_note:
         notes.append(server_note)
-    if session_text(document):
+    if policy or session_text(document):
+        policy = policy or session_text(document)
         channels = {
             "claude-code": "a native `prompt.compose` module in `hooks/hooks.json`, adding a system-prompt section while preserving the host's other sections. Requires Claude Code mods (2.1.287+) enabled",
             "codex": "`SessionStart` and `SubagentStart` in `hooks/hooks.json`, adding developer instructions on startup, resume, clear, compaction, fork and subagent creation. Codex's own hook trust review and feature policy still apply",
             "pi": "the native `before_agent_start` extension, adding a named system-prompt section on each run, including after compaction and session changes. Requires Pi's structured `systemPromptOptions.sections` API",
             "opencode": "the native package plugin's system-context hooks, preserving existing system parts and messages. Requires OpenCode's package plugin API (verified on 2.2.5)",
-            "hermes": ("`register_system_prompt_section`, preserving the host's core prompt, when the policy is at most 4,000 characters. Hermes accepts no more in one section (8,000 in all of them) and skips what is over, so a longer policy is never cut: it registers a `pre_llm_call` hook instead, and Hermes appends the whole text to the user message of the first turn and again after a compression removed it. That is the turn's context, not the system prompt. Hermes writes a hook return over `hooks.output_spill.max_chars` (default 10,000) to disk and shows a preview; the policy is sent in pieces of at most 8,000 characters, so keep that setting at 8,000 or more. " if len(session_text(document).strip()) > 4000 else "`register_system_prompt_section`, preserving the host's core prompt. ") + "Requires a Hermes version exposing that API; an older host reports an explicit warning instead of claiming activation. After updating a policy, start a new session: a resumed session may retain its persisted system prompt. Not run in a live Hermes conversation",
+            "hermes": ("`register_system_prompt_section`, preserving the host's core prompt, when the policy is at most 4,000 characters. Hermes accepts no more in one section (8,000 in all of them) and skips what is over, so a longer policy is never cut: it registers a `pre_llm_call` hook instead, and Hermes appends the whole text to the user message of the first turn and again after a compression removed it. That is the turn's context, not the system prompt. Hermes writes a hook return over `hooks.output_spill.max_chars` (default 10,000) to disk and shows a preview; the policy is sent in pieces of at most 8,000 characters, so keep that setting at 8,000 or more. " if len(policy.strip()) > 4000 else "`register_system_prompt_section`, preserving the host's core prompt. ") + "Requires a Hermes version exposing that API; an older host reports an explicit warning instead of claiming activation. After updating a policy, start a new session: a resumed session may retain its persisted system prompt. Not run in a live Hermes conversation",
         }
-        notes.append(f"The declared policy in `policy.md` registers automatically through {channels[host]}. "
+        what = ("`policy.md`, the Muro system section and then the declared policy," if session_text(document)
+                else "`policy.md`, the Muro system section,")
+        notes.append(f"{what} registers automatically through {channels[host]}. "
                      "Install or load the complete adapter as a native plugin/package; copying only its skills does not load the policy. "
                      "The factory never edits host configuration or changes permissions.")
     wired = [w for w in document.get("hooks", []) if w["host"] == host]

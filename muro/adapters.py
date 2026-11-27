@@ -11,6 +11,7 @@ from .custom_instructions import DIRECTORY as CUSTOM_DIRECTORY, RECEIPT as CUSTO
 from .entries import ENTRIES_FILE, entry_description
 from .claude_adapter import write_claude_policy
 from .hermes_adapter import write_hermes_adapter, write_hermes_servers
+from .system_section import injected_text
 from .native_policy import write_opencode_adapter, write_pi_adapter
 
 
@@ -40,8 +41,10 @@ def _skill_description(plugin: dict, capabilities: list | None = None, entries: 
         never = " Never invoke a skill it absorbs: " + ", ".join(replaces) + "."
     else:
         never = ""
-    # Short, so the AI-authored description before it is not cut to fit the 1024-character limit.
-    suffix = f"{name} AI-routed coordinator: classify by meaning, one capability per step." + never
+    # Short, so the AI-authored description before it is not cut to fit the 1024-character limit. It says
+    # when to use it, not how it works: a host decides here whether work that comes up inside a larger task
+    # or a later turn goes through the package (owner, 2026-11-27; ADR-0037).
+    suffix = f"{name} AI-routed coordinator: use it also when this work comes up inside a larger task." + never
     custom = str(plugin.get("description") or "").strip().replace(":", ";")
     if custom:
         if not custom.lower().startswith("use when"):
@@ -106,8 +109,20 @@ def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_p
         launcher = f"<skill-directory>/../{slug}/muro.py" if entry else "<skill-directory>/muro.py"
         allowed = ""
     desc = entry_description(entry) if entry else _skill_description(plugin, capabilities, entries)
-    # An entry asks for its own area in full and an index of the rest; the umbrella starts from the index.
-    view = "--focus " + ",".join(entry["capabilities"]) if entry else "--brief"
+    # With discovery entries the host names, in the first call, every area the result needs: an entry's name
+    # stands for its capabilities, which come back in full with an index of the rest (ADR-0037). The entry
+    # starts from its own area; the umbrella from the areas it names, or from the index when none fits.
+    if entry or entries:
+        first = entry["name"] if entry else f"<{slug}- skill>"
+        view = f"--focus {first}[,<another {slug}- skill>…]"
+        choose = (f"1. Read the user's task and relevant project context. Decide which areas of {name} the\n"
+                  f"   result needs: the skills named `{slug}-…` in your skill list (without a plugin prefix the\n"
+                  f"   host adds){', this one included' if entry else ''}. Name every one of them in `--focus`, where a\n"
+                  "   skill's name stands for all its capabilities, and run:\n")
+        fallback = "" if entry else "\n   When none of them fits, run it with `--brief` in place of `--focus …`."
+    else:
+        view, fallback = "--brief", ""
+        choose = "1. Read the user's task and relevant project context. Run:\n"
     scope = ""
     if entry:
         titles = {cap.id: next((ln[2:].strip() for ln in cap.body.splitlines() if ln.startswith("# ")), cap.id)
@@ -143,19 +158,30 @@ description: {_yaml_scalar(desc)}
 The offline `GUIDE.html` in the `{slug}` skill folder explains this release's decision graph,
 commands, intents and handoffs. It is documentation, not an activation mechanism.
 
+This skill holds for the rest of the conversation. When a later request, or a part of a
+larger task you are doing, is work this catalog covers (a follow-up that changes the
+result, another screen, a review), invoke this skill again, or the {name} skill for that
+work, and start from step 1 before you do it by hand: the invocation is what lets the
+host run its launcher calls, and the user installed {name} so that the work of its
+sources is done with them.
+
+Speak to the user about the work: what each part of the plan makes or checks, in their
+words, and the choices it leads to. Classification, plans, maps, steps, records and
+launcher calls are this coordinator's mechanics: run them without announcing or
+recapping them.
+
 Keep every command below on one line: no heredoc, no pipe, no `cd … &&`, no JSON
 in the command. Write each JSON file with your file tool and pass its path, so the
 host's permission rules match every call. `{state}` is this coordinator's folder in
 the current project; the runtime keeps it out of Git with its own `.gitignore`.
 
-1. Read the user's task and relevant project context. Run:
-   `python {launcher} plan --compact {view} --task "<user task>" --project "<current project>"`.
+{choose}   `python {launcher} plan --compact {view} --task "<user task>" --project "<current project>"`.{fallback}
 2. The result is `classification-required` with `context` and a compact `catalog`
    (empty fields are omitted). Entries marked `brief` index the capabilities
    outside the focus: a group of capability ids with what the group is for, or one
    capability with its role and intents. They belong to this same catalog. When any
    part of the task needs one, rerun the same command with `--focus <ids>`
-   (comma-separated, keeping the ids already in focus) to read its intents,
+   (capability ids or skill names, comma-separated, keeping the ones already in focus) to read its intents,
    exclusions, tools and constraints, then select it: the plan covers the whole
    request, not only the capabilities in focus. YOU are the AI classifier: apply the Classification
    rules at the end of this file to the task and the project. Interpret outcomes,
@@ -167,6 +193,8 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    (the returned `classification_path`), then run, with the same stack options
    (a stack token is passed whole, prefix included: `--stack stack:css-only`):
    `python {launcher} plan --task "<same task>" --project "<current project>" --classification "<current project>/{state}/classification.json"`.
+   When the user asked for the work to be done, not proposed, add `--confirm` to that
+   same call: the plan needs no further approval, and the result is its first step.
    A `no_match` or `needs_clarification` result stops execution; explain or ask its
    questions. Never silently substitute a coordinator or another variant.
 3. If `direct`, apply only its instructions and run its checks, then hand its
@@ -174,8 +202,8 @@ the current project; the runtime keeps it out of Git with its own `.gitignore`.
    and run the returned `submit` line through the launcher
    (`python {launcher} record --direct --project "<current project>" --capability <capability> --outputs "<current project>/{state}/outputs.json"`).
    A denied shell command does not deny the launcher: run the `submit` line as given.
-   If `confirm`, show the ordered plan in the user's words (what each step produces)
-   and obtain one-line approval unless already authorized, then repeat the same plan
+   If `confirm` (the call had no `--confirm`), show the ordered plan in the user's words
+   (what each step produces) and obtain one-line approval, then repeat the same plan
    call with `--confirm`. Use `resume` for an existing map; `--new` archives evidence
    when confirming a freshly classified task (add `--preserve-completed <steps>` to
    keep valid upstream outputs). A `confirm` result with `approval: not-needed` is one
@@ -288,7 +316,9 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
         root = dist / "adapters" / host
         skill_dir = root / "skills" / plugin["command"]
         skill_dir.mkdir(parents=True)
-        policy = session_text(delivery)
+        # The Muro system section, then the declared session text: every release injects the first by itself
+        # (owner, 2026-11-27; ADR-0037), the second only when delivery.json declares it (ADR-0016).
+        policy = injected_text(session_text(delivery), plugin, capabilities or [], entries)
         if policy:
             (root / "policy.md").write_text(policy, encoding="utf-8", newline="")
         if capabilities:
@@ -327,7 +357,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             entry_dir = root / "skills" / entry["name"]
             entry_dir.mkdir()
             (entry_dir / "SKILL.md").write_text(
-                _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt, entry=entry),
+                _skill(plugin, host, capabilities=capabilities, classify_prompt=classify_prompt, entry=entry,
+                       entries=entries),
                 encoding="utf-8", newline="\n")
             entry_names.append(entry["name"])
         replaces = [r for r in plugin.get("replaces", []) if isinstance(r, str) and r.strip()]
@@ -349,8 +380,8 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
             f"Open `skills/{plugin['command']}/GUIDE.html` for this release's illustrated decision graph and commands. "
             "The universal fallback is `python muro.py` inside that folder. "
             f"See README.md in the source project for current verification limits.{replaces_note}"
-            f"{install_note(delivery, host, plugin['command'])}"
-            f"{_install_steps(host, plugin, host == 'codex' and bool(codex_hooks(delivery, plugin['command'], plugin['name'])))}\n",
+            f"{install_note(delivery, host, plugin['command'], policy)}"
+            f"{_install_steps(host, plugin, host == 'codex' and bool(codex_hooks(delivery, plugin['command'], plugin['name'], bool(policy))))}\n",
             encoding="utf-8", newline="\n")
         if host == "claude-code":
             (root / ".claude-plugin").mkdir()
@@ -390,7 +421,7 @@ def write_adapters(dist: Path, plugin: dict, package_source: Path, capabilities:
                                         "category": "Productivity"}]}
             (root / MARKETPLACE_FILES[host]).parent.mkdir(parents=True)
             (root / MARKETPLACE_FILES[host]).write_text(json.dumps(marketplace, indent=2), encoding="utf-8", newline="\n")
-            registered = codex_hooks(delivery, plugin["command"], plugin["name"])
+            registered = codex_hooks(delivery, plugin["command"], plugin["name"], bool(policy))
             if registered:
                 (root / "hooks").mkdir()
                 (root / "hooks/hooks.json").write_text(json.dumps(registered, indent=2), encoding="utf-8", newline="\n")

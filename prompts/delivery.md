@@ -155,6 +155,23 @@ Scope domain-specific clauses to the work they govern; do not make a broad
 package act as a single-domain assistant. The adapters add the text through
 their native system/developer instruction channels, never as a user request.
 
+The build puts a "Muro system" section before your session text in every
+release with a skill: the package's skills with what each covers, and the rules
+to invoke them also inside a larger task and on later changes. Do not repeat it.
+Session text acts before any skill is chosen, so it decides whether the
+package's capabilities are used at all. A section that governs a kind of work
+(writing code, shaping replies, editing files) also reaches the work a
+capability does inside it: an interface built in code, an explanation given in
+a reply, a document written to a file. Draw that boundary in a marked line in
+the section: it shapes how its own kind of work is done, and the work the
+capability describes is done with the capability, through the discovery entry
+you name, also when it comes up inside a larger task or as a later change. A
+section's rule for the size of its own work (the smallest change, the shortest
+reply) is not a rule for how much of a capability's work the result gets.
+Without that line the session text does the capability's work its own way, and
+the capability is never used. Record each such line with the collision it
+resolves, as for any coexistence line.
+
 A source can contribute only permanent guidance. If the resulting package has
 valid always-on delivery and no procedures, write no capability and no discovery
 entry: keep ROUTER.md's table header, omit entries.json, and author nonempty
