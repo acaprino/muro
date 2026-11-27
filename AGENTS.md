@@ -140,6 +140,25 @@ answered the same request in the chat. A text that acts in every session can
 own a request that a capability also answers: harmonization names the one owner
 there, in a marked line, and a live session checks it.
 
+Owner correction of 2026-11-27, on a source that had been absorbed as one
+capability nothing else used ("l'obiettivo era che venisse usato", "allora non
+hai armonizzato bene", "altrimenti che razza di armonizzazione è"): "prima deve
+capire a che serve, poi capire se è affiancabile o lavorare in sinergia con
+altro", "o se è complementare", "o se è simmetrica", "o subordinate o in
+dipendenza, sub o super", "e in che ordine", "deve fare uno studio accurato",
+"producendo un report finale di intake per capire quali altri
+nodi/plugin/skill sono complementari o simmetriche". So harmonization is a
+study before it is a graph. Intake ends with a relations report (purpose first,
+then how each capability stands to the others, and in which order), the
+Harmonizer reads every pair of sources on every pass and gives each relation a
+decision in a form the catalog already has, and a source that still works alone
+is a finding shown to the owner, never a silent result. Finding two capabilities
+alternatives for a whole piece of work does not end the study: one can still
+supply a part of the other's. A link adds a handoff and never changes what a
+source prescribes (`prompts/intake.md`, `prompts/harmonizer.md`,
+`prompts/review.md`, ADR-0036). The AI judges; no Python rule finds a relation,
+and nothing gates a package on the study yet.
+
 Owner correction of 2026-11-10: Muro is only the factory. The unified skills are
 a package of their own, never part of Muro: a package is a directory
 (`sources.json`, `capabilities/`, `ROUTER.md`, `guide-examples.json`, its own

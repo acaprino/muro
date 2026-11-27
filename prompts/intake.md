@@ -35,6 +35,35 @@ the same function; different names can describe the same outcome. Do not assign
 a branch because of a filename, matching role label or manifest position. The
 Harmonizer makes the final cross-source decisions.
 
+### Relations report
+
+End the intake with a relations report. Understand first what the source is for;
+judge after how each capability you extracted stands to every capability already
+in the catalog and to the others of its own source. Study the bodies and the
+source evidence, never names, roles or outputs that happen to match. For each
+pair that has a relation, write:
+
+- its kind, in plain words. Two capabilities can be **symmetric** (they do the
+  same work from equal standing), **complementary** (each supplies what the other
+  lacks, and together they give a fuller result), **subordinate** one to the other
+  (one serves as a part, a material or a stage inside the other's work: say which
+  is the part and which the whole), **dependent** (one cannot do its work rightly
+  without the other's result) or **beside** each other (alternatives a task
+  chooses between). The kinds are not exclusive and not a closed list: an
+  alternative for a whole piece of work can also supply a part of it. Name every
+  relation that holds;
+- the order, where both act in one task: which comes first, or inside which step
+  of the other it acts;
+- the reason, with the source paths or sections it rests on, and what the user
+  gains when the two work together.
+
+Write the report in the `## Sources` section of each capability as `- Relations:`
+lines. They are proposals: the Harmonizer decides each one. A capability with no
+relation says so, with the reason. Show the whole report to the owner when the
+intake ends, and name every source whose capabilities nothing else uses or meets:
+an absorbed source that works alone is a finding to state plainly, never a silent
+result and never a reason to narrow the package.
+
 In `## Sources`, give a concise rationale with source paths/sections for the
 retained methods, intent boundaries and proposed relationships. Separate source
 facts from adaptation choices and unresolved gaps. If a necessary reference is

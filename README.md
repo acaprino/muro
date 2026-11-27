@@ -227,7 +227,7 @@ A package built with Muro completed a two-step workflow in live runs on **Claude
 | Phase | What happens |
 | --- | --- |
 | **Intake** | Muro exports the verified source selection. The host AI reads it, extracts supported intents, constraints and tools, and records what each part should become. |
-| **Harmonization** | The host AI resolves overlaps and conflicts, defines variants and dependencies, and reviews delivery decisions across the whole package. |
+| **Harmonization** | The host AI studies how the sources stand to each other and links those that work together, resolves overlaps and conflicts, defines variants and dependencies, and reviews delivery decisions across the whole package. |
 | **Build** | Muro verifies pins, licenses, the catalog and examples, then packages the runtime, host adapters, notices and offline guide. |
 | **Runtime** | The host AI interprets the request and chooses capability and intent pairs. Python validates that decision against the task, stack and catalog, expands declared prerequisites, and hands off one capability at a time. |
 

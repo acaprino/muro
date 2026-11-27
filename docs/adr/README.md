@@ -320,3 +320,7 @@ Manual note outside the generated index: [ADR-0035: The plugin of one harness is
 extracted from the project file](ADR-0035-project-extract.md) records the command
 and the button the owner asked for on 2026-11-26. Proposed: the request is the
 owner's; the choices and the text are not separately approved.
+
+Manual note outside the generated index: [ADR-0036: Harmonization studies how the
+sources relate before it builds the graph](ADR-0036-relations-study.md) records the
+relations report of intake and the study of every pair of sources in harmonization.

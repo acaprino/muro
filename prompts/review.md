@@ -31,6 +31,12 @@ keyword checker, scoring script or fixed checklist to perform it for you.
 - **Harmonization records.** Merges, alternatives, handoffs and conflicts still
   describe the capabilities as they stand; a graph edge whose reason is gone is
   a finding. Role labels and manifest order still confer no authority.
+- **Relations.** The study of how the sources stand to each other is on record:
+  every capability's `## Sources` has its `- Relations:` lines, and every pair of
+  sources was judged. A recorded link still has something behind it in both
+  bodies. A source whose capabilities nothing else uses or meets is a finding:
+  say what it could supply to the others, in which order, and what would have to
+  change.
 - **Coverage.** Every selected skill of every source is still reachable from
   the catalog, an entry or the policy; an absorbed outcome that nothing
   discovers is a finding. An `intake_only_paths` file whose content no longer
