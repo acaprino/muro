@@ -434,6 +434,7 @@ def info(mp: Path, cache_root: Path) -> dict[str, Any]:
         "changelog": changelog,
         "prompts": [{"file": name, "text": (prompts_folder / name).read_text(encoding="utf-8")} for name in PROMPT_FILES],
         "instructions": _instruction_texts(folder),
+        "system_prompt": data["system_prompt"],
         "graph": {"entries": entries, "capabilities": data["capabilities"], "examples": data["examples"]},
         "export_harnesses": _export_harnesses(folder / "release" / plugin["slug"] / "adapters"),
         "files": _file_rows(

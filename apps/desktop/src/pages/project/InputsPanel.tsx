@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Cluster, Column, Count, Icon, Section, Text } from '@acaprino/sigrid/primitives';
+import { Button, Cluster, Column, Count, Icon, Section, Text } from '@acaprino/sigrid/primitives';
 import { Empty, ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { useProject } from '../../state/useProject.tsx';
 import { becameParts, instructionsOf, pinnedOf } from './data.ts';
@@ -20,9 +20,10 @@ export interface InputsPanelProps {
   /** Move the pin of an input, or remove it (`remove`). */
   onPin(input: string, remove: boolean): void;
   onInstructions(): void;
+  onSystemPrompt(): void;
 }
 
-export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPanelProps) {
+export function InputsPanel({ data, onChosen, onPin, onInstructions, onSystemPrompt }: InputsPanelProps) {
   const project = useProject();
   const { running } = useJobs();
   const selected = project.view?.selected ?? null;
@@ -67,6 +68,16 @@ export function InputsPanel({ data, onChosen, onPin, onInstructions }: InputsPan
         <Text as="p" pre>{instructionsOf(data.info)}</Text>
         <Text as="p" variant="note">Your own Markdown notes. The AI reads them with the inputs and decides how they fit.</Text>
         <Cluster><GatedButton off={busy} variant="outline" size="sm" onClick={onInstructions}>Instructions…</GatedButton></Cluster>
+      </Section>
+      <Section level={3} title="System prompt" icon={<Icon name="ai" />}>
+        <Text as="p" variant="note">
+          {data.systemPrompt
+            ? `${data.systemPrompt.length} characters added to every session.`
+            : 'No text is added to every session.'}
+        </Text>
+        {data.systemPrompt ? (
+          <Cluster><Button variant="outline" size="sm" onClick={onSystemPrompt}>View system prompt…</Button></Cluster>
+        ) : null}
       </Section>
     </Column>
   );

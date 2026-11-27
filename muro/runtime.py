@@ -1014,7 +1014,10 @@ def runtime_main(argv: list[str] | None = None) -> int:
             from .system_section import injected_text
             sources = args.package / "sources.json"
             manifest = json.loads(sources.read_text(encoding="utf-8")) if sources.is_file() else {}
-            plugin = {"name": "Muro", "command": "muro", **(manifest.get("plugin") or {})}
+            raw_plugin = manifest.get("plugin") if isinstance(manifest, dict) else None
+            if raw_plugin is not None and not isinstance(raw_plugin, dict):
+                raise ValueError("sources.json plugin must be an object")
+            plugin = {"name": "Muro", "command": "muro", **(raw_plugin or {})}
             capabilities = [parse_capability(path) for path in sorted((args.package / "capabilities").glob("*.md"))]
             text = injected_text(text, plugin, capabilities, (load_entries(args.package) or {}).get("entries"))
         except (OSError, ValueError) as exc:

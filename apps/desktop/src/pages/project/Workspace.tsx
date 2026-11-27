@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Button, Cell, Cluster, Column, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Heading, Icon, ScrollArea, Separator, Sheet, SheetContent, SheetHeader, SheetTitle, Spacer, Text, ToggleGroup, ToggleGroupItem } from '@acaprino/sigrid/primitives';
-import { Empty } from '@acaprino/sigrid/components';
+import { Dialog, Empty } from '@acaprino/sigrid/components';
 import { ContentSplit, Inspector, useAppShell } from '@acaprino/sigrid/layout';
 import { GraphCanvas, type GraphCanvasHandle } from '@acaprino/sigrid/graph';
 import type { ProjectInfo } from '../../types.ts';
@@ -142,7 +142,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   }
   const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);
   const summary = [plural(data.inputs.length, 'input'), plural(data.entries.length, 'entry', 'entries'), plural(data.caps.length, 'capability', 'capabilities'), plural(data.examples.length, 'example')].join(' · ');
-  const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} onPin={showPin} onInstructions={() => show('instructions')} />;
+  const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} onPin={showPin} onInstructions={() => show('instructions')} onSystemPrompt={() => show('prompt')} />;
   const litLine = input ? (marked.length ? `The capabilities ${input.id} became are marked on the graph.` : `${input.id} became no capability on the graph.`)
     : shown?.kind === 'decision' && shown.steps.length ? (shown.example !== null ? `The steps of “${shown.example}” are numbered on the graph.` : 'The steps of the answer are numbered on the graph.') : '';
 
@@ -219,19 +219,29 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
       <DetailsDialog id={view.id} info={info} open={dialog === 'details'} onOpenChange={closed} />
       <ReleaseDialog id={view.id} info={info} open={dialog === 'release'} onOpenChange={closed} />
       <ExtractDialog id={view.id} name={projectName(info, view.id)} action="extract_project" harnesses={info.export_harnesses} open={dialog === 'extract'} onOpenChange={closed} />
+      <Dialog
+        drawer
+        open={dialog === 'prompt'}
+        onOpenChange={closed}
+        title="System prompt"
+        description={`${name}: text added to every session (${data.systemPrompt.length} characters).`}
+        footer={<Button variant="outline" onClick={() => setDialog(null)}>Close</Button>}
+      >
+        <Text as="p" variant="soft" mono pre>{data.systemPrompt}</Text>
+      </Dialog>
     </Column>
   );
 }
 
 /** The left panel: a segmented control of its four panels, and the panel chosen, which scrolls. */
-function LeftPanel({ data, panel, onPanel, onChosen, onPin, onInstructions }: { data: ProjectData; panel: Panel; onPanel(p: Panel): void; onChosen(): void; onPin(input: string, remove: boolean): void; onInstructions(): void }) {
+function LeftPanel({ data, panel, onPanel, onChosen, onPin, onInstructions, onSystemPrompt }: { data: ProjectData; panel: Panel; onPanel(p: Panel): void; onChosen(): void; onPin(input: string, remove: boolean): void; onInstructions(): void; onSystemPrompt(): void }) {
   return (
     <Column fill pad="md" gap="md">
       <ToggleGroup fill value={panel} onValueChange={onPanel} aria-label="Project panels">
         {PANELS.map(p => <ToggleGroupItem key={p} value={p}>{PANEL_LABELS[p]}</ToggleGroupItem>)}
       </ToggleGroup>
       <ScrollArea aria-label={PANEL_LABELS[panel]}>
-        {panel === 'inputs' ? <InputsPanel data={data} onChosen={onChosen} onPin={onPin} onInstructions={onInstructions} />
+        {panel === 'inputs' ? <InputsPanel data={data} onChosen={onChosen} onPin={onPin} onInstructions={onInstructions} onSystemPrompt={onSystemPrompt} />
           : panel === 'examples' ? <ExamplesPanel data={data} onChosen={onChosen} />
           : panel === 'records' ? <RecordsPanel data={data} />
           : <RunsPanel data={data} />}

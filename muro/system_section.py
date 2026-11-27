@@ -36,8 +36,12 @@ def system_section(plugin: dict[str, Any], capabilities: list, entries: list | N
                      "of them fits")
     else:
         lines.append(f"- `{command}`: " + "; ".join(titles[cap.id] for cap in capabilities))
-    rules = ["Before you do work one of these skills covers, invoke that skill: when the work is the request, when "
-             "it comes up inside a larger task, and for each later change to it. Do not do it by hand first."]
+    rules = [
+        "Before you do work one of these skills covers, invoke that skill: when the work is the request, when "
+        "it comes up inside a larger task, and for each later change to it. Do not do it by hand first. "
+        "Skip invocation only for a trivial, self-contained edit whose exact change the user already specified "
+        "and that needs none of a skill's method, craft or coordination."
+    ]
     if entries:
         rules.append("In the skill's first call, name every one of these skills the result needs.")
     rules.append("Tell the user about the work and its choices, not about skills, plans or steps.")

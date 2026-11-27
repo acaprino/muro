@@ -11,11 +11,13 @@ import re
 
 from .core import parse_router, validate_capabilities_and_router
 from .credentials import USED_BY, declared_credentials, in_order
-from .delivery import allows_empty_catalog, load_delivery, unregistered_active_hooks, validate_delivery
+from .delivery import allows_empty_catalog, load_delivery, session_text, unregistered_active_hooks, validate_delivery
+from .entries import load_entries, validate_entries
 from .factory import prompts_dir
 from .routing import (catalog_digest, catalog_entries, resolve_selection, selection_step_id, step_capability,
                       validate_classification, validate_stack)
 from .sources import parse_capabilities
+from .system_section import injected_text
 
 
 GUIDE_TEMPLATE = Path(__file__).with_name("guide.html")
@@ -459,7 +461,8 @@ def _public_source(source: dict) -> dict:
     return public
 
 
-def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | None = None) -> str:
+def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | None = None, *,
+                  system_prompt: str | None = None) -> str:
     """Pins and, when the package records them, the AI-authored delivery decisions. Nothing is derived here."""
     delivery, tr = delivery or {}, tr or _I18N['en']
     parts = ['<div class="source-list">']
@@ -497,8 +500,8 @@ def _sources_html(sources: list[dict], delivery: dict | None = None, tr: dict | 
                     parts.append(f'<p><strong>{_text(tr["form_" + item["form"]])}{_text(targets)}</strong><br>'
                                  f'{_text(item["content"])}<br>{_text(item["reason"])}</p>')
             parts.append('</article>')
-    if delivery.get('always_on'):
-        text = delivery['always_on']
+    text = system_prompt if system_prompt is not None else (delivery.get('always_on') or '')
+    if text:
         parts.extend([
             '<article class="source-entry">', f'<h3>{_text(tr["always_on_h3"])}</h3>',
             f'<pre class="source-body">{_text(text)}</pre>',
@@ -693,6 +696,13 @@ def guide_data(dist: Path, plugin: dict, sources: list[dict], *, packaged: bool 
         entry['checks'] = list(cap.checks)
         entry['intent_checks'] = {key: list(names) for key, names in cap.intent_checks.items()}
         entry['check_conditions'] = dict(cap.check_conditions)
+    entries_doc = load_entries(dist)
+    if entries_doc is not None:
+        errors = validate_entries(entries_doc, capabilities, plugin)
+        if errors:
+            raise ValueError('Invalid discovery entries: ' + '; '.join(errors))
+    system_prompt = injected_text(session_text(delivery), plugin, capabilities,
+                                  entries_doc['entries'] if entries_doc else None)
     return {
         'plugin': {key: plugin[key] for key in ('name', 'slug', 'command', 'version')},
         'capabilities': catalog,
@@ -700,6 +710,7 @@ def guide_data(dist: Path, plugin: dict, sources: list[dict], *, packaged: bool 
         'catalog_digest': digest,
         'examples': examples,
         'delivery': delivery,
+        'system_prompt': system_prompt,
     }
 
 
@@ -757,7 +768,7 @@ def write_release_guide(dist: Path, plugin: dict, sources: list[dict]) -> Path:
         '__MURO_VERSION__': _text(plugin['version']),
         '__MURO_DATA__': serialized,
         '__MURO_CONTENT__': '\n'.join(_capability_html(cap, catalog, tr) for cap in catalog) + '\n' + _examples_html(examples, tr) + '\n' + catalog_notes,
-        '__MURO_SOURCES__': _sources_html(public_sources, delivery, tr),
+        '__MURO_SOURCES__': _sources_html(public_sources, delivery, tr, system_prompt=shown['system_prompt']),
         '__MURO_KEYS__': _keys_html(credentials, tr),
         '__MURO_KEYS_STYLE__': _KEYS_STYLE if credentials else '',
         '__MURO_GRAPH_LIBRARY__': graph_script,

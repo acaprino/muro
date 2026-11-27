@@ -136,7 +136,14 @@ function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: Project
               <Column key={`${k}:${i.id}`} as="li" gap="xs">
                 <Text mono truncate>{i.id}</Text>
                 {i.description ? <Text variant="note">{i.description}</Text> : null}
-                {i.excludes ? <Text variant="note">Not for: {i.excludes}</Text> : null}
+                {i.excludes.length === 1 ? (
+                  <Text variant="note">Not for: {i.excludes[0]}</Text>
+                ) : i.excludes.length > 1 ? (
+                  <Column gap="xs">
+                    <Text variant="note">Not for:</Text>
+                    <Text as="div" variant="note"><TextList items={i.excludes} /></Text>
+                  </Column>
+                ) : null}
               </Column>
             ))}
           </Column>

@@ -98,8 +98,10 @@ def _skill(plugin: dict, host: str, capabilities: list | None = None, classify_p
         # Reads of the plugin's own folder are approved too, so a step opens its packaged originals
         # without a prompt. A read rule takes an absolute path as a native path or with a second
         # leading slash, and the host fills in the root differently per system: both are written.
+        # Live run of 2026-11-27 on Windows: Claude Code can also call the launcher via `PowerShell`.
         root = "${CLAUDE_PLUGIN_ROOT}"
         allowed = (f'allowed-tools: Bash(python {launcher} *) Bash(python "{launcher}" *) '
+                   f'PowerShell(python {launcher} *) PowerShell(python "{launcher}" *) '
                    f'Read({root}/**) Read(/{root}/**) Edit(./{state}/**)\n')
         if entry:
             # Discovery only: the model can invoke the entry; the one user-facing command stays /<command>.

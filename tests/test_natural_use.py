@@ -1,9 +1,8 @@
 """A package is used for the whole result, again on later turns, and without talk of its mechanics.
 
-Owner, 2026-11-27, watching a production session: "Non stai usando marionette al massimo", then
-"Ancora l'uso di marionette non è naturale e soddisfacente" (ADR-0037). The host had designed screens
-by hand until it was told to use the package, then selected one capability for a request that named a
-result ("too static, rigid, square; icons instead of buttons?"), and announced its plans and steps.
+Owner, 2026-11-27, watching a production session (ADR-0037): the host had designed screens by hand
+until told to use the package, then selected one capability for a request that named a result
+("too static, rigid, square; icons instead of buttons?"), and announced its plans and steps.
 
 The prompt and the generated skills state the rules. That a host applies them is not proved here: the
 live runs are in docs/verification/2026-11-27-natural-use.md.
@@ -134,6 +133,7 @@ def test_the_muro_system_section_is_written_from_the_package_data():
     assert all(title in text for title in titles.values())  # the capabilities' own titles, nothing invented
     flat = _flat(text)
     assert "when it comes up inside a larger task, and for each later change to it" in flat
+    assert "Skip invocation only for a trivial, self-contained edit whose exact change the user already specified" in flat
     assert "name every one of these skills the result needs" in flat
     assert "not about skills, plans or steps" in flat
     assert "Do not invoke a skill or plugin that Pressroom absorbs" in flat
@@ -142,3 +142,39 @@ def test_the_muro_system_section_is_written_from_the_package_data():
     assert system_section(PLUGIN, [], entries) == ""        # a policy-only package has no skill to invoke
     assert injected_text("Rules.", PLUGIN, caps, entries) == system_section(PLUGIN, caps, entries) + "\nRules."
     assert injected_text("Rules.", PLUGIN, [], None) == "Rules."
+
+
+def test_claude_code_skills_preapprove_powershell_alongside_bash():
+    caps = parse_capabilities(FIXTURE / "capabilities")
+    entries = json.loads((FIXTURE / "entries.json").read_text(encoding="utf-8"))["entries"]
+    for entry in (None, entries[0]):
+        front = _skill(PLUGIN, "claude-code", capabilities=caps, classify_prompt="# R", entry=entry,
+                       entries=entries).split("---", 2)[1]
+        line = next(l for l in front.splitlines() if l.startswith("allowed-tools:"))
+        assert "Bash(python ${CLAUDE_PLUGIN_ROOT}/skills/pressroom/muro.py *)" in line
+        assert 'Bash(python "${CLAUDE_PLUGIN_ROOT}/skills/pressroom/muro.py" *)' in line
+        assert "PowerShell(python ${CLAUDE_PLUGIN_ROOT}/skills/pressroom/muro.py *)" in line
+        assert 'PowerShell(python "${CLAUDE_PLUGIN_ROOT}/skills/pressroom/muro.py" *)' in line
+
+
+def test_guide_and_project_info_expose_the_full_composed_system_prompt(tmp_path):
+    from muro import guide
+    from muro.system_section import injected_text
+    manifest = json.loads((FIXTURE / "sources.json").read_text(encoding="utf-8"))
+    caps = parse_capabilities(FIXTURE / "capabilities")
+    entries = json.loads((FIXTURE / "entries.json").read_text(encoding="utf-8"))["entries"]
+    delivery = json.loads((FIXTURE / "delivery.json").read_text(encoding="utf-8"))
+    expected = injected_text(delivery.get("always_on", ""), manifest["plugin"], caps, entries)
+    data = guide.guide_data(FIXTURE, manifest["plugin"], manifest["sources"], packaged=False)
+    assert data["system_prompt"] == expected
+    assert data["system_prompt"].startswith("# Muro system: ")
+    # Copy fixture to a scratch dir to write GUIDE.html and verify both Muro system and declared session text appear.
+    import shutil
+    scratch = tmp_path / "pkg"
+    shutil.copytree(FIXTURE, scratch)
+    shutil.copytree(ROOT / "prompts", scratch / "prompts")
+    html = guide.write_release_guide(scratch, manifest["plugin"], manifest["sources"]).read_text(encoding="utf-8")
+    assert "# Muro system: " in html
+    assert f"{len(expected)} characters, paid by every session" in html
+    if delivery.get("always_on"):
+        assert delivery["always_on"].splitlines()[0] in html

@@ -141,3 +141,16 @@ test('the steps that light the graph are numbered in the order of the decision; 
   assert.equal(litOf({ kind: 'failed', asked: 't', message: 'm' }).size, 0);
   assert.equal(litOf(decision({ status: 'no_match', steps: [] })).size, 0);
 });
+test('intent exclusions are read whether the catalog stores an array of strings or a single legacy string', () => {
+  const held = info({}, {
+    capabilities: [
+      cap('arr', { intents: [{ id: 'a.one', description: 'Do A', excludes: ['Not B', '', '  ', 7, 'Not C'] }] }),
+      cap('str', { intents: [{ id: 's.one', description: 'Do S', excludes: 'Not T' }] }),
+      cap('empty', { intents: [{ id: 'e.one', description: 'Do E', excludes: '' }, { id: 'e.two', description: 'Do E2', excludes: null }] }),
+    ],
+  });
+  const byId = new Map(capsOf(held).map(c => [c.id, c]));
+  assert.deepEqual(byId.get('arr')!.intents[0].excludes, ['Not B', 'Not C']);
+  assert.deepEqual(byId.get('str')!.intents[0].excludes, ['Not T']);
+  assert.deepEqual(byId.get('empty')!.intents.map(i => i.excludes), [[], []]);
+});
