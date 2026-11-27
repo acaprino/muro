@@ -45,6 +45,48 @@ unresolved choice changes the outcome, report the exact gap or decision needed;
 do not silently pick a source or present that part as harmonized. Missing source
 analysis must return to Intake AI with the approved pinned evidence.
 
+## Study the relations before the graph
+
+Harmonization is a study first and a graph after. Before you merge, order or
+separate anything, say for every source what it is for, and judge how its
+capabilities stand to those of every other source. Read every pair of sources, in
+both directions, on every harmonization, also when the catalog already exists and
+one input changed. Start from the `- Relations:` proposals intake left in
+`## Sources` and from the owner Markdown, and do not stop at them. The kinds are
+the ones the Intake protocol names (symmetric, complementary, subordinate as part
+or whole, dependent, beside); they are not exclusive, and the order matters
+wherever two capabilities act in one task. Finding two capabilities alternatives
+for a whole piece of work does not end the study: ask also whether either supplies
+a part, a material or a stage of the other's work.
+
+Every relation you find gets a decision, in a form the catalog already has:
+
+- symmetric: a merge, variants, or alternatives whose intents exclude each other;
+- dependent: `after` when it always holds, `needs` when it holds in some tasks;
+- complementary or subordinate: a link. The whole says, at the step that uses it,
+  what it takes from the part and where: `reads` for a recorded output, `needs`
+  for a part that must run first in some tasks, or the packaged files of the
+  part's source opened as working material where the part's method is a file to
+  follow. An exclusion that would send away the very use the link makes is
+  reworded, and nothing else of the part changes;
+- beside: nothing but the exclusions that tell them apart;
+- none: the relation was considered and left unwired, with the reason.
+
+A link adds a handoff. It never changes a rule, number, condition or limit of
+either source, never makes a second producer of an output and never runs two
+capability bodies in one step. Where a link cannot be made without changing what
+a source prescribes, it is a coexistence change, recorded with its collision. Say
+what each link costs per task (a step, a call, a billed tool).
+
+Record the study where it is read later. In each capability's `## Sources`,
+replace the proposals with `- Relations:` lines that give, for each related
+capability, the kind, the order, the form you gave it or why none, and the source
+paths. In ROUTER.md's harmonization record, write one line for each link across
+sources, wired or refused. When the harmonization ends, show the owner the whole
+relations report: the links you wired, those you left unwired and why, and every
+source whose capabilities still work alone. A source that works alone after the
+study is a finding you state, never a silent result.
+
 ## Explain the released plugin
 
 Every release renders a compact offline `GUIDE.html`. Initially show only the
@@ -378,7 +420,8 @@ Python validates task/stack/catalog binding, orders prerequisites and manages
 evidence. It never classifies user text, chooses an intent, or adds a fallback.
 
 Include a concise harmonization record explaining merged source-to-intent coverage,
-conflict decisions, retained variants and why prerequisites are necessary. Review
+conflict decisions, retained variants, each link across sources and why
+prerequisites are necessary. Review
 representative requests and near-misses against the resulting graph: no lost
 outcomes, unwanted stages or competing writers. Record these as LLM review,
 separately from mechanical validation; neither alone proves general reliability.
