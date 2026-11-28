@@ -1,4 +1,4 @@
-// Photographs of every screen of the window, on the fake transport and in the fake window of browser-helper.mjs: dark and light, 1440, 860 and 620 px wide, in
+// Photographs of every screen of the window (under Sigrid's narrow width the Sync table is two lists: a plugin and a harness are opened from them), on the fake transport and in the fake window of browser-helper.mjs: dark and light, 1440, 860 and 620 px wide, in
 // apps/desktop/tests/shots (the artifact `muro-shots` of Tests), which a person judges. A screen that cannot be reached, or that overflows sideways, fails the run.
 //   node apps/desktop/tests/shots.mjs        (MURO_UI_PORT moves the dev server off 1422)
 import { mkdir } from 'node:fs/promises';
@@ -30,10 +30,10 @@ const SCREENS = [
   ['sync-unlisted', 'unlisted', async () => {}],
   ['sync-checked', 'demo', checked],
   ['sync-review', 'demo', async page => { await checked(page); await button(page, 'Review').click(); await page.locator('[data-review-sheet]').waitFor(); }],
-  ['sync-plugin', 'changes', async page => { await page.locator('#rows button').first().click(); await page.locator('[data-slot="sheet-content"]').waitFor(); }],
+  ['sync-plugin', 'changes', async page => { await page.locator('#rows button, [aria-label="Your plugins on your harnesses"] button').first().click(); await page.locator('[data-slot="sheet-content"]').waitFor(); }],
   ['sync-add-plugin', 'changes', async page => { await button(page, 'Add plugin').first().click(); await page.locator('[data-slot="sheet-content"]').waitFor(); }],
   ['sync-add-harness', 'changes', async page => { await button(page, 'Add harness').first().click(); await page.getByRole('heading', { name: 'Add a harness' }).waitFor(); }],
-  ['sync-harness', 'demo', async page => { await page.locator('#sync-table th button').first().click(); await page.locator('[data-inspector-form]:not([hidden])').waitFor(); }],
+  ['sync-harness', 'demo', async page => { await page.locator('#sync-table th button, [aria-label="Your harnesses"] button').first().click(); await page.locator('[data-inspector-form]:not([hidden])').waitFor(); }],
   ['projects', 'projects', projects],
   ['project', 'projects', project],
   ['project-example', 'projects', async page => { await project(page); await panel(page, 'Examples'); await row(page, 'A landing page').click(); await page.getByRole('heading', { name: 'Documented example', level: 2 }).first().waitFor(); }],

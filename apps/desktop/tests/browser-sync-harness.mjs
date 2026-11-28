@@ -23,6 +23,8 @@ async function test(name, scenario, options, body) {
 // ---------- where the page's own parts are ----------
 /** The header of a harness in the table: the button with its name opens the inspector. */
 const column = (page, name) => page.locator('th').getByRole('button', { name: new RegExp('^' + name) }).first();
+/** Under Sigrid's narrow width the table is two lists: a harness is a row of the list of harnesses, which opens its inspector as its column head does. */
+const harnessRow = (page, name) => page.getByRole('list', { name: 'Your harnesses' }).getByRole('button', { name: new RegExp('^' + name) }).first();
 const addHarnessButton = page => page.getByRole('button', { name: 'Add harness', exact: true });
 const unlistedSection = page => page.getByRole('region', { name: 'Installed, not in your list' });
 const rowOf = (page, name) => page.getByRole('row').filter({ hasText: name });
@@ -467,7 +469,8 @@ for (const width of [500, 250]) {
     await ready(page);
     await unlistedSection(page).waitFor();
     assert.equal(await fits(unlistedSection(page)), true, 'the section fits');
-    await column(page, 'Codex isolated test').click();
+    assert.equal(await page.locator('#sync-table').count(), 0, 'no table that scrolls sideways: the plugins and the harnesses are lists');
+    await harnessRow(page, 'Codex isolated test').click();
     const panel = inspector(page);
     await headingOf(panel, 'Codex isolated test').waitFor();
     assert.equal(await panel.getAttribute('data-inspector-form'), 'drawer', 'under 1000px the inspector is a panel over the content');
