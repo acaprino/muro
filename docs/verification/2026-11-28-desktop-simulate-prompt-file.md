@@ -41,8 +41,24 @@ which Claude Code reported with no message the runtime read ("Claude Code stoppe
 the check cheap; the runtime names none): `success`, one turn, 0.0078 USD; `simulate-check` of the answer
 against the prepared context: `valid: true`, one step selected. Sample size: one run.
 
+## The changed runtime, run
+
+Tests run 46162477181 on `claude/simulate-and-mcp-button` (37e8879): `tests` and `program` passed, and in
+`desktop` the Rust tests (the new ones of `tests/simulate.rs`, `tests/mcp_server.rs` and the module's own),
+the type check, Sigrid's and Imago's rules and the browser tests passed. "Photographs of every screen" failed
+on `sync-plugin-dark-1440` and `sync-plugin-light-1440`, as on `develop` before this branch (run 46157072159,
+98d98d4); `sync-light-1440` failed once and passed on the rerun.
+
+`muroctl.exe` of that run's `muro-desktop` artifact, on a scratch data folder holding a copy of this machine's
+registry (engine `harness` / `claude-code`, budget 0.5, Claude Code's default model):
+
+| Request | Result |
+|---|---|
+| `simulate`, the larger project, "crea una landing page per un prodotto" | after 37 s: "Claude Code stopped: Reached maximum budget ($0.5)". The whole prompt reaches the model; on the default model it costs more than the default budget, and the runtime now says so |
+
+So the cause of "The agent gave no answer" is gone, and the person's budget decides whether a large catalog
+finishes on an expensive model. A run with a higher budget was not made.
+
 ## Not executed
 
-- The Rust changes and their tests (`tests/simulate.rs`, `tests/real_factory.rs`) wait for the Tests workflow:
-  nothing is compiled on this machine.
-- No run of the changed runtime itself; no run on the default model with a higher budget; no Codex run.
+- No simulation through the changed runtime that finished on the default model; no Codex run.
