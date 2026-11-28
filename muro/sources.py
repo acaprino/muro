@@ -308,12 +308,48 @@ def _apache_template(text: str) -> str:
     return head + found + "\n".join(lines)
 
 
-def copyright_notices(data: bytes, license_type: str) -> list[str]:
+def license_section(src: dict[str, Any]) -> dict[str, str] | None:
+    """Declared approved section inside a multi-section LICENSE file (ADR-0038).
+
+    When a repository carries one LICENSE file with multiple sections (for example,
+    MIT for one part and proprietary terms for another), `license_section` names the
+    exact start/end boundaries of the approved MIT or Apache-2.0 text and the
+    human/AI-reviewed reason it covers the selected paths.
+    """
+    section = src.get("license_section")
+    if section is None:
+        return None
+    shape = "license_section must be {start, end, reason} with nonempty strings"
+    if not isinstance(section, dict) or set(section) != {"start", "end", "reason"}:
+        raise ValueError(shape)
+    if not all(isinstance(section[k], str) and section[k].strip() for k in ("start", "end", "reason")):
+        raise ValueError(shape)
+    return section
+
+
+def _extract_license_section(data: bytes, section: dict[str, str]) -> bytes:
+    """Slice the unique declared section [start..end] from a multi-section LICENSE file."""
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError("LICENSE is not valid UTF-8") from exc
+    start, end = section["start"], section["end"]
+    if text.count(start) != 1:
+        raise ValueError("license_section.start must match uniquely in LICENSE")
+    sub = text[text.index(start):]
+    if sub.count(end) != 1:
+        raise ValueError("license_section.end must match uniquely after license_section.start in LICENSE")
+    return sub[:sub.index(end) + len(end)].encode("utf-8")
+
+
+def copyright_notices(data: bytes, license_type: str, section: dict[str, str] | None = None) -> list[str]:
     """Copyright notices carried by a verified license, never its prose.
 
     License terms contain wrapped lines that merely begin with "copyright";
     only the MIT header and the filled Apache appendix line are notices.
     """
+    if section:
+        data = _extract_license_section(data, section)
     text = data.decode("utf-8-sig")
     if license_type == "MIT":
         header = text.split("Permission is hereby granted, free of charge", 1)[0]
@@ -421,7 +457,9 @@ def inspect_source(src: dict[str, Any], base_dir: Path, *, coverage: bool = Fals
         if entries[license_path] != "100644" and entries[license_path] != "100755":
             raise ValueError(f"{license_label} is not a regular file")
         license_bytes = _blob(repo, commit, license_path)
-        if not _license_matches(license_bytes, src.get("license", "")):
+        section = license_section(src)
+        checked_bytes = _extract_license_section(license_bytes, section) if section else license_bytes
+        if not _license_matches(checked_bytes, src.get("license", "")):
             raise ValueError("LICENSE does not match the complete approved MIT/Apache-2.0 template"
                              + ("" if rooted else f" (license_path {license_path})"))
         declared_media: dict[str, bool] = {}
@@ -505,6 +543,7 @@ def _validate_source_shape(src: dict[str, Any]) -> None:
     license_path = src.get("license_path", "LICENSE")
     if not _safe_pattern(license_path) or any(char in license_path for char in "*?["):
         raise ValueError("license_path must be a plain repository-relative file path")
+    license_section(src)
 
 
 def check_sources(manifest: dict[str, Any], base_dir: Path, offline_pins: bool = False,

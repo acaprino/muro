@@ -246,6 +246,10 @@ installation, publication or replacement of existing dist output without request
   is the root `LICENSE` unless `license_path` names the file that licenses the
   source's own folder; that file covers only paths under its folder, and a
   license deeper than the verified one always needs review (ADR-0005, ADR-0006).
+  Optional `license_section` (`{start, end, reason}`) declares the exact MIT or
+  Apache-2.0 slice inside a multi-section `LICENSE` file; the slice is verified
+  by the same template hash and only its notices enter `NOTICE.md`, while the
+  verbatim `LICENSE` ships in `LICENSES/` (ADR-0038).
   Optional `notice_paths`: selected files that list the third-party notices of
   code a source bundles in a prebuilt file, which the gate cannot see inside.
   They must ship; the aggregated `NOTICE.md` points at each one. Declared at
