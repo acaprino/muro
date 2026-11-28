@@ -93,7 +93,7 @@ export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {
   const operations=checked?checked.operations.length:record!.pending!,blockers=checked?checked.blockers.length:record!.blockers??0,errors=snapshot.sync.errors??0;
   return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,errors,projects:archivedErrors,byKind};
 }
-export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'|'sources'|'projects'; operations:number; blockers:number; errors:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
+export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'|'sources'|'projects'; operations:number; blockers:number; errors:number; projects:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
 /** What the strip leads with. A harness column that cannot be read (its inventory, or the instructions of one of its plugins; `count` tells which) never reads as in sync, and neither does a source that could not be resolved: with nothing to apply they replace "ok" and "blocked", the unreadable harness first. */
 export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
   const summary=syncSummary(snapshot,plan);
