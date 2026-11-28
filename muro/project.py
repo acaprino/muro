@@ -746,7 +746,7 @@ def _store(destination: Path, snapshot: dict[str, _Member]) -> None:
 
 
 # What picks the files a cached copy of a source holds, and what it was fetched and checked for.
-_STAMPED = ("selected_paths", "media_paths", "notice_paths", "license_path", "excluded_paths", "license")
+_STAMPED = ("selected_paths", "media_paths", "notice_paths", "license_path", "license_section", "excluded_paths", "license")
 
 
 def _stamp(src: dict[str, Any]) -> str:

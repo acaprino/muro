@@ -107,7 +107,7 @@ def build_release(manifest_path: Path, project_root: Path, out_root: Path,
                  f"The following upstream works are adapted and merged into {name}:", ""]
         for src, license_bytes, upstream_notice in verified:
             lines.append(f"- {src['id']} — {src['license']} (see LICENSES/{src['id']}.txt)")
-            lines += [f"  {notice}" for notice in copyright_notices(license_bytes, src["license"])]
+            lines += [f"  {notice}" for notice in copyright_notices(license_bytes, src["license"], src.get("license_section"))]
             lines.append(f"  Modified and merged into {name}.")
             if upstream_notice:
                 lines.append(upstream_notice.decode("utf-8"))
