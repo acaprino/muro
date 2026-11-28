@@ -7,6 +7,8 @@
 // The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); a column only says how many changes wait there,
 // and its inspector syncs that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
 import * as React from 'react';
+import { NARROW, useMedia } from '@acaprino/sigrid';
+import { ItemList, ItemRow } from '@acaprino/sigrid/components';
 import { Badge, Button, Cluster, Column, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
 import { cellState, harnessState, outsideList, versionOf, type CellStatus } from '../../model.ts';
@@ -48,6 +50,10 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.min(buttons.length - 1, Math.max(0, at + (event.key === 'ArrowDown' ? 1 : -1)));
     buttons[next]?.focus();
   }
+
+  // Below Sigrid's narrow width a grid of harness columns scrolls sideways and cuts its columns: the same facts become two lists, the harnesses and the plugins.
+  const narrow = useMedia(NARROW);
+  if (narrow) return <SyncList snapshot={snapshot} plan={sync.plan} resolving={sync.resolvingSources} onOpenPlugin={onOpenPlugin} onOpenHarness={onOpenHarness} />;
 
   return (
     <Table id="sync-table" aria-label="Your plugins on your harnesses">
@@ -233,4 +239,82 @@ function CellAction({ label, state, plugin, target }: { label: string; state: Ce
   }
   return <Button variant="outline" size="sm" aria-label={`${label} · ${plugin.name} on ${target.name}`} loading={working} loadingText="Working…"
     disabled={sync.busy && !working} onClick={e => void run(e.currentTarget)}>{label}</Button>;
+}
+
+// ---------- the narrow layout ----------
+
+/** What a column head says, in words: its state, then what else is on that harness. The same facts as `HarnessHead`, for a list. */
+function harnessWords(target: Target, snapshot: Snapshot, plan: Plan | null): string[] {
+  const state = harnessState(target, snapshot, plan), outside = outsideList(snapshot, plan, target);
+  const kinds = snapshot.registry.plugins.map(p => cellState(p, target, snapshot, plan).kind);
+  const besides = (kind: string) => (state.kind === kind ? 0 : kinds.filter(k => k === kind).length);
+  const main: Record<string, string> = {
+    paused: 'Paused', 'adapt-again': adaptAgain(state.count), unavailable: notAvailable(state.count), blocked: notReady(state.count), disabled: turnedOff(state.count),
+    'not-checked': 'Not checked', unscanned: 'Not checked yet', unknown: state.count ? `${plural(state.count, 'plugin')} to check` : 'Cannot be read',
+    'source-error': `${plural(state.count, 'source')} to check`, unseen: 'Check to see the changes', ok: 'In sync',
+    changes: state.count > outside ? `${plural(state.count - outside, 'change')} waiting` : 'In sync',
+  };
+  return [main[state.kind] ?? state.kind, besides('blocked') ? notReady(besides('blocked')) : '', besides('adapt-again') ? adaptAgain(besides('adapt-again')) : '',
+    besides('unavailable') ? notAvailable(besides('unavailable')) : '', outside ? `${plural(outside, 'removal')} outside your list` : ''].filter(Boolean);
+}
+
+/** What a cell says, in words, or null for a harness the plugin is not on and cannot be selected for. The same states as `Cell`, for a fact of a row. */
+function cellWords(state: CellStatus, plugin: Plugin, target: Target, checked: boolean): string | null {
+  switch (state.kind) {
+    case 'ok': return checked ? `In sync, ${state.to}` : `${state.to}, not checked`;
+    case 'update': return state.reason && state.from === state.to ? `Restore ${state.to}` : `Update ${state.from} → ${state.to}`;
+    case 'install': return `Install ${state.to}`;
+    case 'reinstall': return `Reinstall ${state.to}`;
+    case 'activate': return `Activate ${state.to}`;
+    case 'remove': return `Remove ${state.from}`;
+    case 'unavailable': return 'Not available';
+    case 'adapt-again': return state.from === 'never' ? 'Instructions not applied' : 'Adapt again';
+    case 'blocked': return `Not ready: ${state.reason}`;
+    case 'disabled': return 'Turned off';
+    case 'source-error': return 'Check plugin source';
+    case 'changes': return plural(state.count ?? 0, 'change');
+    case 'unscanned': return 'Check installation';
+    case 'unknown': return 'Unknown';
+    case 'paused': return 'Paused';
+    default: return plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path) ? null : 'Not selected';
+  }
+}
+
+interface SyncListProps {
+  snapshot: Snapshot;
+  plan: Plan | null;
+  resolving: readonly string[];
+  onOpenPlugin(pluginId: string, opener: HTMLElement | null): void;
+  onOpenHarness(targetId: string, opener: HTMLElement | null): void;
+}
+
+/** The table as two lists, for a narrow window: each harness with its state (it opens its inspector), then each plugin with its version and one fact per harness it is on (it opens its dialog,
+ * where its changes are applied; Apply all is in the bar). Nothing scrolls sideways and no column is cut. */
+function SyncList({ snapshot, plan, resolving, onOpenPlugin, onOpenHarness }: SyncListProps) {
+  const { plugins, targets } = snapshot.registry;
+  return (
+    <Column gap="lg">
+      <ItemList aria-label="Your harnesses">
+        {targets.map(t => (
+          <ItemRow key={t.id} title={t.name} facts={harnessWords(t, snapshot, plan).map((text, i) => ({ text, ...(i === 0 ? { tone: 'strong' as const } : {}) }))}
+            onClick={(event: React.MouseEvent<HTMLElement>) => onOpenHarness(t.id, event.currentTarget)} />
+        ))}
+      </ItemList>
+      <ItemList aria-label="Your plugins on your harnesses">
+        {plugins.map(p => {
+          const v = versionOf(p), checking = resolving.includes(p.id);
+          const version = checking ? 'Checking source…' : [v.version || 'Not checked', p.policy !== 'stable' ? POLICY[p.policy] : ''].filter(Boolean).join(' · ');
+          const facts = checking ? [] : targets.map(t => {
+            const words = cellWords(cellState(p, t, snapshot, plan), p, t, harnessState(t, snapshot, plan).kind !== 'not-checked');
+            return words ? { text: `${t.name}: ${words}` } : null;
+          }).filter((f): f is { text: string } => f !== null);
+          return (
+            // The version is the row's first fact, not a meta at its end: at narrow widths a meta takes the room of the name.
+            <ItemRow key={p.id} wrapTitle title={p.name} description={p.targets.length ? p.source : `${p.source} · No harness chosen`}
+              facts={[{ text: version, tone: 'strong' as const }, ...facts]} onClick={(event: React.MouseEvent<HTMLElement>) => onOpenPlugin(p.id, event.currentTarget)} />
+          );
+        })}
+      </ItemList>
+    </Column>
+  );
 }
