@@ -65,7 +65,8 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
   const h = syncHeadline(snapshot, plan);
   // A harness whose inventory cannot be read (`count` 0) is named; one that reads fine but holds a plugin whose instructions cannot be read is not blamed: the plugin is.
   const harnesses = h.unreadable.filter(u => !u.count).map(u => u.target.name);
-  const broken = snapshot.registry.plugins.filter(p => snapshot.custom_instructions?.some(i => i.plugin_id === p.id && i.error)).map(p => p.name);
+  const broken = snapshot.registry.plugins.filter(p => h.unreadable.some(u => p.targets.includes(u.target.id))
+    && snapshot.custom_instructions?.some(i => i.plugin_id === p.id && i.error)).map(p => p.name);
   const unreadable = !h.unreadable.length ? '' : harnesses.length ? `${nameList(harnesses)} cannot be read` : broken.length ? `The instructions of ${nameList(broken)} cannot be read` : 'A plugin cannot be read';
   const projectBit = h.projects ? `${plural(h.projects, 'plugin')} ${h.projects === 1 ? 'needs' : 'need'} attention` : '';
   switch (h.kind) {

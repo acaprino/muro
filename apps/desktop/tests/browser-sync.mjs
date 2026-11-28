@@ -203,8 +203,10 @@ await test('a plugin with no version for a harness: its cell and its column say 
   assert.equal(await c.nth(2).textContent(), '2.1.0', 'installed where it has a build');
   assert.equal(await c.nth(3).textContent(), 'Not available');
   await head(page, 'Codex').getByText('1 plugin not available', { exact: true }).waitFor();
-  await head(page, 'Claude Code').getByText('In sync', { exact: true }).waitFor();
+  // Nothing of this list was checked yet: the column does not claim to be in sync before a check.
+  await head(page, 'Claude Code').getByText('Check to see if it is in sync', { exact: true }).waitFor();
   await check(app);
+  await head(page, 'Claude Code').getByText('In sync', { exact: true }).waitFor();
   assert.equal(await kind(page), 'blocked');
   assert.match(await noteText(page).textContent(), /^Codex \/ commit-helper: no build for this harness/);
   assert.equal(await content(page).getByText('Everything is in sync').count(), 0);

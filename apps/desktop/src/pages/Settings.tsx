@@ -137,9 +137,12 @@ function AiEngineSettings() {
 function SavedText({ label, value, disabled, mono, inputMode, onSave }: { label: string; value: string; disabled: boolean; mono?: boolean; inputMode?: 'decimal'; onSave(text: string): Promise<boolean> }) {
   const [draft, setDraft] = React.useState(value);
   React.useEffect(() => setDraft(value), [value]);
+  // The text being saved: Enter commits and the blur that follows does not send it again.
+  const sending = React.useRef<string | null>(null);
   async function commit(): Promise<void> {
-    if (draft === value) return;
-    if (!(await onSave(draft))) setDraft(value);
+    if (draft === value || sending.current === draft) return;
+    sending.current = draft;
+    try { if (!(await onSave(draft))) setDraft(value); } finally { sending.current = null; }
   }
   return <Input aria-label={label} mono={mono} inputMode={inputMode} autoComplete="off" spellCheck={false} value={draft} disabled={disabled}
     onChange={e => setDraft(e.currentTarget.value)} onBlur={() => void commit()}

@@ -322,7 +322,14 @@ pub fn request_with_progress(
             if let Some(report) = progress {
                 report(json!({"phase":"plan"}));
             }
-            let plan = check_plan(data_dir, &registry, &receipts, None, only, None, Some(errors.len()))?;
+            // A project file that needs attention is the plugin's `project_source_error`, which the page
+            // counts on its own: the recorded count is of the sources that did not answer.
+            let unanswered = errors.iter().filter(|e| {
+                registry["plugins"].as_array().into_iter().flatten()
+                    .find(|p| p["id"] == e["plugin_id"])
+                    .is_none_or(|p| !p["project_source_error"].is_string())
+            }).count();
+            let plan = check_plan(data_dir, &registry, &receipts, None, only, None, Some(unanswered))?;
             if errors.is_empty() {
                 log(
                     data_dir,
