@@ -1,3 +1,20 @@
+---
+adr_id: ADR-0038
+version: 1
+title: Multi-section LICENSE files (license_section)
+status: Proposed
+author: JanuraCode
+scope:
+  paths: [muro/sources.py, muro/release.py, muro/project.py, tests/test_license_section_gate.py, AGENTS.md]
+  modules: [muro.sources, muro.release, muro.project]
+  domains: [sources, licensing, release]
+governs_symbols: [license_section, _extract_license_section, copyright_notices, inspect_source, _STAMPED]
+depends_on: [ADR-0002, ADR-0005, ADR-0006]
+created_from_task: multi-section-license-files
+proposed_on: 2026-11-28
+accepted_on: null
+---
+
 # ADR-0038: Multi-section LICENSE files (`license_section`)
 
 - **Status:** Implemented (2026-11-28)
