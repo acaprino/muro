@@ -61,11 +61,11 @@ test('cellState without a plan is read from the snapshot for one target',()=>{
  assert.equal(cellState({...plugin,targets:[]},t,s,null).kind,'none');
  assert.equal(cellState(plugin,{...t,enabled:false},s,null).kind,'paused');
 });
-test('cellState gives needs-build when the plugin has no distribution for the harness of the target',()=>{
+test('cellState: a plugin with no distribution for the harness of the target is unavailable there, never to build',()=>{
  const s=snapshot(),t=s.registry.targets[0];
- assert.equal(cellState({...plugin,distributions:[{harness:'pi',path:'/x',version:'2'}]},t,s,null).kind,'needs-build');
- assert.equal(cellState({...plugin,distributions:[]},t,s,null).kind,'needs-build');
- assert.equal(cellState({...plugin,distributions:[{harness:'codex',path:'',version:'2'}]},t,s,null).kind,'needs-build');
+ assert.equal(cellState({...plugin,distributions:[{harness:'pi',path:'/x',version:'2'}]},t,s,null).kind,'unavailable');
+ assert.equal(cellState({...plugin,distributions:[]},t,s,null).kind,'unavailable');
+ assert.equal(cellState({...plugin,distributions:[{harness:'codex',path:'',version:'2'}]},t,s,null).kind,'unavailable');
 });
 test('a Hermes server component cannot stand in for its main plugin in the Sync table', () => {
   const s = snapshot(), target = { ...s.registry.targets[0], harness: 'hermes' };
@@ -85,10 +85,10 @@ test('cellState: an unreadable inventory or unreadable instructions are unknown,
  assert.equal(cellState(plugin,t,ok,null).kind,'ok');
  for(const s of [incomplete,unsupported,broken])assert.equal(cellState(plugin,t,s,null).kind,'unknown');
 });
-test('cellState: changed instructions need a new build for their harness only',()=>{
+test('cellState: changed instructions ask to adapt again for their harness only',()=>{
  const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
  const stale=(h:string)=>({...s,custom_instructions:[{plugin_id:'pkg',path:'/i',files:[],digest:'new',stale_harnesses:[h]}]});
- assert.equal(cellState(plugin,t,stale('codex'),null).kind,'needs-build');
+ assert.equal(cellState(plugin,t,stale('codex'),null).kind,'adapt-again');
  assert.equal(cellState(plugin,t,stale('pi'),null).kind,'ok');
 });
 
@@ -133,9 +133,11 @@ test('a main plugin and its server count as two changes in the same row and targ
   assert.deepEqual(harnessState(target, s, pair), {kind:'changes',count:2});
   assert.equal(syncSummary(s, pair).operations, 2);
 });
-test('harnessState reports the plugins that have no build for the harness, after the changes',()=>{
+test('harnessState reports the plugins not available on the harness, after the changes and after those to adapt again',()=>{
  const s=snapshot(),t=s.registry.targets[0],bare={...plugin,id:'bare',name:'Bare',distributions:[]};s.registry.plugins=[plugin,bare];s.inventory[0].plugins[0].version='2';
- assert.deepEqual(harnessState(t,s,null),{kind:'needs-build',count:1});
+ assert.deepEqual(harnessState(t,s,null),{kind:'unavailable',count:1});
+ const stale={...s,custom_instructions:[{plugin_id:'pkg',path:'/i',files:[],digest:'new',stale_harnesses:['codex']}]};
+ assert.deepEqual(harnessState(t,stale,null),{kind:'adapt-again',count:1});
  assert.deepEqual(harnessState(t,s,plan([op('reinstall','2','2')])),{kind:'changes',count:1});
 });
 test('harnessState: a plugin whose instructions cannot be read keeps the harness from reading as in sync',()=>{

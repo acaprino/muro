@@ -25,7 +25,8 @@ export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   if(installations.some(i=>i.installed?.version!==distributionFor(plugin,i.target)?.version)) return status('update','Update available','warn');
   return status('ok','Up to date','ok');
 }
-export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'source-error'|'changes'|'unscanned'|'unknown'|'paused'|'none';
+/** `unavailable`: the plugin has no version for the harness of the target (its source ships none and nothing was adapted), so there is nothing to install there. `adapt-again`: its adaptation for that harness was made from custom instructions that changed since. */
+export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'unavailable'|'adapt-again'|'source-error'|'changes'|'unscanned'|'unknown'|'paused'|'none';
 export interface CellStatus { kind:CellKind; from?:string; to?:string; reason?:string; count?:number }
 const cell=(kind:CellKind,from?:string,to?:string):CellStatus=>({kind,...(from?{from}:{}),...(to?{to}:{})});
 /** The operation kinds the service plans: each one is a change waiting to be applied. */
@@ -42,17 +43,17 @@ export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Pla
   if(!wantedHere) return cell('none');
   const instructions=instructionsOf(plugin,snapshot);
   if(instructions?.error) return cell('unknown');
-  if(instructions?.stale_harnesses.includes(target.harness)) return cell('needs-build');
+  if(instructions?.stale_harnesses.includes(target.harness)) return cell('adapt-again');
   const inventory = snapshot.inventory.find(i => i.target_id === target.id);
-  if(inventory?.unscanned) return cell(distributionFor(plugin,target) ? 'unscanned' : 'needs-build');
+  if(inventory?.unscanned) return cell(distributionFor(plugin,target) ? 'unscanned' : 'unavailable');
   if(!inventory?.complete || !inventory.supported) return cell('unknown');
   const wanted=distributionFor(plugin,target);
-  if(!wanted) return cell('needs-build');
+  if(!wanted) return cell('unavailable');
   const installed=installedOn(plugin,target,snapshot);
   if(!installed) return cell('install',undefined,wanted.version);
   return cell(installed.version===wanted.version?'ok':'update',installed.version,wanted.version);
 }
-export interface HarnessStatus { kind:'paused'|'unscanned'|'unknown'|'changes'|'needs-build'|'source-error'|'unseen'|'ok'; count:number }
+export interface HarnessStatus { kind:'paused'|'unscanned'|'unknown'|'changes'|'adapt-again'|'unavailable'|'source-error'|'unseen'|'ok'; count:number }
 /** The state line of a harness column. A harness that cannot be read is never in sync; the count is of what the kind names. `unseen`: the record says changes are waiting and this column has none of its own to show (the record does not say where they are), so it cannot say it is in sync: `count` is the recorded total. */
 export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):HarnessStatus {
   if(!target.enabled) return {kind:'paused',count:0};
@@ -64,9 +65,9 @@ export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):Har
   const checked=currentPlan(snapshot,plan);
   // A Hermes package can have two native operations in one cell. Removals outside the list have no cell.
   const changes=checked ? checked.operations.filter(o=>o.target_id===target.id).length : count(k=>CHANGES.has(k));
-  const build=count(k=>k==='needs-build'),unreadable=count(k=>k==='unknown'),failed=count(k=>k==='source-error');
+  const adapt=count(k=>k==='adapt-again'),unavailable=count(k=>k==='unavailable'),unreadable=count(k=>k==='unknown'),failed=count(k=>k==='source-error');
   const unseen=checked?0:recorded(snapshot)?.pending??0;
-  return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:build?{kind:'needs-build',count:build}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:{kind:'ok',count:0};
+  return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:adapt?{kind:'adapt-again',count:adapt}:unavailable?{kind:'unavailable',count:unavailable}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:{kind:'ok',count:0};
 }
 export interface SyncSummary { kind:'no-harness'|'not-checked'|'changed'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; byKind:Record<string,number> }
 /** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked (`not-checked`), or the last check was of an earlier revision: the list changed since (`changed`). `errors` is the sources the last check could not resolve. */

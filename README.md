@@ -82,7 +82,7 @@ Every plugin follows an update policy: latest stable release, a pinned version o
 
 ### AI adaptation
 
-A plugin with no build for one of its harnesses shows **Needs a build** in that cell. **Adapt with AI**, under **More** in the plugin's panel, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+A plugin with no version for one of its harnesses (its source ships none for that harness) shows **Not available** in that cell, and **Adapt again** there once its custom instructions changed since it was adapted. **Adapt with AI**, under **More** in the plugin's panel, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
 
 <img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
 
@@ -140,7 +140,7 @@ Then, on **Sync**, **Add plugin**: give its source (a repository, a local folder
 
 ### A plugin on a harness it was not made for
 
-In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, its OpenCode cell shows **Needs a build**.
+In the demo, `docs-writer` has a build for Claude Code only. Ticked for OpenCode too, its OpenCode cell shows **Not available**.
 
 1. Open the plugin, then **More → Adapt with AI**. The harness without a build is preselected; set the maximum budget.
 2. Follow the job in **Activity**. When it succeeds, the cell shows the new version.
