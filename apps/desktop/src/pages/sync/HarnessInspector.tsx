@@ -11,6 +11,7 @@ import { RefusalLine } from '../project/write/HarmonizeDialog.tsx';
 import { NotSaved } from '../project/write/DetailsDialog.tsx';
 import { registryWrite } from './registryWrite.ts';
 import { NO_FOLDER, added, listable, useAddToList } from './Unlisted.tsx';
+import { McpServer } from './McpServer.tsx';
 import { useSync } from './useSync.tsx';
 
 /** The harness of a column header, in the inspector (Sigrid's `Inspector`: docked beside the content from 1000px, a panel over its end under it, never modal, so the table stays usable): its name,
@@ -314,6 +315,7 @@ export function HarnessInspector({ targetId, open, onOpenChange }: HarnessInspec
             <HarnessFields values={form} problems={shown} refs={refs} onChange={values => edit(values)} />
             <CheckRow id={`${formId}-enabled`} label="Keep this harness in sync" help="Switch off to pause: Muro leaves it alone." checked={form.enabled} onChange={enabled => edit({ enabled })} />
             <CheckRow id={`${formId}-exclusive`} label="Uninstall plugins that are not in my list" help="Muro asks before it uninstalls. Only on this harness." checked={form.exclusive} onChange={exclusive => edit({ exclusive })} />
+            <McpServer target={target} dirty={dirty} />
             <InstalledHere snapshot={snapshot} target={target} adding={adding} error={session.listError} note={session.listNote} noteRef={note} onAdd={installed => void addToList(installed)} />
             {session.saveError ? <NotSaved text={session.saveError} /> : null}
           </Column></form>

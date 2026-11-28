@@ -28,6 +28,9 @@ export interface SyncTimes { checked:string|null; synced:string|null }
 export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; installed_since?:boolean; targets:Record<string,SyncTimes> }
 /** `left_out` is what an apply with `allow_blocked` reports: the blockers of its plan, left out of the sync. `skipped_removals` is what an apply reports of the removals it did not execute: their number with `skip_removals`, else 0. */
 export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[]; left_out?:string[]; skipped_removals?:number }
+/** What `mcp_status`, `install_mcp` and `remove_mcp` answer for a harness: whether the runtime registers Muro's MCP server there (`supported`: Claude Code and Codex), whether the harness has an
+ * entry by Muro's name (`registered`), and whether that entry starts this Muro (`current`; false for one that starts another copy, moved or updated elsewhere). */
+export interface McpStatus { target_id:string; supported:boolean; registered:boolean; current:boolean }
 export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }
 /** `present` is on a removal, and only when the entry it removes has no files (false); a removal without it uninstalls a real copy. */
 /** `kind` "remove-marketplace" takes a marketplace the harness cannot load out of the harness: `name` is the marketplace, `reason` what is wrong with it, `plugins` the ids of the plugins configured from it, which go with it; it has no plugin of the list (`plugin_id` is empty). */

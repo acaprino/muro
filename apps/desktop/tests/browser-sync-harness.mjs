@@ -237,6 +237,56 @@ await test('a save made on a registry that moved is read again and sent once mor
   await notice(page, 'Typed saved.').waitFor();
 });
 
+// ---------- Muro's MCP server in the harness ----------
+const mcpButton = (panel, label) => panel.getByRole('button', { name: `${label} Muro's MCP server`, exact: true });
+await test("the inspector installs Muro's MCP server in the harness, says so, and removes it at once with an Undo that installs it again", 'changes', {}, async app => {
+  const { page } = app;
+  const panel = await openHarness(page, 'Codex isolated test');
+  await panel.getByText('Muro MCP server', { exact: true }).waitFor();
+  await panel.getByText('Not installed', { exact: true }).waitFor();
+  assert.deepEqual((await callsOf(app, 'mcp_status')).map(c => c.payload), [{ target_id: 't1' }], 'read once, for the harness shown');
+  await mcpButton(panel, 'Install').click();
+  await panel.getByText('Installed', { exact: true }).waitFor();
+  await notice(page, "Muro's MCP server is installed in Codex isolated test. New sessions have it.").waitFor();
+  assert.deepEqual((await callsOf(app, 'install_mcp')).map(c => c.payload), [{ target_id: 't1' }]);
+  await page.screenshot({ path: shots + '/sync-harness-mcp.png' });
+  await mcpButton(panel, 'Remove').click();
+  await panel.getByText('Not installed', { exact: true }).waitFor();
+  await notice(page, "Muro's MCP server was removed from Codex isolated test.").waitFor();
+  assert.equal((await actions(app)).includes('save_target'), false, 'the harness itself is not saved');
+  await page.locator('[data-toasts]').getByRole('button', { name: /^Undo/ }).click();
+  await panel.getByText('Installed', { exact: true }).waitFor();
+  assert.equal((await callsOf(app, 'install_mcp')).length, 2, 'Undo installs it again');
+  assert.deepEqual(await unnamed(panel), [], 'every control of the inspector has a name');
+});
+
+await test("an entry that starts another copy of Muro is updated; a change of the form waits for Save; a refusal is said in the inspector", 'changes', {}, async app => {
+  const { page } = app;
+  await app.flags({ mcpOther: true });
+  const panel = await openHarness(page, 'Codex isolated test');
+  await panel.getByText('Another Muro', { exact: true }).waitFor();
+  await panel.locator('input[name="name"]').fill('Typed');
+  await panel.getByText('Save first: Muro uses the saved folder and executable.', { exact: true }).waitFor();
+  assert.equal(await mcpButton(panel, 'Update').isDisabled(), true, 'the saved folder and executable are what the runtime uses');
+  await panel.locator('input[name="name"]').fill('Codex isolated test');
+  assert.equal(await mcpButton(panel, 'Update').isDisabled(), false, 'typed back: no change');
+  await app.flags({ mcpError: 'Codex isolated test mcp add failed (exit code: 1): no permission' });
+  await mcpButton(panel, 'Update').click();
+  await panel.getByText('Codex isolated test mcp add failed (exit code: 1): no permission').waitFor();
+  await app.flags({ mcpError: '' });
+  await mcpButton(panel, 'Update').click();
+  await panel.getByText('Installed', { exact: true }).waitFor();
+  await notice(page, "Muro's MCP server in Codex isolated test now starts this Muro.").waitFor();
+});
+
+await test("a harness Muro does not install its MCP server in shows nothing of it", 'two-harnesses', {}, async app => {
+  const { page } = app;
+  const panel = await openHarness(page, 'OpenCode isolated test');
+  await page.waitForFunction(() => window.calls.some(c => c.action === 'mcp_status'));
+  await page.waitForTimeout(200);   // the answer is drawn
+  assert.equal(await panel.getByText('Muro MCP server', { exact: true }).count(), 0);
+});
+
 // ---------- what is installed there ----------
 await test('the inspector lists what is installed there and adds a plugin to the list without closing, saying so in its own line', 'unlisted', {}, async app => {
   const { page } = app;

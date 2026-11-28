@@ -270,7 +270,8 @@ the host's own permissions), then calls `validate`. The two `simulate_*` tools
 take a `project` (a `.mp`) instead of a manifest and return JSON: see
 [`muro project simulate`](#muro-project-simulate--simulate-prepare--simulate-check).
 
-Register it in Claude Code:
+Register it in Claude Code (the desktop app does it for a Claude Code or Codex harness of its list: **Muro MCP
+server** in the harness's panel, [desktop.md](desktop.md)):
 
 ```sh
 claude mcp add muro -- python -m muro mcp --manifest /path/to/sources.json

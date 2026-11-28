@@ -4,6 +4,7 @@ pub mod discovery;
 pub mod exec;
 pub mod factory;
 pub mod jobs;
+pub mod mcp_server;
 mod process_tree;
 pub mod project_jobs;
 pub mod projects;
@@ -60,6 +61,9 @@ fn request_with_progress(
         "simulate" => simulate::simulate(data, &payload),
         "cancel_simulation" => simulate::cancel(data, &payload),
         "discover" => cli::discover_via_cli(&data.join("discovery-cache")),
+        "mcp_status" => mcp_server::status(data, &payload),
+        "install_mcp" => mcp_server::install(data, &payload),
+        "remove_mcp" => mcp_server::remove(data, &payload),
         "recover_jobs" => {
             jobs::recover(data)?;
             Ok(json!({"status":"ok"}))

@@ -45,6 +45,9 @@
 //             and an adaptation counts. When a run completes it does what the factory's commit does and nothing about meaning: a new project is listed (and its file exists); a change moves the version by its
 //             step, adds the run to the history and an entry to the changelog, gives the file a new digest, and adds, removes or re-pins the input it names, or writes the instruction files. A project's digest is
 //             64 hex digits that change at every write (a run, an edit); behind.touch(id) writes the file as someone else would; behind.digest(id) tells it.
+//   Muro's MCP server in a harness (mcp_status, install_mcp, remove_mcp; the runtime's mcp_server.rs): Claude Code and Codex only, as the runtime says (`supported`). Nothing is installed at first.
+//                mcpOther        a harness with no entry of its own yet has one that starts another copy of Muro (registered, not current)
+//                mcpError        install_mcp and remove_mcp fail with this message, as a harness that refuses its own command
 //   Settings AI: envSet          the names of the environment variables that are set for the Muro process (`env_present {name}` answers {set}; never a value)
 //                noEnvCheck      env_present fails as a runtime that does not know it yet ("Unknown registry action")
 // behind: what the background worker and the tray do to the registry while the window is open, and nobody tells it:
@@ -209,6 +212,22 @@ export function createTransport(scenario = 'default') {
   const reg = { schema: 1, revision: 1, plugins: data.plugins, targets: data.targets, settings: { auto_sync: data.auto_sync, interval_minutes: 60, close_to_tray: true, agent: 'claude-code', python: 'python', factory_path: '', ai: { engine: 'harness', harness: 'claude-code', budget_usd: 0.5, api_base: 'https://api.openai.com/v1', model: '', api_key_env: 'MURO_API_KEY' } } };
   Object.assign(reg.settings, data.settings);   // a scenario may store settings of its own
   Object.assign(flags, { envSet: [], noEnvCheck: false });   // the knobs of the Settings AI section
+  Object.assign(flags, { mcpOther: false, mcpError: '' });   // the knobs of Muro's MCP server in a harness
+  // Muro's MCP server in each harness: 'current' (installed, starts this Muro), '' (none); absent: what `mcpOther` says.
+  const mcpEntries = {};
+  const mcpStatus = id => {
+    const target = reg.targets.find(t => t.id === id);
+    if (!target) throw new Error(`No harness ${id} in the list`);
+    const supported = target.harness === 'claude-code' || target.harness === 'codex';
+    const entry = supported ? (mcpEntries[id] ?? (flags.mcpOther ? 'other' : '')) : '';
+    return { target_id: id, supported, registered: entry !== '', current: entry === 'current' };
+  };
+  const mcpChange = (id, entry) => {
+    if (!mcpStatus(id).supported) throw new Error('Muro installs its MCP server in Claude Code and Codex only');
+    if (flags.mcpError) throw new Error(flags.mcpError);
+    mcpEntries[id] = entry;
+    return mcpStatus(id);
+  };
   Object.assign(flags, { pickFolder: 'D:/Projects', existingFiles: [], missingFolders: [], runEnds: '', runDelay: 0, runMessage: '', cancelHolds: false, updatesError: '', staleDeletes: 0 });   // the knobs of the project writes
   Object.assign(flags, { releaseError: '', releaseHeld: false, releaseCaller: false, releaseDelay: 0 });   // the knobs of a release
   // Resolved .mp sources, keyed by the source entered in Sync. A repository and a local file both supply the same result shape.
@@ -853,6 +872,9 @@ export function createTransport(scenario = 'default') {
       case 'open_custom_instructions': case 'custom_instructions': return structuredClone(instructions().find(i => i.plugin_id === payload.id));
       case 'maintenance': return { message: payload.kind === 'verify' ? 'Every stored build is intact' : 'Nothing to clean up', details: [] };
       // The runtime's env_present (plan 2, Task 5): whether the variable is set for the Muro process. The name is checked as the registry checks it; no value is ever returned.
+      case 'mcp_status': return mcpStatus(payload.target_id);
+      case 'install_mcp': return mcpChange(payload.target_id, 'current');
+      case 'remove_mcp': return mcpChange(payload.target_id, '');
       case 'env_present': {
         if (flags.noEnvCheck) throw new Error('Unknown registry action: env_present');
         if (!/^[A-Z_][A-Z0-9_]{0,63}$/.test(String(payload.name))) throw new Error('The key setting must name an environment variable, not hold a key');
