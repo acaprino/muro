@@ -6,7 +6,7 @@ import { obj, text, amount } from '../../model.ts';
  * means; a documented example and the AI's validated answer are the only things that name a branch. */
 export type Status = 'selected' | 'no_match' | 'needs_clarification';
 const STATUSES: readonly string[] = ['selected', 'no_match', 'needs_clarification'];
-export interface Intent { id: string; description: string; excludes: string }
+export interface Intent { id: string; description: string; excludes: string[] }
 export interface Need { capability: string; label: string; when: string; reason: string }
 export interface Cap { id: string; title: string; role: string; when: string; after: string[]; outputs: string[]; intents: Intent[]; needs: Need[]; conflicts: string[] }
 export interface Entry { name: string; description: string; capabilities: string[] }
@@ -22,6 +22,7 @@ export type Outcome =
   | { kind: 'failed'; asked: string; message: string };
 
 const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+const excludesOf = (v: unknown): string[] => typeof v === 'string' ? (v.trim() ? [v] : []) : strings(v).filter(s => s.trim() !== '');
 const items = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.map(obj).filter((x): x is Record<string, unknown> => !!x) : [];
 const isStatus = (v: unknown): v is Status => typeof v === 'string' && STATUSES.includes(v);
 
@@ -31,7 +32,7 @@ export function capsOf(info: ProjectInfo): Cap[] {
     const id = c.id as string;
     return {
       id, title: text(c.title) || id, role: text(c.role), when: text(c.when), after: strings(c.after), outputs: strings(c.outputs), conflicts: strings(c.conflicts),
-      intents: items(c.intents).filter(i => typeof i.id === 'string').map(i => ({ id: i.id as string, description: text(i.description), excludes: text(i.excludes) })),
+      intents: items(c.intents).filter(i => typeof i.id === 'string').map(i => ({ id: i.id as string, description: text(i.description), excludes: excludesOf(i.excludes) })),
       needs: items(c.needs).filter(n => typeof n.capability === 'string').map(n => ({ capability: n.capability as string, label: text(n.label), when: text(n.when), reason: text(n.reason) })),
     };
   });

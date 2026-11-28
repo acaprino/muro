@@ -34,6 +34,8 @@ def test_codex_plugin_declares_instructions_for_every_session_boundary_and_subag
     assert manifest['name'] == 'policy-probe'
     hooks = json.loads((root / 'hooks/hooks.json').read_text(encoding='utf-8'))['hooks']
     assert set(hooks) == {'SessionStart', 'SubagentStart'}
+    injected = (root / 'policy.md').read_text(encoding='utf-8')
+    assert injected.startswith('# Muro system: Policy Probe\n') and injected.endswith('\n\n' + POLICY)
     [session] = hooks['SessionStart']
     for event in ('startup', 'resume', 'clear', 'compact', 'fork'):
         assert re.fullmatch(session['matcher'], event)
@@ -48,15 +50,16 @@ def test_codex_plugin_declares_instructions_for_every_session_boundary_and_subag
                    if os.name == 'nt' else ['sh', '-c', hook['command']])
         result = subprocess.run(command, cwd=tmp_path, env=env, capture_output=True, encoding='utf-8')
         assert result.returncode == 0, result.stderr
+        # The Muro system section first, then the declared policy, as in every host's policy.md (ADR-0037).
         assert json.loads(result.stdout) == {'hookSpecificOutput': {
-            'hookEventName': event, 'additionalContext': POLICY,
+            'hookEventName': event, 'additionalContext': injected,
         }}
     launcher = root / 'skills/policy-probe/muro.py'
     for _ in range(2):
         result = subprocess.run([sys.executable, str(launcher), 'session-context'], cwd=tmp_path,
                                 capture_output=True, encoding='utf-8')
         assert result.returncode == 0, result.stderr
-        assert result.stdout.strip() == POLICY
+        assert result.stdout.strip() == injected.strip()
     note = (root / 'INSTALL.md').read_text(encoding='utf-8')
     assert 'developer' in note and 'trust' in note
     assert 'does not register' not in note
@@ -87,6 +90,6 @@ def test_hook_output_envelopes_json_looking_policy_as_context(portable_project, 
     result = subprocess.run([sys.executable, str(launcher), 'session-context', '--hook-event', event],
                             cwd=tmp_path, capture_output=True, encoding='utf-8')
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == {'hookSpecificOutput': {
-        'hookEventName': event, 'additionalContext': policy,
-    }}
+    output = json.loads(result.stdout)
+    assert set(output) == {'hookSpecificOutput'} and output['hookSpecificOutput']['hookEventName'] == event
+    assert output['hookSpecificOutput']['additionalContext'].endswith('\n\n' + policy)

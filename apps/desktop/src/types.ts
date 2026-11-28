@@ -59,7 +59,7 @@ export interface ProjectRun { id:string; time:string; version:string; status:'co
 export interface GraphCapability { id:string; title:string; [key:string]:unknown }
 export interface GraphExample { [key:string]:unknown }
 /** What the action `project {id}` returns: `muro project info` of the file as it is. */
-export interface ProjectInfo { project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; instructions?:InstructionFile[]; export_harnesses?:string[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
+export interface ProjectInfo { project:ProjectMeta; plugin:{name:string;slug:string;version:string;description:string}; inputs:ProjectInput[]; decisions:ProjectDecision[]; records:ProjectRecord[]; history:ProjectRun[]; changelog:string; prompts:{file:string;text:string}[]; instructions?:InstructionFile[]; system_prompt?:string; export_harnesses?:string[]; graph:{entries:{name:string;description:string;capabilities:string[]}[];capabilities:GraphCapability[];examples:GraphExample[]}; files:{part:string;path:string;detail:string}[]; digest:string }
 /** One of the owner's Markdown files under `custom-instructions/` as `muro project info` reads it: its path relative to that folder and its text. */
 export interface InstructionFile { path:string; text:string }
 /** The repository a project is published from: the https address, the branch and the prefix of its release tags. */

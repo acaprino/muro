@@ -97,9 +97,13 @@ def focused_catalog(catalog: list[dict[str, Any]], focus: set[str],
     with its role and intent descriptions.
     """
     known = {entry["id"] for entry in catalog}
+    # A discovery entry's name stands for its capabilities: the host names the areas the result needs
+    # from its own skill list in the first call, without a second call to read them (ADR-0037).
+    areas = {item["name"]: item["capabilities"] for item in entries or []}
+    focus = {cap for name in focus for cap in (areas.get(name, [name]) if name not in known else [name])}
     unknown = sorted(focus - known)
     if unknown:
-        raise ValueError("--focus names unknown capability: " + ", ".join(unknown))
+        raise ValueError("--focus names unknown capability or entry: " + ", ".join(unknown))
 
     def line(entry: dict[str, Any]) -> dict[str, Any]:
         return {"id": entry["id"], "role": entry["role"], "brief": True,
@@ -564,7 +568,8 @@ class Coordinator:
                                      + ("" if focus is None else
                                         " Entries marked brief index the capabilities outside the focus; they belong "
                                         "to this same catalog. When any part of the task needs one, rerun plan --compact "
-                                        "with --focus <ids> (comma-separated, together with the ones already in focus) to "
+                                        "with --focus <ids> (capability ids or entry names, comma-separated, together with "
+                                        "the ones already in focus) to "
                                         "read its intents, exclusions, tools and constraints, then select it: the plan "
                                         "covers the whole request, not only the capabilities in focus.")),
                     "classification_path": str(self.classification_path),
@@ -962,7 +967,7 @@ def runtime_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--compact", action="store_true",
                         help="plan without a decision: return context and a compact catalog only (rules live in SKILL.md)")
     parser.add_argument("--focus", metavar="IDS",
-                        help="with --compact: comma-separated capabilities returned in full; the others as a brief index")
+                        help="with --compact: comma-separated capabilities, or discovery entries standing for theirs, returned in full; the others as a brief index")
     parser.add_argument("--brief", action="store_true",
                         help="with --compact: return every capability as a brief index (role and intents)")
     parser.add_argument("--new", action="store_true", help="Start a fresh map, archiving any previous map")
@@ -1005,6 +1010,16 @@ def runtime_main(argv: list[str] | None = None) -> int:
             if not isinstance(text, str) or len(text) > limit:
                 raise ValueError(f"always_on must be text of at most {limit} characters "
                                  "(one allowance for each source with an always-on decision)")
+            # The Muro system section goes first, as on every other host's policy file (ADR-0037).
+            from .system_section import injected_text
+            sources = args.package / "sources.json"
+            manifest = json.loads(sources.read_text(encoding="utf-8")) if sources.is_file() else {}
+            raw_plugin = manifest.get("plugin") if isinstance(manifest, dict) else None
+            if raw_plugin is not None and not isinstance(raw_plugin, dict):
+                raise ValueError("sources.json plugin must be an object")
+            plugin = {"name": "Muro", "command": "muro", **(raw_plugin or {})}
+            capabilities = [parse_capability(path) for path in sorted((args.package / "capabilities").glob("*.md"))]
+            text = injected_text(text, plugin, capabilities, (load_entries(args.package) or {}).get("entries"))
         except (OSError, ValueError) as exc:
             print(f"Invalid delivery session policy: {exc}", file=sys.stderr)
             return 1

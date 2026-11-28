@@ -37,6 +37,11 @@ keyword checker, scoring script or fixed checklist to perform it for you.
   bodies. A source whose capabilities nothing else uses or meets is a finding:
   say what it could supply to the others, in which order, and what would have to
   change.
+- **Session text against capabilities.** A section of the always-on text that
+  governs a kind of work a capability also does inside it (an interface built in
+  code, an explanation given in a reply) has its marked boundary line naming the
+  entry for that work; a section without it does the capability's work its own
+  way, and that is a finding.
 - **Coverage.** Every selected skill of every source is still reachable from
   the catalog, an entry or the policy; an absorbed outcome that nothing
   discovers is a finding. An `intake_only_paths` file whose content no longer

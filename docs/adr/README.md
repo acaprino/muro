@@ -324,3 +324,11 @@ owner's; the choices and the text are not separately approved.
 Manual note outside the generated index: [ADR-0036: Harmonization studies how the
 sources relate before it builds the graph](ADR-0036-relations-study.md) records the
 relations report of intake and the study of every pair of sources in harmonization.
+
+Manual note outside the generated index: [ADR-0037: A package is used for the whole
+result, on every turn, without talk of its mechanics](ADR-0037-natural-use.md) records
+the owner's correction of 2026-11-27 ("non stai usando marionette al massimo", "l'uso
+non è naturale e soddisfacente"): classification sized to the result, the first call
+naming every area, follow-ups classified again, approval in the classification call,
+the boundary between session text and the capabilities it reaches, and the Muro system
+section every plugin with a skill injects (amending ADR-0016).

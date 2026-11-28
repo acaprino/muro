@@ -130,3 +130,8 @@ test('a record, a run, a choice or an input with an object where the file should
   assert.deepEqual([none.records, none.history, none.decisions, none.inputs], [[], [], [], []], 'a list that is not a list is an empty one');
   assert.deepEqual([said('text'), said(null), said(undefined), said(4), said(true)], ['text', '', '', '4', 'true']);
 });
+test('systemPrompt reads the composed system prompt from project info and stays empty when absent or malformed', () => {
+  assert.equal(projectData(info({ system_prompt: '# Muro system: Sample\n\nRules.' })).systemPrompt, '# Muro system: Sample\n\nRules.');
+  assert.equal(projectData(info()).systemPrompt, '');
+  assert.equal(projectData(info({ system_prompt: { text: 'bad' } })).systemPrompt, '');
+});

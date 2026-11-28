@@ -18,6 +18,7 @@ export interface ProjectData {
   decisions: ProjectDecision[];
   records: ProjectRecord[];
   history: ProjectRun[];
+  systemPrompt: string;
 }
 const rows = (v: unknown): Record<string, unknown>[] => Array.isArray(v) ? v.map(obj).filter((x): x is Record<string, unknown> => !!x) : [];
 const strings = (v: unknown): string[] => Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -50,6 +51,7 @@ export function projectData(info: ProjectInfo): ProjectData {
     info, slug: text(info.plugin?.slug), caps: capsOf(info), entries: entriesOf(info), examples: examplesOf(info),
     inputs: rows(info.inputs).filter(i => typeof i.id === 'string').map(inputOf), decisions: rows(info.decisions).map(decisionOf),
     records: rows(info.records).map(recordOf), history: rows(info.history).map(runOf),
+    systemPrompt: text(info.system_prompt),
   };
 }
 

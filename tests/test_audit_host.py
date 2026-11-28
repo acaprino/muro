@@ -156,6 +156,9 @@ def test_skill_embeds_rules_uses_one_line_calls_and_preapproves_them_on_claude_c
             assert "Bash(python ${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py *)" in line
             # Live run of 2026-11-14: the host quoted the launcher path and the unquoted rule denied the call.
             assert 'Bash(python "${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py" *)' in line
+            # Live run of 2026-11-27 on Windows: Claude Code can invoke the launcher via PowerShell as well as Bash.
+            assert "PowerShell(python ${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py *)" in line
+            assert 'PowerShell(python "${CLAUDE_PLUGIN_ROOT}/skills/muro/muro.py" *)' in line
             # Owner, 2026-11-14: a step opens its packaged originals without a permission prompt.
             assert "Read(${CLAUDE_PLUGIN_ROOT}/**)" in line and "Read(/${CLAUDE_PLUGIN_ROOT}/**)" in line
             assert "Edit(./.muro/**)" in line

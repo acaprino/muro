@@ -5,7 +5,7 @@ import type { ProjectInfo, ProjectSummary } from '../types.ts';
 import { useRegistry } from './registry.tsx';
 
 /** The dialogs of a project: the ones its actions open, and the ones its header and its panel open. */
-export type ProjectDialog = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details' | 'release' | 'extract';
+export type ProjectDialog = 'add' | 'harmonize' | 'pin' | 'instructions' | 'details' | 'release' | 'extract' | 'prompt';
 
 /** The open project of the Projects tab, for the workspace and for the window's inspector.
  * The state is `state/project.ts`'s; this only holds it in React and writes it to the
