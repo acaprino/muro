@@ -159,7 +159,7 @@ function CapabilityDetails({ cap: c, data, onSelect }: { cap: Cap; data: Project
   );
 }
 
-const FORMS: Record<string, string> = { capability: 'Capability', 'always-on': 'Always on', hook: 'Hook', 'mcp-server': 'MCP server', dropped: 'Dropped' };
+const FORMS: Record<string, string> = { capability: 'Capability', 'always-on': 'Always on', hook: 'Hook', 'mcp-server': 'MCP server', 'package-tool': 'Package tool', dropped: 'Dropped' };
 /** A form in the words of the interface; one this window does not know is shown as it came (`constructor` is none of them either). */
 const formOf = (form: string): string => Object.hasOwn(FORMS, form) ? FORMS[form] : form;
 

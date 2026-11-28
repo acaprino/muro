@@ -20,7 +20,7 @@ const info = (over: Record<string, unknown> = {}): ProjectInfo => ({
 } as unknown as ProjectInfo);
 const data = (over: Record<string, unknown> = {}) => projectData(info(over));
 const run = (id: string, time: string, version: string, over: Record<string, unknown> = {}) => ({ id, time, version, status: 'completed', budget_usd: null, engine: null, pins: {}, changelog: `Changes of ${version}.`, ...over });
-const became = (capability = 0, always = 0, hook = 0, dropped = 0) => ({ capability, 'always-on': always, hook, dropped });
+const became = (capability = 0, always = 0, hook = 0, dropped = 0, server = 0, tool = 0) => ({ capability, 'always-on': always, hook, 'mcp-server': server, 'package-tool': tool, dropped });
 const input = (over: Record<string, unknown> = {}): ProjectInput => ({ id: 'taste-skill', url: 'https://github.com/example/taste-skill', pin: 'release', release: 'v1.2.0', commit: 'abcdef1234567890', license: 'MIT', paths: ['skills'], became: became(), ...over } as ProjectInput);
 
 // ---------- the engine ----------
@@ -96,6 +96,7 @@ test('what an input became says only the forms it used, and one of a form in the
   assert.deepEqual(becameParts(input({ became: became(4, 0, 1, 0) })), ['4 capabilities', '1 hook']);
   assert.deepEqual(becameParts(input({ became: became(1, 0, 1, 0) })), ['1 capability', '1 hook']);
   assert.deepEqual(becameParts(input({ became: became(0, 0, 2, 0) })), ['2 hooks']);
+  assert.deepEqual(becameParts(input({ became: became(0, 0, 0, 0, 1, 2) })), ['1 MCP server', '2 package tools'], 'an input made into a server is harmonized');
   assert.deepEqual(becameParts(input({ became: became() })), [], 'not harmonized yet');
 });
 
@@ -125,7 +126,7 @@ test('a record, a run, a choice or an input with an object where the file should
   assert.deepEqual(d.records, [{ id: 'r1', date: '', subjects: [], text: '{"en":"One owner per output."}', author: 'muro', binding: false }]);
   assert.deepEqual(d.history, [{ id: 'x', time: '', version: '', status: 'odd', budget_usd: null, engine: null, pins: { a: 'v1' }, changelog: '["a","b"]' }]);
   assert.deepEqual(d.decisions, [{ source: 'taste-skill', content: '{"path":"SKILL.md"}', form: 'capability', targets: ['a'], reason: '' }]);
-  assert.deepEqual(d.inputs, [{ id: 'taste-skill', url: null, pin: 'release', release: null, commit: null, license: null, paths: [], became: { capability: 0, 'always-on': 0, hook: 1, dropped: 0 } }]);
+  assert.deepEqual(d.inputs, [{ id: 'taste-skill', url: null, pin: 'release', release: null, commit: null, license: null, paths: [], became: { capability: 0, 'always-on': 0, hook: 1, 'mcp-server': 0, 'package-tool': 0, dropped: 0 } }]);
   const none = projectData(info({ records: 'x', history: {}, decisions: 3, inputs: null }));
   assert.deepEqual([none.records, none.history, none.decisions, none.inputs], [[], [], [], []], 'a list that is not a list is an empty one');
   assert.deepEqual([said('text'), said(null), said(undefined), said(4), said(true)], ['text', '', '', '4', 'true']);

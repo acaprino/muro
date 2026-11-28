@@ -28,11 +28,12 @@ const MAX_INSTRUCTION = 256 * 1024;
 const MAX_INSTRUCTION_FILES = 50;
 const MAX_RECORD = 20_000;
 
-/** How long the runtime lets an AI run go before it stops it (`jobs::run`): a run of a project 120 minutes, the adaptation of a plugin 30. The page only says the numbers; the runtime keeps them. */
+/** How long the runtime lets each step of an AI run go before it stops it (`jobs::run`, applied to each process in turn: the AI run, then the factory's checks and build): a step of a project run
+ * 120 minutes, of an adaptation 30. The whole run can last longer. The page only says the numbers; the runtime keeps them. */
 export const PROJECT_RUN_MINUTES = 120;
 export const ADAPTATION_RUN_MINUTES = 30;
 /** What a dialog that starts an AI run says under its fields: who does it, with what, at most what it costs, how long it may last, what it can reach, and what it does not do. */
-export const AI_RUN_NOTE = `Claude Code does it on this computer with its own credentials, and spends at most the budget below. It works in a folder of its own, but it can read and write whatever you can, and it stops after ${PROJECT_RUN_MINUTES} minutes. The project file is replaced only when the build succeeds; nothing is installed until you install it.`;
+export const AI_RUN_NOTE = `Claude Code does it on this computer with its own credentials, and spends at most the budget below. It works in a folder of its own, but it can read and write whatever you can, and each of its steps stops after ${PROJECT_RUN_MINUTES} minutes. The project file is replaced only when the build succeeds; nothing is installed until you install it.`;
 /** The hint under the budget field: what the budget counts, and what a small one runs into. */
 export const BUDGET_HINT = 'Checked between turns: the run can end slightly above it. Your Claude Code settings (plugins, hooks, instructions) load into every turn, so a small budget can run out before the work is done.';
 /** Why Move pin is off for an input pinned to a frozen commit (`static`): it is held at the commit that was reviewed, on purpose. */
@@ -401,7 +402,13 @@ export const jobTitle = (job: Job): string => job.title || (isProject(job) ? 'Ch
 /** Why the page offers no other change while a run goes, in its words, or null when none does. The card of that run, with its Cancel, is on the Projects page (`JobCard`). */
 export function busyReason(running: Job | null): string | null {
   if (!running) return null;
-  return `${jobTitle(running)} is running: one AI run goes at a time. Wait for it to finish, or cancel it.`;
+  return `${jobTitle(running)} is running: one AI run goes at a time. Wait for it to finish${canCancel(running) ? ', or cancel it' : ''}.`;
+}
+/** Why an edit by hand (details, records, a release, a deletion) waits: a run is changing this very project, and the runtime refuses the edit meanwhile. Not the rule of one AI run at a time,
+ * which an edit is not. Null when no run changes it. */
+export function editBlockedReason(running: Job | null): string | null {
+  if (!running) return null;
+  return `${jobTitle(running)} is changing this project: edits wait for it to finish${canCancel(running) ? ', or cancel it' : ''}.`;
 }
 
 /** The phase the runtime says while the factory builds and saves a project run (`project_jobs.rs`). From there on the runtime ignores a Cancel: a build that replaces the file cannot be stopped half way. */

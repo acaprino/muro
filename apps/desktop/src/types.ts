@@ -24,14 +24,18 @@ export interface Activity { id:string; time:string; action:string; status:string
 export interface Job { id:string; kind?:'project'; plugin_id?:string; harness?:string; project_id?:string; operation?:string; title?:string; file?:string; status:string; phase:string; budget_usd:number; log_path:string; message:string; time:string|number }
 /** Epoch seconds as text, or null while it never happened; the overall fields are those of the last full plan, and `errors` is the sources the last check could not resolve (null before any check). */
 export interface SyncTimes { checked:string|null; synced:string|null }
-export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; targets:Record<string,SyncTimes> }
+/** `installed_since`: the counts were dropped because a plugin was installed on its own since the last full check (the list did not change). */
+export interface SyncStatus { last_check:string|null; last_sync:string|null; revision:number|null; pending:number|null; blockers:number|null; errors:number|null; installed_since?:boolean; targets:Record<string,SyncTimes> }
 /** `left_out` is what an apply with `allow_blocked` reports: the blockers of its plan, left out of the sync. `skipped_removals` is what an apply reports of the removals it did not execute: their number with `skip_removals`, else 0. */
 export interface Snapshot { registry:Registry; inventory:Inventory[]; activity:Activity[]; sync:SyncStatus; jobs?:Job[]; data_dir?:string; custom_instructions?:InstructionState[]; left_out?:string[]; skipped_removals?:number }
 export interface Discovered { harness:string; name:string; executable:string; version:string|null; config_root:string|null; available:boolean; supported:boolean }
 /** `present` is on a removal, and only when the entry it removes has no files (false); a removal without it uninstalls a real copy. */
 /** `kind` "remove-marketplace" takes a marketplace the harness cannot load out of the harness: `name` is the marketplace, `reason` what is wrong with it, `plugins` the ids of the plugins configured from it, which go with it; it has no plugin of the list (`plugin_id` is empty). */
-export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean; plugins?:string[] }
-export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[] }
+/** `native_id` is on a removal: the harness's own id of what it uninstalls. */
+export interface Operation { target_id:string; plugin_id:string; name:string; kind:string; from_version:string; to_version:string; reason:string; present?:boolean; plugins?:string[]; native_id?:string }
+/** `blocked` holds the same blockers by the pair they hold back (harness and plugin, with the service's reason); absent in a plan stored before the field existed. A blocker of a whole harness (one that cannot be read) is not in it. */
+export interface Blocked { target_id:string; plugin_id:string; reason:string }
+export interface Plan { id:string; revision:number; operations:Operation[]; blockers:string[]; blocked?:Blocked[] }
 export interface CheckResult { snapshot:Snapshot; plan:Plan; errors:{plugin_id:string;message:string}[] }
 export type CheckProgress = { phase:'source'; index:number; total:number; name:string } | { phase:'plan' };
 /** A source the last check could not resolve, with the service's words. */
@@ -50,7 +54,7 @@ export type ActivityFilter = 'all'|'sync'|'ai'|'problems';
 export interface ProjectMeta { schema:number; name:string; slug:string; version:string; author:string; created:string; changed:string; repository:{url:string;branch:string;tag_prefix:string}|null; builtin:boolean }
 /** What the action `projects` returns for each listed project: its id and file, then what `muro project info` knows in short (a count the runtime does not send is absent), or `error` when the file is missing or invalid. */
 export interface ProjectSummary extends ProjectFile { project?:ProjectMeta; plugin?:{name:string;slug:string;version:string}; inputs?:number; capabilities?:number; entries?:number; examples?:number; records?:number; runs?:number; digest?:string; error?:string }
-export type DecisionForm = 'capability'|'always-on'|'hook'|'dropped';
+export type DecisionForm = 'capability'|'always-on'|'hook'|'mcp-server'|'package-tool'|'dropped';
 export interface ProjectInput { id:string; url:string|null; pin:string; release:string|null; commit:string|null; license:string|null; paths:string[]; became:Record<DecisionForm,number> }
 export interface ProjectDecision { source:string; content:string; form:DecisionForm; targets:string[]; reason:string }
 export interface ProjectRecord { id:string; date:string; subjects:string[]; text:string; author:'muro'|'you'; binding:boolean }

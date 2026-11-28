@@ -196,15 +196,17 @@ await test('a plan with nothing ready: the note says what is not ready, Review l
   assert.equal((await actions(app)).includes('apply'), false);
 });
 
-await test('a plugin without a build for a harness: its cell and its column say so, and the note never says in sync', 'projects', {}, async app => {
+await test('a plugin with no version for a harness: its cell and its column say it is not available there, and the note never says in sync', 'projects', {}, async app => {
   const { page } = app;
   await ready(page);
   const c = cells(page, 'commit-helper');
   assert.equal(await c.nth(2).textContent(), '2.1.0', 'installed where it has a build');
-  assert.equal(await c.nth(3).textContent(), 'Needs a build');
-  await head(page, 'Codex').getByText('1 plugin needs a build', { exact: true }).waitFor();
-  await head(page, 'Claude Code').getByText('In sync', { exact: true }).waitFor();
+  assert.equal(await c.nth(3).textContent(), 'Not available');
+  await head(page, 'Codex').getByText('1 plugin not available', { exact: true }).waitFor();
+  // Nothing of this list was checked yet: the column does not claim to be in sync before a check.
+  await head(page, 'Claude Code').getByText('Check to see if it is in sync', { exact: true }).waitFor();
   await check(app);
+  await head(page, 'Claude Code').getByText('In sync', { exact: true }).waitFor();
   assert.equal(await kind(page), 'blocked');
   assert.match(await noteText(page).textContent(), /^Codex \/ commit-helper: no build for this harness/);
   assert.equal(await content(page).getByText('Everything is in sync').count(), 0);
@@ -251,7 +253,8 @@ await test('a harness that holds a marketplace it cannot load is read all the sa
   }
   assert.equal((await actions(app)).includes('apply'), false, 'nothing is applied before the sheet\'s Apply');
   await page.screenshot({ path: shots + '/sync-broken-marketplace-review.png' });
-  await sheetFoot(page).getByRole('button', { name: 'Apply 2 changes', exact: true }).click();
+  // It takes notes@old-notes away: a removal, confirmed here as any other (never by the background sync).
+  await sheetFoot(page).getByRole('button', { name: 'Apply and uninstall 1 plugin', exact: true }).click();
   await sheet(page).waitFor({ state: 'detached' });
   await notice(page, '2 changes applied.').waitFor();
   await titled(page, 'Everything is in sync');
@@ -436,14 +439,14 @@ await test('the table: a row per plugin with its source, version and policy, a c
   const t = cells(page, 'test-runner');
   assert.match(await t.nth(1).textContent(), /Pinned version/);
   await t.nth(4).getByRole('button', { name: 'Install 1.0.4 · test-runner on OpenCode', exact: true }).waitFor();
-  assert.equal(await cells(page, 'docs-writer').nth(4).textContent(), 'Needs a build');
+  assert.equal(await cells(page, 'docs-writer').nth(4).textContent(), 'Not available');
   const s = cells(page, 'sql-companion');
   assert.equal(await s.nth(1).textContent(), 'Not checkedLatest commit', 'no version yet, on the latest commit');
   assert.equal(await s.nth(2).textContent(), 'Not selected');
   await head(page, 'Claude Code').getByText('2 changes waiting', { exact: true }).waitFor();
   await head(page, 'Codex').getByText('In sync', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByText('1 change waiting', { exact: true }).waitFor();
-  await head(page, 'OpenCode').getByText('1 plugin needs a build', { exact: true }).waitFor();
+  await head(page, 'OpenCode').getByText('1 plugin not available', { exact: true }).waitFor();
   assert.equal(await noteText(page).textContent(), '1 install, 1 update, 1 removal · 1 item not ready yet. Nothing changes until you apply.');
   // The rows are one tab stop, and the arrows move between them.
   const name = n => page.locator('#rows').getByRole('button', { name: n, exact: true });

@@ -96,7 +96,7 @@ export function ReviewSheet() {
     <Dialog
       open={sync.review !== null}
       onOpenChange={open => { if (!open) sync.closeReview(); }}
-      title={plugin ? `Review ${plugin} on ${scope}` : scope ? `Sync ${scope}` : 'Review changes'}
+      title={plugin ? (scope ? `Review ${plugin} on ${scope}` : `Reinstall ${plugin}`) : scope ? `Sync ${scope}` : 'Review changes'}
       description={plugin ? 'Review the changes for this plugin before applying.' : `${scope ? 'Only the changes of this harness. ' : ''}Nothing changes until you apply.`}
       footer={footer}
     >

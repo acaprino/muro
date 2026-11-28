@@ -35,7 +35,7 @@ const inputOf = (r: Record<string, unknown>): ProjectInput => {
   const b = obj(r.became) ?? {};
   return {
     id: text(r.id), url: orNull(r.url), pin: text(r.pin), release: orNull(r.release), commit: orNull(r.commit), license: orNull(r.license), paths: strings(r.paths),
-    became: { capability: count(b.capability), 'always-on': count(b['always-on']), hook: count(b.hook), dropped: count(b.dropped) },
+    became: { capability: count(b.capability), 'always-on': count(b['always-on']), hook: count(b.hook), 'mcp-server': count(b['mcp-server']), 'package-tool': count(b['package-tool']), dropped: count(b.dropped) },
   };
 };
 // A form or a status this window does not know stays as it came: the page shows it as it is (Details.tsx, RunsPanel.tsx).
@@ -67,6 +67,8 @@ export function becameParts(input: ProjectInput): string[] {
     count(n.capability) ? plural(count(n.capability), 'capability', 'capabilities') : '',
     count(n['always-on']) ? `${count(n['always-on'])} always on` : '',
     count(n.hook) ? plural(count(n.hook), 'hook') : '',
+    count(n['mcp-server']) ? plural(count(n['mcp-server']), 'MCP server') : '',
+    count(n['package-tool']) ? plural(count(n['package-tool']), 'package tool') : '',
     count(n.dropped) ? `${count(n.dropped)} dropped` : '',
   ].filter(Boolean);
 }

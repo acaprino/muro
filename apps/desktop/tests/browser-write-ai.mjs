@@ -23,8 +23,9 @@ async function test(name, scenario, options, body) {
 // What the runtime says (crates/muro-desktop-runtime/src/project_jobs.rs), and what the fake's runs end with.
 const NEEDS_CLAUDE = 'Making and changing a project needs Claude Code (the only agent Muro can hold to a budget). Choose Claude Code in Settings → AI.';
 const CHANGED = 'The project file changed since it was opened: open it again and repeat the change';
-const SAVED = 'The project was saved. Install it again from its Install step to bring the change to the harnesses';
+const SAVED = 'The project was saved. Use Install via Sync… to bring the change to your harnesses';
 const busyWith = title => `${title} is running: one AI run goes at a time. Wait for it to finish, or cancel it.`;
+const editWith = title => `${title} is changing this project: edits wait for it to finish, or cancel it.`;
 const FROZEN_PIN = 'A frozen commit is held at the commit that was reviewed: its pin is not moved from here.';
 const NOT_CANCELLABLE = 'The project is being saved: it cannot be cancelled now';
 
@@ -110,7 +111,7 @@ await test('Add input: an address that is no input and a request that is too lon
   const title = 'Add the input https://github.com/example/x';
   await card(page).getByRole('heading', { name: title }).waitFor();
   const facts = await card(page).textContent();
-  for (const fact of ['Running', 'Opening the project', 'Claude Code', 'up to $2.50', 'Stops after 120 min', 'output.log']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
+  for (const fact of ['Running', 'Opening the project', 'Claude Code', 'up to $2.50', 'Each step stops after 120 min', 'output.log']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
   assert.equal(await button(card(page), 'Cancel').count(), 1);
   assert.equal(await button(page, 'Add input…').isDisabled(), true, 'no second run while this one goes');
   assert.equal(await button(page, 'Add input…').getAttribute('title'), busyWith(title));
@@ -147,12 +148,16 @@ await test('Harmonize again: the request and the step go to the run; while it ru
   const reason = busyWith('Harmonize again');
   assert.equal(await button(page, 'Install via Sync…').isEnabled(), true, 'opening Sync can read the current project while a new version is being prepared');
   // Release… is no AI run, and still waits for a run that changes this project, as Edit details… does.
-  for (const name of ['Harmonize again…', 'Add input…', 'Edit details…']) {
+  for (const name of ['Harmonize again…', 'Add input…']) {
     assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);
     assert.equal(await button(page, name).getAttribute('title'), reason, `${name} says why`);
   }
+  // An edit by hand is no AI run: it waits because this project is being changed, and says so.
+  const edit = editWith('Harmonize again');
+  assert.equal(await button(page, 'Edit details…').isDisabled(), true, 'Edit details… waits for the run');
+  assert.equal(await button(page, 'Edit details…').getAttribute('title'), edit, 'Edit details… says why');
   assert.equal(await (await releaseItem(page)).isDisabled(), true, 'Release… waits for the run');
-  assert.equal(await (await releaseItem(page)).getAttribute('title'), reason, 'Release… says why');
+  assert.equal(await (await releaseItem(page)).getAttribute('title'), edit, 'Release… says why');
   await closeMenu(page);
   await page.getByRole('status').filter({ hasText: reason }).first().waitFor();
   await segment(page, 'Inputs').click();
@@ -246,7 +251,7 @@ await test('A run of another project or an adaptation: its card, with Cancel, is
   await page.evaluate(() => window.shown?.());
   await card(page).getByRole('heading', { name: 'The adaptation of docs-writer' }).waitFor();
   const facts = await card(page).textContent();
-  for (const fact of ['Running', 'harmonization', 'docs-writer for opencode', 'up to $2.00', 'Stops after 30 min']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
+  for (const fact of ['Running', 'harmonization', 'docs-writer for opencode', 'up to $2.00', 'Each step stops after 30 min']) assert.ok(facts.includes(fact), `the card says ${fact}: ${facts}`);
   assert.equal(await page.getByRole('button', { name: 'New project…', exact: true }).isDisabled(), true, 'no other run while it goes');
   await button(card(page), 'Cancel').click();
   await card(page).waitFor({ state: 'detached' });
@@ -281,7 +286,7 @@ await test('Records: while a run changes the project the panel offers no edit, A
   await dialog(page).waitFor({ state: 'detached' });
   await card(page).getByRole('heading', { name: 'Harmonize again' }).waitFor();
   await segment(page, 'Records').click();
-  const reason = busyWith('Harmonize again');
+  const reason = editWith('Harmonize again');
   const names = ['Add record…', 'Edit the record of 2026-11-10 about design-taste', 'Delete the record of 2026-11-10 about design-taste', 'Edit the record of 2026-11-12 about office-docs', 'Delete the record of 2026-11-12 about office-docs'];
   for (const name of names) {
     assert.equal(await button(page, name).isDisabled(), true, `${name} waits for the run`);

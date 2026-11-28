@@ -46,6 +46,9 @@ pub fn record_check(
     let time = plan["created"].clone();
     ensure!(time.is_string(), "Plan has no creation time");
     if full {
+        if let Some(entry) = state.as_object_mut() {
+            entry.remove("installed_since");
+        }
         state["last_check"] = time.clone();
         state["revision"] = plan["revision"].clone();
         state["pending"] = json!(plan["operations"].as_array().context("operations")?.len());
@@ -86,10 +89,13 @@ pub fn forget_target(root: &Path, id: &str) -> Result<()> {
 
 /// A single-plugin install changes the inventory without calculating the remaining full plan.
 /// Preserve the timestamps of actual harness checks and syncs until the next one runs.
+/// `installed_since` says why the counts are gone (a plugin was installed, the list did not change),
+/// until the next full check.
 pub fn invalidate_counts(root: &Path) -> Result<()> {
     let mut state = load(root)?;
     if state["revision"].is_null() { return Ok(()); }
     for field in ["revision", "pending", "blockers"] { state[field] = Value::Null; }
+    state["installed_since"] = json!(true);
     write(&root.join(FILE), &state)
 }
 

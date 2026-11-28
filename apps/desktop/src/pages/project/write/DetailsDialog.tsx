@@ -6,7 +6,7 @@ import { text } from '../../../model.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../../state/registry.tsx';
 import { message } from '../../../words.ts';
-import { REPOSITORY_FIELDS, busyReason, checkRepository, checkText, editPayload, repositoryOf, runningOn } from './jobs.ts';
+import { REPOSITORY_FIELDS, editBlockedReason, checkRepository, checkText, editPayload, repositoryOf, runningOn } from './jobs.ts';
 import type { EditPatch, RepositoryErrors } from './jobs.ts';
 import { useJobs } from './useJobs.tsx';
 
@@ -15,7 +15,7 @@ import { useJobs } from './useJobs.tsx';
  * Only what the person changed is sent. This file also holds what the other edits by hand (the records, `RecordsEditor.tsx`) share: `useEdit`, `useBlocked` and `NotSaved`. */
 
 /** Why the page offers no edit of this project: an AI run is changing it, and the runtime refuses an edit meanwhile. Null when nothing is. */
-export const useBlocked = (id: string): string | null => busyReason(runningOn(useJobs().jobs, id));
+export const useBlocked = (id: string): string | null => editBlockedReason(runningOn(useJobs().jobs, id));
 
 /** What the runtime refused, or the page could not send, shown as it was said: a box in the window that failed, with a word that says it besides the colour. */
 export function NotSaved({ text: said }: { text: string }) {

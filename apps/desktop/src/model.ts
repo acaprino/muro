@@ -19,13 +19,16 @@ export function pluginState(plugin:Plugin,snapshot:Snapshot):PluginStatus {
   if(instructions?.error) return status('unknown','Check instructions','warn');
   if(targets.some(t=>instructions?.stale_harnesses.includes(t.harness))) return status('prepare','Adapt again','warn');
   if(targets.some(t=>!readable(t,snapshot))) return status('unknown','Needs checking','warn');
-  if(targets.some(t=>!distributionFor(plugin,t))) return status('prepare','Needs preparing','accent');
+  if(targets.some(t=>!distributionFor(plugin,t))) return status('prepare','Not available on every harness','accent');
   const installations=targets.map(t=>({target:t,installed:installedOn(plugin,t,snapshot)}));
   if(installations.some(i=>!i.installed)) return status('missing','Not installed yet','accent');
   if(installations.some(i=>i.installed?.version!==distributionFor(plugin,i.target)?.version)) return status('update','Update available','warn');
   return status('ok','Up to date','ok');
 }
-export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'needs-build'|'source-error'|'changes'|'unscanned'|'unknown'|'paused'|'none';
+/** `unavailable`: the plugin has no version for the harness of the target (its source ships none and nothing was adapted), so there is nothing to install there; `reason`, when the plan
+ * says it, is why. `adapt-again`: its build for that harness was made without the custom instructions it has now (`from`: 'never' when no build of it was adapted by Muro). `blocked`: the current
+ * plan holds it back, with the service's reason. `disabled`: installed and turned off in the harness. */
+export type CellKind = 'ok'|'install'|'update'|'reinstall'|'activate'|'remove'|'unavailable'|'adapt-again'|'blocked'|'disabled'|'source-error'|'changes'|'unscanned'|'unknown'|'paused'|'none';
 export interface CellStatus { kind:CellKind; from?:string; to?:string; reason?:string; count?:number }
 const cell=(kind:CellKind,from?:string,to?:string):CellStatus=>({kind,...(from?{from}:{}),...(to?{to}:{})});
 /** The operation kinds the service plans: each one is a change waiting to be applied. */
@@ -42,17 +45,23 @@ export function cellState(plugin:Plugin,target:Target,snapshot:Snapshot,plan:Pla
   if(!wantedHere) return cell('none');
   const instructions=instructionsOf(plugin,snapshot);
   if(instructions?.error) return cell('unknown');
-  if(instructions?.stale_harnesses.includes(target.harness)) return cell('needs-build');
-  const inventory = snapshot.inventory.find(i => i.target_id === target.id);
-  if(inventory?.unscanned) return cell(distributionFor(plugin,target) ? 'unscanned' : 'needs-build');
-  if(!inventory?.complete || !inventory.supported) return cell('unknown');
   const wanted=distributionFor(plugin,target);
-  if(!wanted) return cell('needs-build');
+  if(instructions?.stale_harnesses.includes(target.harness)) return {kind:'adapt-again',...(wanted?.origin==='muro'?{}:{from:'never'})};
+  // What the current plan holds back: never read as what the snapshot shows.
+  const held=currentPlan(snapshot,plan)?.blocked?.find(b=>b.target_id===target.id&&b.plugin_id===plugin.id);
+  if(!wanted) return held?{kind:'unavailable',reason:held.reason}:cell('unavailable');
+  if(held) return {kind:'blocked',reason:held.reason};
+  const inventory = snapshot.inventory.find(i => i.target_id === target.id);
+  if(inventory?.unscanned) return cell('unscanned');
+  if(!inventory?.complete || !inventory.supported) return cell('unknown');
   const installed=installedOn(plugin,target,snapshot);
   if(!installed) return cell('install',undefined,wanted.version);
-  return cell(installed.version===wanted.version?'ok':'update',installed.version,wanted.version);
+  // A record whose files are gone is put back (the service plans an update); one turned off in the harness is not in sync, and only a check says whether Muro turns it on again.
+  if(installed.present===false) return {kind:'update',from:installed.version,to:wanted.version,reason:'Files missing'};
+  if(installed.version!==wanted.version) return cell('update',installed.version,wanted.version);
+  return installed.enabled===false?cell('disabled',installed.version,wanted.version):cell('ok',installed.version,wanted.version);
 }
-export interface HarnessStatus { kind:'paused'|'unscanned'|'unknown'|'changes'|'needs-build'|'source-error'|'unseen'|'ok'; count:number }
+export interface HarnessStatus { kind:'paused'|'unscanned'|'unknown'|'changes'|'blocked'|'adapt-again'|'unavailable'|'disabled'|'source-error'|'unseen'|'not-checked'|'ok'; count:number }
 /** The state line of a harness column. A harness that cannot be read is never in sync; the count is of what the kind names. `unseen`: the record says changes are waiting and this column has none of its own to show (the record does not say where they are), so it cannot say it is in sync: `count` is the recorded total. */
 export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):HarnessStatus {
   if(!target.enabled) return {kind:'paused',count:0};
@@ -64,31 +73,34 @@ export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):Har
   const checked=currentPlan(snapshot,plan);
   // A Hermes package can have two native operations in one cell. Removals outside the list have no cell.
   const changes=checked ? checked.operations.filter(o=>o.target_id===target.id).length : count(k=>CHANGES.has(k));
-  const build=count(k=>k==='needs-build'),unreadable=count(k=>k==='unknown'),failed=count(k=>k==='source-error');
-  const unseen=checked?0:recorded(snapshot)?.pending??0;
-  return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:build?{kind:'needs-build',count:build}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:{kind:'ok',count:0};
+  const held=count(k=>k==='blocked'),adapt=count(k=>k==='adapt-again'),unavailable=count(k=>k==='unavailable'),off=count(k=>k==='disabled'),unreadable=count(k=>k==='unknown'),failed=count(k=>k==='source-error');
+  const record=checked?null:recorded(snapshot),unseen=record?.pending??0;
+  // In sync only as far as a check of this revision knows: with neither a plan nor a record of it, nothing current was checked.
+  const fine:HarnessStatus=checked||record?{kind:'ok',count:0}:{kind:'not-checked',count:0};
+  return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:held?{kind:'blocked',count:held}:adapt?{kind:'adapt-again',count:adapt}:unavailable?{kind:'unavailable',count:unavailable}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:off?{kind:'disabled',count:off}:fine;
 }
-export interface SyncSummary { kind:'no-harness'|'not-checked'|'changed'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; byKind:Record<string,number> }
+/** `errors` is the sources the last check could not resolve; `projects` the plugins whose project file or update policy needs attention (`project_source_error`), which no source answer fixes. */
+export interface SyncSummary { kind:'no-harness'|'not-checked'|'changed'|'installed'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; projects:number; byKind:Record<string,number> }
 /** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked (`not-checked`), or the last check was of an earlier revision: the list changed since (`changed`). `errors` is the sources the last check could not resolve. */
 export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {
-  const empty=(kind:SyncSummary['kind']):SyncSummary=>({kind,operations:0,blockers:0,errors:0,byKind:{}});
+  const empty=(kind:SyncSummary['kind']):SyncSummary=>({kind,operations:0,blockers:0,errors:0,projects:0,byKind:{}});
   if(!snapshot.registry.targets.some(t=>t.enabled)) return empty('no-harness');
   const checked=currentPlan(snapshot,plan),record=checked?null:recorded(snapshot);
-  if(!checked&&!record) return empty(snapshot.sync.last_check&&snapshot.sync.revision!==snapshot.registry.revision?'changed':'not-checked');
+  if(!checked&&!record) return empty(snapshot.sync.last_check&&snapshot.sync.revision!==snapshot.registry.revision?(snapshot.sync.installed_since?'installed':'changed'):'not-checked');
   const byKind:Record<string,number>={};
   for(const o of checked?.operations??[]) byKind[o.kind]=(byKind[o.kind]||0)+1;
   const archivedErrors=snapshot.registry.plugins.filter(p=>p.project_source_error && snapshot.registry.targets.some(t=>t.enabled&&p.targets.includes(t.id))).length;
-  const operations=checked?checked.operations.length:record!.pending!,blockers=checked?checked.blockers.length:record!.blockers??0,errors=Math.max(snapshot.sync.errors??0,archivedErrors);
-  return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,errors,byKind};
+  const operations=checked?checked.operations.length:record!.pending!,blockers=checked?checked.blockers.length:record!.blockers??0,errors=snapshot.sync.errors??0;
+  return {kind:operations?'changes':blockers?'blocked':'ok',operations,blockers,errors,projects:archivedErrors,byKind};
 }
-export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'|'sources'; operations:number; blockers:number; errors:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
+export interface SyncHeadline { kind:SyncSummary['kind']|'unreadable'|'sources'|'projects'; operations:number; blockers:number; errors:number; projects:number; byKind:Record<string,number>; unreadable:{target:Target;count:number}[] }
 /** What the strip leads with. A harness column that cannot be read (its inventory, or the instructions of one of its plugins; `count` tells which) never reads as in sync, and neither does a source that could not be resolved: with nothing to apply they replace "ok" and "blocked", the unreadable harness first. */
 export function syncHeadline(snapshot:Snapshot,plan:Plan|null):SyncHeadline {
   const summary=syncSummary(snapshot,plan);
   const unreadable=snapshot.registry.targets.filter(t=>t.enabled).map(target=>({target,state:harnessState(target,snapshot,plan)})).filter(x=>x.state.kind==='unknown').map(x=>({target:x.target,count:x.state.count}));
   const quiet=summary.kind==='ok'||summary.kind==='blocked';
   const unchecked = snapshot.inventory.some(i => i.unscanned && snapshot.registry.targets.some(t => t.enabled && t.id === i.target_id));
-  return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':summary.kind==='ok'&&unchecked?'not-checked':summary.kind,unreadable};
+  return {...summary,kind:quiet&&unreadable.length?'unreadable':quiet&&summary.errors?'sources':quiet&&summary.projects?'projects':summary.kind==='ok'&&unchecked?'not-checked':summary.kind,unreadable};
 }
 /** What an enabled harness holds that it cannot load itself (the `warnings` of its inventory), each with its harness. The service read around it: the harness is listed and managed all the same, so this is told beside the sync state and never takes its place. */
 export function harnessWarnings(snapshot:Snapshot):{target:Target;message:string}[] {
@@ -100,10 +112,13 @@ export function sameOperations(a:Plan|null,b:Plan|null):boolean {
   const key=(o:Operation)=>JSON.stringify([o.target_id,o.plugin_id,o.name,o.kind,o.from_version,o.to_version]),left=a.operations.map(key).sort(),right=b.operations.map(key).sort();
   return left.every((k,i)=>k===right[i]);
 }
-/** What a plan removes: `total` is its operations of kind `remove`; `missing` of them clear a record whose files are gone (`present === false`: an operation without the field is a real uninstall), `uninstall` of them remove a copy that is there. */
+/** Whether an operation uninstalls plugins: a `remove`, or a broken marketplace that takes plugins with it (the service's `uninstalls`). It waits for the person's confirmation. */
+export const uninstalls=(o:Operation):boolean=>o.kind==='remove'||(o.kind==='remove-marketplace'&&!!o.plugins?.length);
+/** What a plan removes: `total` is its operations that uninstall (the number `confirm_removals` names); `missing` of them clear a record whose files are gone (`present === false`: an operation without the field is a real uninstall), `uninstall` is the plugins the others take away (a broken marketplace takes all of its own). */
 export function removals(plan:Plan):{total:number;uninstall:number;missing:number} {
- const gone=plan.operations.filter(o=>o.kind==='remove'),missing=gone.filter(o=>o.present===false).length;
- return {total:gone.length,uninstall:gone.length-missing,missing};
+ const gone=plan.operations.filter(uninstalls),missing=gone.filter(o=>o.kind==='remove'&&o.present===false).length;
+ const uninstall=gone.filter(o=>!(o.kind==='remove'&&o.present===false)).reduce((n,o)=>n+(o.kind==='remove-marketplace'?o.plugins?.length??0:1),0);
+ return {total:gone.length,uninstall,missing};
 }
 /** The primary button of the review sheet. With removals it says what they do (uninstall, clear a record without files, or both), so confirming is reading; without any it is the plain count of changes. */
 export function removalLabel(plan:Plan):string {
@@ -123,6 +138,14 @@ export const mustReview=(shown:Plan|null,fresh:Plan):boolean=>!!fresh.blockers.l
 /** Installed on an enabled harness that was read completely, and that the list does not hold (`inList`: not put there by Muro, and not added to the list since): `index` is its place in the inventory. */
 export function unlisted(snapshot:Snapshot):{target:Target;plugin:InstalledPlugin;index:number}[] {
   return snapshot.registry.targets.filter(t=>t.enabled).flatMap(target=>{const inventory=snapshot.inventory.find(i=>i.target_id===target.id);return inventory?.complete?inventory.plugins.map((plugin,index)=>({target,plugin,index})).filter(u=>!inList(snapshot,target,u.plugin)):[];});
+}
+/** What "Uninstall, asking first" does to one plugin outside the list, as far as a plan of this revision says: `planned` when the plan removes it (it waits for the review sheet's confirmation),
+ * `held` when the plan removes nothing on that harness because something there is not ready (a harness with a blocker gets no removal), `unchecked` with no plan of this revision. */
+export function removalOf(snapshot:Snapshot,plan:Plan|null,target:Target,installed:InstalledPlugin):'planned'|'held'|'unchecked' {
+ const current=currentPlan(snapshot,plan);
+ if(!current) return 'unchecked';
+ if(current.operations.some(o=>o.target_id===target.id&&(o.kind==='remove'&&o.native_id===installed.id||o.kind==='remove-marketplace'&&!!o.plugins?.includes(installed.id)))) return 'planned';
+ return current.blockers.some(b=>b.startsWith(`${target.name}:`)||b.startsWith(`${target.name} / `))||current.blocked?.some(b=>b.target_id===target.id)?'held':'unchecked';
 }
 export const exclusiveMode=(targets:Target[]):'keep'|'remove'|'mixed'=>targets.length&&targets.every(t=>t.exclusive)?'remove':targets.some(t=>t.exclusive)?'mixed':'keep';
 const INTERVALS:[number,string][]=[[15,'Every 15 minutes'],[30,'Every 30 minutes'],[60,'Every hour'],[180,'Every 3 hours'],[720,'Every 12 hours'],[1440,'Once a day']];

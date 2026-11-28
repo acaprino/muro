@@ -1,7 +1,9 @@
 // The table of the Sync page: a row per plugin of the list, a column per managed harness. A port of the Imago window's `table`, `rows`, `cell` and `hstate`
 // (pages/sync.ts of commit 5e33a82) on Sigrid's table parts. What a cell or a column says is model.ts's (`cellState`, `harnessState`), read with the plan of this
 // window (useSync), which counts only for the registry revision it was made for: with none the cells say what the snapshot shows, and a column that the recorded
-// check says has changes, with nothing of its own to show, says to check. A cell never reads as in sync for a harness that cannot be read or a plugin without a build.
+// check says has changes, with nothing of its own to show, says to check. A cell never reads as in sync for a harness that cannot be read or a plugin with no version for it:
+// such a plugin is "Not available" there (nothing to install; Adapt with AI, in its dialog, can make one), and one whose instructions changed is to adapt again. A pair the current plan
+// holds back is "Not ready" with the service's reason, never what the snapshot shows; and a column with neither a current plan nor a recorded check of this revision asks for a check.
 // The name of a plugin opens its dialog and the name of a harness its inspector (the page decides where they open); a column only says how many changes wait there,
 // and its inspector syncs that harness alone. The rows are one tab stop: the arrows, Home and End move between them.
 import * as React from 'react';
@@ -13,8 +15,14 @@ import { useSync } from './useSync.tsx';
 
 /** The update policy of a plugin, as its row says it under the version. */
 const POLICY: Record<string, string> = { stable: 'Latest release', pinned: 'Pinned version', head: 'Latest commit' };
-/** "1 plugin needs a build", "2 plugins need a build". */
-const needBuild = (n: number): string => `${plural(n, 'plugin')} need${n === 1 ? 's' : ''} a build`;
+/** "1 plugin not available", "2 plugins not available": selected for a harness they have no version for. */
+const notAvailable = (n: number): string => `${plural(n, 'plugin')} not available`;
+/** "1 plugin to adapt", "2 plugins to adapt": their build for the harness was made without the custom instructions they have now. */
+const adaptAgain = (n: number): string => `${plural(n, 'plugin')} to adapt`;
+/** "1 plugin not ready", "2 plugins not ready": the current plan holds them back. */
+const notReady = (n: number): string => `${plural(n, 'plugin')} not ready`;
+/** "1 plugin turned off", "2 plugins turned off": installed, and switched off in the harness. */
+const turnedOff = (n: number): string => `${plural(n, 'plugin')} turned off`;
 
 export interface SyncTableProps {
   snapshot: Snapshot;
@@ -46,7 +54,7 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
       <TableHeader>
         <TableRow>
           <TableHead><TwoLines first="Plugin" second={`${plural(plugins.length, 'plugin')} in your list`} /></TableHead>
-          <TableHead><Text>Latest version</Text></TableHead>
+          <TableHead><Text>Version</Text></TableHead>
           {targets.map(t => (
             <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} onOpen={onOpenHarness} />
           ))}
@@ -71,11 +79,13 @@ interface HarnessHeadProps {
   onOpen(targetId: string, opener: HTMLElement | null): void;
 }
 
-/** The head of a harness column: its name (which opens it), its state and how many plugins need a build there. When it was checked and synced is in its inspector. */
+/** The head of a harness column: its name (which opens it), its state, and how many plugins are to adapt again or not available there. When it was checked and synced is in its inspector. */
 function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
   const state = harnessState(target, snapshot, plan);
-  // The plugins without a build here, counted even where changes come first: Apply all leaves them out.
-  const builds = state.kind === 'needs-build' ? 0 : snapshot.registry.plugins.filter(p => cellState(p, target, snapshot, plan).kind === 'needs-build').length;
+  // The plugins with nothing to install here, counted even where changes come first: Apply all leaves them out.
+  const kinds = snapshot.registry.plugins.map(p => cellState(p, target, snapshot, plan).kind);
+  const besides = (kind: string) => (state.kind === kind ? 0 : kinds.filter(k => k === kind).length);
+  const held = besides('blocked'), adapt = besides('adapt-again'), missing = besides('unavailable');
   let line: React.ReactNode;
   switch (state.kind) {
     case 'paused':
@@ -84,8 +94,20 @@ function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
     case 'changes':
       line = <Badge tone="info">{plural(state.count, 'change')} waiting</Badge>;
       break;
-    case 'needs-build':
-      line = <Badge tone="warning">{needBuild(state.count)}</Badge>;
+    case 'blocked':
+      line = <Badge tone="warning">{notReady(state.count)}</Badge>;
+      break;
+    case 'adapt-again':
+      line = <Badge tone="warning">{adaptAgain(state.count)}</Badge>;
+      break;
+    case 'disabled':
+      line = <Badge variant="outline">{turnedOff(state.count)}</Badge>;
+      break;
+    case 'not-checked':
+      line = <Text variant="strong">Check to see if it is in sync</Text>;
+      break;
+    case 'unavailable':
+      line = <Badge variant="outline">{notAvailable(state.count)}</Badge>;
       break;
     case 'unscanned':
       line = <Text variant="muted">Not checked yet</Text>;
@@ -107,7 +129,9 @@ function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
       <Column gap="xs" align="start">
         <Button variant="ghost" size="sm" onClick={event => onOpen(target.id, event.currentTarget)}><Text truncate>{target.name}</Text></Button>
         {line}
-        {builds ? <Badge tone="warning">{needBuild(builds)}</Badge> : null}
+        {held ? <Badge tone="warning">{notReady(held)}</Badge> : null}
+        {adapt ? <Badge tone="warning">{adaptAgain(adapt)}</Badge> : null}
+        {missing ? <Badge variant="outline">{notAvailable(missing)}</Badge> : null}
       </Column>
     </TableHead>
   );
@@ -162,12 +186,17 @@ function Cell({ state, plugin, target }: { state: CellStatus; plugin: Plugin; ta
   let action: string;
   switch (state.kind) {
     case 'ok': return <Cluster gap="xs" wrap={false}><Text tone="success"><Icon name="check" /></Text><Text variant="strong">{state.to}</Text></Cluster>;
-    case 'update': action = `Update ${state.from} → ${state.to}`; break;
+    case 'update': action = state.reason && state.from === state.to ? `Restore ${state.to}` : `Update ${state.from} → ${state.to}`; break;
     case 'install': action = `Install ${state.to}`; break;
     case 'reinstall': action = `Reinstall ${state.to}`; break;
     case 'activate': action = `Activate ${state.to}`; break;
     case 'remove': return <Badge tone="danger">Remove {state.from}</Badge>;
-    case 'needs-build': return <Badge tone="warning">Needs a build</Badge>;
+    case 'unavailable': return <Badge variant="outline" title={state.reason ?? `${plugin.name} has no version for ${target.name}`}>Not available</Badge>;
+    case 'adapt-again': return state.from === 'never'
+      ? <Badge tone="warning" title={`${plugin.name} has custom instructions, and its build for ${target.name} was made without them: Adapt with AI uses them`}>Instructions not applied</Badge>
+      : <Badge tone="warning" title={`The instructions of ${plugin.name} changed since it was adapted for ${target.name}`}>Adapt again</Badge>;
+    case 'blocked': return <Column gap="xs" align="start"><Badge tone="warning">Not ready</Badge><Text variant="note" title={state.reason} truncate>{state.reason}</Text></Column>;
+    case 'disabled': return <Badge variant="outline" title={`${plugin.name} ${state.to} is installed on ${target.name} and turned off there`}>Turned off</Badge>;
     case 'source-error': return <Column gap="xs" align="start"><Badge tone="warning">Check plugin source</Badge><Text variant="note" title={state.reason} truncate>{state.reason}</Text></Column>;
     case 'changes': action = `Review ${plural(state.count ?? 0, 'change')}`; break;
     case 'unscanned': action = 'Check installation'; break;

@@ -27,7 +27,7 @@ export const FILTERS: readonly { id: ActivityFilter; label: string }[] = [
   { id: 'ai', label: 'AI runs' },
   { id: 'problems', label: 'Problems' },
 ];
-/** A status that is not a problem; anything else (failed, cancelled, interrupted, a status not known) is one. */
+/** A status that is not a problem; anything else (failed, partial, cancelled, interrupted, a status not known) is one. */
 const OK: ReadonlySet<string> = new Set(['complete', 'completed', 'ok']);
 export const isOk = (status: string): boolean => OK.has(status);
 const humanize = (action: string): string => {
@@ -64,7 +64,8 @@ export function finished(snapshot: Snapshot, live: readonly Job[]): Job[] {
 export function entries(snapshot: Snapshot, live: readonly Job[] = []): Entry[] {
   const events = [...snapshot.activity].reverse().map((a): Entry => {
     const [done, failed] = TITLES[a.action] ?? [humanize(a.action), humanize(a.action)];
-    return { key: `event:${a.id}`, time: a.time, kind: SYNC_ACTIONS.has(a.action) ? 'sync' : 'other', title: isOk(a.status) ? done : failed, message: a.message, status: a.status, log: '' };
+    // A run that applied what was ready and left the rest out (`partial`) is not a failure: its title is the done one, its badge says what was left out.
+    return { key: `event:${a.id}`, time: a.time, kind: SYNC_ACTIONS.has(a.action) ? 'sync' : 'other', title: isOk(a.status) || a.status === 'partial' ? done : failed, message: a.message, status: a.status, log: '' };
   });
   const runs = finished(snapshot, live).map((job): Entry => {
     const began = startedAt(job);

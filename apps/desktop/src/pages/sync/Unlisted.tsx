@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Badge, Button, Cluster, Column, Count, Icon, RadioGroup, RadioGroupItem, Section, Text } from '@acaprino/sigrid/primitives';
 import { SettingRow } from '@acaprino/sigrid/components';
 import type { InstalledPlugin, Snapshot, Target } from '../../types.ts';
-import { exclusiveMode, filesMissing, listing, unlisted } from '../../model.ts';
+import { exclusiveMode, filesMissing, listing, removalOf, unlisted } from '../../model.ts';
 import { useNotify } from '@acaprino/imago';
 import { useRegistry } from '../../state/registry.tsx';
 import { message, plural } from '../../words.ts';
@@ -58,7 +58,7 @@ const lineOf = (installed: InstalledPlugin, target: Target): string => `${instal
 
 export function Unlisted() {
   const { snapshot, request } = useRegistry();
-  const { adopt } = useSync();
+  const { adopt, plan } = useSync();
   const notify = useNotify();
   const { add, adding } = useAddToList();
   const [failure, setFailure] = React.useState<string | null>(null);
@@ -120,9 +120,12 @@ export function Unlisted() {
                 description={<Text pre>{lineOf(plugin, target)}{listable(plugin) ? '' : ` ${NO_FOLDER}`}</Text>}
                 control={(
                   <Cluster justify="end">
-                    {target.exclusive
-                      ? <Badge tone="warning" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
-                      : <Text variant="note">Left alone</Text>}
+                    {!target.exclusive ? <Text variant="note">Left alone</Text> : (() => {
+                      const removal = removalOf(snapshot, plan, target, plugin);
+                      return removal === 'planned' ? <Badge tone="warning" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
+                        : removal === 'held' ? <Badge variant="outline" title={`A harness with something not ready gets no removal: ${target.name} keeps it until the plan is clear`}>Kept until the harness is ready</Badge>
+                        : <Text variant="note">Uninstalled after a check, when you confirm</Text>;
+                    })()}
                     {listable(plugin)
                       ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>
                       : null}

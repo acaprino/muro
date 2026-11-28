@@ -441,13 +441,17 @@ await test('a plugin added to the list while Uninstall, asking first is on is no
   assert.equal(await unlistedSection(page).count(), 0, 'and it is no longer in the section');
 });
 
-await test('on an exclusive harness every line waits for confirmation, and a record whose files are gone says so', 'removals', {}, async app => {
+await test('on an exclusive harness every line waits for confirmation once a check planned it, and a record whose files are gone says so', 'removals', {}, async app => {
   const { page } = app;
   await ready(page);
   const section = unlistedSection(page);
   await section.waitFor();
   assert.equal(await section.getByRole('listitem').count(), 2);
-  await section.getByRole('listitem').filter({ hasText: 'old-snippets' }).getByText('Removal waits for your confirmation', { exact: true }).waitFor();
+  const snippets = section.getByRole('listitem').filter({ hasText: 'old-snippets' });
+  // No plan yet: no removal is waiting, only the rule says what a check will plan.
+  await snippets.getByText('Uninstalled after a check, when you confirm', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Check now', exact: true }).first().click();
+  await snippets.getByText('Removal waits for your confirmation', { exact: true }).waitFor();
   const ghost = section.getByRole('listitem').filter({ hasText: 'ghost' });
   await ghost.getByText('files missing').waitFor();
   await ghost.getByText('Removal waits for your confirmation', { exact: true }).waitFor();

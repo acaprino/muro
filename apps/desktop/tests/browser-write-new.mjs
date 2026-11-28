@@ -224,7 +224,7 @@ await test('New project: the payload is what was typed; the run shows above the 
   const text = await row.textContent();
   for (const fact of ['0.1.0', 'D:/Projects/docs-kit.mp', '2 inputs']) assert.ok(text.includes(fact), `the new row says ${fact}: ${text}`);
   assert.ok((await callsOf(app, 'projects')).length > read, 'the list was read again when the run ended');
-  await notice(page, 'New project Docs Kit: The project was created and added to your list. Install it from its Install step').waitFor();
+  await notice(page, 'New project Docs Kit: The project was created and added to your list. Install it with Install via Sync…').waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll('button')].some(b => b.textContent.includes('New project…') && !b.disabled));
   // The project is listed now: its id is taken, and the form is a new one.
   await newButton(page).click();

@@ -63,7 +63,12 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
   if (doing.progress) return note('applying', 'info', `Applying ${plural(doing.progress.total, 'change')}…`, doing.progress.names);
   if (doing.checking) return note('checking', null, 'Checking sources and harnesses…', 'Reading what is installed and looking for new versions.');
   const h = syncHeadline(snapshot, plan);
-  const unreadable = h.unreadable.length ? `${nameList(h.unreadable.map(u => u.target.name))} cannot be read` : '';
+  // A harness whose inventory cannot be read (`count` 0) is named; one that reads fine but holds a plugin whose instructions cannot be read is not blamed: the plugin is.
+  const harnesses = h.unreadable.filter(u => !u.count).map(u => u.target.name);
+  const broken = snapshot.registry.plugins.filter(p => h.unreadable.some(u => p.targets.includes(u.target.id))
+    && snapshot.custom_instructions?.some(i => i.plugin_id === p.id && i.error)).map(p => p.name);
+  const unreadable = !h.unreadable.length ? '' : harnesses.length ? `${nameList(harnesses)} cannot be read` : broken.length ? `The instructions of ${nameList(broken)} cannot be read` : 'A plugin cannot be read';
+  const projectBit = h.projects ? `${plural(h.projects, 'plugin')} ${h.projects === 1 ? 'needs' : 'need'} attention` : '';
   switch (h.kind) {
     case 'no-harness':
       return note(h.kind, 'warn', 'No harness is managed', 'Muro needs at least one harness to install plugins into.');
@@ -71,9 +76,11 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
       return note(h.kind, null, 'Not checked yet', 'Check now to compare your list with what is installed and to look for new versions. Nothing changes until you apply.', true);
     case 'changed':
       return note(h.kind, null, 'Your list changed since the last check', 'Check now to see what the change means for your harnesses. Nothing changes until you apply.', true);
+    case 'installed':
+      return note(h.kind, null, 'A plugin was installed since the last check', 'Check now to see whether the rest of your list is in sync. Nothing changes until you apply.', true);
     case 'changes': {
       const parts = CHANGE_WORDS.filter(([kind]) => h.byKind[kind]).map(([kind, word]) => plural(h.byKind[kind]!, word));
-      const bits = [parts.join(', '), h.blockers ? `${plural(h.blockers, 'item')} not ready yet` : '', unreadable, h.errors ? `${plural(h.errors, 'source')} could not be checked` : ''].filter(Boolean);
+      const bits = [parts.join(', '), h.blockers ? `${plural(h.blockers, 'item')} not ready yet` : '', unreadable, h.errors ? `${plural(h.errors, 'source')} could not be checked` : '', projectBit].filter(Boolean);
       return note(h.kind, 'info', `${plural(h.operations, 'change')} ready to apply`, `${bits.length ? `${bits.join(' · ')}. ` : ''}Nothing changes until you apply.`);
     }
     case 'unreadable':
@@ -85,6 +92,8 @@ export function noteOf(snapshot: Snapshot, plan: Plan | null, doing: { checking:
       return note(h.kind, 'warn', `${plural(h.errors, 'source')} could not be checked`,
         `Muro could not resolve ${one ? 'it' : 'them'}, so it cannot say ${one ? 'it is' : 'they are'} up to date.${h.blockers ? ` ${plural(h.blockers, 'item')} not ready yet.` : ''} Check again when ${one ? 'it answers' : 'they answer'}.`, true);
     }
+    case 'projects':
+      return note(h.kind, 'warn', projectBit, `Their project file or update policy needs attention, so Muro cannot say ${h.projects === 1 ? 'it is' : 'they are'} up to date. The reason is in ${h.projects === 1 ? 'its cell' : 'their cells'}.${h.blockers ? ` ${plural(h.blockers, 'item')} not ready yet.` : ''}`, true);
     case 'blocked': {
       const b = currentPlan(snapshot, plan)?.blockers ?? [];
       return note(h.kind, 'warn', 'Some plugins are not ready', b.length
@@ -103,10 +112,12 @@ export function chipOf(h: SyncHeadline): Chip {
     'no-harness': 'No harness',
     'not-checked': 'Not checked yet',
     changed: 'List changed',
+    installed: 'Check the rest',
     changes: `${plural(h.operations, 'change')} waiting`,
     blocked: 'Needs attention',
-    unreadable: 'A harness cannot be read',
+    unreadable: h.unreadable.length && h.unreadable.every(u => u.count) ? 'A plugin cannot be read' : 'A harness cannot be read',
     sources: 'Sources not checked',
+    projects: 'A plugin needs attention',
     ok: 'In sync',
   }[h.kind];
   return { text, tone: h.kind === 'ok' ? 'ok' : 'warn' };
