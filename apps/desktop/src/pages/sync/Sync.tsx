@@ -6,7 +6,7 @@
 // shows is the registry (useRegistry) and the sync state (useSync), and its buttons ask useSync; the dialogs of a plugin, a new plugin and a new harness are
 // their own files, and the harness inspector is the frame's (App.tsx), so the table stays usable beside it.
 import * as React from 'react';
-import { Button, Card, Cluster, Column, Heading, Icon, Section, Split, Text } from '@acaprino/sigrid/primitives';
+import { Button, Card, Cluster, Column, Count, Heading, Icon, Section, Split, Text } from '@acaprino/sigrid/primitives';
 import { Empty, Note, SettingRow } from '@acaprino/sigrid/components';
 import type { Snapshot } from '../../types.ts';
 import { harnessWarnings, syncHeadline } from '../../model.ts';
@@ -90,14 +90,19 @@ export function Sync({ openHarness, entry }: SyncProps) {
           </Column>
         </Section>
       ) : null}
-      {listEmpty ? (
-        <Card variant="quiet" pad="xl">
-          <Empty title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
-        </Card>
-      ) : noPlugin ? null : (
-        <SyncTable snapshot={snapshot} onOpenPlugin={(id, opener) => { pluginOpener.current = opener; setPlugin({ id, open: true }); }} onOpenHarness={openHarness} />
-      )}
-      <Unlisted />
+      {/* Two parts of equal rank, each named, with the space between sections that the space inside each does not reach: your list, and what is installed outside it. */}
+      <Column gap="3xl">
+        {listEmpty ? (
+          <Card variant="quiet" pad="xl">
+            <Empty title="Your list is empty" description="Add a plugin by its source, or take one that is already installed from the list below." action={addPlugin} />
+          </Card>
+        ) : noPlugin ? null : (
+          <Section title="Your plugins" icon={<Icon name="package" />} end={<Count value={plugins.length} label={plugins.length === 1 ? 'plugin' : 'plugins'} />}>
+            <SyncTable snapshot={snapshot} onOpenPlugin={(id, opener) => { pluginOpener.current = opener; setPlugin({ id, open: true }); }} onOpenHarness={openHarness} />
+          </Section>
+        )}
+        <Unlisted />
+      </Column>
       <ReviewSheet />
       {/* One dialog for each plugin opened: another row starts a dialog of its own, with nothing of the last one's form. */}
       {plugin ? <PluginDialog key={plugin.id} pluginId={plugin.id} open={plugin.open} onOpenChange={open => setPlugin(p => (p ? { ...p, open } : p))} restoreFocusTo={pluginOpener} /> : null}
