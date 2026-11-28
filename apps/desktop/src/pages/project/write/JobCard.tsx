@@ -117,7 +117,7 @@ export function RunningCard({ job, cancelling, onCancel, elsewhere = false }: { 
               whose !== '' && { name: ofProject ? 'Project' : 'Plugin', value: <Text pre>{whose}</Text> },
               budget !== '' && { name: 'Budget', value: budget },
               began ? { name: 'Time', value: since(now / 1000 - began) } : null,
-              { name: 'Limit', value: `Stops after ${runLimit(job)} min` },
+              { name: 'Limit', value: `Each step stops after ${runLimit(job)} min` },
               job.log_path ? { name: 'Log', value: job.log_path, code: true } : null,
             ]}
           />

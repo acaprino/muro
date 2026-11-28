@@ -2262,9 +2262,14 @@ fn codex_is_read_and_written_beside_a_marketplace_whose_folder_is_gone() {
     assert_eq!(ids(&s), ["keep@lost"]);
     assert_eq!(s["inventory"][0]["plugins"][0]["version"], "0.4.1");
 
+    // It takes keep@lost away with it: a removal, applied only on the person's confirmation.
+    let refused = request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap_err().to_string();
+    assert!(refused.contains("This plan uninstalls 1 plugin; review it and confirm the removals"), "{refused}");
+    assert_eq!(ids(&snapshot(&r)), ["keep@lost"], "nothing changed");
+
     // Written and repaired: the install runs beside the marketplace Codex cannot load, then the
     // marketplace goes, with Codex's own commands. Codex lists again, and the next plan has nothing to do.
-    request(&r, "apply", json!({"plan_id":plan["id"]})).unwrap();
+    request(&r, "apply", json!({"plan_id":plan["id"],"confirm_removals":1})).unwrap();
     let s = snapshot(&r);
     assert_eq!(ids(&s), ["muro-registry-test@muro-native-test"], "{s}");
     let ours = &s["inventory"][0]["plugins"][0];
@@ -2304,4 +2309,29 @@ fn codex_is_read_and_written_beside_a_marketplace_whose_folder_is_gone() {
     request(&r, "apply", confirmed(&plan)).unwrap();
     let s = snapshot(&r);
     assert_eq!(ids(&s), Vec::<String>::new(), "{s}");
+}
+
+/// "Plan a reinstall" of one plugin plans that plugin alone, on every harness it is on: no other
+/// plugin's change and no removal of the exclusive harness comes with it.
+#[test]
+fn a_reinstall_of_one_plugin_with_no_harness_named_plans_that_plugin_alone() {
+    let (temp, root, profile, artifact) = fixture();
+    target(&root, &profile);
+    plugin_as(&root, &artifact, "example", &["oc"]);
+    let first = request(&root, "plan", json!({})).unwrap();
+    request(&root, "apply", json!({"plan_id":first["id"]})).unwrap();
+    plugin_as(&root, &second_artifact(temp.path()), "second", &["oc"]);
+    fs::write(profile.join("opencode.json"), {
+        let mut config: Value = serde_json::from_str(&fs::read_to_string(profile.join("opencode.json")).unwrap()).unwrap();
+        config["plugins"].as_array_mut().unwrap().push(json!("stale-plugin"));
+        config.to_string()
+    }).unwrap();
+    let whole = request(&root, "plan", json!({"reinstall":"example"})).unwrap();
+    let kinds: Vec<_> = whole["operations"].as_array().unwrap().iter().map(|o| (o["plugin_id"].clone(), o["kind"].clone())).collect();
+    assert!(kinds.len() > 1, "without plugin_id the plan holds every change: {whole}");
+    let one = request(&root, "plan", json!({"reinstall":"example","plugin_id":"example"})).unwrap();
+    let ops = one["operations"].as_array().unwrap();
+    assert_eq!(ops.len(), 1, "{one}");
+    assert_eq!((&ops[0]["plugin_id"], &ops[0]["kind"]), (&json!("example"), &json!("reinstall")));
+    assert!(request(&root, "plan", json!({"plugin_id":"example"})).is_err(), "an install still names its harness");
 }

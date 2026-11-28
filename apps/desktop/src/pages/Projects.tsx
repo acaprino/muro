@@ -9,7 +9,7 @@ import { message, unknownTo } from '../words.ts';
 import { Workspace } from './project/Workspace.tsx';
 import { DeleteDialog, atRevision, nameOf } from './project/write/DeleteDialog.tsx';
 import { JobCard } from './project/write/JobCard.tsx';
-import { busyReason, pickProjectFile, runningOn } from './project/write/jobs.ts';
+import { busyReason, editBlockedReason, pickProjectFile, runningOn } from './project/write/jobs.ts';
 import { NewProjectDialog } from './project/write/NewProjectDialog.tsx';
 import { useJobs } from './project/write/useJobs.tsx';
 import { countsOf } from './project/lines.ts';
@@ -159,7 +159,7 @@ function ProjectList({ list, error, loadList, showOpened }: {
           <ProjectRow
             key={p.id}
             p={p}
-            deleteReason={busyReason(runningOn(jobs, p.id))}
+            deleteReason={editBlockedReason(runningOn(jobs, p.id))}
             onOpen={() => project.open(p.id)}
             onRemove={() => setRemoval({ open: true, target: p })}
             onDelete={() => setDeletion({ open: true, target: p })}

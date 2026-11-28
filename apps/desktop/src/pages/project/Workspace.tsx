@@ -23,7 +23,7 @@ import { ExamplesPanel } from './ExamplesPanel.tsx';
 import { InputsPanel } from './InputsPanel.tsx';
 import { RecordsPanel } from './RecordsPanel.tsx';
 import { RunsPanel } from './RunsPanel.tsx';
-import { NO_RELEASE_REPOSITORY, busyReason, runningOn } from './write/jobs.ts';
+import { NO_RELEASE_REPOSITORY, busyReason, editBlockedReason, runningOn } from './write/jobs.ts';
 import { useJobs } from './write/useJobs.tsx';
 import { GatedButton, JobCard } from './write/JobCard.tsx';
 import { AddInputDialog } from './write/AddInputDialog.tsx';
@@ -125,7 +125,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const chosen = () => setDrawer(false);
   // An edit by hand waits only for a run of this project.
   const mine = runningOn(jobs.jobs, view.id);
-  const editBusy = mine ? busyReason(mine) : null;
+  const editBusy = editBlockedReason(mine);
   /** A dialog opens over the workspace; a drawer that holds the panel closes first, so no two modal surfaces are open at once. */
   const show = (next: ProjectDialog) => { setDrawer(false); setDialog(next); };
   const showPin = (input: string, remove: boolean) => { setPin({ input, remove }); show('pin'); };
@@ -143,7 +143,7 @@ export function Workspace({ info, file }: { info: ProjectInfo; file: string | nu
   const name = text(info.project?.name) || text(info.plugin?.name) || view.id, version = text(info.plugin?.version), about = aboutLine(info);
   const summary = [plural(data.inputs.length, 'input'), plural(data.entries.length, 'entry', 'entries'), plural(data.caps.length, 'capability', 'capabilities'), plural(data.examples.length, 'example')].join(' · ');
   const panel = <LeftPanel data={data} panel={view.panel} onPanel={p => project.setPanel(p)} onChosen={chosen} onPin={showPin} onInstructions={() => show('instructions')} onSystemPrompt={() => show('prompt')} />;
-  const litLine = input ? (marked.length ? `The capabilities ${input.id} became are marked on the graph.` : `${input.id} became no capability on the graph.`)
+  const litLine = input ? (marked.length ? `The capabilities ${input.id} went to are marked on the graph.` : `${input.id} went to no capability on the graph.`)
     : shown?.kind === 'decision' && shown.steps.length ? (shown.example !== null ? `The steps of “${shown.example}” are numbered on the graph.` : 'The steps of the answer are numbered on the graph.') : '';
 
   const pane = (
@@ -256,8 +256,8 @@ export function ProjectActions({ onInstall, checkingProject }: { onInstall(): vo
   const { setDialog, view, info } = useProject();
   const jobs = useJobs();
   const busy = busyReason(jobs.running);
-  const noRelease = info && releaseOf(info) ? (view ? busyReason(runningOn(jobs.jobs, view.id)) : null) : NO_RELEASE_REPOSITORY;
-  const noExport = info?.export_harnesses?.length === 0 ? 'Harmonize this project to build its harness variants.' : null;
+  const noRelease = info && releaseOf(info) ? (view ? editBlockedReason(runningOn(jobs.jobs, view.id)) : null) : NO_RELEASE_REPOSITORY;
+  const noExport = info?.export_harnesses?.length === 0 ? 'Use Harmonize again… to build its harness variants.' : null;
   // One solid button, the one that ends the work: the project on the harnesses. What changes it stays in sight; what takes it elsewhere (a folder, a release) is in More,
   // each item off with its reason in place.
   return (

@@ -7,7 +7,7 @@ import type { Job, Plugin } from '../src/types.ts';
 import {
   ADAPTATION_RUN_MINUTES, AI_RUN_NOTE, BUDGET_HINT, CHANGED, DEFAULT_BUDGET, FROZEN_PIN, MAX_BUDGET, NEEDS_CLAUDE, NOT_CANCELLABLE, NO_RELEASE_REPOSITORY, PROJECT_RUN_MINUTES, RELEASE_ABOUT,
   RELEASE_INIT, RELEASE_INIT_HINT, RELEASE_NOTE, REPOSITORY_FIELDS, SAVING_PHASE, VERSION_STEPS,
-  agentRefusal, busyReason, canCancel, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
+  agentRefusal, busyReason, canCancel, editBlockedReason, changePayload, checkBudget, checkFolder, checkInputs, checkInstructions, checkRecords, checkRepository, checkSlug, checkSource, checkText,
   defaultStep, deletePayload, editPayload, endedBetween, inputLines, instructionDiff, isFullPath, jobTitle, lastOver, newProjectPayload, newRecordId,
   operationWords, outcomeOf, parseBudget, releasePayload, releasedLine, repositoryOf, runLimit, runningJob, runningOn, slugOf, startedAt, upsertJob,
   EXTRACT_HARNESSES, extractPayload, extractedLine, indexProjectPlugins,
@@ -290,6 +290,10 @@ test('which run goes and on which project, how a run is called, when the runtime
   assert.equal(busyReason(null), null);
   assert.equal(busyReason(run()), 'Harmonize again is running: one AI run goes at a time. Wait for it to finish, or cancel it.');
   assert.equal(busyReason(adaptation), 'The adaptation of p1 is running: one AI run goes at a time. Wait for it to finish, or cancel it.');
+  assert.equal(busyReason(run({ phase: SAVING_PHASE })), 'Harmonize again is running: one AI run goes at a time. Wait for it to finish.', 'no cancel is offered while the project is being saved');
+  assert.equal(editBlockedReason(null), null);
+  assert.equal(editBlockedReason(run()), 'Harmonize again is changing this project: edits wait for it to finish, or cancel it.');
+  assert.equal(editBlockedReason(run({ phase: SAVING_PHASE })), 'Harmonize again is changing this project: edits wait for it to finish.');
   assert.deepEqual([jobTitle(run()), jobTitle(run({ title: undefined })), jobTitle(adaptation), jobTitle({ ...adaptation, plugin_id: undefined })], ['Harmonize again', 'Changing the project', 'The adaptation of p1', 'An adaptation']);
   assert.deepEqual([runLimit(run()), runLimit(adaptation)], [120, 30], 'a project run has its own limit, an adaptation keeps 30 minutes');
   // Once the project is being built and saved the runtime ignores a Cancel: the card offers none. An adaptation has no such phase.
@@ -326,7 +330,7 @@ test('what a reading of the runs tells that the one before did not: the project 
 });
 
 test('the outcome of a run is said in the runtime\'s words: its title and its message', () => {
-  const saved = 'The project was saved. Install it again from its Install step to bring the change to the harnesses';
+  const saved = 'The project was saved. Use Install via Sync… to bring the change to your harnesses';
   assert.deepEqual(outcomeOf(run({ status: 'completed', message: saved })), { text: `Harmonize again: ${saved}`, error: false });
   assert.deepEqual(outcomeOf(run({ status: 'completed', message: '' })), { text: 'Harmonize again: done.', error: false });
   assert.deepEqual(outcomeOf(run({ status: 'failed', message: 'The AI run failed (exit code: 1); see output.log. The project file was not changed' })),
@@ -397,7 +401,7 @@ test('one AI run goes at a time, an adaptation counts, and the project that is b
   assert.equal((await jobsOf(fake)).length, 1);
   fake.behind.finish();
   const [done] = await jobsOf(fake);
-  assert.deepEqual([done.status, done.phase, done.message], ['completed', 'Finished', 'The project was saved. Install it again from its Install step to bring the change to the harnesses']);
+  assert.deepEqual([done.status, done.phase, done.message], ['completed', 'Finished', 'The project was saved. Use Install via Sync… to bring the change to your harnesses']);
   // an adaptation of a plugin is a run too
   await fake.request('adapt', { id: 'commit-helper', harness: 'codex', budget_usd: 2 });
   await assert.rejects(fake.request('project_job', harmonize(fake)), { message: 'Another AI run is in progress (harmonization): wait for it to finish, or cancel it in Activity' });
@@ -585,7 +589,7 @@ test('a new project is refused before the run for what the runtime refuses, list
   assert.deepEqual(await ids(fake), ['sample'], 'listed when it ends, not before');
   fake.behind.finish();
   assert.deepEqual(await ids(fake), ['sample', 'docs-kit']);
-  assert.equal((await jobsOf(fake))[0].message, 'The project was created and added to your list. Install it from its Install step');
+  assert.equal((await jobsOf(fake))[0].message, 'The project was created and added to your list. Install it with Install via Sync…');
   const made: any = await fake.request('project', { id: 'docs-kit' });
   assert.deepEqual([made.project.name, made.project.author, made.project.version, made.plugin.version, made.inputs.map((i: any) => i.id), made.history.length], ['Docs Kit', 'me', '0.1.0', '0.1.0', ['docs', 'writing'], 1]);
   assert.match(made.digest, /^[0-9a-f]{64}$/);

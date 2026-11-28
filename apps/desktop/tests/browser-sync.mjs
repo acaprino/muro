@@ -251,7 +251,8 @@ await test('a harness that holds a marketplace it cannot load is read all the sa
   }
   assert.equal((await actions(app)).includes('apply'), false, 'nothing is applied before the sheet\'s Apply');
   await page.screenshot({ path: shots + '/sync-broken-marketplace-review.png' });
-  await sheetFoot(page).getByRole('button', { name: 'Apply 2 changes', exact: true }).click();
+  // It takes notes@old-notes away: a removal, confirmed here as any other (never by the background sync).
+  await sheetFoot(page).getByRole('button', { name: 'Apply and uninstall 1 plugin', exact: true }).click();
   await sheet(page).waitFor({ state: 'detached' });
   await notice(page, '2 changes applied.').waitFor();
   await titled(page, 'Everything is in sync');

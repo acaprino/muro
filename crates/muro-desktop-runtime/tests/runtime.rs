@@ -560,7 +560,9 @@ fn sync_now_syncs_a_healthy_harness_when_another_harness_folder_is_gone() {
     // with their quotes and doubled backslashes.
     let missing = format!("gone: Target configuration directory does not exist: {}", gone.display());
     assert_eq!(blockers[0], missing.as_str(), "{out}");
-    assert_eq!(registry.automation()["message"], missing.as_str());
+    let status = registry.automation();
+    assert_eq!(status["status"], "partial", "the healthy harness was synced: {status}");
+    assert_eq!(status["message"], format!("1 change applied. Left out: {missing}"));
     assert_eq!(plugins_in(&healthy), 1);
 }
 
@@ -640,8 +642,8 @@ fn sync_now_records_a_failure_and_returns_it() {
 }
 
 /// A source that could not be resolved (offline, the repository gone) is not a clean run: it is
-/// recorded as failed with the names of the plugins, whether the run applied or only checked,
-/// and what could be applied still is.
+/// recorded with the names of the plugins, as failed when nothing was applied and as partial when
+/// what could be applied was.
 #[test]
 fn sync_now_records_the_sources_it_could_not_check_as_a_failure() {
     let registry = Registry::new();
@@ -662,12 +664,13 @@ fn sync_now_records_the_sources_it_could_not_check_as_a_failure() {
     assert_eq!(status["message"], "Sources not checked: Broken plugin", "{status}");
     assert_eq!(plugins_in(&profile), 0);
 
+    // What could be applied was: the run is partly done, not failed, and says both.
     let out = registry.sync(json!({}));
     assert_eq!(out["applied"], 1, "{out}");
     let status = registry.automation();
     assert_eq!(status["action"], "Automatic sync", "{status}");
-    assert_eq!(status["status"], "failed", "{status}");
-    assert_eq!(status["message"], "Sources not checked: Broken plugin", "{status}");
+    assert_eq!(status["status"], "partial", "{status}");
+    assert_eq!(status["message"], "1 change applied. Left out: Sources not checked: Broken plugin", "{status}");
     assert_eq!(plugins_in(&profile), 1);
 
     // Blockers too: both are said, the sources first.

@@ -331,9 +331,16 @@ pub fn request_with_progress(
                     "Sources resolved and plan calculated",
                 )?;
             } else {
+                // The names a person reads, as Activity shows them; an id only for a plugin gone from the list.
                 let failed: Vec<_> = errors
                     .iter()
                     .filter_map(|e| e["plugin_id"].as_str())
+                    .map(|id| {
+                        registry["plugins"].as_array().into_iter().flatten()
+                            .find(|p| p["id"] == id)
+                            .and_then(|p| p["name"].as_str())
+                            .unwrap_or(id)
+                    })
                     .collect();
                 log(
                     data_dir,
@@ -1173,11 +1180,18 @@ fn check_plan(
     errors: Option<usize>,
 ) -> Result<Value> {
     if let Some(pid) = plugin_id {
-        let tid = only.context("A plugin install needs a target_id")?;
+        // A reinstall of one plugin may name no harness: it covers every harness the plugin is on.
+        let tid = match only {
+            Some(tid) => Some(tid),
+            None if reinstall == Some(pid) => None,
+            None => anyhow::bail!("A plugin install needs a target_id"),
+        };
         let plugin = reg["plugins"].as_array().context("plugins")?.iter()
             .find(|p| p["id"] == pid).context("Plugin not found")?;
-        ensure!(plugin["targets"].as_array().context("plugin targets")?.iter().any(|id| id == tid),
-                "Select this harness for the plugin before installing it");
+        if let Some(tid) = tid {
+            ensure!(plugin["targets"].as_array().context("plugin targets")?.iter().any(|id| id == tid),
+                    "Select this harness for the plugin before installing it");
+        }
         ensure!(reinstall.is_none_or(|requested| requested == pid), "Reinstall must name the selected plugin");
     }
     // Compare all desired native identities on this harness before narrowing the saved operations.
@@ -1220,6 +1234,9 @@ fn plan(
     let currency = projects::Currency::new(reg);
     let mut ops: Vec<Value> = vec![];
     let mut blockers = vec![];
+    // The same blockers, by the pair they hold back (`target_id`, `plugin_id`, `reason`), so a cell can say
+    // it is not ready instead of what the snapshot shows. A harness that cannot be read has none: its column says so.
+    let mut blocked: Vec<Value> = vec![];
     for target in targets {
         let tid = str_field(target, "id")?;
         let h = str_field(target, "harness")?;
@@ -1266,6 +1283,7 @@ fn plan(
                 Ok(artifacts) => artifacts,
                 Err(e) => {
                     blockers.push(format!("{} / {}: {e:#}", text(&target["name"]), text(&plugin["name"])));
+                    blocked.push(json!({"target_id":tid,"plugin_id":pid,"reason":format!("{e:#}")}));
                     desired_native.extend(installed.iter().filter(|i| i["registry_id"] == pid).map(|i| i["id"].clone()));
                     continue;
                 }
@@ -1296,6 +1314,11 @@ fn plan(
             if plugins.len() > 1 || protected_installs.contains(&native_id) {
                 if selected_plugin.is_none_or(|pid| plugins.contains(pid)) {
                     blockers.push(format!("{}: native installation {native_id} already belongs to another plugin", text(&target["name"])));
+                }
+                for pid in &plugins {
+                    if !blocked.iter().any(|b| b["target_id"] == tid && b["plugin_id"] == *pid) {
+                        blocked.push(json!({"target_id":tid,"plugin_id":pid,"reason":format!("native installation {native_id} already belongs to another plugin")}));
+                    }
                 }
                 blocked_plugins.extend(plugins);
             }
@@ -1354,7 +1377,7 @@ fn plan(
     ensure!(instructions::bindings(root, reg)? == instruction_bindings,
             "custom-instructions changed while preparing the plan; calculate a new plan");
     Ok(
-        json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"inventory_scope":only_target,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
+        json!({"id":uuid::Uuid::new_v4().to_string(),"revision":reg["revision"],"operations":ops,"blockers":blockers,"blocked":blocked,"inventory_scope":only_target,"inventory_hash":hash(&invs),"custom_instructions_hash":hash(&instruction_bindings),"created":event("plan","ready","")["time"]}),
     )
 }
 /// One native package is one operation, including the optional Hermes MCP package.
@@ -1453,6 +1476,15 @@ fn applied_snapshot(
     result["skipped_removals"] = json!(skipped_removals);
     Ok(result)
 }
+/// Whether an operation uninstalls plugins: a `remove`, or a `remove-marketplace` that takes plugins
+/// with it (`codex plugin remove` for each). Such an operation runs only on a person's confirmation,
+/// and `skip_removals` leaves it out, as Muro promises. A broken marketplace with no plugin takes
+/// nothing away and goes with the other changes.
+pub fn uninstalls(op: &Value) -> bool {
+    op["kind"] == "remove"
+        || (op["kind"] == "remove-marketplace"
+            && op["plugins"].as_array().is_some_and(|plugins| !plugins.is_empty()))
+}
 fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Result<Value> {
     let pid = str_field(payload, "plan_id")?;
     id(pid)?;
@@ -1481,18 +1513,24 @@ fn apply(root: &Path, reg: &Value, receipts: &mut Value, payload: &Value) -> Res
     let ops = plan["operations"].as_array().context("operations")?;
     // A plan that uninstalls runs only when the request names how many plugins it uninstalls:
     // a caller that has not read the plan, or does not know the field, removes nothing.
-    let removals = ops.iter().filter(|o| o["kind"] == "remove").count();
-    let noun = if removals == 1 { "plugin" } else { "plugins" };
+    // `confirm_removals` counts the operations; the refusal says how many plugins they take away.
+    let removals = ops.iter().filter(|o| uninstalls(o)).count();
+    let plugins: usize = ops
+        .iter()
+        .filter(|o| uninstalls(o))
+        .map(|o| o["plugins"].as_array().map_or(1, Vec::len))
+        .sum();
+    let noun = if plugins == 1 { "plugin" } else { "plugins" };
     ensure!(
         skip_removals
             || removals == 0
             || payload["confirm_removals"].as_u64() == Some(removals as u64),
-        "This plan uninstalls {removals} {noun}; review it and confirm the removals"
+        "This plan uninstalls {plugins} {noun}; review it and confirm the removals"
     );
     let skipped = if skip_removals { removals } else { 0 };
     let executed: Vec<&Value> = ops
         .iter()
-        .filter(|o| !skip_removals || o["kind"] != "remove")
+        .filter(|o| !skip_removals || !uninstalls(o))
         .collect();
     if executed.is_empty() {
         return applied_snapshot(

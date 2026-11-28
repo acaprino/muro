@@ -76,13 +76,13 @@ Muro can stay in the notification area and keep your harnesses in line without a
 
 Every plugin follows an update policy: latest stable release, a pinned version or the latest commit. **Check now** reads every plugin's source, records the upstream version and revision, and takes the native build the source publishes for each harness; **Check for updates** in a plugin's dialog does the same for that one plugin. Sync then installs the new version.
 
-- The *Latest version* column shows what the source offers, and each harness cell shows what is installed there, or the change that is waiting, such as **Update 0.3.0 → 0.4.0**.
+- The *Version* column shows what the source offers (for a pinned plugin, its pinned version), and each harness cell shows what is installed there, or the change that is waiting, such as **Update 0.3.0 → 0.4.0**.
 - **Plan a reinstall**, under **More** in a plugin's panel, puts back the last verified build, not whatever the source holds today.
 - **Settings → Maintenance** verifies the stored builds and deletes the ones nothing uses.
 
 ### AI adaptation
 
-A plugin with no version for one of its harnesses (its source ships none for that harness) shows **Not available** in that cell, and **Adapt again** there once its custom instructions changed since it was adapted. **Adapt with AI**, under **More** in the plugin's panel, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
+A plugin with no version for one of its harnesses (its source ships none for that harness) shows **Not available** in that cell (its tooltip says why, once a check gave the reason), and **Adapt again** there once its custom instructions changed since it was adapted (**Instructions not applied** when its build there was never adapted with them). A plugin the current plan holds back shows **Not ready** with the reason, and a harness column that no check of the current list has read asks for a check instead of saying it is in sync. **Adapt with AI**, under **More** in the plugin's panel, has Claude Code rebuild it for that harness with Muro's factory, and the factory validates the result before Muro records it. You set a maximum budget in dollars; Claude Code checks it between turns. Your own Markdown instructions for the plugin go in with the source. Sync installs the new build like any other.
 
 <img src="docs/assets/screenshots/adapt.png" alt="Adapt with AI dialog for docs-writer: OpenCode, the harness without a build, is preselected, with a maximum budget of 2 dollars." width="880">
 

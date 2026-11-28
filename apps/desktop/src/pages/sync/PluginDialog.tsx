@@ -315,7 +315,7 @@ function adaptWords(engine: Engine): { codex: boolean; said: string } {
   const agent = harnessNames[engine.harness] ?? engine.harness;
   const codex = engine.harness === 'codex';
   const lead = engine.api ? `Adapting a plugin needs a coding agent on this computer: ${agent}. It` : agent;
-  return { codex, said: codex ? ADAPT_NEEDS_CLAUDE : `${lead} rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses ${agent}'s own credentials and spends at most the budget below.` };
+  return { codex, said: codex ? ADAPT_NEEDS_CLAUDE : `${lead} builds this plugin for the harness you choose, with your custom instructions, and validates the result. It uses ${agent}'s own credentials and spends at most the budget below.` };
 }
 /** The harness Adapt offers first: one whose instructions changed, or one the plugin targets and has no build for; else Claude Code. */
 function adaptTarget(plugin: Plugin, snapshot: Snapshot): string {
@@ -460,10 +460,11 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
   function planReinstall(): void {
     if (!shown || unsaved()) return;
     // The review sheet is a window of its own: this drawer goes, and the plan (no request is made for it again) opens there. It is never the plan the note and the table read.
-    void act('reinstall', () => latest.current.request<Plan>('plan', { reinstall: shown.id }), plan => {
+    // The reinstall of this plugin alone, on every harness it is on: no other change comes with it.
+    void act('reinstall', () => latest.current.request<Plan>('plan', { reinstall: shown.id, plugin_id: shown.id }), plan => {
       after.current = 'review';
       onOpenChange(false);
-      void latest.current.openReview({ plan });
+      void latest.current.openReview({ plan, pluginId: shown.id });
     });
   }
   function openFolder(): void {
@@ -550,7 +551,7 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
     );
   } else if (ui.view === 'remove') {
     title = `Remove ${label} from your list?`;
-    description = 'It stays installed where it is, unless plugins outside your list are always uninstalled.';
+    description = 'It stays installed where it is. On a harness set to uninstall what is not in your list, the next sync plans its removal and asks you to confirm it.';
     body = <React.Fragment key="remove">{fault ? <RefusalLine>{fault.text}</RefusalLine> : null}</React.Fragment>;
     footer = (
       <React.Fragment key="remove">
@@ -565,7 +566,9 @@ export function PluginDialog({ pluginId, open, onOpenChange, restoreFocusTo }: P
     footer = <DiscardFooter key="discard" onKeep={back} onDiscard={() => onOpenChange(false)} />;
   } else {
     title = label;
-    description = archive ? 'Sync installs the builds included in this Muro project file.' : plugin?.project ? 'The build of one of your projects.' : 'Installed as its author ships it.';
+    const adapted = [...new Set((plugin?.distributions ?? []).filter(d => d.origin === 'muro').map(d => harnessNames[d.harness] ?? d.harness))];
+    description = archive ? 'Sync installs the builds included in this Muro project file.' : plugin?.project ? 'The build of one of your projects.'
+      : adapted.length ? `Its author's builds, and the ones Muro adapted for ${adapted.join(', ')}.` : 'Its author\'s builds, as they ship them.';
     body = gone ? <RefusalLine>This plugin is no longer in your list.</RefusalLine> : (
       <form key="form" id={formId} noValidate onSubmit={submit}><Column gap="lg">
         {sourceFailure && fault?.text !== sourceFailure ? <RefusalLine>{sourceFailure}</RefusalLine> : null}

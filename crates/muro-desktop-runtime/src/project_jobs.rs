@@ -9,7 +9,7 @@
 //! (`muro project commit`), which builds it, records the run and replaces the file only while it is still
 //! the file the run started from. A change no AI judges (the name, the author, the repository, the records,
 //! the changelog) is `muro project edit`. Nothing is installed on a harness: a project's plugin is installed
-//! from its Install step, through a plan the person applies.
+//! with Install via Sync, through a plan the person applies.
 //!
 //! Releasing a project (ADR-0034) is `muro project release`: the factory puts the file into the repository its
 //! `project.json` names, with the person's own Git, and that repository's workflow makes the release. The runtime
@@ -528,8 +528,8 @@ fn launch(data: &Path, run: Run, mut state: Value) -> Result<Value> {
         state["status"] = json!(if result.is_ok() { "completed" } else if cancelled { "cancelled" } else { "failed" });
         state["phase"] = json!("Finished");
         state["message"] = json!(match &result {
-            Ok(()) if run.create.is_some() => "The project was created and added to your list. Install it from its Install step".to_owned(),
-            Ok(()) => "The project was saved. Install it again from its Install step to bring the change to the harnesses".to_owned(),
+            Ok(()) if run.create.is_some() => "The project was created and added to your list. Install it with Install via Sync…".to_owned(),
+            Ok(()) => "The project was saved. Use Install via Sync… to bring the change to your harnesses".to_owned(),
             Err(error) => {
                 let text = format!("{error:#}");
                 let after = file_after_failure(&run, saved, &text);

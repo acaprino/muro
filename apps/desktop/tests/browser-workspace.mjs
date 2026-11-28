@@ -373,7 +373,7 @@ await test('choosing an input shows it, and opens the entries of the capabilitie
   await page.waitForFunction(id => document.querySelector(`[data-node-id="${id}"]`)?.getAttribute('aria-expanded') === 'true', OFFICE);
   assert.equal(await node(page, DESIGN).getAttribute('aria-expanded'), 'false');
   await node(page, 'cap:office-docs').waitFor();
-  await graphPane(page).getByText('The capabilities genoffice became are marked on the graph.', { exact: true }).waitFor();
+  await graphPane(page).getByText('The capabilities genoffice went to are marked on the graph.', { exact: true }).waitFor();
   // Marked as chosen together (Sigrid's several chosen): its one capability here is the choice a screen reader hears.
   assert.equal(await node(page, 'cap:office-docs').getAttribute('aria-selected'), 'true');
   await row(page, 'taste-skill').click();
@@ -381,7 +381,7 @@ await test('choosing an input shows it, and opens the entries of the capabilitie
   assert.equal(await node(page, OFFICE).getAttribute('aria-expanded'), 'false', 'another input opens its own entries and closes the others');
   await row(page, 'superpowers').click();
   await inspector(page).getByText('None: no choice of this input went to a capability.', { exact: true }).waitFor();
-  await graphPane(page).getByText('superpowers became no capability on the graph.', { exact: true }).waitFor();
+  await graphPane(page).getByText('superpowers went to no capability on the graph.', { exact: true }).waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="graph-node"][data-node-id^="entry:"]')].every(n => n.getAttribute('aria-expanded') === 'false'));
   assert.equal(await page.locator('[data-slot="graph-node"][aria-selected="true"]').count(), 0, 'nothing is marked');
   await page.screenshot({ path: shots + '/workspace-inputs.png' });

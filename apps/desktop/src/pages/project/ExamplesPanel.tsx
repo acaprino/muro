@@ -135,7 +135,7 @@ function Result({ outcome: o, known, onCapability, onClear }: { outcome: Outcome
       {asked}
       <Text as="p" variant="strong">The simulation could not run</Text>
       <Text as="p" variant="soft" pre>{o.message}</Text>
-      <Text as="p" variant="note">Check the AI engine in Settings.</Text>
+      <Text as="p" variant="note">When the message is about the engine, its address or its key, check Settings → AI.</Text>
       {clear}
     </Card>
   );

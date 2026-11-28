@@ -274,7 +274,7 @@ export function createTransport(scenario = 'default') {
         const kind = !have ? 'install' : reinstall === p.id ? 'reinstall' : have.version !== want.version ? 'update' : null;
         if (kind) operations.push({ target_id: t.id, plugin_id: p.id, name: p.name, kind, from_version: have?.version || '', to_version: want.version, reason: kind === 'install' ? 'Missing desired distribution' : 'Reconcile desired artifact' });
       }
-      if (t.exclusive && blockers.length === before) for (const i of inv.plugins) if (!wanted.has(i.id)) operations.push({ target_id: t.id, plugin_id: i.registry_id || '', name: i.name, kind: 'remove', from_version: i.version, to_version: '', reason: 'Not in desired registry for this target', ...(i.present === false ? { present: false } : {}) });   // the service's Contract 2: a removal copies the entry's `present` when it is false
+      if (t.exclusive && blockers.length === before) for (const i of inv.plugins) if (!wanted.has(i.id)) operations.push({ target_id: t.id, plugin_id: i.registry_id || '', name: i.name, kind: 'remove', from_version: i.version, to_version: '', reason: 'Not in desired registry for this target', native_id: i.id, ...(i.present === false ? { present: false } : {}) });   // the service's Contract 2: a removal copies the entry's `present` when it is false
     }
     const broken = reg.targets.find(t => t.enabled && (!only || t.id === only) && inventory(t).warnings?.length);
     if (broken) operations.push({ target_id: broken.id, plugin_id: '', name: 'old-notes', kind: 'remove-marketplace', from_version: '', to_version: '', reason: inventory(broken).warnings[0], plugins: ['notes@old-notes'] });
@@ -481,7 +481,7 @@ export function createTransport(scenario = 'default') {
     effects.delete(job.id);
     const project = job.kind === 'project', created = job.operation === 'create';
     const said = {
-      completed: !project ? 'Adapter validated and added to registry; review a new sync plan to install' : created ? 'The project was created and added to your list. Install it from its Install step' : 'The project was saved. Install it again from its Install step to bring the change to the harnesses',
+      completed: !project ? 'Adapter validated and added to registry; review a new sync plan to install' : created ? 'The project was created and added to your list. Install it with Install via Sync…' : 'The project was saved. Use Install via Sync… to bring the change to your harnesses',
       failed: `${flags.runMessage || 'The AI run failed (exit code: 1); see output.log'}${project ? '. The project file was not changed' : ''}`,
       // The runtime's own words: the agent's step says the AI run was cancelled, the others that the job was cancelled.
       cancelled: project ? (job.phase === AGENT_PHASE ? 'The AI run was cancelled. The project file was not changed' : 'Job cancelled. The project file was not changed') : 'Job cancelled',
@@ -695,9 +695,12 @@ export function createTransport(scenario = 'default') {
     if (plan.revision !== reg.revision) throw new Error('Registry revision changed; calculate a new plan');
     if (plan.blockers.length && !payload.allow_blocked) throw new Error('Plan has blockers; resolve them before applying');
     // The service's Contract 1: a removal is executed only when the request carries the plan's number of removals; skip_removals leaves them out.
-    const skip = payload.skip_removals === true, removals = plan.operations.filter(o => o.kind === 'remove').length;
-    if (!skip && removals && payload.confirm_removals !== removals) throw new Error(`This plan uninstalls ${removals} ${removals === 1 ? 'plugin' : 'plugins'}; review it and confirm the removals`);
-    const executed = skip ? plan.operations.filter(o => o.kind !== 'remove') : plan.operations;
+    // A broken marketplace that takes plugins with it is a removal too.
+    const uninstalls = o => o.kind === 'remove' || (o.kind === 'remove-marketplace' && !!o.plugins?.length);
+    const skip = payload.skip_removals === true, removals = plan.operations.filter(uninstalls).length;
+    const gone = plan.operations.filter(uninstalls).reduce((n, o) => n + (o.kind === 'remove-marketplace' ? o.plugins.length : 1), 0);
+    if (!skip && removals && payload.confirm_removals !== removals) throw new Error(`This plan uninstalls ${gone} ${gone === 1 ? 'plugin' : 'plugins'}; review it and confirm the removals`);
+    const executed = skip ? plan.operations.filter(o => !uninstalls(o)) : plan.operations;
     for (const op of executed) {
       if (op.kind === 'remove-marketplace') { flags.brokenMarketplace = false; continue; }
       const list = installed[op.target_id] ||= [], at = list.findIndex(i => (op.plugin_id ? i.registry_id === op.plugin_id : i.name === op.name));

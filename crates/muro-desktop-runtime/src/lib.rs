@@ -112,8 +112,10 @@ fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
         v => v.as_bool().context("apply must be a boolean")?,
     };
     let outcome = check_and_apply(data, apply);
-    let (failed, message) = match &outcome {
-        Err(e) => (true, format!("{e:#}")),
+    // `partial`: the run applied changes and left out what was not ready or not checked; the message
+    // says both. A run that applied nothing and has problems is `failed`, as before.
+    let (status, message) = match &outcome {
+        Err(e) => ("failed", format!("{e:#}")),
         Ok((result, unchecked)) => {
             let blockers: Vec<&str> = result["blockers"]
                 .as_array()
@@ -129,14 +131,16 @@ fn sync_now(data: &Path, payload: &Value) -> Result<Value> {
                 problems.push(blockers.join("; "));
             }
             if problems.is_empty() {
-                (false, summary(apply, result))
+                ("complete", summary(apply, result))
+            } else if apply && result["applied"].as_u64().unwrap_or(0) > 0 {
+                ("partial", format!("{}. Left out: {}", summary(apply, result), problems.join(". ")))
             } else {
-                (true, problems.join(". "))
+                ("failed", problems.join(". "))
             }
         }
     };
     let action = if apply { "Automatic sync" } else { "Background check" };
-    let recorded = record(data, action, failed, &message);
+    let recorded = record(data, action, status, &message);
     let (result, _) = outcome?;
     recorded?;
     Ok(result)
@@ -195,7 +199,8 @@ fn check_and_apply(data: &Path, apply: bool) -> Result<(Value, Vec<String>)> {
         .as_array()
         .context("Plan operations missing")?;
     let operations = planned.len();
-    let removals = planned.iter().filter(|op| op["kind"] == "remove").count();
+    // A removal, or a broken marketplace that takes plugins with it, waits for a person.
+    let removals = planned.iter().filter(|op| muro_registry::service::uninstalls(op)).count();
     let others = operations - removals;
     // A removal is applied only on a person's confirmation, which the worker cannot give.
     let applied = if apply && others > 0 {
@@ -216,18 +221,19 @@ pub fn record_automation(data: &Path, error: Option<&str>) -> Result<()> {
     record(
         data,
         "Automatic sync",
-        error.is_some(),
+        if error.is_some() { "failed" } else { "complete" },
         error.unwrap_or("Automatic sync verified"),
     )
 }
 
 /// Replaces `automation-status.json`, the event the Activity page shows for the background work.
-fn record(data: &Path, action: &str, failed: bool, message: &str) -> Result<()> {
+/// `status` is complete, partial (applied, with items left out) or failed.
+fn record(data: &Path, action: &str, status: &str, message: &str) -> Result<()> {
     use std::io::Write;
     let time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
-    let event = json!({"id":"automation","time":time.to_string(),"action":action,"status":if failed{"failed"}else{"complete"},"message":message});
+    let event = json!({"id":"automation","time":time.to_string(),"action":action,"status":status,"message":message});
     let mut file = tempfile::NamedTempFile::new_in(data)?;
     file.write_all(&serde_json::to_vec_pretty(&event)?)?;
     file.as_file().sync_all()?;

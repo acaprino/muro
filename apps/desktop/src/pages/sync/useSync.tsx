@@ -30,6 +30,8 @@ export interface ReviewOptions {
   targetId?: string;
   /** A plan someone else made (a reinstall): shown as it is, with no request, and not the one the note and the table read. */
   plan?: Plan;
+  /** The plugin that plan is for alone (a reinstall of one plugin): the sheet names it. */
+  pluginId?: string;
 }
 
 export interface SyncApi {
@@ -210,7 +212,7 @@ export function SyncProvider({ children }: { children?: React.ReactNode }) {
     if (progressRef.current) return;
     if (options.plan) {
       setError(null);
-      show({ plan: options.plan, target_id: null });
+      show({ plan: options.plan, target_id: null, ...(options.pluginId ? { plugin_id: options.pluginId } : {}) });
       return;
     }
     const target = options.targetId ? snapshotRef.current?.registry.targets.find(t => t.id === options.targetId) : undefined;

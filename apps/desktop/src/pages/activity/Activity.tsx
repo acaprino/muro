@@ -6,7 +6,7 @@ import * as React from 'react';
 import { Badge, Cluster, Column, Icon, Page, Section, Text, ToggleGroup, ToggleGroupItem, type BadgeTone } from '@acaprino/sigrid/primitives';
 import { ConfirmDialog, Empty } from '@acaprino/sigrid/components';
 import { useNotify } from '@acaprino/imago';
-import type { ActivityFilter, Job } from '../../types.ts';
+import type { ActivityFilter, Job, Snapshot } from '../../types.ts';
 import { harnessNames, stamp } from '../../model.ts';
 import { message } from '../../words.ts';
 import { useRegistry } from '../../state/registry.tsx';
@@ -16,11 +16,12 @@ import { jobTitle } from '../project/write/jobs.ts';
 import { FILTERS, emptyWords, entries, isOk, matches, type Entry } from './entries.ts';
 
 /** How an outcome that is not a success is said: a status the window does not know is shown humanized and with no tone. */
-const TONES: Readonly<Record<string, BadgeTone>> = { failed: 'danger', error: 'danger', cancelled: 'warning', interrupted: 'warning' };
-const outcome = (status: string): string => (status === 'failed' || status === 'error' ? 'Failed' : status.charAt(0).toUpperCase() + status.slice(1));
+const TONES: Readonly<Record<string, BadgeTone>> = { failed: 'danger', error: 'danger', partial: 'warning', cancelled: 'warning', interrupted: 'warning' };
+const outcome = (status: string): string => (status === 'failed' || status === 'error' ? 'Failed' : status === 'partial' ? 'Some items left out' : status.charAt(0).toUpperCase() + status.slice(1));
 
 /** What stopping a run is called in the question. */
-const whatIs = (job: Job): string => (job.kind === 'project' ? jobTitle(job) : `The adaptation of ${job.plugin_id ?? 'a plugin'}${job.harness ? ` for ${harnessNames[job.harness] ?? job.harness}` : ''}`);
+const whatIs = (job: Job, snapshot: Snapshot | null): string => (job.kind === 'project' ? jobTitle(job)
+  : `The adaptation of ${snapshot?.registry.plugins.find(p => p.id === job.plugin_id)?.name ?? job.plugin_id ?? 'a plugin'}${job.harness ? ` for ${harnessNames[job.harness] ?? job.harness}` : ''}`);
 
 function Row({ entry }: { entry: Entry }) {
   const when = entry.time ? stamp(entry.time) : '';
@@ -86,7 +87,7 @@ export function Activity() {
           open={asking.open}
           onOpenChange={open => { if (!stopping) setAsking(now => (now ? { ...now, open } : now)); }}
           title={`Cancel ${asking.job.kind === 'project' ? 'run' : 'adaptation'}?`}
-          description={`${whatIs(asking.job)} stops where it is. It cannot be resumed.`}
+          description={`${whatIs(asking.job, snapshot)} stops where it is. It cannot be resumed.`}
           confirmLabel={asking.job.kind === 'project' ? 'Cancel run' : 'Cancel adaptation'}
           cancelLabel="Keep running"
           busy={stopping}

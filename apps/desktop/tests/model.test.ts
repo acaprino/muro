@@ -111,7 +111,9 @@ test('harnessState without a plan, or with a stale one, reads the snapshot',()=>
  const s=snapshot(),t=s.registry.targets[0];
  assert.deepEqual(harnessState(t,s,null),{kind:'changes',count:1});
  s.inventory[0].plugins[0].version='2';
- assert.deepEqual(harnessState(t,s,plan([op('update','1','2')],3)),{kind:'ok',count:0});
+ assert.deepEqual(harnessState(t,s,plan([op('update','1','2')],3)),{kind:'not-checked',count:0},'a plan of another revision checked nothing current: never in sync');
+ s.sync={...s.sync,revision:4,pending:0};
+ assert.deepEqual(harnessState(t,s,null),{kind:'ok',count:0},'a recorded check of this revision with nothing pending is');
 });
 test('a refused archive check explains its selected cells even with an old installed build', () => {
   const s = snapshot(), target = s.registry.targets[0];
@@ -121,7 +123,7 @@ test('a refused archive check explains its selected cells even with an old insta
   assert.deepEqual(cellState(broken, target, s, null), {kind:'source-error',reason:broken.project_source_error});
   assert.equal(harnessState(target, s, null).kind, 'source-error');
   assert.equal(pluginState(broken, s).kind, 'unknown');
-  assert.equal(syncHeadline(s, plan([])).kind, 'sources');
+  assert.equal(syncHeadline(s, plan([])).kind, 'projects', 'a project file that needs attention is not a source that did not answer');
   s.inventory[0].plugins = [];
   assert.equal(cellState(broken, target, s, plan([])).kind, 'source-error');
   assert.equal(cellState({...broken,targets:[]}, target, s, null).kind, 'none');
@@ -148,33 +150,33 @@ test('harnessState: a plugin whose instructions cannot be read keeps the harness
 
 test('syncSummary: no enabled harness',()=>{
  const s=snapshot();s.registry.targets[0].enabled=false;
- assert.deepEqual(syncSummary(s,plan([op('update','1','2')])),{kind:'no-harness',operations:0,blockers:0,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('update','1','2')])),{kind:'no-harness',operations:0,blockers:0,errors:0,projects:0,byKind:{}});
  s.registry.targets=[];assert.equal(syncSummary(s,null).kind,'no-harness');
 });
 test('a plan of another revision counts as not checked',()=>{
- const s=snapshot(),empty={kind:'not-checked',operations:0,blockers:0,errors:0,byKind:{}};
+ const s=snapshot(),empty={kind:'not-checked',operations:0,blockers:0,errors:0,projects:0,byKind:{}};
  assert.deepEqual(syncSummary(s,plan([op('update','1','2')],3,['Codex: broken'])),empty);
  assert.deepEqual(syncSummary(s,null),empty);
 });
 test('syncSummary counts the operations of a current plan by kind, and its blockers',()=>{
  const s=snapshot();
- assert.deepEqual(syncSummary(s,plan([op('install','','2','a'),op('update','1','2','b'),op('update','1','2','c'),op('remove','1','','')],4,['Codex / D: no build'])),{kind:'changes',operations:4,blockers:1,errors:0,byKind:{install:1,update:2,remove:1}});
- assert.deepEqual(syncSummary(s,plan([],4,['Codex / D: no build'])),{kind:'blocked',operations:0,blockers:1,errors:0,byKind:{}});
- assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('install','','2','a'),op('update','1','2','b'),op('update','1','2','c'),op('remove','1','','')],4,['Codex / D: no build'])),{kind:'changes',operations:4,blockers:1,errors:0,projects:0,byKind:{install:1,update:2,remove:1}});
+ assert.deepEqual(syncSummary(s,plan([],4,['Codex / D: no build'])),{kind:'blocked',operations:0,blockers:1,errors:0,projects:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,projects:0,byKind:{}});
 });
 
 /** What the service recorded for the snapshot's own revision (4): the check a person has not seen in this window. */
 const recordedSync=(over:Partial<Snapshot['sync']>={}):Snapshot['sync']=>({last_check:'1700000000',last_sync:null,revision:4,pending:3,blockers:0,errors:null,targets:{},...over});
 test('with no plan of this revision the summary is the recorded check: its counts, with no breakdown',()=>{
  const s=snapshot();s.sync=recordedSync();
- assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:3,blockers:0,errors:0,byKind:{}});
- assert.deepEqual(syncSummary(s,plan([op('update','1','2')],3)),{kind:'changes',operations:3,blockers:0,errors:0,byKind:{}},'a plan of another revision is no plan');
- s.sync=recordedSync({pending:0,blockers:2});assert.deepEqual(syncSummary(s,null),{kind:'blocked',operations:0,blockers:2,errors:0,byKind:{}});
- s.sync=recordedSync({pending:0});assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
- s.sync=recordedSync({pending:2,blockers:1});assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:2,blockers:1,errors:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:3,blockers:0,errors:0,projects:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('update','1','2')],3)),{kind:'changes',operations:3,blockers:0,errors:0,projects:0,byKind:{}},'a plan of another revision is no plan');
+ s.sync=recordedSync({pending:0,blockers:2});assert.deepEqual(syncSummary(s,null),{kind:'blocked',operations:0,blockers:2,errors:0,projects:0,byKind:{}});
+ s.sync=recordedSync({pending:0});assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:0,projects:0,byKind:{}});
+ s.sync=recordedSync({pending:2,blockers:1});assert.deepEqual(syncSummary(s,null),{kind:'changes',operations:2,blockers:1,errors:0,projects:0,byKind:{}});
 });
 test('a record of another revision, or of none, is not a check of this one',()=>{
- const empty=(kind:string)=>({kind,operations:0,blockers:0,errors:0,byKind:{}}),s=snapshot();
+ const empty=(kind:string)=>({kind,operations:0,blockers:0,errors:0,projects:0,byKind:{}}),s=snapshot();
  for(const over of [{revision:3},{revision:null},{revision:5}]){s.sync=recordedSync(over);assert.deepEqual(syncSummary(s,null),empty('changed'),`checked at ${JSON.stringify(over)}: the list changed since`);}
  s.sync=recordedSync({revision:3,last_check:null});assert.deepEqual(syncSummary(s,null),empty('not-checked'),'no check at all');
  s.sync=recordedSync({pending:null,blockers:null});assert.deepEqual(syncSummary(s,null),empty('not-checked'),'a record of this revision without counts');
@@ -182,13 +184,13 @@ test('a record of another revision, or of none, is not a check of this one',()=>
 });
 test('a plan of this revision wins over the record',()=>{
  const s=snapshot();s.sync=recordedSync({pending:3});
- assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,byKind:{}});
- assert.deepEqual(syncSummary(s,plan([op('install','','2')])),{kind:'changes',operations:1,blockers:0,errors:0,byKind:{install:1}});
+ assert.deepEqual(syncSummary(s,plan([])),{kind:'ok',operations:0,blockers:0,errors:0,projects:0,byKind:{}});
+ assert.deepEqual(syncSummary(s,plan([op('install','','2')])),{kind:'changes',operations:1,blockers:0,errors:0,projects:0,byKind:{install:1}});
  s.registry.targets[0].enabled=false;assert.equal(syncSummary(s,null).kind,'no-harness','no harness still comes first');
 });
 test('the sources a check could not resolve are counted, with or without a plan',()=>{
  const s=snapshot();s.sync=recordedSync({pending:0,errors:2});
- assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:2,byKind:{}});
+ assert.deepEqual(syncSummary(s,null),{kind:'ok',operations:0,blockers:0,errors:2,projects:0,byKind:{}});
  assert.equal(syncSummary(s,plan([])).errors,2);
  s.sync=recordedSync({pending:0,errors:null});assert.equal(syncSummary(s,null).errors,0,'no count is none');
  s.sync=recordedSync({pending:0,errors:2});s.inventory[0].plugins[0].version='2';
@@ -266,7 +268,7 @@ test('syncHeadline: instructions that cannot be read also keep a harness from re
 });
 test('syncHeadline keeps the counts of syncSummary',()=>{
  const s=snapshot(),p=plan([op('install','','2','a'),op('remove','1','','')],4,['Codex / D: no build']);
- const {unreadable,kind,...counts}=syncHeadline(s,p);assert.equal(kind,'changes');assert.deepEqual(unreadable,[]);assert.deepEqual(counts,{operations:2,blockers:1,errors:0,byKind:{install:1,remove:1}});
+ const {unreadable,kind,...counts}=syncHeadline(s,p);assert.equal(kind,'changes');assert.deepEqual(unreadable,[]);assert.deepEqual(counts,{operations:2,blockers:1,errors:0,projects:0,byKind:{install:1,remove:1}});
 });
 test('sameOperations compares the operations of two plans in any order, and never equates a missing plan',()=>{
  const a=plan([op('install','','2','a'),op('update','1','2','b')]),b=plan([op('update','1','2','b'),op('install','','2','a')],5);
@@ -391,7 +393,34 @@ test('a broken marketplace to take out of a harness is a change of the plan, cou
  const p=plan([out]);
  assert.deepEqual(harnessState(t,s,p),{kind:'changes',count:1});
  assert.deepEqual(syncSummary(s,p).byKind,{'remove-marketplace':1});assert.equal(syncHeadline(s,p).kind,'changes');
- assert.deepEqual(removals(p),{total:0,uninstall:0,missing:0},'not one of the removals a person confirms by their number');
- assert.deepEqual(applyPayload(p,'confirm'),{plan_id:p.id});
+ assert.deepEqual(removals(p),{total:1,uninstall:1,missing:0},'it takes a plugin away: a removal the person confirms by its number');
+ assert.deepEqual(applyPayload(p,'confirm'),{plan_id:p.id,confirm_removals:1});
+ assert.deepEqual(applyPayload(p,'skip'),{plan_id:p.id,skip_removals:true},'Apply without uninstalling leaves it');
+ assert.equal(removalLabel(p),'Apply and uninstall 1 plugin');
+ assert.deepEqual(removals(plan([{...out,plugins:[]}])),{total:0,uninstall:0,missing:0},'an empty broken marketplace takes nothing away');
  assert.equal(mustReview(p,p),true,'the sheet names what goes with it');
+});
+
+test('cellState: a pair the current plan holds back is not ready, with its reason; one with no build stays not available and carries the reason',()=>{
+ const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
+ const held:Plan={...plan([]),blocked:[{target_id:'target',plugin_id:'pkg',reason:'Project file changed: open the project again'}]};
+ assert.deepEqual(cellState(plugin,t,s,held),{kind:'blocked',reason:'Project file changed: open the project again'});
+ assert.deepEqual(harnessState(t,s,held),{kind:'blocked',count:1});
+ assert.deepEqual(cellState(plugin,t,s,{...held,revision:3}).kind,'ok','a plan of another revision holds nothing back');
+ assert.deepEqual(cellState({...plugin,distributions:[]},t,s,held),{kind:'unavailable',reason:'Project file changed: open the project again'});
+});
+test('cellState: a record whose files are gone is put back, one turned off is not in sync',()=>{
+ const s=snapshot(),t=s.registry.targets[0];s.inventory[0].plugins[0].version='2';
+ s.inventory[0].plugins[0].present=false;
+ assert.deepEqual(cellState(plugin,t,s,null),{kind:'update',from:'2',to:'2',reason:'Files missing'});
+ s.inventory[0].plugins[0].present=true;s.inventory[0].plugins[0].enabled=false;
+ assert.deepEqual(cellState(plugin,t,s,null),{kind:'disabled',from:'2',to:'2'});
+ assert.deepEqual(harnessState(t,s,plan([])),{kind:'disabled',count:1});
+});
+test('cellState: instructions added to a plugin no one adapted ask for a first adaptation, not to adapt again',()=>{
+ const s=snapshot(),t=s.registry.targets[0];
+ const stale={...s,custom_instructions:[{plugin_id:'pkg',path:'/i',files:['a.md'],digest:'new',stale_harnesses:['codex']}]};
+ assert.deepEqual(cellState(plugin,t,stale,null),{kind:'adapt-again',from:'never'});
+ const adapted={...plugin,distributions:[{harness:'codex',path:'/x',version:'2',origin:'muro' as const}]};
+ assert.deepEqual(cellState(adapted,t,stale,null),{kind:'adapt-again'});
 });

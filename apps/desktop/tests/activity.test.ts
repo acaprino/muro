@@ -74,3 +74,9 @@ test('an empty page says it is empty, or that the filter hides everything', () =
   assert.equal(emptyWords('all').title, 'Nothing yet');
   assert.equal(emptyWords('problems').title, 'Nothing here');
 });
+
+test('an automatic sync that applied what was ready and left the rest out is not a failure, and is still under Problems', () => {
+  const [partial] = entries(snapshot([event('a', 3, 'Automatic sync', 'partial', '1 change applied. Left out: Pi / X: no Pi build yet')]));
+  assert.equal(partial!.title, 'Automatic sync');
+  assert.equal(matches(partial!, 'problems'), true, 'what was left out still asks for a look');
+});

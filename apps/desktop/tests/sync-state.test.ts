@@ -144,7 +144,7 @@ test('instructions that cannot be read keep a harness from reading as in sync to
   const s = snapshot(recorded());
   s.custom_instructions = [{ plugin_id: 'pkg', path: '/instructions', files: [], digest: '', stale_harnesses: [], error: 'Unreadable Markdown' }];
   const n = noteOf(s, null, nothing);
-  assert.deepEqual([n.kind, n.title, n.lead], ['unreadable', 'Codex cannot be read', true]);
+  assert.deepEqual([n.kind, n.title, n.lead], ['unreadable', 'The instructions of Package cannot be read', true], 'the plugin is named, not the harness, which reads fine');
   assert.equal(n.text, 'The custom instructions of a plugin on it could not be read, so it cannot say whether it is in sync. Check the plugin, then check again.');
 });
 
@@ -173,7 +173,7 @@ test('a check or an apply under way is what the note says, the apply first', () 
 });
 
 // ---------- the chip, the lines of times, the names ----------
-const headline = (kind: SyncHeadline['kind'], over: Partial<SyncHeadline> = {}): SyncHeadline => ({ kind, operations: 0, blockers: 0, errors: 0, byKind: {}, unreadable: [], ...over });
+const headline = (kind: SyncHeadline['kind'], over: Partial<SyncHeadline> = {}): SyncHeadline => ({ kind, operations: 0, blockers: 0, errors: 0, projects: 0, byKind: {}, unreadable: [], ...over });
 
 test('the chip of the status row says each state in a few words, and is ok only when in sync', () => {
   assert.deepEqual(chipOf(headline('no-harness')), { text: 'No harness', tone: 'warn' });
@@ -183,7 +183,11 @@ test('the chip of the status row says each state in a few words, and is ok only 
   assert.deepEqual(chipOf(headline('changes', { operations: 5 })), { text: '5 changes waiting', tone: 'warn' });
   assert.deepEqual(chipOf(headline('blocked')), { text: 'Needs attention', tone: 'warn' });
   assert.deepEqual(chipOf(headline('unreadable')), { text: 'A harness cannot be read', tone: 'warn' });
+  const codex = { id: 't', harness: 'codex', name: 'Codex', root: '/c', executable: 'codex', exclusive: false, enabled: true };
+  assert.deepEqual(chipOf(headline('unreadable', { unreadable: [{ target: codex, count: 1 }] })), { text: 'A plugin cannot be read', tone: 'warn' }, 'a harness that reads fine is not blamed for a plugin');
   assert.deepEqual(chipOf(headline('sources')), { text: 'Sources not checked', tone: 'warn' });
+  assert.deepEqual(chipOf(headline('projects', { projects: 1 })), { text: 'A plugin needs attention', tone: 'warn' });
+  assert.deepEqual(chipOf(headline('installed')), { text: 'Check the rest', tone: 'warn' });
   assert.deepEqual(chipOf(headline('ok')), { text: 'In sync', tone: 'ok' });
 });
 

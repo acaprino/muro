@@ -609,7 +609,7 @@ await test('Adapt with AI is a view of the drawer: the budget starts from Settin
   await fold(s, 'Adapt with AI').click();
   await title(s, 'Adapt Package with AI').waitFor();
   assert.equal(await sheet(page).count(), 1, 'one surface, not a second window over the first');
-  await s.getByText("Claude Code rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses Claude Code's own credentials and spends at most the budget below.", { exact: true }).waitFor();
+  await s.getByText("Claude Code builds this plugin for the harness you choose, with your custom instructions, and validates the result. It uses Claude Code's own credentials and spends at most the budget below.", { exact: true }).waitFor();
   assert.equal(await field(s, 'budget').inputValue(), '0.5', 'the budget Settings, section AI, starts from');
   assert.equal(await s.getByRole('combobox', { name: 'For harness' }).textContent(), 'Claude Code', 'a plugin with every build has none that needs adapting: the first choice is Claude Code');
   await page.screenshot({ path: shots + '/sync-plugin-adapt.png' });
@@ -676,7 +676,7 @@ await test('Adapt with AI with Codex as the coding agent says what is needed bef
   s = await openPlugin(page, 'Package');
   await fold(s, 'More').click();
   await fold(s, 'Adapt with AI').click();
-  await s.getByText("Adapting a plugin needs a coding agent on this computer: Claude Code. It rebuilds this plugin for a harness that has no native version of it, and validates the result. It uses Claude Code's own credentials and spends at most the budget below.", { exact: true }).waitFor();
+  await s.getByText("Adapting a plugin needs a coding agent on this computer: Claude Code. It builds this plugin for the harness you choose, with your custom instructions, and validates the result. It uses Claude Code's own credentials and spends at most the budget below.", { exact: true }).waitFor();
   assert.equal(await s.getByRole('button', { name: 'Start', exact: true }).isEnabled(), true);
 });
 
@@ -715,8 +715,9 @@ await test('Plan a reinstall closes the drawer and opens the plan it made in the
   await fold(s, 'More').click();
   await fold(s, 'Plan a reinstall').click();
   await s.waitFor({ state: 'detached' });
-  assert.deepEqual((await callsOf(app, 'plan')).at(-1).payload, { reinstall: 'p1' });
-  // The review is Task 2's sheet: it shows the reinstall the plan holds (no request is made for it again).
+  assert.deepEqual((await callsOf(app, 'plan')).at(-1).payload, { reinstall: 'p1', plugin_id: 'p1' }, 'the reinstall of this plugin alone');
+  // The review is Task 2's sheet: it shows the reinstall the plan holds (no request is made for it again), named for the plugin.
+  await page.getByRole('heading', { name: 'Reinstall Package' }).waitFor();
   await page.getByText('Reinstall', { exact: true }).first().waitFor();
   await page.screenshot({ path: shots + '/sync-plugin-reinstall.png' });
   const plans = (await callsOf(app, 'plan')).length;
@@ -731,7 +732,7 @@ await test('Remove from my list asks first, in the drawer, with Cancel in focus;
   await fold(s, 'More').click();
   await fold(s, 'Remove from my list').click();
   await title(s, 'Remove Package from your list?').waitFor();
-  await s.getByText('It stays installed where it is, unless plugins outside your list are always uninstalled.', { exact: true }).waitFor();
+  await s.getByText('It stays installed where it is. On a harness set to uninstall what is not in your list, the next sync plans its removal and asks you to confirm it.', { exact: true }).waitFor();
   assert.equal(await sheet(page).count(), 1, 'one surface, not a second window over the first');
   await page.waitForFunction(() => document.activeElement?.textContent === 'Cancel');
   await page.screenshot({ path: shots + '/sync-plugin-remove.png' });

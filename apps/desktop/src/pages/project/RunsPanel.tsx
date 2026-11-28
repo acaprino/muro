@@ -23,7 +23,7 @@ export function RunsPanel({ data }: { data: ProjectData }) {
   const { runs, current } = runsOf(data);
   return (
     <Section level={3} title="Runs" icon={<Icon name="history" />} end={<Count value={runs.length} label={runs.length === 1 ? 'run' : 'runs'} />}>
-      <Text as="p" variant="note">Every harmonization, with the version it made and its changelog entry.</Text>
+      <Text as="p" variant="note">Every harmonization that completed, with the version it made and its changelog entry. A run that failed or was cancelled changed nothing and is not listed.</Text>
       {runs.length ? (
         <Column as="ul" gap="lg" aria-label="Runs">
           {runs.map((r, i) => {
@@ -33,7 +33,7 @@ export function RunsPanel({ data }: { data: ProjectData }) {
                 <Cluster>
                   <Text variant="strong" pre>{r.version || '—'}</Text>
                   {i === current ? <Badge variant="outline">current</Badge> : null}
-                  {tag ? <Text mono truncate>{tag}</Text> : null}
+                  {tag ? <Text variant="note" truncate title={`A release of this version is tagged ${tag}: the tag exists only once Release… published it.`}>{`Release tag ${tag}`}</Text> : null}
                 </Cluster>
                 <Text as="p" variant="soft" pre>{r.changelog || '—'}</Text>
                 <DescriptionList

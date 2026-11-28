@@ -300,7 +300,7 @@ fn a_change_that_succeeds_is_saved_over_the_file_it_was_asked_on() {
     let started = harmonize(&home, &file, "");
     let ended = finished(&home, &started);
     assert_eq!(ended["status"], "completed", "{ended}");
-    assert_eq!(ended["message"], "The project was saved. Install it again from its Install step to bring the change to the harnesses");
+    assert_eq!(ended["message"], "The project was saved. Use Install via Sync… to bring the change to your harnesses");
     let held: Value = serde_json::from_str(&fs::read_to_string(&file).unwrap()).unwrap();
     assert_eq!(held["committed"], json!({"operation":"Harmonize again","step":"patch","summary":"What changed for a user."}));
     let commit = commits(&home).pop().unwrap();
@@ -368,7 +368,7 @@ fn a_new_project_is_saved_with_the_identity_it_was_asked_for_and_listed() {
     let started = new_project(&home, |p: &mut Value| p["name"] = json!("-My Plugin")).unwrap();
     let ended = finished(&home, &started);
     assert_eq!(ended["status"], "completed", "{ended}");
-    assert_eq!(ended["message"], "The project was created and added to your list. Install it from its Install step");
+    assert_eq!(ended["message"], "The project was created and added to your list. Install it with Install via Sync…");
     let file = home.files().join("my-plugin.mp");
     assert!(file.is_file());
     assert_eq!(home.registry()["projects"], json!([{"id":"my-plugin","path":file}]));
