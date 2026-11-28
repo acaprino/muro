@@ -80,6 +80,11 @@ export function harnessState(target:Target,snapshot:Snapshot,plan:Plan|null):Har
   return changes?{kind:'changes',count:changes}:failed?{kind:'source-error',count:failed}:held?{kind:'blocked',count:held}:adapt?{kind:'adapt-again',count:adapt}:unavailable?{kind:'unavailable',count:unavailable}:unreadable?{kind:'unknown',count:unreadable}:unseen?{kind:'unseen',count:unseen}:off?{kind:'disabled',count:off}:fine;
 }
 /** `errors` is the sources the last check could not resolve; `projects` the plugins whose project file or update policy needs attention (`project_source_error`), which no source answer fixes. */
+/** The changes of the current plan on a harness that no row of the table shows: the removals of plugins outside the list and the broken marketplaces. They are counted where they are seen (the section of what is installed outside the list, the warnings), not as the column's own. */
+export function outsideList(snapshot:Snapshot,plan:Plan|null,target:Target):number {
+ const listed=new Set(snapshot.registry.plugins.map(p=>p.id));
+ return currentPlan(snapshot,plan)?.operations.filter(o=>o.target_id===target.id&&!listed.has(o.plugin_id)).length??0;
+}
 export interface SyncSummary { kind:'no-harness'|'not-checked'|'changed'|'installed'|'changes'|'blocked'|'ok'; operations:number; blockers:number; errors:number; projects:number; byKind:Record<string,number> }
 /** The strip over the table. The counts are those of the plan while it is of the snapshot's revision; with none, those the service recorded for this revision, with no breakdown by kind (`byKind` is empty); with neither, nothing was checked (`not-checked`), or the last check was of an earlier revision: the list changed since (`changed`). `errors` is the sources the last check could not resolve. */
 export function syncSummary(snapshot:Snapshot,plan:Plan|null):SyncSummary {

@@ -99,7 +99,7 @@ await test('the note before and after a check: opening the page checks nothing, 
   assert.deepEqual(await solid(page).allTextContents(), ['Apply all 1 change'], 'one solid button');
   const c = cells(page, 'Package');
   assert.match(await c.nth(0).textContent(), /github\.com\/example\/p1/, 'the source under the name');
-  assert.equal(await c.nth(1).textContent(), 'v2Latest release', 'the latest version with the update policy');
+  assert.equal(await c.nth(1).textContent(), 'v2', 'the latest version; the default policy is not repeated on every row');
   await c.nth(2).getByRole('button', { name: 'Update 1 → 2 · Package on Codex isolated test', exact: true }).waitFor();
   await head(page, 'Codex isolated test').getByText('1 change waiting', { exact: true }).waitFor();
   await page.screenshot({ path: shots + '/sync-dark.png' });
@@ -204,7 +204,7 @@ await test('a plugin with no version for a harness: its cell and its column say 
   assert.equal(await c.nth(3).textContent(), 'Not available');
   await head(page, 'Codex').getByText('1 plugin not available', { exact: true }).waitFor();
   // Nothing of this list was checked yet: the column does not claim to be in sync before a check.
-  await head(page, 'Claude Code').getByText('Check to see if it is in sync', { exact: true }).waitFor();
+  await head(page, 'Claude Code').getByText('Not checked', { exact: true }).waitFor();
   await check(app);
   await head(page, 'Claude Code').getByText('In sync', { exact: true }).waitFor();
   assert.equal(await kind(page), 'blocked');
@@ -433,7 +433,7 @@ await test('the table: a row per plugin with its source, version and policy, a c
   const m = cells(page, 'Sample');
   assert.match(await m.nth(0).textContent(), /github\.com\/owner\/sample/);
   assert.equal(await m.nth(0).locator('[title="Sample"]').count(), 1, 'the whole name in its title');
-  assert.equal(await m.nth(1).textContent(), 'v0.4.0Latest release');
+  assert.equal(await m.nth(1).textContent(), 'v0.4.0', 'the default policy is not repeated');
   await m.nth(2).getByRole('button', { name: 'Update 0.3.0 → 0.4.0 · Sample on Claude Code', exact: true }).waitFor();
   assert.equal(await m.nth(3).textContent(), '0.4.0');
   const t = cells(page, 'test-runner');
@@ -442,8 +442,10 @@ await test('the table: a row per plugin with its source, version and policy, a c
   assert.equal(await cells(page, 'docs-writer').nth(4).textContent(), 'Not available');
   const s = cells(page, 'sql-companion');
   assert.equal(await s.nth(1).textContent(), 'Not checkedLatest commit', 'no version yet, on the latest commit');
-  assert.equal(await s.nth(2).textContent(), 'Not selected');
-  await head(page, 'Claude Code').getByText('2 changes waiting', { exact: true }).waitFor();
+  assert.equal(await s.nth(2).textContent(), '–Not selected', 'a quiet dash, and the words for a screen reader');
+  // The removal of a plugin outside the list is said where it is seen, not as the column's own change.
+  await head(page, 'Claude Code').getByText('1 change waiting', { exact: true }).waitFor();
+  await head(page, 'Claude Code').getByText('1 removal outside your list', { exact: true }).waitFor();
   await head(page, 'Codex').getByText('In sync', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByText('1 change waiting', { exact: true }).waitFor();
   await head(page, 'OpenCode').getByText('1 plugin not available', { exact: true }).waitFor();

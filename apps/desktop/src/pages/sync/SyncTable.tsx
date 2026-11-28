@@ -9,7 +9,7 @@
 import * as React from 'react';
 import { Badge, Button, Cluster, Column, Icon, Table, TableBody, TableCell, TableHead, TableHeader, TableRow, Text } from '@acaprino/sigrid/primitives';
 import type { Plan, Plugin, Snapshot, Target } from '../../types.ts';
-import { cellState, harnessState, versionOf, type CellStatus } from '../../model.ts';
+import { cellState, harnessState, outsideList, versionOf, type CellStatus } from '../../model.ts';
 import { plural } from '../../words.ts';
 import { useSync } from './useSync.tsx';
 
@@ -53,7 +53,7 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
     <Table id="sync-table" aria-label="Your plugins on your harnesses">
       <TableHeader>
         <TableRow>
-          <TableHead><TwoLines first="Plugin" second={`${plural(plugins.length, 'plugin')} in your list`} /></TableHead>
+          <TableHead><Text>Plugin</Text></TableHead>
           <TableHead><Text>Version</Text></TableHead>
           {targets.map(t => (
             <HarnessHead key={t.id} target={t} snapshot={snapshot} plan={sync.plan} onOpen={onOpenHarness} />
@@ -69,8 +69,6 @@ export function SyncTable({ snapshot, onOpenPlugin, onOpenHarness }: SyncTablePr
   );
 }
 
-/** A heading of two lines: what the column holds, and a fact about it. */
-const TwoLines = ({ first, second }: { first: string; second: string }) => <Column gap="xs"><Text>{first}</Text><Text variant="caption">{second}</Text></Column>;
 
 interface HarnessHeadProps {
   target: Target;
@@ -86,13 +84,16 @@ function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
   const kinds = snapshot.registry.plugins.map(p => cellState(p, target, snapshot, plan).kind);
   const besides = (kind: string) => (state.kind === kind ? 0 : kinds.filter(k => k === kind).length);
   const held = besides('blocked'), adapt = besides('adapt-again'), missing = besides('unavailable');
+  // A change of the plan that no row shows (a removal outside the list) is not this column's: it is said where it is.
+  const outside = outsideList(snapshot, plan, target);
+  const extra = [held ? notReady(held) : '', adapt ? adaptAgain(adapt) : '', missing ? notAvailable(missing) : '', outside ? `${plural(outside, 'removal')} outside your list` : ''].filter(Boolean).join(' · ');
   let line: React.ReactNode;
   switch (state.kind) {
     case 'paused':
       line = <Badge variant="outline"><Icon name="pause" />Paused</Badge>;
       break;
     case 'changes':
-      line = <Badge tone="info">{plural(state.count, 'change')} waiting</Badge>;
+      line = state.count > outside ? <Badge tone="info">{plural(state.count - outside, 'change')} waiting</Badge> : <Badge tone="success">In sync</Badge>;
       break;
     case 'blocked':
       line = <Badge tone="warning">{notReady(state.count)}</Badge>;
@@ -104,7 +105,7 @@ function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
       line = <Badge variant="outline">{turnedOff(state.count)}</Badge>;
       break;
     case 'not-checked':
-      line = <Text variant="strong">Check to see if it is in sync</Text>;
+      line = <Badge variant="outline" title="No check of your list has read this harness yet">Not checked</Badge>;
       break;
     case 'unavailable':
       line = <Badge variant="outline">{notAvailable(state.count)}</Badge>;
@@ -129,9 +130,8 @@ function HarnessHead({ target, snapshot, plan, onOpen }: HarnessHeadProps) {
       <Column gap="xs" align="start">
         <Button variant="ghost" size="sm" onClick={event => onOpen(target.id, event.currentTarget)}><Text truncate>{target.name}</Text></Button>
         {line}
-        {held ? <Badge tone="warning">{notReady(held)}</Badge> : null}
-        {adapt ? <Badge tone="warning">{adaptAgain(adapt)}</Badge> : null}
-        {missing ? <Badge variant="outline">{notAvailable(missing)}</Badge> : null}
+        {/* What else is on this harness, in one quiet line under its state: one badge per head, so the names stay on one line. */}
+        {extra ? <Text variant="note">{extra}</Text> : null}
       </Column>
     </TableHead>
   );
@@ -166,26 +166,31 @@ function PluginRow({ plugin, targets, snapshot, plan, resolving, tabStop, onFocu
             <Text truncate>{plugin.name}</Text>
           </Button>
           <Text variant="note" truncate>{plugin.source}</Text>
+          {plugin.targets.length ? null : <Text variant="note">No harness chosen: open it to choose</Text>}
         </Column>
       </TableCell>
       <TableCell>
         <Column gap="xs">
           <Text variant="strong" role={resolving ? 'status' : undefined}>{resolving ? 'Checking source…' : v.version || 'Not checked'}</Text>
-          <Text variant="note">{POLICY[plugin.policy] ?? ''}{v.commit ? ` · ${v.commit}` : ''}</Text>
+          {/* The policy only when it is not the default (the latest release), so the column holds one line. */}
+          {plugin.policy !== 'stable' || v.commit ? <Text variant="note">{plugin.policy !== 'stable' ? POLICY[plugin.policy] ?? '' : ''}{plugin.policy !== 'stable' && v.commit ? ' · ' : ''}{v.commit}</Text> : null}
         </Column>
       </TableCell>
       {targets.map(target => <TableCell key={target.id}>{resolving && target.enabled && plugin.targets.includes(target.id)
         ? <Text variant="muted">Checking builds…</Text>
-        : <Cell state={cellState(plugin, target, snapshot, plan)} plugin={plugin} target={target} />}</TableCell>)}
+        : <Cell state={cellState(plugin, target, snapshot, plan)} plugin={plugin} target={target} checked={harnessState(target, snapshot, plan).kind !== 'not-checked'} />}</TableCell>)}
     </TableRow>
   );
 }
 
 /** One plugin on one harness: the installed version, or the change a sync would make there, or why it cannot say. */
-function Cell({ state, plugin, target }: { state: CellStatus; plugin: Plugin; target: Target }) {
+function Cell({ state, plugin, target, checked }: { state: CellStatus; plugin: Plugin; target: Target; checked: boolean }) {
   let action: string;
   switch (state.kind) {
-    case 'ok': return <Cluster gap="xs" wrap={false}><Text tone="success"><Icon name="check" /></Text><Text variant="strong">{state.to}</Text></Cluster>;
+    // The tick says in sync, which only a check of this list can say: until then the installed version alone.
+    case 'ok': return checked
+      ? <Cluster gap="xs" wrap={false}><Text tone="success"><Icon name="check" /></Text><Text variant="strong">{state.to}</Text></Cluster>
+      : <Text variant="soft" title={`${state.to} is installed on ${target.name}; no check of your list has compared it yet`}>{state.to}</Text>;
     case 'update': action = state.reason && state.from === state.to ? `Restore ${state.to}` : `Update ${state.from} → ${state.to}`; break;
     case 'install': action = `Install ${state.to}`; break;
     case 'reinstall': action = `Reinstall ${state.to}`; break;
@@ -203,8 +208,8 @@ function Cell({ state, plugin, target }: { state: CellStatus; plugin: Plugin; ta
     case 'unknown': return <Text variant="muted">Unknown</Text>;
     case 'paused': return <Text variant="muted">Paused</Text>;
     default:
-      // Not chosen here: an empty cell, said to a screen reader.
-      if (plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path)) return <Text srOnly>Not selected</Text>;
+      // Not chosen here: a quiet dash, so the cell is not read as missing, and the words for a screen reader.
+      if (plugin.project_source_error || !plugin.distributions.some(d => d.harness === target.harness && d.path)) return <Text variant="muted" title="Not selected for this harness"><span aria-hidden="true">–</span><Text srOnly>Not selected</Text></Text>;
       action = 'Select for sync';
   }
   return <CellAction label={action} state={state} plugin={plugin} target={target} />;

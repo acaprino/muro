@@ -99,38 +99,42 @@ export function Unlisted() {
     if (result?.error) setFailure(result.error);
   }
 
+  // What a check planned to uninstall here: counted on this section, where the rows are, not only in the harness columns.
+  const waiting = items.filter(({ target, plugin }) => target.exclusive && removalOf(snapshot, plan, target, plugin) === 'planned').length;
   return (
-    <Section title="Installed, not in your list" icon={<Icon name="download" />} end={<Count value={items.length} label={items.length === 1 ? 'plugin' : 'plugins'} />}>
-      <Text as="p" variant="note" id={note}>Uninstall: Muro plans the removal of what is installed on a harness but is not in your list, and asks you to confirm it. The background sync never uninstalls. One harness can differ, in its own panel.</Text>
-      <Cluster gap="lg">
-        <RadioGroup aria-label="Plugins that are not in my list" aria-describedby={note} orientation="horizontal" value={mode === 'mixed' ? '' : mode} onValueChange={value => void setRule(value === 'remove')}>
-          <RadioGroupItem value="keep">Leave alone</RadioGroupItem>
-          <RadioGroupItem value="remove">Uninstall, asking first</RadioGroupItem>
-        </RadioGroup>
-        {mode === 'mixed' ? <Text variant="note">Differs per harness</Text> : null}
-      </Cluster>
+    <Section title="Installed, not in your list" icon={<Icon name="download" />}
+      end={<Cluster gap="sm">{waiting ? <Badge tone="warning">{plural(waiting, 'removal')} waiting</Badge> : null}<Count value={items.length} label={items.length === 1 ? 'plugin' : 'plugins'} /></Cluster>}>
+      {/* The rule first, as the setting it is; the plugins it governs under it. */}
+      {/* The rule on lines of its own, so it wraps at narrow widths instead of running into its description. */}
+      <Column gap="xs">
+        <Text variant="strong">What Muro does with them</Text>
+        <Text as="p" variant="note" id={note}>Muro never uninstalls without asking, and the background sync never uninstalls. One harness can differ, in its own panel.</Text>
+        <Cluster gap="lg">
+          <RadioGroup aria-label="Plugins that are not in my list" aria-describedby={note} orientation="horizontal" value={mode === 'mixed' ? '' : mode} onValueChange={value => void setRule(value === 'remove')}>
+            <RadioGroupItem value="keep">Leave alone</RadioGroupItem>
+            <RadioGroupItem value="remove">Uninstall, asking first</RadioGroupItem>
+          </RadioGroup>
+          {mode === 'mixed' ? <Text variant="note">Differs per harness</Text> : null}
+        </Cluster>
+      </Column>
       {failure ? <RefusalLine>{failure}</RefusalLine> : null}
-      <Column as="ul" gap="xs">
+      <Column as="ul" gap="xs" aria-label="Plugins installed, not in your list">
         {items.map(({ target, plugin }) => {
           const key = `${target.id}:${plugin.id}`;
+          const removal = target.exclusive ? removalOf(snapshot, plan, target, plugin) : null;
+          // What happens to it is said under its name, so the row holds one control and nothing overlaps at narrow widths.
+          const fate = removal === null ? <Text variant="note">Left alone</Text>
+            : removal === 'planned' ? <Badge tone="warning" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
+            : removal === 'held' ? <Badge variant="outline" title={`A harness with something not ready gets no removal: ${target.name} keeps it until the plan is clear`}>Kept until the harness is ready</Badge>
+            : <Text variant="note">Uninstalled after a check, when you confirm</Text>;
           return (
             <li key={key}>
               <SettingRow
                 label={<Text variant="strong" truncate>{plugin.name}</Text>}
-                description={<Text pre>{lineOf(plugin, target)}{listable(plugin) ? '' : ` ${NO_FOLDER}`}</Text>}
-                control={(
-                  <Cluster justify="end">
-                    {!target.exclusive ? <Text variant="note">Left alone</Text> : (() => {
-                      const removal = removalOf(snapshot, plan, target, plugin);
-                      return removal === 'planned' ? <Badge tone="warning" title="Muro asks before it uninstalls">Removal waits for your confirmation</Badge>
-                        : removal === 'held' ? <Badge variant="outline" title={`A harness with something not ready gets no removal: ${target.name} keeps it until the plan is clear`}>Kept until the harness is ready</Badge>
-                        : <Text variant="note">Uninstalled after a check, when you confirm</Text>;
-                    })()}
-                    {listable(plugin)
-                      ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>
-                      : null}
-                  </Cluster>
-                )}
+                description={<Column gap="xs" align="start"><Text pre>{lineOf(plugin, target)}{listable(plugin) ? '' : ` ${NO_FOLDER}`}</Text>{fate}</Column>}
+                control={listable(plugin)
+                  ? <Button variant="outline" size="sm" aria-label={`Add to my list: ${plugin.name}`} loading={adding === key} loadingText="Adding…" disabled={adding !== null && adding !== key} onClick={() => void addToList(plugin, target)}><Icon name="plus" />Add to my list</Button>
+                  : undefined}
               />
             </li>
           );
