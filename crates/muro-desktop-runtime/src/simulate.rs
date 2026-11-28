@@ -6,14 +6,15 @@
 //! - engine `api`: `muro project simulate` calls an OpenAI-compatible endpoint itself. The key is read
 //!   by the factory from the environment of this process, by the variable's name: it is never an
 //!   argument, a setting or a file here.
-//! - engine `harness`: a coding agent on this computer, headless, with `muro mcp` registered for the
-//!   call only, serving nothing but `simulate_prepare` and `simulate_check` (the text it works from may
-//!   come from a project file of anyone: no other tool of the factory is there to call). It calls
-//!   `simulate_prepare`, classifies, calls `simulate_check`, and ends with its answer, the JSON object
-//!   it classified with. What the page shows is never the harness's report of a result: this module
-//!   takes that answer and the context the factory prepared for this request (`simulate-prepare`, run
-//!   here before the harness starts, so the harness cannot change what it is judged against) and has
-//!   the factory validate them (`simulate-check`).
+//! - engine `harness`: a coding agent on this computer, headless. The factory prepares the request here,
+//!   before the agent starts (`simulate-prepare`: the context the answer is judged against and the prompt
+//!   that asks for it). Claude Code is given that prompt as its system prompt, from a file, with no tool
+//!   at all, and ends with its answer. Codex has `muro mcp` registered for the call only, serving nothing
+//!   but `simulate_prepare` and `simulate_check` (the text it works from may come from a project file of
+//!   anyone: no other tool of the factory is there to call): it calls `simulate_prepare`, classifies,
+//!   calls `simulate_check`, and ends with its answer. What the page shows is never the agent's report of
+//!   a result: this module takes the answer and the context prepared here, which the agent cannot change,
+//!   and has the factory validate them (`simulate-check`).
 //!
 //! An invalid answer is a result (`valid: false` with its errors), never repaired here.
 use crate::{exec, factory::Factory};
@@ -28,7 +29,9 @@ use std::{
 pub const LIMIT: Duration = Duration::from_secs(540);
 const TASK_LIMIT: usize = 8000;
 /// The name the MCP server has in the harness: it is part of the tool names Claude Code is allowed.
-const SERVER: &str = "muro";
+/// The same name Muro installs its server under in a harness (`mcp_server`): Codex's `-c mcp_servers.muro.*`
+/// then replaces, for the call, the command, the arguments and the tools of that entry.
+pub const SERVER: &str = "muro";
 const TOOLS: [&str; 2] = ["simulate_prepare", "simulate_check"];
 
 /// The request, checked where it enters: text, not empty, not absurdly long, no NUL.
@@ -129,8 +132,8 @@ fn through_api(factory: &Factory, file: &Path, cache: &Path, task: &str, stack: 
 
 // --- the harness engine -----------------------------------------------------------------------
 
-/// What the harness is asked: the whole job, in order, so the classification is its own judgment and the
-/// validation is the factory's. The request and the package's manifest go in as JSON strings, so no
+/// What Codex is asked (Claude Code is given the prepared prompt itself: `claude_args`): the whole job, in
+/// order, so the classification is its own judgment and the validation is the factory's. The request and the package's manifest go in as JSON strings, so no
 /// character of either can be read as part of the instructions. The manifest is the `sources.json` of
 /// the project's unpacked folder (the factory's own cache, which this runtime names), so the MCP server
 /// reads the project exactly as the digest said and keeps no cache of its own.
@@ -153,35 +156,32 @@ invalid, do not call the tools again and do not repair the answer: your last mes
     )
 }
 
-/// The arguments the MCP server is started with: the factory's `mcp`, serving the two simulate tools
-/// and no other (`muro mcp --tools`). One list, for every harness: Claude Code reads it in its MCP
-/// configuration, Codex in `-c mcp_servers.muro.args`.
+/// The arguments Codex's MCP server is started with: the factory's `mcp`, serving the two simulate tools
+/// and no other (`muro mcp --tools`), read in `-c mcp_servers.muro.args`.
 fn server_args() -> Vec<String> {
     vec!["mcp".to_owned(), "--tools".to_owned(), TOOLS.join(",")]
 }
 
-/// The MCP server the harness starts for the call: the factory's own launcher, run by the same Python,
-/// serving only what the simulation needs.
-pub fn mcp_config(factory: &Factory) -> Value {
-    let (python, args) = factory.invocation(&server_args());
-    json!({"mcpServers":{SERVER:{"type":"stdio","command":python,"args":args}}})
-}
+/// What Claude Code is asked; the rules, the catalog and the request are in its system prompt.
+pub const CLAUDE_REQUEST: &str = "Classify the simulated request with the rules and the catalog of your system prompt. \
+Your whole reply is the one JSON object they ask for: no code fence, no comment.";
 
-/// Claude Code, headless, with nothing but the two simulate tools: no built-in tool, no other MCP
-/// server, no skills, nothing that would ask (anything not allowed is denied), a dollar budget, a
-/// stream whose last line carries the last message and the cost, no session left behind. Every flag is in `claude --help`
-/// (2.1.327); `--allowedTools` and `--tools` take lists, so each gets one argument and a flag after it.
-pub fn claude_args(prompt: &str, config: &Path, budget: f64) -> Result<Vec<String>> {
+/// Claude Code, headless, answering the prompt the factory prepared, which is its system prompt
+/// (`--system-prompt-file`, the file `instructions`): no tool, no MCP server, no skills, nothing that
+/// would ask, a dollar budget, a stream whose last line carries the last message and the cost, no
+/// session left behind. The prompt holds the project's whole catalog (108,000 characters for a large
+/// one): as the result of an MCP tool it went over what Claude Code hands a model (about 100 KB; the rest
+/// is left in a file this call cannot read) and the agent answered nothing, and a command line cannot hold
+/// it either (32,767 characters on Windows). Every flag is in `claude --help` (2.1.332); `--tools` takes a
+/// list, so it gets one argument and a flag after it.
+pub fn claude_args(instructions: &Path, budget: f64) -> Result<Vec<String>> {
     muro_registry::ai::validate_budget(budget)?;
-    let allowed = TOOLS.map(|tool| format!("mcp__{SERVER}__{tool}")).join(",");
     Ok(vec![
         "-p".into(),
-        prompt.into(),
-        "--mcp-config".into(),
-        config.to_string_lossy().into_owned(),
+        CLAUDE_REQUEST.into(),
+        "--system-prompt-file".into(),
+        instructions.to_string_lossy().into_owned(),
         "--strict-mcp-config".into(),
-        "--allowedTools".into(),
-        allowed,
         "--tools".into(),
         String::new(),
         "--permission-mode".into(),
@@ -290,7 +290,12 @@ pub fn claude_result(stream: &str) -> Result<Harvest> {
         let Ok(event) = serde_json::from_str::<Value>(line.trim()) else { continue };
         if event["type"] == "result" {
             cost = event["total_cost_usd"].as_f64();
-            closing = Some((event["is_error"] == true, text_of(&event["result"])));
+            // A run Claude Code stopped itself (its budget, its turns) has no `result`: its words are in `errors`.
+            let mut said = text_of(&event["result"]);
+            if said.trim().is_empty() {
+                said = event["errors"].as_array().into_iter().flatten().filter_map(Value::as_str).collect::<Vec<_>>().join("; ");
+            }
+            closing = Some((event["is_error"] == true, said));
         }
     }
     match closing {
@@ -305,16 +310,22 @@ pub fn codex_answer(last_message: &str) -> Result<Value> {
     first_json_object(last_message).context(NO_ANSWER)
 }
 
-/// The context the factory prepares for this request (`muro project simulate-prepare`): the one the
-/// harness's answer is judged against. It is asked of the factory here, with the real request, before the
-/// harness starts; the harness never supplies it.
-pub fn prepared_context(factory: &Factory, manifest: &Path, task: &str, stack: &[String], cancelled: &dyn Fn() -> bool) -> Result<Value> {
+/// What the factory prepares for this request (`muro project simulate-prepare`): the context the harness's
+/// answer is judged against, and the prompt that asks for the answer. It is asked of the factory here, with
+/// the real request, before the harness starts; the harness never supplies it.
+pub struct Prepared {
+    pub context: Value,
+    pub prompt: String,
+}
+
+pub fn prepared(factory: &Factory, manifest: &Path, task: &str, stack: &[String], cancelled: &dyn Fn() -> bool) -> Result<Prepared> {
     let mut args = vec!["project".to_owned(), "simulate-prepare".into(), "--manifest".into(), manifest.to_string_lossy().into_owned(), format!("--task={task}")];
     args.extend(stack.iter().map(|token| format!("--stack={token}")));
     let mut prepared = factory.json(&args, "Preparing the request", cancelled, crate::factory::READ_LIMIT)?;
     let context = prepared["context"].take();
     ensure!(context.is_object(), "The factory prepared no context for the request");
-    Ok(context)
+    let prompt = prepared["prompt"].as_str().filter(|prompt| !prompt.trim().is_empty()).context("The factory prepared no prompt for the request")?;
+    Ok(Prepared { context, prompt: prompt.to_owned() })
 }
 
 /// What the page shows of a harness's run: the factory's validation (`muro project simulate-check`) of the
@@ -346,14 +357,13 @@ fn resolved(harness: &str) -> Result<String> {
 
 fn through_harness(factory: &Factory, manifest: &Path, task: &str, stack: &[String], ai: &Value, work: &Path, cancelled: &dyn Fn() -> bool) -> Result<Value> {
     // What the answer is judged against comes from the factory, now: the harness never gives it.
-    let context = prepared_context(factory, manifest, task, stack, cancelled)?;
-    let prompt = harness_prompt(manifest, task, stack);
+    let prepared = prepared(factory, manifest, task, stack, cancelled)?;
     let harness = ai["harness"].as_str().unwrap_or("claude-code");
     let (answer, cost) = match harness {
         "claude-code" => {
-            let config = work.join("mcp.json");
-            std::fs::write(&config, serde_json::to_vec_pretty(&mcp_config(factory))?)?;
-            let args = claude_args(&prompt, &config, ai["budget_usd"].as_f64().unwrap_or(f64::NAN))?;
+            let instructions = work.join("classify.md");
+            std::fs::write(&instructions, &prepared.prompt)?;
+            let args = claude_args(&instructions, ai["budget_usd"].as_f64().unwrap_or(f64::NAN))?;
             let command = harness_command(&resolved("claude-code")?, args, work, ai);
             let done = exec::capture(command, "Claude Code", cancelled, LIMIT)?;
             let harvest = claude_result(&done.stdout).map_err(|error| match (done.status.success(), done.stderr.trim()) {
@@ -365,6 +375,9 @@ fn through_harness(factory: &Factory, manifest: &Path, task: &str, stack: &[Stri
         }
         "codex" => {
             let last = work.join("last-message.txt");
+            // shortcut: Codex still takes the prompt through `simulate_prepare`, and whether it hands a model a
+            // result of 100 KB was not checked; give it `prepared.prompt` too if a large catalog leaves it without an answer.
+            let prompt = harness_prompt(manifest, task, stack);
             let command = harness_command(&resolved("codex")?, codex_args(&prompt, factory, work, &last), work, ai);
             let done = exec::capture(command, "Codex", cancelled, LIMIT)?;
             let message = std::fs::read_to_string(&last).unwrap_or_default();
@@ -376,7 +389,7 @@ fn through_harness(factory: &Factory, manifest: &Path, task: &str, stack: &[Stri
         }
         _ => bail!("The AI harness must be claude-code or codex"),
     };
-    let mut result = judge(factory, manifest, &context, &answer, work, cancelled)?;
+    let mut result = judge(factory, manifest, &prepared.context, &answer, work, cancelled)?;
     let object = result.as_object_mut().context("The validation did not answer with an object")?;
     object.insert("engine".into(), json!("harness"));
     object.insert("harness".into(), json!(harness));

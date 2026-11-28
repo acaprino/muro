@@ -137,7 +137,9 @@ fn a_real_project_is_listed_read_installed_made_stale_and_simulated() {
     // and the validation of an answer against it (no harness runs here)
     let factory = Factory::from_settings(&call("registry", json!({})).unwrap()["settings"]).unwrap();
     let manifest = projects_cache(&data, &second).join("sources.json");
-    let context = simulate::prepared_context(&factory, &manifest, "Verify the artifact", &["stack:rust".to_owned()], &|| false).unwrap();
+    let prepared = simulate::prepared(&factory, &manifest, "Verify the artifact", &["stack:rust".to_owned()], &|| false).unwrap();
+    assert!(prepared.prompt.contains("Verify the artifact"), "the prompt Claude Code is given carries the request");
+    let context = prepared.context;
     assert_eq!((context["task"].as_str(), context["stack_tokens"].clone()), (Some("Verify the artifact"), json!(["stack:rust"])));
     let work = temp.path().join("work");
     fs::create_dir_all(&work).unwrap();

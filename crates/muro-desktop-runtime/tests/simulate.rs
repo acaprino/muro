@@ -1,5 +1,5 @@
 //! The simulator in the desktop runtime (ADR-0028 decision 10): the argument builders for both engines
-//! (no harness is run here: the lines are checked against `claude --help` 2.1.327 and `codex exec
+//! (no harness is run here: the lines are checked against `claude --help` 2.1.332 and `codex exec
 //! --help` 0.169.0, read on this machine), how a harness's output is read, and the API engine and the
 //! cancellation through the stand-in factory.
 mod common;
@@ -21,12 +21,14 @@ fn factory(root: &Path) -> Factory {
 }
 
 #[test]
-fn claude_code_gets_only_the_two_simulate_tools_and_nothing_that_could_ask() {
-    let args = simulate::claude_args("THE PROMPT", Path::new("C:/work/mcp.json"), 0.5).unwrap();
+fn claude_code_answers_the_prepared_prompt_from_a_file_with_no_tool_and_nothing_that_could_ask() {
+    let args = simulate::claude_args(Path::new("C:/work/classify.md"), 0.5).unwrap();
     assert_eq!(args, [
-        "-p", "THE PROMPT",
-        "--mcp-config", "C:/work/mcp.json", "--strict-mcp-config",
-        "--allowedTools", "mcp__muro__simulate_prepare,mcp__muro__simulate_check",
+        "-p", simulate::CLAUDE_REQUEST,
+        // the prepared prompt holds the whole catalog: as an MCP tool's result Claude Code handed the model
+        // its first 2 KB (over about 100 KB), and no command line holds it
+        "--system-prompt-file", "C:/work/classify.md",
+        "--strict-mcp-config",
         "--tools", "",
         "--permission-mode", "dontAsk",
         "--setting-sources", "project,local",
@@ -35,11 +37,9 @@ fn claude_code_gets_only_the_two_simulate_tools_and_nothing_that_could_ask() {
         "--output-format", "stream-json", "--verbose",
         "--no-session-persistence",
     ]);
-    // the prompt is one argument whatever it holds
-    let tricky = "a \"quoted\" line\nand --dangerously-skip-permissions";
-    assert_eq!(simulate::claude_args(tricky, Path::new("m.json"), 2.0).unwrap()[1], tricky);
+    assert!(!args.iter().any(|a| a == "--mcp-config" || a == "--allowedTools"), "no MCP server and no tool to allow");
     for budget in [0.0, -1.0, 100.5, f64::NAN, f64::INFINITY] {
-        assert!(simulate::claude_args("p", Path::new("m.json"), budget).is_err(), "{budget}");
+        assert!(simulate::claude_args(Path::new("p.md"), budget).is_err(), "{budget}");
     }
 }
 
@@ -61,21 +61,6 @@ fn codex_gets_the_server_for_the_call_through_config_overrides_and_no_budget_it_
     assert_eq!(args[15], "THE PROMPT");
     assert_eq!(args.len(), 16);
     assert!(!args.iter().any(|a| a.contains("budget") || a.contains("dangerously")));
-}
-
-#[test]
-fn the_mcp_server_is_the_factory_launcher_run_by_its_python_in_utf8_mode_serving_only_the_simulate_tools() {
-    let temp = tempfile::tempdir().unwrap();
-    let factory = factory(temp.path());
-    let config = simulate::mcp_config(&factory);
-    let server = &config["mcpServers"]["muro"];
-    assert_eq!(server["type"], "stdio");
-    assert_eq!(server["command"], common::python());
-    let args: Vec<&str> = server["args"].as_array().unwrap().iter().map(|a| a.as_str().unwrap()).collect();
-    assert_eq!(&args[..2], ["-X", "utf8"]);
-    assert!(args[2].ends_with("muro_build.py"), "{args:?}");
-    assert_eq!(&args[3..], ["mcp", "--tools", "simulate_prepare,simulate_check"], "no other tool of the factory is there to call");
-    assert_eq!(config["mcpServers"].as_object().unwrap().len(), 1, "no other server");
 }
 
 #[test]
@@ -173,6 +158,9 @@ fn a_run_without_an_answer_or_ended_in_error_is_an_error_with_the_harnesss_words
     assert_eq!(simulate::NO_ANSWER, "The agent gave no answer");
     let budget = stream(&[closing("Reached the maximum budget", true, 0.5)]);
     assert!(simulate::claude_result(&budget).unwrap_err().to_string().contains("Reached the maximum budget"));
+    // as Claude Code 2.1.332 ends a run over its budget: no `result`, the words in `errors`
+    let stopped = stream(&[json!({"type":"result","subtype":"error_max_budget_usd","is_error":true,"errors":["Reached maximum budget ($0.5)"],"total_cost_usd":0.67})]);
+    assert_eq!(simulate::claude_result(&stopped).unwrap_err().to_string(), "Claude Code stopped: Reached maximum budget ($0.5)");
     assert!(simulate::claude_result("").unwrap_err().to_string().contains("printed no result"));
     assert!(simulate::claude_result("not json\n{broken").unwrap_err().to_string().contains("printed no result"));
 }
@@ -213,8 +201,9 @@ fn nobody_cancels() -> bool {
 fn the_context_is_what_the_factory_prepares_for_the_request_not_what_the_harness_names() {
     let run = run();
     let stack = vec!["stack:rust".to_owned(), "--odd".to_owned()];
-    let context = simulate::prepared_context(&run.factory, &run.manifest, "--task looks like an option", &stack, &nobody_cancels).unwrap();
-    assert_eq!(context, json!({"task":"--task looks like an option","stack_tokens":["--odd","stack:rust"],"catalog_digest":"d".repeat(64)}));
+    let prepared = simulate::prepared(&run.factory, &run.manifest, "--task looks like an option", &stack, &nobody_cancels).unwrap();
+    assert_eq!(prepared.context, json!({"task":"--task looks like an option","stack_tokens":["--odd","stack:rust"],"catalog_digest":"d".repeat(64)}));
+    assert_eq!(prepared.prompt, "the prompt", "the prompt Claude Code is given is the factory's");
     let made = calls(&run.folder);
     assert_eq!(made.len(), 1);
     assert_eq!(&made[0][..2], ["project", "simulate-prepare"]);
@@ -227,7 +216,7 @@ fn the_context_is_what_the_factory_prepares_for_the_request_not_what_the_harness
 #[test]
 fn an_answer_is_judged_by_the_factory_against_the_context_it_prepared_and_both_are_written_to_the_run() {
     let run = run();
-    let context = simulate::prepared_context(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap();
+    let context = simulate::prepared(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap().context;
     let given = classification(&context, &["write-letter", "proofread"]);
     let result = simulate::judge(&run.factory, &run.manifest, &context, &given, &run.work, &nobody_cancels).unwrap();
     assert_eq!(result["valid"], true);
@@ -245,7 +234,7 @@ fn an_answer_is_judged_by_the_factory_against_the_context_it_prepared_and_both_a
 #[test]
 fn a_harness_that_relays_a_valid_result_instead_of_an_answer_is_shown_invalid() {
     let run = run();
-    let context = simulate::prepared_context(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap();
+    let context = simulate::prepared(&run.factory, &run.manifest, "Write a letter", &[], &nobody_cancels).unwrap().context;
     // Claude Code: the tool said valid (it was handed a context of the model's choosing) and the last message
     // relays "valid" with steps; the answer the model gave is for another request than the one asked
     let invented = json!({"task":"Something the harness chose","stack_tokens":[],"catalog_digest":"d".repeat(64)});
